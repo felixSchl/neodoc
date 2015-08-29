@@ -14,7 +14,6 @@ main = do
 """
 Usage:
   naval-fate -vvv
-  naval-fate -vvv
-  naval-fate -vvv
+             -v
 """
   log $ show x
