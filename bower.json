@@ -12,12 +12,10 @@
   ],
   "dependencies": {
     "purescript-console": "^0.1.0",
-    "purescript-parsing": "~0.6.1"
-  },
-  "resolutions": {
-    "purescript-strings": "~0.7.0",
-    "purescript-transformers": "^0.7.1"
+    "purescript-parsing": "~0.6.1",
+    "purescript-foldable-traversable": "~0.4.0"
   },
   "devDependencies": {
+    "purescript-debug": "~0.1.0"
   }
 }
