@@ -61,8 +61,7 @@ _argname_ = do
 -- | Parse a positional argument
 positional :: Parser String Meta
 positional = do
-  x <- _ARGNAME <|> _argname_
-  return $ Positional x
+  Positional <$> (_ARGNAME <|> _argname_)
 
 -- | Parse a long option
 -- |
