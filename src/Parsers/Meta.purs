@@ -46,27 +46,46 @@ instance showMeta :: Show Meta where
 -- | Parse an ARGNAME
 _ARGNAME :: Parser String String
 _ARGNAME = do
-  x <- matches "[A-Z]"
-  xs <- Array.many $ matches "[A-Z]"
-  return $ fromCharArray $ Array.cons x xs
+  fromCharArray <$> (Array.cons
+    <$> (matches "[A-Z]")
+    <*> (Array.many $ matches "[A-Z]"))
 
 -- | Parse an <argname>
 _argname_ :: Parser String String
 _argname_ = do
   char '<'
-  xs <- Array.some $ matches "[a-z]"
+  *> (fromCharArray <$> (Array.some $ matches "[a-z]")) <*
   char '>'
-  return $ fromCharArray xs
 
 -- | Parse a positional argument
+-- |
+-- | A positional argument is a simple identifier of the shape:
+-- | ```bash
+-- | naval-fate <foo>
+-- | naval-fata FOO
+-- | ```
+-- |
 positional :: Parser String Meta
 positional = do
   Positional <$> (_ARGNAME <|> _argname_)
 
--- | Parse a long option
+-- | Parse a short option.
 -- |
--- | --foo
--- | --foo <argument>|ARGUMENT
+-- | A short option may or may not have an argument.
+-- | The argument may be specified explicitly by way of an equal sign `=`,
+-- | or ambiguosly, by way of a space. Where a space is used, it is unclear at
+-- | first as to whether the token is an argument to the option or a positional
+-- | option. It is only through the parsing of the `Options` block, that the
+-- | answer can be dervied.
+-- |
+-- | By default, the adjacent token, if parsed correctly, is assigned as the
+-- | argument to the preceding option and must be proved otherwise.
+-- |
+-- | ```bash
+-- | naval-fate --verbose
+-- | naval-fate --verbose=<argument>|ARGUMENT
+-- | naval-fate --verbose <argument>|ARGUMENT
+-- | ```
 -- |
 longOption :: Parser String Meta
 longOption = do
@@ -76,14 +95,27 @@ longOption = do
     <*> ((do many $ char ' '
              Just <$> (_ARGNAME <|> _argname_)) <|> return Nothing)
 
--- | Parse a short option
+-- | Parse a short option.
 -- |
--- | -v
--- | -vv
--- | -xvzf
--- | -v <argument>|ARGUMENT
--- | -vv <argument>|ARGUMENT
--- | -xvzf <argument>|ARGUMENT
+-- | A short option may or may not have an argument.
+-- | The argument may be specified explicitly by way of an equal sign `=`,
+-- | or ambiguosly, by way of a space. Where a space is used, it is unclear at
+-- | first as to whether the token is an argument to the option or a positional
+-- | option. It is only through the parsing of the `Options` block, that the
+-- | answer can be dervied.
+-- |
+-- | By default, the adjacent token, if parsed correctly, is assigned as the
+-- | argument to the preceding option and must be proved otherwise.
+-- |
+-- | ```bash
+-- | naval-fate -v
+-- | naval-fate -vv
+-- | naval-fate -xvzf
+-- | naval-fate -v <argument>|ARGUMENT
+-- | naval-fate -v=<argument>|ARGUMENT
+-- | naval-fate -vv <argument>|ARGUMENT
+-- | naval-fate -vv=<argument>|ARGUMENT
+-- | ```
 -- |
 shortOption :: Parser String Meta
 shortOption = do
