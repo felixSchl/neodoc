@@ -90,14 +90,12 @@ longOption = do
 -- |
 shortOption :: Parser String Meta
 shortOption = do
-  string "-"
-  x <- matches "[a-z]"
-  stacked <- Array.many $ matches "[a-z]"
-  arg <- (do
-    many $ char ' '
-    arg <- (_ARGNAME <|> _argname_)
-    return $ Just arg) <|> (return Nothing)
-  return $ ShortOpt x stacked arg
+  char '-'
+  ShortOpt
+    <$> (matches "[a-z]")
+    <*> (Array.many $ matches "[a-z]")
+    <*> ((do many $ char ' '
+             Just <$> (_ARGNAME <|> _argname_)) <|> return Nothing)
 
 -- | Parse any type of option
 option :: Parser String Meta
@@ -110,19 +108,19 @@ usageToken = option <|> positional
 -- | Parse a `Usage line` into tokens.
 usage :: String -> Parser String Usage
 usage program = do
-  -- | Program name
+
+  -- Program name
   string program <* space
   Position { column: col } <- getPosition
 
-  -- | First line of usage tokens
+  -- First line of usage tokens
   x <- usageToken `sepBy` (many space)
 
-  xs <- (many $ try $ do
+  xs <- (many $ try do
     many space *> eol
     indent (col - 1)
-    debugPosition
     many space
-    usageToken `sepBy` (many space))
+    usageToken `sepBy` many space)
 
   return $ concat (x:xs)
 
