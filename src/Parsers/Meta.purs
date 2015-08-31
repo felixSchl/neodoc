@@ -72,12 +72,10 @@ positional = do
 longOption :: Parser String Meta
 longOption = do
   string "--"
-  xs <- Array.some $ matches "[a-z]"
-  arg <- (do
-    many $ char ' '
-    arg <- (_ARGNAME <|> _argname_)
-    return $ Just arg) <|> (return Nothing)
-  return $ LongOpt (fromCharArray xs) arg
+  LongOpt
+    <$> (fromCharArray <$> (Array.some $ matches "[a-z]"))
+    <*> ((do many $ char ' '
+             Just <$> (_ARGNAME <|> _argname_)) <|> return Nothing)
 
 -- | Parse a short option
 -- |
@@ -114,13 +112,14 @@ usage program = do
   Position { column: col } <- getPosition
 
   -- First line of usage tokens
-  x <- usageToken `sepBy` (many space)
+  x <- usageToken `sepBy` many space
 
+  -- And the rest of 'em
   xs <- (many $ try do
-    many space *> eol
-    indent (col - 1)
-    many space
-    usageToken `sepBy` many space)
+          many space *> eol
+          indent (col - 1)
+          many space
+          usageToken `sepBy` many space)
 
   return $ concat (x:xs)
 
