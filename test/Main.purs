@@ -10,11 +10,20 @@ runUsage s i = flip runParser (Docopt.usage s) i
 runMeta s i = flip runParser (Docopt.meta s) i -- (Str.split "\n" i)
 
 main = do
+--   let x = runMeta "naval-fate" $
+-- """
+-- Usage:
+--   naval-fate -vvv
+--              -c
+--   naval-fate -vvv
+-- """
+--   log $ show x
+
   let x = runMeta "naval-fate" $
 """
 Usage:
-  naval-fate -vvv
-             -c
-  naval-fate -vvv
+  naval-fate
+Options:
+  -v, --verbose=<TEST>  blah
 """
   log $ show x

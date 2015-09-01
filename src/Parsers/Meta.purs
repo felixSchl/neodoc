@@ -69,7 +69,7 @@ positional :: Parser String Meta
 positional = do
   Positional <$> (_ARGNAME <|> _argname_)
 
--- | Parse a short option.
+-- | Parse a long option.
 -- |
 -- | A short option may or may not have an argument.
 -- | The argument may be specified explicitly by way of an equal sign `=`,
@@ -139,48 +139,73 @@ usage :: String -> Parser String Usage
 usage program = do
 
   -- Program name
-  string program <* space
+  string program <* many space
   Position { column: col } <- getPosition
 
-  -- First line of usage tokens
-  x <- usageToken `sepBy` many space
-
-  -- And the rest of 'em
-  xs <- (many $ try do
+  -- Parse the first and any consecutive usage rows.
+  concat <$> ((:)
+    <$> (usageToken `sepBy` many space)
+    <*> (many $ try do
           many space *> eol
           indent (col - 1)
           many space
-          usageToken `sepBy` many space)
-
-  return $ concat (x:xs)
+          usageToken `sepBy` many space))
 
 -- | Parse a complete usage block
 -- |
+-- | ```
 -- | Usage:
--- |    naval-fate -vvv
--- |               -v
--- |    naval-fate --debug
+-- | / naval-fate -vvv --qux
+-- | //////////// --foo --bar
+-- | / naval-fate --debug
+-- | ```
+-- |
+-- | TODO: Add support for the following notation:
+-- |
+-- | ```
+-- | Usage: naval-fate -vvv --qux
+-- | ///////////////// --foo --bar
+-- | ////// naval-fate --debug
+-- | ```
+-- |
 usageBlock :: String -> Parser String UsageBlock
 usageBlock program = do
+
   -- Title
   string "Usage:" <* chompRight
-
-  -- First usage line, indicates indentation
   many space
   Position { column: col } <- getPosition
-  x <- usage program
 
-  -- Subsequent usage lines
-  xs <- many $ try $ do
-    eol
-    indent (col - 1)
-    usage program <* many space <* eol
+  -- Usage lines (at least one)
+  (:)
+    <$> (usage program)
+    <*> (many $ try do
+          eol
+          indent (col - 1)
+          usage program <* many space)
 
-  return (x:xs)
+optionsBlock :: Parser String Unit
+optionsBlock = do
+
+  -- Title
+  string "Options:" <* chompRight
+  many space
+  Position { column: col } <- getPosition
+
+  --
+
+  return unit
 
 meta :: String -> Parser String Unit
 meta program = do
   skipSpaces
-  x <- usageBlock program
-  debug x
+
+  -- Parse the `Usage` section
+  usage <- usageBlock program
+  debug usage
+
+  -- Parse the `Options` section
+  opts <- optionsBlock
+  debug opts
+
   return unit
