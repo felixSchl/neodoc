@@ -22,25 +22,32 @@ import qualified Data.Array as Array
 import Data.List (List(..), concat, toList, many)
 import Docopt.Parsers.Base
 
+data Argument
+  = Explicit String
+  | Implicit String
+  | None
+
 -- | Represent a meta token, derived from a usage line
 data Meta
   = Command String
   | Positional String
-  | LongOpt String (Maybe String)
-  | ShortOpt Char (Array Char) (Maybe String)
+  | LongOpt String Argument
+  | ShortOpt Char (Array Char) Argument
 
 -- | Represent a single usage
 type Usage = List Meta
 type UsageBlock = List Usage
 
+instance showArgument :: Show Argument where
+  show (Explicit s) = "Explicit " ++ s
+  show (Implicit s) = "Implicit " ++ s
+  show None         = "None"
+
 instance showMeta :: Show Meta where
-  show (Command name) =
-    "Command " ++ name
-  show (Positional name) =
-    "Positional " ++ name
-  show (LongOpt name arg) =
-    "LongOpt " ++ name ++ " " ++ show arg
-  show (ShortOpt x xs arg) =
+  show (Command name)      = "Command " ++ name
+  show (Positional name)   = "Positional " ++ name
+  show (LongOpt name arg)  = "LongOpt " ++ name ++ " " ++ show arg
+  show (ShortOpt x xs arg) = do
     "ShortOpt " ++ (show $ fromChar x ++ fromCharArray xs) ++ " " ++ show arg
 
 -- | Parse an ARGNAME
@@ -69,6 +76,33 @@ positional :: Parser String Meta
 positional = do
   Positional <$> (_ARGNAME <|> _argname_)
 
+-- | Parse the argument binding of an options.
+-- | An option can either have an `Explicit`, an `Implicit` or no
+-- | argument binding at all.
+-- |
+-- | `Explicit` are those that are either assigned via an `=`, or where the
+-- | argument is directly adjacent (no space). There is no question as to
+-- | whether the following identifier is an argument or a `Positional`.
+-- |
+-- | `Implicit` are those that are seperated only by spaces. It is impossible
+-- | to know, without "solving" using further constraints, if we are dealing
+-- | with a `Positional` or a bound argument.
+-- |
+optionArgument :: Parser String Argument
+optionArgument = do
+  (try do
+    char '='
+    Explicit <$> do _ARGNAME <|> _argname_)
+  <|>
+  (try do
+    Explicit <$> do _ARGNAME <|> _argname_)
+  <|>
+  (try do
+    many space
+    Implicit <$> do _ARGNAME <|> _argname_)
+  <|> do
+    return None
+
 -- | Parse a long option.
 -- |
 -- | A short option may or may not have an argument.
@@ -92,8 +126,7 @@ longOption = do
   string "--"
   LongOpt
     <$> (fromCharArray <$> (Array.some $ matches "[a-z]"))
-    <*> (do (try (Just <$> (many space *> (_ARGNAME <|> _argname_))))
-        <|> return Nothing)
+    <*> optionArgument
 
 -- | Parse a short option.
 -- |
@@ -117,18 +150,20 @@ longOption = do
 -- | naval-fate -vv=<argument>|ARGUMENT
 -- | ```
 -- |
-shortOption :: Parser String Meta
-shortOption = do
+shortOption :: Boolean -> Parser String Meta
+shortOption allowStacked = do
   char '-'
   ShortOpt
     <$> (matches "[a-z]")
-    <*> (Array.many $ matches "[a-z]")
-    <*> ((do many $ char ' '
-             Just <$> (_ARGNAME <|> _argname_)) <|> return Nothing)
+    <*> (if allowStacked then
+          Array.many $ matches "[a-z]"
+        else
+          return mempty)
+    <*> optionArgument
 
 -- | Parse any type of option
 option :: Parser String Meta
-option = longOption <|> shortOption
+option = longOption <|> (shortOption true)
 
 -- | Parse any valid usage token
 usageToken :: Parser String Meta
@@ -184,6 +219,19 @@ usageBlock program = do
           indent (col - 1)
           usage program <* many space)
 
+
+optionLine :: Parser String Unit
+optionLine = do
+
+  opt <- shortOption false
+  debug opt
+  char ','
+  many space
+  lopt <- longOption
+  debug lopt
+
+  return unit
+
 optionsBlock :: Parser String Unit
 optionsBlock = do
 
@@ -192,7 +240,8 @@ optionsBlock = do
   many space
   Position { column: col } <- getPosition
 
-  --
+  -- Option lines
+  x <- optionLine
 
   return unit
 
@@ -202,10 +251,14 @@ meta program = do
 
   -- Parse the `Usage` section
   usage <- usageBlock program
+  debug "Usage:"
   debug usage
+
+  many $ try $ many space *> eol
 
   -- Parse the `Options` section
   opts <- optionsBlock
+  debug "Options:"
   debug opts
 
   return unit
