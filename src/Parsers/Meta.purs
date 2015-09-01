@@ -73,8 +73,7 @@ _argname_ = do
 -- | ```
 -- |
 positional :: Parser String Meta
-positional = do
-  Positional <$> (_ARGNAME <|> _argname_)
+positional = Positional <$> (_ARGNAME <|> _argname_)
 
 -- | Parse the argument binding of an options.
 -- | An option can either have an `Explicit`, an `Implicit` or no
