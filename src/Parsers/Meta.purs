@@ -22,7 +22,12 @@ import qualified Data.Array as Array
 import Data.List (List(..), concat, toList, many)
 import Docopt.Parsers.Base
 
+--------------------------------------------------------------------------------
+-- Types
+--------------------------------------------------------------------------------
+
 type Description = Maybe String
+
 data OptionSpec
   = FullOptionSpec  ShortOption LongOption Description
   | ShortOptionSpec ShortOption Description
@@ -33,26 +38,25 @@ data OptionArgument
   | Implicit String
   | None
 
-data LongOption = LongOption String OptionArgument
+data Command     = Command String
+data Positional  = Positional String
+data LongOption  = LongOption String OptionArgument
 data ShortOption = ShortOption Char (Array Char) OptionArgument
-data Command = Command String
-data Positional = Positional String
 
-type Option = Either LongOption ShortOption 
+data UsageToken
+  = UsageTokenCommand     Command
+  | UsageTokenPositional  Positional
+  | UsageTokenLongOption  LongOption
+  | UsageTokenShortOption ShortOption
 
--- -- | Represent a meta token, derived from a usage line
--- data Meta
---   = MetaCommand String
---   | MetaPositional String
---   | MetaLongOption LongOption
---   | MetaShortOption ShortOption
-class Meta where
-
--- | Represent a single usage
-type Usage a = forall a. (Meta a) => List a
+type Usage = List UsageToken
 type UsageBlock = List Usage
 
-instance showArgument :: Show OptionArgument where
+--------------------------------------------------------------------------------
+-- Instances
+--------------------------------------------------------------------------------
+
+instance showOptionArgument :: Show OptionArgument where
   show (Explicit s) = "Explicit " ++ s
   show (Implicit s) = "Implicit " ++ s
   show None         = "None"
@@ -66,13 +70,25 @@ instance showShortOption :: Show ShortOption where
     ++ (fromCharArray stack) ++ " "
     ++ show arg
 
--- instance showMeta :: Show Meta where
---   show (MetaCommand opt)    = "MetaCommand " ++ show opt
---   show (MetaPositional opt) = "MetaPositional " ++ show opt
---   show (MetaLongOption opt)  = "MetaLongOption " ++ show opt
---   show (MetaShortOption opt) = "MetaShortOption " ++ show opt
+instance showCommand :: Show Command where
+  show (Command s) = "Command " ++ s
+
+instance showPositional :: Show Positional where
+  show (Positional s) = "Positional " ++ s
+
+instance showUsageToken :: Show UsageToken where
+  show (UsageTokenCommand tok)     = "UsageTokenCommand "      ++ show tok
+  show (UsageTokenPositional tok)  = "UsageTokenPositional "   ++ show tok
+  show (UsageTokenLongOption tok)  = "UsageTokenLongOption "   ++ show tok
+  show (UsageTokenShortOption tok)  = "UsageTokenShortOption " ++ show tok
+
+--------------------------------------------------------------------------------
+-- Options / Commands and Positional parsers
+--------------------------------------------------------------------------------
 
 -- | Parse an ARGNAME
+-- | Parses an all-cap argname: `FOO`
+-- |
 _ARGNAME :: Parser String String
 _ARGNAME = do
   fromCharArray <$> (Array.cons
@@ -80,6 +96,8 @@ _ARGNAME = do
     <*> (Array.many $ matches "[A-Z]"))
 
 -- | Parse an <argname>
+-- | Parses an argname enclosed in angled brackets '<foo>'
+-- |
 _argname_ :: Parser String String
 _argname_ = do
   char '<'
@@ -94,7 +112,7 @@ _argname_ = do
 -- | naval-fata FOO
 -- | ```
 -- |
-positional :: forall a. (Meta a) => Parser String a
+positional :: Parser String Positional
 positional = Positional <$> (_ARGNAME <|> _argname_)
 
 -- | Parse the argument binding of an options.
@@ -184,17 +202,23 @@ shortOption allowStacked = do
           return mempty)
     <*> optionArgument
 
--- | Parse any type of option
-option :: Parser String Option
-option = (Left <$> longOption) <|> (Right <$> shortOption true)
+--------------------------------------------------------------------------------
+-- Usage parsers
+--------------------------------------------------------------------------------
 
 -- | Parse any valid usage token
-usageToken :: forall a. (Meta a) => Parser String a
-usageToken = option <|> positional
+-- |
+-- | A usage token is any valid argument, option or positional.
+-- |
+usageToken :: Parser String UsageToken
+usageToken = do
+      (UsageTokenLongOption  <$> longOption)
+  <|> (UsageTokenShortOption <$> (shortOption true))
+  <|> (UsageTokenPositional  <$> positional)
 
 -- | Parse a `Usage line` into tokens.
-usage :: String -> Parser String Usage
-usage program = do
+usageLine :: String -> Parser String Usage
+usageLine program = do
 
   -- Program name
   string program <* many space
@@ -236,54 +260,54 @@ usageBlock program = do
 
   -- Usage lines (at least one)
   (:)
-    <$> (usage program)
+    <$> (usageLine program)
     <*> (many $ try do
           eol
           indent (col - 1)
-          usage program <* many space)
+          usageLine program <* many space)
 
-optionLine :: Parser String Unit
-optionLine = do
-  return unit
-
-  -- ((try do
-  --     FullOptionSpec
-  --       <$> (shortOption false)
-  --       <*> (do char ','
-  --               many space
-  --               longOption))
-  --   <|> (try do ShortOptionSpec <$> shortOption false)
-  --   <|> (try do LongOptionSpec <$> longOption)
-  -- ) <*> Nothing
-
-  --
-  -- char ','
-  -- many space
-  -- lopt <- longOption
-  --
-  -- -- The description is expected to start
-  -- --  with at least 2 spaces distance.
-  -- space
-  -- space
-  -- many space
-  --
-  -- desc <- description
-  --
-  -- return unit
-
-optionsBlock :: Parser String Unit
-optionsBlock = do
-
-  -- Title
-  string "Options:" <* chompRight
-  many space
-  Position { column: col } <- getPosition
-
-  -- Option lines
-  x <- optionLine
-
-  return unit
-
+-- optionLine :: Parser String Unit
+-- optionLine = do
+--   return unit
+--
+--   -- ((try do
+--   --     FullOptionSpec
+--   --       <$> (shortOption false)
+--   --       <*> (do char ','
+--   --               many space
+--   --               longOption))
+--   --   <|> (try do ShortOptionSpec <$> shortOption false)
+--   --   <|> (try do LongOptionSpec <$> longOption)
+--   -- ) <*> Nothing
+--
+--   --
+--   -- char ','
+--   -- many space
+--   -- lopt <- longOption
+--   --
+--   -- -- The description is expected to start
+--   -- --  with at least 2 spaces distance.
+--   -- space
+--   -- space
+--   -- many space
+--   --
+--   -- desc <- description
+--   --
+--   -- return unit
+--
+-- optionsBlock :: Parser String Unit
+-- optionsBlock = do
+--
+--   -- Title
+--   string "Options:" <* chompRight
+--   many space
+--   Position { column: col } <- getPosition
+--
+--   -- Option lines
+--   x <- optionLine
+--
+--   return unit
+--
 meta :: String -> Parser String Unit
 meta program = do
   skipSpaces
@@ -293,11 +317,11 @@ meta program = do
   debug "Usage:"
   debug usage
 
-  many $ try $ many space *> eol
-
-  -- Parse the `Options` section
-  opts <- optionsBlock
-  debug "Options:"
-  debug opts
+  -- many $ try $ many space *> eol
+  --
+  -- -- Parse the `Options` section
+  -- opts <- optionsBlock
+  -- debug "Options:"
+  -- debug opts
 
   return unit
