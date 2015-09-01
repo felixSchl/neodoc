@@ -22,18 +22,26 @@ import qualified Data.Array as Array
 import Data.List (List(..), concat, toList, many)
 import Docopt.Parsers.Base
 
-data Argument
+type Description = Maybe String
+data OptionSpec
+  = FullOptionSpec  ShortOption LongOption Description
+  | ShortOptionSpec ShortOption Description
+  | LongOptionSpec  LongOption Description
+
+data OptionArgument
   = Explicit String
   | Implicit String
   | None
 
-data LongOption = LongOption String Argument
-data ShortOption = ShortOption Char (Array Char) Argument
+data LongOption = LongOption String OptionArgument
+data ShortOption = ShortOption Char (Array Char) OptionArgument
+
+type Option = Either LongOption ShortOption 
 
 -- | Represent a meta token, derived from a usage line
 data Meta
-  = Command String
-  | Positional String
+  = MetaCommand String
+  | MetaPositional String
   | MetaLongOption LongOption
   | MetaShortOption ShortOption
 
@@ -41,16 +49,25 @@ data Meta
 type Usage = List Meta
 type UsageBlock = List Usage
 
-instance showArgument :: Show Argument where
+instance showArgument :: Show OptionArgument where
   show (Explicit s) = "Explicit " ++ s
   show (Implicit s) = "Implicit " ++ s
   show None         = "None"
 
+instance showLongOption :: Show LongOption where
+  show (LongOption name arg) = "LongOption " ++ name ++ " " ++ show arg
+
+instance showShortOption :: Show ShortOption where
+  show (ShortOption name stack arg) = "ShortOption "
+    ++ (fromChar name) ++ " "
+    ++ (fromCharArray stack) ++ " "
+    ++ show arg
+
 instance showMeta :: Show Meta where
-  show (Command name)    = "Command " ++ name
-  show (Positional name) = "Positional " ++ name
-  show (LongOption opt)  = "LongOption " ++ show opt
-  show (ShortOption opt) = "ShortOption " ++ show opt
+  show (MetaCommand opt)    = "MetaCommand " ++ show opt
+  show (MetaPositional opt) = "MetaPositional " ++ show opt
+  show (MetaLongOption opt)  = "MetaLongOption " ++ show opt
+  show (MetaShortOption opt) = "MetaShortOption " ++ show opt
 
 -- | Parse an ARGNAME
 _ARGNAME :: Parser String String
@@ -75,7 +92,7 @@ _argname_ = do
 -- | ```
 -- |
 positional :: Parser String Meta
-positional = Positional <$> (_ARGNAME <|> _argname_)
+positional = MetaPositional <$> (_ARGNAME <|> _argname_)
 
 -- | Parse the argument binding of an options.
 -- | An option can either have an `Explicit`, an `Implicit` or no
@@ -91,7 +108,7 @@ positional = Positional <$> (_ARGNAME <|> _argname_)
 -- | that without further prove, an `Implicit` argument is treated as a
 -- | `Positional`.
 -- |
-optionArgument :: Parser String Argument
+optionArgument :: Parser String OptionArgument
 optionArgument = do
   (try do
     char '='
@@ -124,7 +141,7 @@ optionArgument = do
 -- | naval-fate --verbose <argument>|ARGUMENT
 -- | ```
 -- |
-longOption :: Parser String Meta
+longOption :: Parser String LongOption
 longOption = do
   string "--"
   LongOption
@@ -153,7 +170,7 @@ longOption = do
 -- | naval-fate -vv=<argument>|ARGUMENT
 -- | ```
 -- |
-shortOption :: Boolean -> Parser String Meta
+shortOption :: Boolean -> Parser String ShortOption
 shortOption allowStacked = do
   char '-'
   ShortOption
@@ -165,8 +182,8 @@ shortOption allowStacked = do
     <*> optionArgument
 
 -- | Parse any type of option
-option :: Parser String Meta
-option = longOption <|> (shortOption true)
+option :: Parser String Option
+option = (Left <$> longOption) <|> (Right <$> shortOption true)
 
 -- | Parse any valid usage token
 usageToken :: Parser String Meta
@@ -222,28 +239,19 @@ usageBlock program = do
           indent (col - 1)
           usage program <* many space)
 
-data AtLeastOne a b
-  = Both a b
-  | OnlyOne (Either a b)
-
-type Description = Maybe String
-data OptionSpec
-  = FullOptionSpec  ShortOption LongOption Description
-  | ShortOptionSpec Option Description
-  | LongOptionSpec  LongOption Description
-
 optionLine :: Parser String Unit
 optionLine = do
+  return unit
 
-  ((try do
-      FullOptionSpec
-        <$> (shortOption false)
-        <*> (do char ','
-                many space
-                longOption))
-    <|> (try do ShortOptionSpec <$> shortOption false)
-    <|> (try do LongOptionSpec <$> longOption)
-  ) <*> Nothing
+  -- ((try do
+  --     FullOptionSpec
+  --       <$> (shortOption false)
+  --       <*> (do char ','
+  --               many space
+  --               longOption))
+  --   <|> (try do ShortOptionSpec <$> shortOption false)
+  --   <|> (try do LongOptionSpec <$> longOption)
+  -- ) <*> Nothing
 
   --
   -- char ','
