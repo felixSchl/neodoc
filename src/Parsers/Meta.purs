@@ -27,12 +27,15 @@ data Argument
   | Implicit String
   | None
 
+data LongOption = LongOption String Argument
+data ShortOption = ShortOption Char (Array Char) Argument
+
 -- | Represent a meta token, derived from a usage line
 data Meta
   = Command String
   | Positional String
-  | LongOpt String Argument
-  | ShortOpt Char (Array Char) Argument
+  | MetaLongOption LongOption
+  | MetaShortOption ShortOption
 
 -- | Represent a single usage
 type Usage = List Meta
@@ -44,11 +47,10 @@ instance showArgument :: Show Argument where
   show None         = "None"
 
 instance showMeta :: Show Meta where
-  show (Command name)      = "Command " ++ name
-  show (Positional name)   = "Positional " ++ name
-  show (LongOpt name arg)  = "LongOpt " ++ name ++ " " ++ show arg
-  show (ShortOpt x xs arg) = do
-    "ShortOpt " ++ (show $ fromChar x ++ fromCharArray xs) ++ " " ++ show arg
+  show (Command name)    = "Command " ++ name
+  show (Positional name) = "Positional " ++ name
+  show (LongOption opt)  = "LongOption " ++ show opt
+  show (ShortOption opt) = "ShortOption " ++ show opt
 
 -- | Parse an ARGNAME
 _ARGNAME :: Parser String String
@@ -85,7 +87,9 @@ positional = Positional <$> (_ARGNAME <|> _argname_)
 -- |
 -- | `Implicit` are those that are seperated only by spaces. It is impossible
 -- | to know, without "solving" using further constraints, if we are dealing
--- | with a `Positional` or a bound argument.
+-- | with a `Positional` or a bound argument. Note that the docopt spec dictates
+-- | that without further prove, an `Implicit` argument is treated as a
+-- | `Positional`.
 -- |
 optionArgument :: Parser String Argument
 optionArgument = do
@@ -123,7 +127,7 @@ optionArgument = do
 longOption :: Parser String Meta
 longOption = do
   string "--"
-  LongOpt
+  LongOption
     <$> (fromCharArray <$> (Array.some $ matches "[a-z]"))
     <*> optionArgument
 
@@ -152,7 +156,7 @@ longOption = do
 shortOption :: Boolean -> Parser String Meta
 shortOption allowStacked = do
   char '-'
-  ShortOpt
+  ShortOption
     <$> (matches "[a-z]")
     <*> (if allowStacked then
           Array.many $ matches "[a-z]"
@@ -218,18 +222,43 @@ usageBlock program = do
           indent (col - 1)
           usage program <* many space)
 
+data AtLeastOne a b
+  = Both a b
+  | OnlyOne (Either a b)
+
+type Description = Maybe String
+data OptionSpec
+  = FullOptionSpec  ShortOption LongOption Description
+  | ShortOptionSpec Option Description
+  | LongOptionSpec  LongOption Description
 
 optionLine :: Parser String Unit
 optionLine = do
 
-  opt <- shortOption false
-  debug opt
-  char ','
-  many space
-  lopt <- longOption
-  debug lopt
+  ((try do
+      FullOptionSpec
+        <$> (shortOption false)
+        <*> (do char ','
+                many space
+                longOption))
+    <|> (try do ShortOptionSpec <$> shortOption false)
+    <|> (try do LongOptionSpec <$> longOption)
+  ) <*> Nothing
 
-  return unit
+  --
+  -- char ','
+  -- many space
+  -- lopt <- longOption
+  --
+  -- -- The description is expected to start
+  -- --  with at least 2 spaces distance.
+  -- space
+  -- space
+  -- many space
+  --
+  -- desc <- description
+  --
+  -- return unit
 
 optionsBlock :: Parser String Unit
 optionsBlock = do

@@ -16,6 +16,6 @@ Usage:
   naval-fate
 
 Options:
-  -vBLAH, --verbose=BLAH
+  -vBLAH, --verbose=BLAH  foo bar qux baz see u mma aa
 """
   log $ show x
