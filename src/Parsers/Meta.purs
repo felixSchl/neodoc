@@ -35,18 +35,21 @@ data OptionArgument
 
 data LongOption = LongOption String OptionArgument
 data ShortOption = ShortOption Char (Array Char) OptionArgument
+data Command = Command String
+data Positional = Positional String
 
 type Option = Either LongOption ShortOption 
 
--- | Represent a meta token, derived from a usage line
-data Meta
-  = MetaCommand String
-  | MetaPositional String
-  | MetaLongOption LongOption
-  | MetaShortOption ShortOption
+-- -- | Represent a meta token, derived from a usage line
+-- data Meta
+--   = MetaCommand String
+--   | MetaPositional String
+--   | MetaLongOption LongOption
+--   | MetaShortOption ShortOption
+class Meta where
 
 -- | Represent a single usage
-type Usage = List Meta
+type Usage a = forall a. (Meta a) => List a
 type UsageBlock = List Usage
 
 instance showArgument :: Show OptionArgument where
@@ -63,11 +66,11 @@ instance showShortOption :: Show ShortOption where
     ++ (fromCharArray stack) ++ " "
     ++ show arg
 
-instance showMeta :: Show Meta where
-  show (MetaCommand opt)    = "MetaCommand " ++ show opt
-  show (MetaPositional opt) = "MetaPositional " ++ show opt
-  show (MetaLongOption opt)  = "MetaLongOption " ++ show opt
-  show (MetaShortOption opt) = "MetaShortOption " ++ show opt
+-- instance showMeta :: Show Meta where
+--   show (MetaCommand opt)    = "MetaCommand " ++ show opt
+--   show (MetaPositional opt) = "MetaPositional " ++ show opt
+--   show (MetaLongOption opt)  = "MetaLongOption " ++ show opt
+--   show (MetaShortOption opt) = "MetaShortOption " ++ show opt
 
 -- | Parse an ARGNAME
 _ARGNAME :: Parser String String
@@ -91,8 +94,8 @@ _argname_ = do
 -- | naval-fata FOO
 -- | ```
 -- |
-positional :: Parser String Meta
-positional = MetaPositional <$> (_ARGNAME <|> _argname_)
+positional :: forall a. (Meta a) => Parser String a
+positional = Positional <$> (_ARGNAME <|> _argname_)
 
 -- | Parse the argument binding of an options.
 -- | An option can either have an `Explicit`, an `Implicit` or no
@@ -186,7 +189,7 @@ option :: Parser String Option
 option = (Left <$> longOption) <|> (Right <$> shortOption true)
 
 -- | Parse any valid usage token
-usageToken :: Parser String Meta
+usageToken :: forall a. (Meta a) => Parser String a
 usageToken = option <|> positional
 
 -- | Parse a `Usage line` into tokens.
