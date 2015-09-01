@@ -1,4 +1,4 @@
-module Docopt.Parsers.Meta where
+module Docopt.Parsers.Meta.Options where
 
 import Prelude
 import Data.Monoid (mempty)
@@ -20,17 +20,14 @@ import Data.Either
 import qualified Data.List as List
 import qualified Data.Array as Array
 import Data.List (List(..), concat, toList, many)
+import Docopt.Parsers.Meta.Option
 
-import Docopt.Parsers.Base
-import Docopt.Parsers.Meta.Usage
+--------------------------------------------------------------------------------
+-- Types
+--------------------------------------------------------------------------------
 
-meta :: String -> Parser String Unit
-meta program = do
-  skipSpaces
-
-  -- Parse the `Usage` section
-  usage <- usageBlock program
-  debug "Usage:"
-  debug usage
-
-  eof
+type Description = Maybe String
+data OptionSpec
+  = FullOptionSpec  ShortOption LongOption Description
+  | ShortOptionSpec ShortOption Description
+  | LongOptionSpec  LongOption Description
