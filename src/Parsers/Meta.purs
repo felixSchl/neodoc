@@ -92,8 +92,8 @@ longOption = do
   string "--"
   LongOpt
     <$> (fromCharArray <$> (Array.some $ matches "[a-z]"))
-    <*> ((do many $ char ' '
-             Just <$> (_ARGNAME <|> _argname_)) <|> return Nothing)
+    <*> (do (try (Just <$> (many space *> (_ARGNAME <|> _argname_))))
+        <|> return Nothing)
 
 -- | Parse a short option.
 -- |
