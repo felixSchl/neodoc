@@ -13,7 +13,7 @@ main = do
   let x = runMeta "naval-fate" $
 """
 Usage:
-  naval-fate [--verbose]
+  naval-fate [ --verbose <x>    --blah ]
 
 Options:
   -vBLAH, --verbose=BLAH  foo bar qux baz see u mma aa

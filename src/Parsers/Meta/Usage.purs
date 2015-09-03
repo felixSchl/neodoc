@@ -1,6 +1,7 @@
 module Docopt.Parsers.Meta.Usage where
 
 import Prelude
+import Control.Lazy (defer)
 import Data.Monoid (mempty)
 import Control.Apply ((*>), (<*))
 import Data.Traversable (for, traverse)
@@ -11,15 +12,16 @@ import Control.Monad.Eff.Console (log)
 import Text.Parsing.Parser (Parser(), ParserT(..), PState(..))
 import Text.Parsing.Parser.Pos (Position(..))
 import Data.List (List(), (:))
-import Text.Parsing.Parser.String (char, string, satisfy, eof, skipSpaces, whiteSpace)
-import Text.Parsing.Parser.Combinators (try, sepBy)
+import Text.Parsing.Parser.String (char, string, satisfy, eof, skipSpaces
+                                  , whiteSpace, anyChar, noneOf)
+import Text.Parsing.Parser.Combinators (try, sepBy, between, sepBy1)
 import Data.Char (toString, toUpper)
 import Data.String (charAt, fromChar, fromCharArray)
 import Data.Maybe
 import Data.Either
 import qualified Data.List as List
 import qualified Data.Array as Array
-import Data.List (List(..), concat, toList, many)
+import Data.List (List(..), concat, toList, many, some)
 import Docopt.Parsers.Base
 import Docopt.Parsers.Meta.Option
 import Docopt.Parsers.Meta.Positional
@@ -30,10 +32,11 @@ import Docopt.Parsers.Meta.Command
 --------------------------------------------------------------------------------
 
 data UsageToken
-  = UsageTokenCommand     Command
-  | UsageTokenPositional  Positional
-  | UsageTokenLongOption  LongOption
-  | UsageTokenShortOption ShortOption
+  = UsageTokenCommand       Command
+  | UsageTokenPositional    Positional
+  | UsageTokenLongOption    LongOption
+  | UsageTokenShortOption   ShortOption
+  | UsageTokenGroupOptional (List (List UsageToken))
 
 type Usage = List UsageToken
 type UsageBlock = List Usage
@@ -43,20 +46,29 @@ type UsageBlock = List Usage
 --------------------------------------------------------------------------------
 
 instance showUsageToken :: Show UsageToken where
-  show (UsageTokenCommand tok)     = "UsageTokenCommand "      ++ show tok
-  show (UsageTokenPositional tok)  = "UsageTokenPositional "   ++ show tok
-  show (UsageTokenLongOption tok)  = "UsageTokenLongOption "   ++ show tok
-  show (UsageTokenShortOption tok)  = "UsageTokenShortOption " ++ show tok
+  show (UsageTokenCommand tok)       = "UsageTokenCommand "       ++ show tok
+  show (UsageTokenPositional tok)    = "UsageTokenPositional "    ++ show tok
+  show (UsageTokenLongOption tok)    = "UsageTokenLongOption "    ++ show tok
+  show (UsageTokenShortOption tok)   = "UsageTokenShortOption "   ++ show tok
+  show (UsageTokenGroupOptional tok) = "UsageTokenGroupOptional " ++ show tok
 
 -- | Parse any valid usage token
 -- |
 -- | A usage token is any valid argument, option or positional.
 -- |
 usageToken :: Parser String UsageToken
-usageToken = do
-      (UsageTokenLongOption  <$> longOption)
-  <|> (UsageTokenShortOption <$> (shortOption true))
-  <|> (UsageTokenPositional  <$> positional)
+usageToken = defer \_ -> do
+      (UsageTokenLongOption    <$> longOption)
+  <|> (UsageTokenShortOption   <$> (shortOption true))
+  <|> (UsageTokenPositional    <$> positional)
+  <|> (UsageTokenGroupOptional <$> (do
+        between
+          (char '[')
+          (char ']')
+          (flip sepBy
+            (char '|')
+            (many $ try do
+              many space *> usageToken <* many space))))
 
 -- | Parse a `Usage line`
 usageLine :: String -> Parser String Usage
@@ -65,6 +77,7 @@ usageLine program = do
   Position { column: col } <- getPosition
   concat <$> ((:)
     <$> (usageToken `sepBy` many space)
+    -- XXX: Is this too loose?
     <*> (many $ try do
           many space *> eol
           indent (col - 1)
