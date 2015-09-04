@@ -101,8 +101,10 @@ parseToken = P.choice
   identLetter :: P.Parser String Char
   identLetter = alphaNum <|> P.oneOf ['_', '-']
 
+-- | Parser that  parses a stream of tokens
 type TokenParser a = P.Parser (List PositionedToken) a
 
+-- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> TokenParser a
 token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
@@ -121,6 +123,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         Nothing -> P.parseFailed toks pos "expected token, met EOF"
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
+-- | Match the token at the head of the stream
 match :: forall a. Token -> TokenParser Unit
 match tok = token (\tok' -> if (tok' == tok) then Just unit else Nothing)
             P.<?> prettyPrintToken tok
