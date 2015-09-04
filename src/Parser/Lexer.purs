@@ -21,19 +21,19 @@ data Token
   | RSquare
   | LAngle
   | RAngle
-  | TripleDot
+  | Dot
   | Dash
   | Name String
 
 prettyPrintToken :: Token -> String
-prettyPrintToken LParen      = "("
-prettyPrintToken RParen      = ")"
-prettyPrintToken LSquare     = "["
-prettyPrintToken RSquare     = "]"
-prettyPrintToken LAngle      = "<"
-prettyPrintToken RAngle      = ">"
-prettyPrintToken Dash        = "-"
-prettyPrintToken TripleDot   = "..."
+prettyPrintToken LParen  = "("
+prettyPrintToken RParen  = ")"
+prettyPrintToken LSquare = "["
+prettyPrintToken RSquare = "]"
+prettyPrintToken LAngle  = "<"
+prettyPrintToken RAngle  = ">"
+prettyPrintToken Dash    = "-"
+prettyPrintToken Dot     = "."
 prettyPrintToken (Name name) = name
 
 data PositionedToken = PositionedToken
@@ -62,14 +62,14 @@ parsePositionedToken = P.try $ do
 
 parseToken :: P.Parser String Token
 parseToken = P.choice
-  [ P.try $ P.char   '('   *> pure LParen
-  , P.try $ P.char   ')'   *> pure RParen
-  , P.try $ P.char   '['   *> pure LSquare
-  , P.try $ P.char   ']'   *> pure RSquare
-  , P.try $ P.char   '<'   *> pure LAngle
-  , P.try $ P.char   '>'   *> pure RAngle
-  , P.try $ P.char   '-'   *> pure Dash
-  , P.try $ P.string "..." *> pure TripleDot
+  [ P.try $ P.char '(' *> pure LParen
+  , P.try $ P.char ')' *> pure RParen
+  , P.try $ P.char '[' *> pure LSquare
+  , P.try $ P.char ']' *> pure RSquare
+  , P.try $ P.char '<' *> pure LAngle
+  , P.try $ P.char '>' *> pure RAngle
+  , P.try $ P.char '-' *> pure Dash
+  , P.try $ P.char '.' *> pure Dot
   , Name <$> parseName
   ] <* P.skipSpaces
 
