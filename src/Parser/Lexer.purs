@@ -5,13 +5,15 @@ import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
+import qualified Text.Parsing.Parser.Token as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 import qualified Data.List as L
 import qualified Data.Array as A
 import Data.Char (toString, toLower, toUpper)
 import Data.String (fromCharArray)
-import Data.List ((:))
+import Data.List (List(..), (:))
+import Data.Either (Either(..))
 import Docopt.Parser.Base
 
 data Token
@@ -85,3 +87,15 @@ parseToken = P.choice
 
   identLetter :: P.Parser String Char
   identLetter = alphaNum <|> P.oneOf ['_', '-']
+
+type TokenParser a = P.Parser (List PositionedToken) a
+
+-- token :: PositionedToken -> TokenParser Unit
+-- token (PositionedToken { sourcePos=pos }) =
+--   P.ParserT $ \(P.PState { input=toks }) ->
+--     return $ case toks of
+--       Cons x xs -> { consumed: true
+--                    , input: xs
+--                    , result: Right x
+--                    , position: pos }
+--       _ -> P.fail "expected token, met EOF"
