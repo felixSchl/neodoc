@@ -12,4 +12,4 @@ main = do
             Lexer.parseTokens
       y = flip Lexer.runTokenParser (Lexer.iname) <$> x
   log $ show x
-  -- log $ show y
+  log $ show y

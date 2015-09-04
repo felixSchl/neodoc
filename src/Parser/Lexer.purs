@@ -169,9 +169,10 @@ iname = token go P.<?> "identifier"
 
 runTokenParser :: forall a.
                   (List PositionedToken)
-                -> P.ParserT (List PositionedToken) (State ParserState) a
-                -> ParserState
+                -> TokenParser a
                 -> Either P.ParseError a
-runTokenParser s = evalState <<< P.runParserT (P.PState
-                                              { input: s
-                                              , position: P.initialPos })
+runTokenParser s =
+  flip evalState
+  (ParserState { indentation: 0 })
+  <<< P.runParserT
+  (P.PState { input: s, position: P.initialPos })
