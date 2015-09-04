@@ -14,6 +14,7 @@ import Data.Char (toString, toLower, toUpper)
 import Data.String (fromCharArray)
 import Data.List (List(..), (:))
 import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 import Docopt.Parser.Base
 
 data Token
@@ -23,20 +24,20 @@ data Token
   | RSquare
   | LAngle
   | RAngle
-  | Dot
+  | TripleDot
   | Dash
   | Name String
 
 prettyPrintToken :: Token -> String
-prettyPrintToken LParen  = "("
-prettyPrintToken RParen  = ")"
-prettyPrintToken LSquare = "["
-prettyPrintToken RSquare = "]"
-prettyPrintToken LAngle  = "<"
-prettyPrintToken RAngle  = ">"
-prettyPrintToken Dash    = "-"
-prettyPrintToken Dot     = "."
-prettyPrintToken (Name name) = name
+prettyPrintToken LParen      = show '('
+prettyPrintToken RParen      = show ')'
+prettyPrintToken LSquare     = show '['
+prettyPrintToken RSquare     = show ']'
+prettyPrintToken LAngle      = show '<'
+prettyPrintToken RAngle      = show '>'
+prettyPrintToken Dash        = show '-'
+prettyPrintToken TripleDot   = show "..."
+prettyPrintToken (Name name) = show name
 
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position
@@ -45,6 +46,18 @@ data PositionedToken = PositionedToken
 
 instance showToken :: Show Token where
   show = show <<< prettyPrintToken
+
+instance eqToken :: Eq Token where
+  eq LParen      LParen       = true
+  eq RParen      RParen       = true
+  eq LSquare     LSquare      = true
+  eq RSquare     RSquare      = true
+  eq LAngle      LAngle       = true
+  eq RAngle      RAngle       = true
+  eq Dash        Dash         = true
+  eq TripleDot   TripleDot    = true
+  eq (Name name) (Name name') = name == name'
+  eq _ _                      = false
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
@@ -64,14 +77,14 @@ parsePositionedToken = P.try $ do
 
 parseToken :: P.Parser String Token
 parseToken = P.choice
-  [ P.try $ P.char '(' *> pure LParen
-  , P.try $ P.char ')' *> pure RParen
-  , P.try $ P.char '[' *> pure LSquare
-  , P.try $ P.char ']' *> pure RSquare
-  , P.try $ P.char '<' *> pure LAngle
-  , P.try $ P.char '>' *> pure RAngle
-  , P.try $ P.char '-' *> pure Dash
-  , P.try $ P.char '.' *> pure Dot
+  [ P.try $ P.char   '('   *> pure LParen
+  , P.try $ P.char   ')'   *> pure RParen
+  , P.try $ P.char   '['   *> pure LSquare
+  , P.try $ P.char   ']'   *> pure RSquare
+  , P.try $ P.char   '<'   *> pure LAngle
+  , P.try $ P.char   '>'   *> pure RAngle
+  , P.try $ P.char   '-'   *> pure Dash
+  , P.try $ P.string "..." *> pure TripleDot
   , Name <$> parseName
   ] <* P.skipSpaces
 
@@ -90,12 +103,24 @@ parseToken = P.choice
 
 type TokenParser a = P.Parser (List PositionedToken) a
 
--- token :: PositionedToken -> TokenParser Unit
--- token (PositionedToken { sourcePos=pos }) =
---   P.ParserT $ \(P.PState { input=toks }) ->
---     return $ case toks of
---       Cons x xs -> { consumed: true
---                    , input: xs
---                    , result: Right x
---                    , position: pos }
---       _ -> P.fail "expected token, met EOF"
+token :: forall a. (Token -> Maybe a) -> TokenParser a
+token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+  return $ case toks of
+    Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
+      case test tok of
+        Just a ->
+          let nextpos =
+              case xs of
+                Cons (PositionedToken { sourcePos: npos }) _ -> npos
+                Nil -> ppos
+          in
+            { consumed: true
+            , input: xs
+            , result: Right a
+            , position: nextpos }
+        Nothing -> P.parseFailed toks pos "expected token, met EOF"
+    _ -> P.parseFailed toks pos "expected token, met EOF"
+
+match :: forall a. Token -> TokenParser Unit
+match tok = token (\tok' -> if (tok' == tok) then Just unit else Nothing)
+            P.<?> prettyPrintToken tok

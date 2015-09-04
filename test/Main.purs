@@ -11,3 +11,5 @@ main = do
             "(<a>)"
             Lexer.parseTokens
   log $ show x
+  let y = flip runParser (Lexer.match Lexer.RParen) <$> x
+  log $ show y
