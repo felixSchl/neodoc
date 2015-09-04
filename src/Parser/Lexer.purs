@@ -75,7 +75,7 @@ parseToken = P.choice
       <*> A.many identLetter
 
   identStart :: P.Parser String Char
-  identStart = lower <|> P.oneOf ['_']
+  identStart = alpha
 
   identLetter :: P.Parser String Char
-  identLetter = alphaNum <|> P.oneOf ['_', '\'']
+  identLetter = alphaNum <|> P.oneOf ['_', '-']
