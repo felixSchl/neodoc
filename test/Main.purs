@@ -8,6 +8,6 @@ import qualified Data.String as Str
 
 main = do
   let x = runParser
-            "( ] aaaa -- - -- )"
+            "(<a>)"
             Lexer.parseTokens
   log $ show x

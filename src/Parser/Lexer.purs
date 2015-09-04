@@ -19,6 +19,8 @@ data Token
   | RParen
   | LSquare
   | RSquare
+  | LAngle
+  | RAngle
   | TripleDot
   | Dash
   | Name String
@@ -28,6 +30,8 @@ prettyPrintToken LParen      = "("
 prettyPrintToken RParen      = ")"
 prettyPrintToken LSquare     = "["
 prettyPrintToken RSquare     = "]"
+prettyPrintToken LAngle      = "<"
+prettyPrintToken RAngle      = ">"
 prettyPrintToken Dash        = "-"
 prettyPrintToken TripleDot   = "..."
 prettyPrintToken (Name name) = name
@@ -62,6 +66,8 @@ parseToken = P.choice
   , P.try $ P.char   ')'   *> pure RParen
   , P.try $ P.char   '['   *> pure LSquare
   , P.try $ P.char   ']'   *> pure RSquare
+  , P.try $ P.char   '<'   *> pure LAngle
+  , P.try $ P.char   '>'   *> pure RAngle
   , P.try $ P.char   '-'   *> pure Dash
   , P.try $ P.string "..." *> pure TripleDot
   , Name <$> parseName
