@@ -10,6 +10,6 @@ main = do
   let x = runParser
             "abc"
             Lexer.parseTokens
+      y = flip Lexer.runTokenParser (Lexer.iname) <$> x
   log $ show x
-  let y = flip runParser (Lexer.iname) <$> x
-  log $ show y
+  -- log $ show y

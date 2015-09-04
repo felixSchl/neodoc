@@ -1,5 +1,6 @@
 module Docopt.Parser.Lexer where
 
+import Control.Monad.State (State(), evalState)
 import Prelude
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
@@ -16,6 +17,7 @@ import Data.List (List(..), (:))
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Docopt.Parser.Base
+import Docopt.Parser.State
 
 data Token
   = LParen
@@ -106,7 +108,7 @@ parseToken = P.choice
   identLetter = alphaNum <|> P.oneOf ['_', '-']
 
 -- | Parser that  parses a stream of tokens
-type TokenParser a = P.Parser (List PositionedToken) a
+type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
 
 -- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> TokenParser a
@@ -164,3 +166,12 @@ iname = token go P.<?> "identifier"
   where
     go (IName s) = Just s
     go _ = Nothing
+
+runTokenParser :: forall a.
+                  (List PositionedToken)
+                -> P.ParserT (List PositionedToken) (State ParserState) a
+                -> ParserState
+                -> Either P.ParseError a
+runTokenParser s = evalState <<< P.runParserT (P.PState
+                                              { input: s
+                                              , position: P.initialPos })
