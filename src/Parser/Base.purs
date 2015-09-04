@@ -37,5 +37,13 @@ num = regex "[0-9]"
 alpha :: P.Parser String Char
 alpha = regex "[a-zA-Z]"
 
+-- | Parse any upper-case alphabetical character
+upperAlpha :: P.Parser String Char
+upperAlpha = regex "[A-Z]"
+
+-- | Parse any lower-case alphabetical character
+lowerAlpha :: P.Parser String Char
+lowerAlpha = regex "[a-z]"
+
 -- | Parse any number or alphabetical character
 alphaNum = alpha <|> num

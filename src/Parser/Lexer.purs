@@ -1,9 +1,10 @@
 module Docopt.Parser.Lexer where
 
-import Control.Monad.State (State(), evalState)
 import Prelude
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
+import Control.Monad.State (State(), evalState, get)
+import Control.Monad.Trans
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Token as P
@@ -12,7 +13,7 @@ import qualified Text.Parsing.Parser.String as P
 import qualified Data.List as L
 import qualified Data.Array as A
 import Data.Char (toString, toLower, toUpper)
-import Data.String (fromCharArray)
+import Data.String (fromCharArray, fromChar)
 import Data.List (List(..), (:))
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -29,19 +30,33 @@ data Token
   | Dash
   | Equal
   | TripleDot
-  | IName String
+  | LOpt String (Maybe String)
+  | SOpt Char (Array Char) (Maybe String)
+  | PosOpt String
+  | CmdOpt String
 
 prettyPrintToken :: Token -> String
-prettyPrintToken LParen       = show '('
-prettyPrintToken RParen       = show ')'
-prettyPrintToken LSquare      = show '['
-prettyPrintToken RSquare      = show ']'
-prettyPrintToken LAngle       = show '<'
-prettyPrintToken RAngle       = show '>'
-prettyPrintToken Dash         = show '-'
-prettyPrintToken Equal        = show '='
-prettyPrintToken TripleDot    = show "..."
-prettyPrintToken (IName name) = show name
+prettyPrintToken LParen        = show '('
+prettyPrintToken RParen        = show ')'
+prettyPrintToken LSquare       = show '['
+prettyPrintToken RSquare       = show ']'
+prettyPrintToken LAngle        = show '<'
+prettyPrintToken RAngle        = show '>'
+prettyPrintToken Dash          = show '-'
+prettyPrintToken Equal         = show '='
+prettyPrintToken TripleDot     = show "..."
+prettyPrintToken (PosOpt name) = show name
+prettyPrintToken (CmdOpt name) = show name
+prettyPrintToken (LOpt name arg) =
+  show $ "--" ++ name
+    ++ case arg of
+            Just arg -> "=" ++ arg
+            Nothing  -> ""
+prettyPrintToken (SOpt name stack arg) =
+  show $ "-" ++ (fromChar name) ++ (fromCharArray stack)
+    ++ case arg of
+            Just arg -> "=" ++ arg
+            Nothing  -> ""
 
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position
@@ -52,17 +67,20 @@ instance showToken :: Show Token where
   show = show <<< prettyPrintToken
 
 instance eqToken :: Eq Token where
-  eq LParen      LParen         = true
-  eq RParen      RParen         = true
-  eq LSquare     LSquare        = true
-  eq RSquare     RSquare        = true
-  eq LAngle      LAngle         = true
-  eq RAngle      RAngle         = true
-  eq Dash        Dash           = true
-  eq Equal       Equal          = true
-  eq TripleDot   TripleDot      = true
-  eq (IName name) (IName name') = name == name'
-  eq _ _                        = false
+  eq LParen        LParen           = true
+  eq RParen        RParen           = true
+  eq LSquare       LSquare          = true
+  eq RSquare       RSquare          = true
+  eq LAngle        LAngle           = true
+  eq RAngle        RAngle           = true
+  eq Dash          Dash             = true
+  eq Equal         Equal            = true
+  eq TripleDot     TripleDot        = true
+  eq (PosOpt n)    (PosOpt n')      = n == n'
+  eq (CmdOpt n)    (CmdOpt n')      = n == n'
+  eq (LOpt n a)    (LOpt n' a')     = (n == n') && (a == a')
+  eq (SOpt n ns a) (SOpt n' ns' a') = (n == n') && (ns' == ns') && (a == a')
+  eq _ _                            = false
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
@@ -86,20 +104,34 @@ parseToken = P.choice
   , P.try $ P.char   ')'   *> pure RParen
   , P.try $ P.char   '['   *> pure LSquare
   , P.try $ P.char   ']'   *> pure RSquare
+  , PosOpt <$> parsePosOpt
+  , CmdOpt <$> parseCmdOpt
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
   , P.try $ P.char   '-'   *> pure Dash
   , P.try $ P.char   '='   *> pure Equal
   , P.try $ P.string "..." *> pure TripleDot
-  , IName <$> parseName
   ] <* P.skipSpaces
 
  where
+
   parseName :: P.Parser String String
   parseName = fromCharArray <$> do
     A.cons
       <$> identStart
       <*> A.many identLetter
+
+  parseAngleName :: P.Parser String String
+  parseAngleName =
+    P.char '<' *> parseName <* P.char '>'
+
+  parseUpperName :: P.Parser String String
+  parseUpperName = fromCharArray <$> do
+    A.cons
+      <$> upperAlpha
+      <*> (A.many $ regex "[A-Z_-]")
+
+  parsePosOpt = parseUpperName <|> parseAngleName
 
   identStart :: P.Parser String Char
   identStart = alpha
@@ -160,12 +192,6 @@ tripleDot = match TripleDot
 
 equal :: TokenParser Unit
 equal = match Equal
-
-iname :: TokenParser String
-iname = token go P.<?> "identifier"
-  where
-    go (IName s) = Just s
-    go _ = Nothing
 
 runTokenParser :: forall a.
                   (List PositionedToken)
