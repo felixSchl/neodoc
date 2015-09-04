@@ -8,8 +8,8 @@ import qualified Data.String as Str
 
 main = do
   let x = runParser
-            "(<a>)"
+            "abc"
             Lexer.parseTokens
   log $ show x
-  let y = flip runParser (Lexer.match Lexer.RParen) <$> x
+  let y = flip runParser (Lexer.iname) <$> x
   log $ show y

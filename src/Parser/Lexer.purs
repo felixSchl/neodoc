@@ -24,20 +24,22 @@ data Token
   | RSquare
   | LAngle
   | RAngle
-  | TripleDot
   | Dash
-  | Name String
+  | Equal
+  | TripleDot
+  | IName String
 
 prettyPrintToken :: Token -> String
-prettyPrintToken LParen      = show '('
-prettyPrintToken RParen      = show ')'
-prettyPrintToken LSquare     = show '['
-prettyPrintToken RSquare     = show ']'
-prettyPrintToken LAngle      = show '<'
-prettyPrintToken RAngle      = show '>'
-prettyPrintToken Dash        = show '-'
-prettyPrintToken TripleDot   = show "..."
-prettyPrintToken (Name name) = show name
+prettyPrintToken LParen       = show '('
+prettyPrintToken RParen       = show ')'
+prettyPrintToken LSquare      = show '['
+prettyPrintToken RSquare      = show ']'
+prettyPrintToken LAngle       = show '<'
+prettyPrintToken RAngle       = show '>'
+prettyPrintToken Dash         = show '-'
+prettyPrintToken Equal        = show '='
+prettyPrintToken TripleDot    = show "..."
+prettyPrintToken (IName name) = show name
 
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position
@@ -48,16 +50,17 @@ instance showToken :: Show Token where
   show = show <<< prettyPrintToken
 
 instance eqToken :: Eq Token where
-  eq LParen      LParen       = true
-  eq RParen      RParen       = true
-  eq LSquare     LSquare      = true
-  eq RSquare     RSquare      = true
-  eq LAngle      LAngle       = true
-  eq RAngle      RAngle       = true
-  eq Dash        Dash         = true
-  eq TripleDot   TripleDot    = true
-  eq (Name name) (Name name') = name == name'
-  eq _ _                      = false
+  eq LParen      LParen         = true
+  eq RParen      RParen         = true
+  eq LSquare     LSquare        = true
+  eq RSquare     RSquare        = true
+  eq LAngle      LAngle         = true
+  eq RAngle      RAngle         = true
+  eq Dash        Dash           = true
+  eq Equal       Equal          = true
+  eq TripleDot   TripleDot      = true
+  eq (IName name) (IName name') = name == name'
+  eq _ _                        = false
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
@@ -84,8 +87,9 @@ parseToken = P.choice
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
   , P.try $ P.char   '-'   *> pure Dash
+  , P.try $ P.char   '='   *> pure Equal
   , P.try $ P.string "..." *> pure TripleDot
-  , Name <$> parseName
+  , IName <$> parseName
   ] <* P.skipSpaces
 
  where
@@ -127,3 +131,36 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 match :: forall a. Token -> TokenParser Unit
 match tok = token (\tok' -> if (tok' == tok) then Just unit else Nothing)
             P.<?> prettyPrintToken tok
+
+lparen :: TokenParser Unit
+lparen = match LParen
+
+rparen :: TokenParser Unit
+rparen = match RParen
+
+lsquare :: TokenParser Unit
+lsquare = match LSquare
+
+rsquare :: TokenParser Unit
+rsquare = match RSquare
+
+langle :: TokenParser Unit
+langle = match LAngle
+
+rangle :: TokenParser Unit
+rangle = match RAngle
+
+dash :: TokenParser Unit
+dash = match Dash
+
+tripleDot :: TokenParser Unit
+tripleDot = match TripleDot
+
+equal :: TokenParser Unit
+equal = match Equal
+
+iname :: TokenParser String
+iname = token go P.<?> "identifier"
+  where
+    go (IName s) = Just s
+    go _ = Nothing
