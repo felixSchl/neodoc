@@ -63,7 +63,7 @@ parseToken = P.choice
   , P.try $ P.char   '['   *> pure LSquare
   , P.try $ P.char   ']'   *> pure RSquare
   , P.try $ P.char   '-'   *> pure Dash
-  , P.try $ P.string "..." *> pure RSquare
+  , P.try $ P.string "..." *> pure TripleDot
   , Name <$> parseName
   ] <* P.skipSpaces
 
