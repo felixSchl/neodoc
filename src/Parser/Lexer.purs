@@ -28,25 +28,31 @@ data Token
   | LAngle
   | RAngle
   | Dash
+  | VBar
+  | Colon
   | Equal
   | TripleDot
   | LOpt String (Maybe String)
   | SOpt Char (Array Char) (Maybe String)
-  | PosOpt String
-  | CmdOpt String
+  | ShoutName String
+  | AngleName String
+  | Name      String
 
 prettyPrintToken :: Token -> String
-prettyPrintToken LParen        = show '('
-prettyPrintToken RParen        = show ')'
-prettyPrintToken LSquare       = show '['
-prettyPrintToken RSquare       = show ']'
-prettyPrintToken LAngle        = show '<'
-prettyPrintToken RAngle        = show '>'
-prettyPrintToken Dash          = show '-'
-prettyPrintToken Equal         = show '='
-prettyPrintToken TripleDot     = show "..."
-prettyPrintToken (PosOpt name) = show name
-prettyPrintToken (CmdOpt name) = show name
+prettyPrintToken LParen           = show '('
+prettyPrintToken RParen           = show ')'
+prettyPrintToken LSquare          = show '['
+prettyPrintToken RSquare          = show ']'
+prettyPrintToken LAngle           = show '<'
+prettyPrintToken RAngle           = show '>'
+prettyPrintToken Dash             = show '-'
+prettyPrintToken VBar             = show '|'
+prettyPrintToken Colon            = show ':'
+prettyPrintToken Equal            = show '='
+prettyPrintToken TripleDot        = show "..."
+prettyPrintToken (ShoutName name) = show name
+prettyPrintToken (AngleName name) = show name
+prettyPrintToken (Name      name) = show name
 prettyPrintToken (LOpt name arg) =
   show $ "--" ++ name
     ++ case arg of
@@ -73,11 +79,14 @@ instance eqToken :: Eq Token where
   eq RSquare       RSquare          = true
   eq LAngle        LAngle           = true
   eq RAngle        RAngle           = true
+  eq VBar          VBar             = true
+  eq Colon         Colon            = true
   eq Dash          Dash             = true
   eq Equal         Equal            = true
   eq TripleDot     TripleDot        = true
-  eq (PosOpt n)    (PosOpt n')      = n == n'
-  eq (CmdOpt n)    (CmdOpt n')      = n == n'
+  eq (AngleName n) (AngleName n')   = n == n'
+  eq (ShoutName n) (ShoutName n')   = n == n'
+  eq (Name n)      (Name n')        = n == n'
   eq (LOpt n a)    (LOpt n' a')     = (n == n') && (a == a')
   eq (SOpt n ns a) (SOpt n' ns' a') = (n == n') && (ns' == ns') && (a == a')
   eq _ _                            = false
@@ -104,13 +113,16 @@ parseToken = P.choice
   , P.try $ P.char   ')'   *> pure RParen
   , P.try $ P.char   '['   *> pure LSquare
   , P.try $ P.char   ']'   *> pure RSquare
-  , PosOpt <$> parsePosOpt
-  , CmdOpt <$> parseCmdOpt
+  , P.try $ P.char   '|'   *> pure VBar
+  , P.try $ P.char   ':'   *> pure Colon
+  , AngleName <$> parseAngleName
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
   , P.try $ P.char   '-'   *> pure Dash
   , P.try $ P.char   '='   *> pure Equal
   , P.try $ P.string "..." *> pure TripleDot
+  , ShoutName <$> parseShoutName
+  , Name      <$> parseName
   ] <* P.skipSpaces
 
  where
@@ -125,13 +137,11 @@ parseToken = P.choice
   parseAngleName =
     P.char '<' *> parseName <* P.char '>'
 
-  parseUpperName :: P.Parser String String
-  parseUpperName = fromCharArray <$> do
+  parseShoutName :: P.Parser String String
+  parseShoutName = fromCharArray <$> do
     A.cons
       <$> upperAlpha
       <*> (A.many $ regex "[A-Z_-]")
-
-  parsePosOpt = parseUpperName <|> parseAngleName
 
   identStart :: P.Parser String Char
   identStart = alpha

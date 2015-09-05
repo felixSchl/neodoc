@@ -1,0 +1,7 @@
+*.un~
+*.sw[mnopqrstuvwx]
+/bower_components/
+/node_modules/
+/output/
+/.psci*
+/src/.webpack.js

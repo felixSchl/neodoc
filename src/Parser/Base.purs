@@ -10,40 +10,45 @@ import qualified Data.String.Regex as Regex
 import Data.Char (toString, toLower, toUpper)
 import Data.Maybe
 import Data.Either
+import Debug.Trace
+
+debug :: forall a b. (Show a) => a -> P.Parser b Unit
+debug x = traceShow x \_ -> pure unit
+
+debugInput :: forall a. (Show a) => P.Parser a Unit
+debugInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
+  traceShow s \_ ->
+    return { input: s, result: Right unit, consumed: false, position: pos }
 
 -- | Return the current parser position
 getPosition :: forall a. P.Parser a P.Position
 getPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
-  return { input: s, result: Right pos, consumed: true, position: pos }
+  return { input: s, result: Right pos, consumed: false, position: pos }
 
--- | Match a char against a regex
 regex :: String -> P.Parser String Char
 regex s = P.satisfy \c ->
   Regex.test (Regex.regex s Regex.noFlags) (toString c)
 
--- -- | Parse any lower case character
 lower :: P.Parser String Char
 lower = P.satisfy \c -> c == toLower c
 
--- -- | Parse any upper case character
 upper :: P.Parser String Char
 upper = P.satisfy \c -> c == toUpper c
 
--- | Parse any number
 num :: P.Parser String Char
 num = regex "[0-9]"
 
--- | Parse any alphabetical character
 alpha :: P.Parser String Char
 alpha = regex "[a-zA-Z]"
 
--- | Parse any upper-case alphabetical character
 upperAlpha :: P.Parser String Char
 upperAlpha = regex "[A-Z]"
 
--- | Parse any lower-case alphabetical character
 lowerAlpha :: P.Parser String Char
 lowerAlpha = regex "[a-z]"
 
--- | Parse any number or alphabetical character
+alphaNum :: P.Parser String Char
 alphaNum = alpha <|> num
+
+space :: P.Parser String Char
+space = P.char ' '
