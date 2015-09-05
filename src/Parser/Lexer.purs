@@ -50,9 +50,9 @@ prettyPrintToken VBar             = show '|'
 prettyPrintToken Colon            = show ':'
 prettyPrintToken Equal            = show '='
 prettyPrintToken TripleDot        = show "..."
-prettyPrintToken (ShoutName name) = show name
-prettyPrintToken (AngleName name) = show name
-prettyPrintToken (Name      name) = show name
+prettyPrintToken (Name      name) = "Name "      ++ show name
+prettyPrintToken (ShoutName name) = "ShoutName " ++ show name
+prettyPrintToken (AngleName name) = "AngleName " ++ show name
 prettyPrintToken (LOpt name arg) =
   show $ "--" ++ name
     ++ case arg of
@@ -202,6 +202,24 @@ tripleDot = match TripleDot
 
 equal :: TokenParser Unit
 equal = match Equal
+
+name :: TokenParser String
+name = token go P.<?> "name"
+  where
+    go (Name n) = Just n
+    go _        = Nothing
+
+angleName :: TokenParser String
+angleName = token go P.<?> "<name>"
+  where
+    go (AngleName n) = Just n
+    go _             = Nothing
+
+shoutName :: TokenParser String
+shoutName = token go P.<?> "NAME"
+  where
+    go (ShoutName n) = Just n
+    go _             = Nothing
 
 runTokenParser :: forall a.
                   (List PositionedToken)

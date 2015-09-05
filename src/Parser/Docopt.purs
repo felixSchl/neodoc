@@ -12,6 +12,8 @@ import Data.List (List(..), many, toList, fromList, (:), length, filter)
 import Data.String (fromCharArray)
 import Data.Either
 import Docopt.Parser.Base
+import qualified Docopt.Parser.Lexer as Lexer
+import qualified Docopt.Parser.Usage as Usage
 
 data Section
   = Preamble String
@@ -42,9 +44,9 @@ prelex = do
 
   usage <-
     case findUsages sections of
-      Nil                 -> P.fail "No usage section found!"
-      Cons _ (Cons _ Nil) -> P.fail "More than one usage section found!"
-      Cons x Nil          -> pure x
+      Nil               -> P.fail "No usage section found!"
+      Cons _ (Cons _ _) -> P.fail "More than one usage section found!"
+      Cons x Nil        -> pure x
 
   return $ Source
     (unSection usage)
@@ -81,6 +83,18 @@ parseSectionCons = do
 
 docopt :: String -> Either P.ParseError Unit
 docopt input = do
-  source <- P.runParser input prelex
-  debug source
+  -- Break the source code into sections
+  Source usageSource opts <- P.runParser input prelex
+
+  -- Lex the usage section
+  usageToks <-  P.runParser usageSource Lexer.parseTokens
+  debug usageToks
+
+  -- Parse the usage section
+  usage <- Lexer.runTokenParser usageToks Usage.parseUsage
+  debug usage
+
+  -- Lex and parse each options section
+  -- ...TODO
+
   return unit
