@@ -9,8 +9,6 @@ import qualified Data.String as Str
 
 input =
 """
-Naval Fate.
-
 Usage:
   naval_fate ship new <name>...
   naval_fate ship <name> move <x> <y> [--speed=<kn>]

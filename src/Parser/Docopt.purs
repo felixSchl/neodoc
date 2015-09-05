@@ -8,7 +8,7 @@ import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
-import Data.List (List(), many, toList, fromList, (:))
+import Data.List (List(), many, toList, fromList, (:), length, filter)
 import Data.String (fromCharArray)
 import Docopt.Parser.Base
 
@@ -34,7 +34,15 @@ prelex = do
   preamble <- Preamble <$> parseSectionSource
   sections <- many $ P.try do
     parseSectionCons <*> parseSectionSource
+  (guard $ hasSingleUsage sections)
+    P.<?> "Expected single Usage section, got " ++ (show $ numUsages sections)
   return $ Docopt $ preamble:sections
+
+  where
+    hasSingleUsage xs = (numUsages xs) == 1
+    numUsages xs      = length $ filter isUsage xs
+    isUsage (Usage _) = true
+    isUsage _         = false
 
 -- | Parse the body of a section.
 --   The body of a section is defined as the string until
@@ -50,7 +58,7 @@ parseSectionSource = fromCharArray <<< fromList <$> do
 parseSectionCons :: P.Parser String (String -> Section)
 parseSectionCons = do
   P.Position { column: col }  <- getPosition
-  (guard $ col == 1) P.<?> "Section to be anchored"
+  (guard $ col == 1) P.<?> "Anchored Section"
   many space
   P.choice
     [ P.string "Usage:"   *> pure Usage
