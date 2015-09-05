@@ -27,6 +27,8 @@ instance showSection :: Show Section where
   show (Usage    x) = "Usage: "    ++ show x
   show (Options  x) = "Options: "  ++ show x
 
+-- | Pre-parse the docopt string and break it into
+--   sections.
 prelex :: P.Parser String Docopt
 prelex = do
   preamble <- Preamble <$> parseSectionSource
@@ -34,12 +36,17 @@ prelex = do
     parseSectionCons <*> parseSectionSource
   return $ Docopt $ preamble:sections
 
+-- | Parse the body of a section.
+--   The body of a section is defined as the string until
+--   another section starts or the EOF is met.
 parseSectionSource :: P.Parser String String
 parseSectionSource = fromCharArray <<< fromList <$> do
   P.manyTill
     P.anyChar
     (P.lookAhead (void parseSectionCons) <|> P.eof)
 
+-- | Parse a section header and partially apply the
+--   corresponding Section constructor
 parseSectionCons :: P.Parser String (String -> Section)
 parseSectionCons = do
   P.Position { column: col }  <- getPosition
