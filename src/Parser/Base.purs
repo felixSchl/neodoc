@@ -12,7 +12,7 @@ import Data.Maybe
 import Data.Either
 import Debug.Trace
 
-debug :: forall a b. (Show a) => a -> P.Parser b Unit
+debug :: forall a b m. (Show a, Monad m) => a -> m Unit
 debug x = traceShow x \_ -> pure unit
 
 debugInput :: forall a. (Show a) => P.Parser a Unit
