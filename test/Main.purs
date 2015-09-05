@@ -9,6 +9,8 @@ import qualified Data.String as Str
 
 input =
 """
+Naval-Fate.
+
 Usage:
   naval_fate ship new <name>...
   naval_fate ship <name> move <x> <y> [--speed=<kn>]
@@ -26,11 +28,15 @@ Options:
 """
 
 main = do
-  let x = runParser
-            input
-            Docopt.prelex
+
+  let x = Docopt.docopt input
   log $ show x
 
+  -- let x = runParser
+  --           input
+  --           Docopt.prelex
+  -- log $ show x
+  --
   -- let x = runParser
   --           "<arg-name> HELLO-WORLD"
   --           Lexer.parseTokens

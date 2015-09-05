@@ -8,8 +8,9 @@ import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
-import Data.List (List(), many, toList, fromList, (:), length, filter)
+import Data.List (List(..), many, toList, fromList, (:), length, filter)
 import Data.String (fromCharArray)
+import Data.Either
 import Docopt.Parser.Base
 
 data Section
@@ -17,32 +18,45 @@ data Section
   | Usage String
   | Options String
 
-data Docopt = Docopt (List Section)
+unSection :: Section -> String
+unSection (Preamble s) = s
+unSection (Usage    s) = s
+unSection (Options  s) = s
 
-instance showDocopt :: Show Docopt where
-  show (Docopt xs) = "Docopt " ++ show xs
+data Source = Source String (List String)
+
+instance showDocopt :: Show Source where
+  show (Source x xs) = "Source " ++ show x ++ show xs
 
 instance showSection :: Show Section where
   show (Preamble x) = "Preamble: " ++ show x
   show (Usage    x) = "Usage: "    ++ show x
   show (Options  x) = "Options: "  ++ show x
 
--- | Pre-parse the docopt string and break it into
---   sections.
-prelex :: P.Parser String Docopt
+-- | Pre-parse the docopt string and break it into sections.
+prelex :: P.Parser String Source
 prelex = do
   preamble <- Preamble <$> parseSectionSource
   sections <- many $ P.try do
     parseSectionCons <*> parseSectionSource
-  (guard $ hasSingleUsage sections)
-    P.<?> "Expected single Usage section, got " ++ (show $ numUsages sections)
-  return $ Docopt $ preamble:sections
+
+  usage <-
+    case findUsages sections of
+      Nil                 -> P.fail "No usage section found!"
+      Cons _ (Cons _ Nil) -> P.fail "More than one usage section found!"
+      Cons x Nil          -> pure x
+
+  return $ Source
+    (unSection usage)
+    (map unSection $ findOptions sections)
 
   where
-    hasSingleUsage xs = (numUsages xs) == 1
-    numUsages xs      = length $ filter isUsage xs
-    isUsage (Usage _) = true
-    isUsage _         = false
+    findUsages           = filter isUsage
+    isUsage (Usage _)    = true
+    isUsage _            = false
+    findOptions          = filter isOption
+    isOption (Options _) = true
+    isOption _           = false
 
 -- | Parse the body of a section.
 --   The body of a section is defined as the string until
@@ -64,3 +78,9 @@ parseSectionCons = do
     [ P.string "Usage:"   *> pure Usage
     , P.string "Options:" *> pure Options
     ]
+
+docopt :: String -> Either P.ParseError Unit
+docopt input = do
+  source <- P.runParser input prelex
+  debug source
+  return unit
