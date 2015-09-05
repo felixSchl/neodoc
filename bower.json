@@ -1,0 +1,19 @@
+{
+  "name": "docopt",
+  "version": "0.0.0",
+  "homepage": "https://github.com/felixschl/docopt.js",
+  "authors": [
+    "Felix Schlitter <felixschlitter@gmail.com>"
+  ],
+  "description": "Docopt for purescript/js",
+  "keywords": [
+    "docopt",
+    "purescript",
+    "node"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "purescript-parsing": "~0.6.1",
+    "purescript-debug": "~0.1.0"
+  }
+}
