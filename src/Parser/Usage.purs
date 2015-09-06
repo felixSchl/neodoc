@@ -4,7 +4,7 @@ import Prelude
 import Control.Lazy (defer)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
-import Data.List (List(..), some)
+import Data.List (List(..), some, (:), toList)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -14,7 +14,6 @@ import Data.Maybe
 import Docopt.Parser.Base
 import Docopt.Parser.Lexer
 
-type OptionName     = String
 type OptionAlias    = String
 type OptionArgument = String
 type IsOptional     = Boolean
@@ -24,8 +23,8 @@ data UsageNode
   = Command     String
   | Positional  String
                 IsRepeatable
-  | Option      OptionName
-                (Maybe OptionAlias)
+  | Option      (Maybe String)
+                (Maybe Char)
                 (Maybe OptionArgument)
                 IsRepeatable
   | Group       IsOptional
@@ -38,10 +37,11 @@ instance showUsageNode :: Show UsageNode where
   show (Positional n b) =
     "Positional " ++ n ++ " " ++ show b
   show (Option n a arg b) =
-    "Option " ++ n ++ " " ++ show a ++ " " ++ show arg ++ " " ++ show b
+    "Option " ++ show n ++ " " ++ show a ++ " " ++ show arg ++ " " ++ show b
   show (Group n b o) =
     "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
 
+-- | Parse the usage section
 parseUsage :: TokenParser Unit
 parseUsage = do
   program <- parseProgram

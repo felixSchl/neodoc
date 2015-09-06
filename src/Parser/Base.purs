@@ -21,7 +21,7 @@ debugInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
     return { input: s, result: Right unit, consumed: false, position: pos }
 
 -- | Return the current parser position
-getPosition :: forall a. P.Parser a P.Position
+getPosition :: forall a m. (Monad m) => P.ParserT a m P.Position
 getPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
   return { input: s, result: Right pos, consumed: false, position: pos }
 
