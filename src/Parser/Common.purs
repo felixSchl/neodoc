@@ -38,7 +38,7 @@ checkIndentation rel = do
 -- Check that the current indentation level is past the current mark
 --
 indented :: TokenParser Unit
-indented = checkIndentation (>) P.<?> "indentation"
+indented = checkIndentation (>=) P.<?> "indentation"
 
 -- |
 -- Check that the current indentation level is at the same indentation as the
