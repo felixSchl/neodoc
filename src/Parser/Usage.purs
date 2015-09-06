@@ -48,6 +48,7 @@ parseUsage = do
   P.Position { column: col } <- getPosition
   program <- parseProgram
   elems <- mark do
+    -- XXX: This needs more thought
     P.manyTill
       (indented *> parseElem)
       (parseProgram)
