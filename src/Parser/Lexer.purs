@@ -197,6 +197,10 @@ match :: forall a. Token -> TokenParser Unit
 match tok = token (\tok' -> if (tok' == tok) then Just unit else Nothing)
             P.<?> prettyPrintToken tok
 
+anyToken = token $ Just
+
+eof = P.notFollowedBy anyToken
+
 lparen :: TokenParser Unit
 lparen = match LParen
 

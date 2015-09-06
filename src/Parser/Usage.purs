@@ -2,6 +2,8 @@ module Docopt.Parser.Usage where
 
 import Prelude
 import Control.Lazy (defer)
+import Control.Monad.Trans (lift)
+import Control.Monad.State (get)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Data.List (List(..), many, some, (:), toList)
@@ -14,6 +16,7 @@ import Data.Maybe
 import Docopt.Parser.Base
 import Docopt.Parser.Common
 import Docopt.Parser.Lexer
+import Docopt.Parser.State
 
 type OptionAlias    = String
 type OptionArgument = String
@@ -46,12 +49,12 @@ instance showUsageNode :: Show UsageNode where
 parseUsage :: TokenParser Unit
 parseUsage = do
   P.Position { column: col } <- getPosition
+  debug col
   program <- parseProgram
   elems <- mark do
-    -- XXX: This needs more thought
     P.manyTill
-      (indented *> parseElem)
-      (parseProgram)
+      parseElem
+      eof
   debug elems
   debug program
 
