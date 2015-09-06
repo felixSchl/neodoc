@@ -14,7 +14,7 @@ import qualified Data.List as L
 import qualified Data.Array as A
 import Data.Char (toString, toLower, toUpper)
 import Data.String (fromCharArray, fromChar)
-import Data.List (List(..), (:))
+import Data.List (List(..), (:), fromList, many)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Docopt.Parser.Base
@@ -33,33 +33,33 @@ data Token
   | Equal
   | TripleDot
   | LOpt String (Maybe String)
-  | SOpt Char (Array Char) (Maybe String)
+  | SOpt Char (List Char) (Maybe String)
   | ShoutName String
   | AngleName String
   | Name      String
 
 prettyPrintToken :: Token -> String
-prettyPrintToken LParen           = show '('
-prettyPrintToken RParen           = show ')'
-prettyPrintToken LSquare          = show '['
-prettyPrintToken RSquare          = show ']'
-prettyPrintToken LAngle           = show '<'
-prettyPrintToken RAngle           = show '>'
-prettyPrintToken Dash             = show '-'
-prettyPrintToken VBar             = show '|'
-prettyPrintToken Colon            = show ':'
-prettyPrintToken Equal            = show '='
-prettyPrintToken TripleDot        = show "..."
-prettyPrintToken (Name      name) = "Name "      ++ show name
-prettyPrintToken (ShoutName name) = "ShoutName " ++ show name
-prettyPrintToken (AngleName name) = "AngleName " ++ show name
-prettyPrintToken (LOpt name arg) =
-  show $ "--" ++ name
+prettyPrintToken LParen        = show '('
+prettyPrintToken RParen        = show ')'
+prettyPrintToken LSquare       = show '['
+prettyPrintToken RSquare       = show ']'
+prettyPrintToken LAngle        = show '<'
+prettyPrintToken RAngle        = show '>'
+prettyPrintToken Dash          = show '-'
+prettyPrintToken VBar          = show '|'
+prettyPrintToken Colon         = show ':'
+prettyPrintToken Equal         = show '='
+prettyPrintToken TripleDot     = show "..."
+prettyPrintToken (Name      n) = "Name "      ++ show n
+prettyPrintToken (ShoutName n) = "ShoutName " ++ show n
+prettyPrintToken (AngleName n) = "AngleName " ++ show n
+prettyPrintToken (LOpt n arg) =
+  show $ "--" ++ n
     ++ case arg of
             Just arg -> "=" ++ arg
             Nothing  -> ""
-prettyPrintToken (SOpt name stack arg) =
-  show $ "-" ++ (fromChar name) ++ (fromCharArray stack)
+prettyPrintToken (SOpt n stack arg) =
+  show $ "-" ++ (fromChar n) ++ (fromCharArray $ fromList stack)
     ++ case arg of
             Just arg -> "=" ++ arg
             Nothing  -> ""
@@ -115,6 +115,8 @@ parseToken = P.choice
   , P.try $ P.char   ']'   *> pure RSquare
   , P.try $ P.char   '|'   *> pure VBar
   , P.try $ P.char   ':'   *> pure Colon
+  , P.try $ parseLongOption
+  , P.try $ parseShortOption
   , AngleName <$> parseAngleName
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
@@ -142,6 +144,25 @@ parseToken = P.choice
     A.cons
       <$> upperAlpha
       <*> (A.many $ regex "[A-Z_-]")
+
+  parseShortOption :: P.Parser String Token
+  parseShortOption = P.char '-' *> do
+    SOpt
+      <$> alphaNum
+      <*> (many $ P.try alphaNum)
+      <*> ((P.try do
+            P.char '='
+            Just <$> P.choice [ parseAngleName, parseShoutName, parseName ])
+          <|> pure Nothing)
+
+  parseLongOption :: P.Parser String Token
+  parseLongOption = P.string "--" *> do
+    LOpt
+      <$> parseName
+      <*> ((P.try do
+            P.char '='
+            Just <$> P.choice [ parseAngleName, parseShoutName, parseName ])
+          <|> pure Nothing)
 
   identStart :: P.Parser String Char
   identStart = alpha

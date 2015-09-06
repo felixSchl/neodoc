@@ -12,7 +12,7 @@ input =
 Naval-Fate.
 
 Usage:
-  naval_fate [<name>...]...
+  naval_fate -vvv
 
 Options:
   -h --help     Show this screen.
