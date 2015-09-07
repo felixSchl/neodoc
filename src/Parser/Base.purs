@@ -2,15 +2,20 @@ module Docopt.Parser.Base where
 
 import Prelude
 import Control.Alt ((<|>))
+import Control.Apply ((*>), (<*))
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 import qualified Data.String.Regex as Regex
+import qualified Data.Array as A
+import Data.Array ((:))
 import Data.Char (toString, toLower, toUpper)
+import Data.String (fromCharArray, toCharArray, fromChar)
 import Data.Maybe
 import Data.Either
 import Debug.Trace
+import Data.Tuple (Tuple(..))
 
 debug :: forall a m. (Show a, Monad m) => a -> m Unit
 debug x = traceShow x $ const $ pure unit
@@ -58,3 +63,12 @@ alphaNum = alpha <|> num
 
 space :: P.Parser String Char
 space = P.char ' '
+
+eol :: P.Parser String Unit
+eol = (void $ P.string "\r\n") <|> (void $ P.char '\n')
+
+string' :: String -> P.Parser String String
+string' s = A.foldM step "" (toCharArray s)
+  where
+    step acc x = do
+      (acc ++) <<< fromChar <$> P.satisfy \c -> toLower c == toLower x
