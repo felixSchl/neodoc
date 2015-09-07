@@ -14,6 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "purescript-parsing": "~0.6.1",
-    "purescript-debug": "~0.1.0"
+    "purescript-debug": "~0.1.0",
+    "purescript-console": "~0.1.1"
   }
 }

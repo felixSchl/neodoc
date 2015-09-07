@@ -15,15 +15,15 @@ import Debug.Trace
 debug :: forall a m. (Show a, Monad m) => a -> m Unit
 debug x = traceShow x $ const $ pure unit
 
-debugInput :: forall a. (Show a) => P.Parser a Unit
-debugInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
-  traceShow s \_ ->
-    return { input: s, result: Right unit, consumed: false, position: pos }
-
 -- | Return the current parser position
 getPosition :: forall a m. (Monad m) => P.ParserT a m P.Position
 getPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
   return { input: s, result: Right pos, consumed: false, position: pos }
+
+-- | Return the current parser position
+getInput :: forall a m. (Monad m, Show a) => P.ParserT a m a
+getInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
+  return { input: s, result: Right s, consumed: false, position: pos }
 
 regex :: String -> P.Parser String Char
 regex s = P.satisfy \c ->

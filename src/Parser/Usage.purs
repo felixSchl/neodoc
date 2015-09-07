@@ -35,6 +35,11 @@ data UsageNode
                 (List UsageNode)
                 IsRepeatable
 
+data Usage = Usage String (List UsageNode)
+
+instance showUsage :: Show Usage where
+  show (Usage n xs) = "Usage " ++ show n ++ " " ++ show xs
+
 instance showUsageNode :: Show UsageNode where
   show (Command n) =
     "Command " ++ n
@@ -49,21 +54,29 @@ instance showUsageNode :: Show UsageNode where
 parseUsage :: TokenParser Unit
 parseUsage = do
   P.Position { column: col } <- getPosition
-  debug col
-  program <- parseProgram
-  elems <- mark do
-    P.manyTill
-      parseElem
-      eof
-  debug elems
-  debug program
+
+  usages <- many parseLine
+  input <- getInput
+  debug input
+  debug usages
 
   where
+
+    parseLine :: TokenParser Usage
+    parseLine = Usage
+      <$> parseProgram
+      <*> mark do
+        input <- getInput
+        debug input
+        P.manyTill
+          parseElem
+          ((P.lookAhead <<< void $ do
+            lessIndented *> parseProgram) <|> eof)
+
     parseProgram :: TokenParser String
     parseProgram = name
 
-    parseElem :: TokenParser UsageNode
-    parseElem = defer \_ ->
+    parseElem = defer \_ -> do
           (indented *> parsePositional)
       <|> (indented *> parseCommand)
       <|> (indented *> parseGroup)
@@ -82,16 +95,23 @@ parseUsage = do
       <|> parseOptGroup
 
     parseOptGroup :: TokenParser UsageNode
-    parseOptGroup = defer \_ -> Group
-      <$> (indented *> pure true)
-      <*> (indented *> P.between lsquare rsquare (some parseElem))
-      <*> (indented *> parseRepetition)
+    parseOptGroup = defer \_ -> Group true
+      <$> (P.between
+            (indented *> lsquare)
+            (indented *> rsquare)
+            (some parseElem))
+      <*> parseRepetition
 
     parseReqGroup :: TokenParser UsageNode
-    parseReqGroup = defer \_ -> Group
-      <$> (indented *> pure false)
-      <*> (indented *> P.between lparen rparen (some parseElem))
-      <*> (indented *> parseRepetition)
+    parseReqGroup = defer \_ -> Group false
+      <$> (P.between
+            (indented *> lparen)
+            (indented *> rparen)
+            (some parseElem))
+      <*> parseRepetition
 
     parseRepetition :: TokenParser Boolean
-    parseRepetition = (P.try tripleDot *> pure true) <|> pure false
+    parseRepetition = P.choice
+      [ P.try $ indented *> tripleDot *> pure true
+      , pure false
+      ]

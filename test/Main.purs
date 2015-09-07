@@ -12,8 +12,8 @@ input =
 Naval-Fate.
 
 Usage:
-        naval_fate <name> (
-          <blah> nav)
+    naval_fate ([<name>])
+    naval_fate <qux>
 
 
 Options:

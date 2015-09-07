@@ -41,6 +41,12 @@ indented :: TokenParser Unit
 indented = checkIndentation (>=) P.<?> "indentation"
 
 -- |
+-- Check that the current indentation level is before the current mark
+--
+lessIndented :: TokenParser Unit
+lessIndented = checkIndentation (<) P.<?> "less indentation"
+
+-- |
 -- Check that the current indentation level is at the same indentation as the
 -- current mark
 --
