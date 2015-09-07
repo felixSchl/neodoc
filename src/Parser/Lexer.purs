@@ -223,6 +223,9 @@ rangle = match RAngle
 dash :: TokenParser Unit
 dash = match Dash
 
+vbar :: TokenParser Unit
+vbar = match VBar
+
 tripleDot :: TokenParser Unit
 tripleDot = match TripleDot
 

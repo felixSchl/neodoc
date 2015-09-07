@@ -13,10 +13,7 @@ Naval-Fate. Usage: varies.
 
 UsAgE: 
 
-  naval_fate <qux>
-    (foo) naval_fate <foo>
-  naval_fate
-  naval_fate (<bar>)
+  naval_fate foo | foo
 
 The program can be used in many ways.
 Consider, for example:

@@ -7,7 +7,7 @@ import Control.Monad.Trans (lift)
 import Control.Monad.State (get)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
-import Data.List (List(..), many, some, (:), toList)
+import Data.List (List(..), many, some, (:), toList, concat)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -38,7 +38,18 @@ data UsageNode
                 (List UsageNode)
                 IsRepeatable
 
-data Usage = Usage String (List UsageNode)
+-- | Represent a single program usage.
+-- | A single usage is made up of a list of mutually exclusive groups,
+-- | separated by a vertical bar `|`. Each of those groups can contain
+-- | one or more `UsageNode`.
+-- |
+-- | node node | node | node
+-- | ^^^^ ^^^^   ^^^^   ^^^^
+-- |   |   |      |      |
+-- | [ 0 , 1 ]  [ 0 ]  [ 0 ]
+-- |    \ /       |      |
+-- | [   0    ,   1   ,  2 ]
+data Usage = Usage String (List (List UsageNode))
 
 instance showUsage :: Show Usage where
   show (Usage n xs) = "Usage " ++ show n ++ " " ++ show xs
@@ -71,10 +82,10 @@ parseUsage = do
 
   where
 
-    parseElems :: String -> TokenParser (List UsageNode)
+    parseElems :: String -> TokenParser (List (List UsageNode))
     parseElems programName = do
-      P.manyTill
-        parseElem
+      concat <$> P.manyTill
+        ((some parseElem) `P.sepBy` vbar)
         ((void $ same *>
           parseKnownProgram programName) <|> (P.lookAhead eof))
 

@@ -114,7 +114,15 @@ prelex = do
 
 docopt :: String -> Either P.ParseError Unit
 docopt input = do
+
+  debug "Scanning..."
   Source usageSrc _ <- P.runParser input prelex
+  debug usageSrc
+
+  debug "Lexing..."
   usageToks         <- P.runParser usageSrc Lexer.parseTokens
+  debug usageToks
+
+  debug "Parsing..."
   usage             <- Lexer.runTokenParser usageToks Usage.parseUsage
   debug usage
