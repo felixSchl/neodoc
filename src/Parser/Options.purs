@@ -10,6 +10,6 @@ import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 import Data.Either
-import Data.Maybe
+import Data.Maybe hiding (maybe)
 import Docopt.Parser.Base
 import Docopt.Parser.Lexer

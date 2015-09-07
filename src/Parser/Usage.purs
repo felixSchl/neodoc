@@ -15,7 +15,8 @@ import qualified Text.Parsing.Parser.String as P
 import qualified Data.List as L
 import Data.String (length)
 import Data.Either
-import Data.Maybe
+import Data.Tuple
+import Data.Maybe hiding (maybe)
 import Docopt.Parser.Base
 import Docopt.Parser.Common
 import Docopt.Parser.Lexer
@@ -98,9 +99,29 @@ parseUsage = do
       guard (s == s') P.<?> "Program token " ++ s
 
     parseElem = defer \_ -> do
-          (indented *> parsePositional)
+          (indented *> parseOption)
+      <|> (indented *> parsePositional)
       <|> (indented *> parseCommand)
       <|> (indented *> parseGroup)
+
+
+    parseLongOption :: TokenParser (Maybe OptionArgument
+                                      -> IsRepeatable
+                                      -> UsageNode)
+    parseLongOption = flip Option Nothing
+      <$> (Just <$> lopt)
+
+    parseShortOption :: TokenParser (Maybe OptionArgument
+                                      -> IsRepeatable
+                                      -> UsageNode)
+    parseShortOption = Option Nothing
+      <$> (Just <<< fst <$> sopt)
+
+    parseOption :: TokenParser UsageNode
+    parseOption =
+      (parseLongOption <|> parseShortOption)
+        <*> (maybe $ equal *> (angleName <|> shoutName))
+        <*> (pure true)
 
     parsePositional :: TokenParser UsageNode
     parsePositional = Positional

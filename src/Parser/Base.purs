@@ -12,7 +12,7 @@ import qualified Data.Array as A
 import Data.Array ((:))
 import Data.Char (toString, toLower, toUpper)
 import Data.String (fromCharArray, toCharArray, fromChar)
-import Data.Maybe
+import Data.Maybe hiding (maybe)
 import Data.Either
 import Debug.Trace
 import Data.Tuple (Tuple(..))
@@ -30,6 +30,9 @@ getCol :: forall a m. (Monad m) => P.ParserT a m Int
 getCol = do
   P.Position { column: col } <- getPosition
   return col
+
+maybe :: forall s m a. (Monad m) => P.ParserT s m a -> P.ParserT s m (Maybe a)
+maybe p = (Just <$> p) <|> (pure Nothing)
 
 -- | Return the current parser position
 getInput :: forall a m. (Monad m, Show a) => P.ParserT a m a
