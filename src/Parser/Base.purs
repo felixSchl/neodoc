@@ -68,7 +68,7 @@ eol :: P.Parser String Unit
 eol = (void $ P.string "\r\n") <|> (void $ P.char '\n')
 
 string' :: String -> P.Parser String String
-string' s = A.foldM step "" (toCharArray s)
+string' s = fromCharArray <$> A.foldM step [] (toCharArray s)
   where
     step acc x = do
-      (acc ++) <<< fromChar <$> P.satisfy \c -> toLower c == toLower x
+      (acc ++) <<< A.singleton <$> P.satisfy \c -> toLower c == toLower x
