@@ -189,6 +189,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
             , input: xs
             , result: Right a
             , position: nextpos }
+        -- XXX: Fix this error message, it makes no sense!
         Nothing -> P.parseFailed toks pos "expected token, met EOF"
     _ -> P.parseFailed toks pos "expected token, met EOF"
 

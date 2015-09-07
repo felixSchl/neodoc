@@ -20,6 +20,12 @@ getPosition :: forall a m. (Monad m) => P.ParserT a m P.Position
 getPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
   return { input: s, result: Right pos, consumed: false, position: pos }
 
+-- | Return the current parser column
+getCol :: forall a m. (Monad m) => P.ParserT a m Int
+getCol = do
+  P.Position { column: col } <- getPosition
+  return col
+
 -- | Return the current parser position
 getInput :: forall a m. (Monad m, Show a) => P.ParserT a m a
 getInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->

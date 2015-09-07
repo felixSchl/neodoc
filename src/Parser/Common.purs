@@ -26,6 +26,17 @@ mark p = do
   return a
 
 -- |
+-- Mark a custom  indentation level
+--
+mark' :: forall a. Int -> TokenParser a -> TokenParser a
+mark' level p = do
+  ParserState { indentation: current } <- lift get
+  lift $ modify \(ParserState st) -> ParserState { indentation: level }
+  a <- p
+  lift $ modify \(ParserState st) -> ParserState { indentation: current }
+  return a
+
+-- |
 -- Check that the current identation level matches a predicate
 --
 checkIndentation :: (Int -> Int -> Boolean) -> TokenParser Unit

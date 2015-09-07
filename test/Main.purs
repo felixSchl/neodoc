@@ -12,9 +12,11 @@ input =
 Naval-Fate.
 
 Usage:
-    naval_fate ([<name>])
-    naval_fate <qux>
-
+  naval_fate <qux>
+             (foo)
+  naval_fate <foo>
+  naval_fate
+  naval_fate (<bar>)
 
 Options:
   -h --help     Show this screen.

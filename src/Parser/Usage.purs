@@ -2,6 +2,7 @@ module Docopt.Parser.Usage where
 
 import Prelude
 import Control.Lazy (defer)
+import Control.MonadPlus (guard)
 import Control.Monad.Trans (lift)
 import Control.Monad.State (get)
 import Control.Alt ((<|>))
@@ -11,6 +12,8 @@ import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
+import qualified Data.List as L
+import Data.String (length)
 import Data.Either
 import Data.Maybe
 import Docopt.Parser.Base
@@ -53,28 +56,32 @@ instance showUsageNode :: Show UsageNode where
 -- | Parse the usage section
 parseUsage :: TokenParser Unit
 parseUsage = do
-  P.Position { column: col } <- getPosition
 
-  usages <- many parseLine
-  input <- getInput
-  debug input
+  -- Parse first token, this is expected to be the program name
+
+  startCol <- getCol
+  name <- parseProgram
+
+  usages <- P.manyTill
+    (P.try $ Usage name <$> (parseElems name))
+    eof
   debug usages
 
   where
 
-    parseLine :: TokenParser Usage
-    parseLine = Usage
-      <$> parseProgram
-      <*> mark do
-        input <- getInput
-        debug input
-        P.manyTill
-          parseElem
-          ((P.lookAhead <<< void $ do
-            lessIndented *> parseProgram) <|> eof)
+    parseElems :: String -> TokenParser (List UsageNode)
+    parseElems programName = do
+      P.manyTill
+        parseElem
+        ((void $ parseKnownProgram programName) <|> (P.lookAhead eof))
 
     parseProgram :: TokenParser String
     parseProgram = name
+
+    parseKnownProgram :: String -> TokenParser Unit
+    parseKnownProgram s = do
+      s' <- parseProgram
+      guard (s == s') P.<?> "Program token " ++ s
 
     parseElem = defer \_ -> do
           (indented *> parsePositional)
