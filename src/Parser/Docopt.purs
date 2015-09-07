@@ -38,14 +38,28 @@ instance showSection :: Show Section where
   show (Options  x) = "Options: "  ++ show x
 
 -- | Pre-parse the docopt string and break it into sections.
-prelex :: P.Parser String Unit
+prelex :: P.Parser String Source
 prelex = do
 
   P.manyTill P.anyChar (P.lookAhead anySectionHeader)
   sections <- many parseSection
-  debug sections
+  usage <- case findUsages sections of
+    Nil               -> P.fail "No usage section found!"
+    Cons _ (Cons _ _) -> P.fail "More than one usage section found!"
+    Cons x Nil        -> pure x
+
+  return $ Source
+    (unSection usage)
+    (map unSection $ findOptions sections)
 
   where
+    findUsages           = filter isUsage
+    isUsage (Usage _)    = true
+    isUsage _            = false
+    findOptions          = filter isOption
+    isOption (Options _) = true
+    isOption _           = false
+
     anySectionHeader :: P.Parser String String
     anySectionHeader = usageSectionHeader <|> optionsSectionHeader
 
@@ -100,5 +114,7 @@ prelex = do
 
 docopt :: String -> Either P.ParseError Unit
 docopt input = do
-  P.runParser input prelex
-  return unit
+  Source usageSrc _ <- P.runParser input prelex
+  usageToks         <- P.runParser usageSrc Lexer.parseTokens
+  usage             <- Lexer.runTokenParser usageToks Usage.parseUsage
+  debug usage
