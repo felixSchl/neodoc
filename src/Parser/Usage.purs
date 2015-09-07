@@ -57,12 +57,14 @@ instance showUsageNode :: Show UsageNode where
 parseUsage :: TokenParser Unit
 parseUsage = do
 
-  -- Parse first token, this is expected to be the program name
-
-  startCol <- getCol
+  -- Calculate the leading start indentation.
+  -- The first usage line is indicative of of the start indentation of every
+  -- other usage line!
   name <- parseProgram
+  col' <- getCol
+  let startCol = col' - (length name) - 1
 
-  usages <- P.manyTill
+  usages <- mark' startCol $ P.manyTill
     (P.try $ Usage name <$> (parseElems name))
     eof
   debug usages
@@ -73,7 +75,8 @@ parseUsage = do
     parseElems programName = do
       P.manyTill
         parseElem
-        ((void $ parseKnownProgram programName) <|> (P.lookAhead eof))
+        ((void $ same *>
+          parseKnownProgram programName) <|> (P.lookAhead eof))
 
     parseProgram :: TokenParser String
     parseProgram = name

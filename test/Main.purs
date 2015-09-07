@@ -9,16 +9,21 @@ import qualified Data.String as Str
 
 input =
 """
-Naval-Fate.
+Naval-Fate. Usage: varies.
 
-Usage:
+UsAgE: 
+
   naval_fate <qux>
-             (foo)
-  naval_fate <foo>
+    (foo) naval_fate <foo>
   naval_fate
   naval_fate (<bar>)
 
+The program can be used in many ways.
+Consider, for example:
+Blah.
+
 Options:
+
   -h --help     Show this screen.
   --version     Show version.
   --speed=<kn>  Speed in knots [default: 10].
