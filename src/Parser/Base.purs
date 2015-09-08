@@ -31,8 +31,8 @@ getCol = do
   P.Position { column: col } <- getPosition
   return col
 
-maybe :: forall s m a. (Monad m) => P.ParserT s m a -> P.ParserT s m (Maybe a)
-maybe p = (Just <$> p) <|> (pure Nothing)
+tryMaybe :: forall s m a. (Monad m) => P.ParserT s m a -> P.ParserT s m (Maybe a)
+tryMaybe p = (Just <$> p) <|> (pure Nothing)
 
 -- | Return the current parser position
 getInput :: forall a m. (Monad m, Show a) => P.ParserT a m a
@@ -60,6 +60,12 @@ upperAlpha = regex "[A-Z]"
 
 lowerAlpha :: P.Parser String Char
 lowerAlpha = regex "[a-z]"
+
+lowerAlphaNum :: P.Parser String Char
+lowerAlphaNum = regex "[0-9a-z]"
+
+upperAlphaNum :: P.Parser String Char
+upperAlphaNum = regex "[0-9A-Z]"
 
 alphaNum :: P.Parser String Char
 alphaNum = alpha <|> num

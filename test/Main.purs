@@ -13,7 +13,7 @@ Naval-Fate. Usage: varies.
 
 UsAgE: 
 
-  naval_fate foo | --foo
+  naval_fate foo | -fooFILE...
 
 The program can be used in many ways.
 Consider, for example:

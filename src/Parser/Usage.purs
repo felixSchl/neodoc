@@ -31,8 +31,11 @@ data UsageNode
   = Command     String
   | Positional  String
                 IsRepeatable
-  | Option      (Maybe String)
-                (Maybe Char)
+  | Option      String
+                (Maybe OptionArgument)
+                IsRepeatable
+  | OptionStack Char
+                (List Char)
                 (Maybe OptionArgument)
                 IsRepeatable
   | Group       IsOptional
@@ -60,8 +63,10 @@ instance showUsageNode :: Show UsageNode where
     "Command " ++ n
   show (Positional n b) =
     "Positional " ++ n ++ " " ++ show b
-  show (Option n a arg b) =
-    "Option " ++ show n ++ " " ++ show a ++ " " ++ show arg ++ " " ++ show b
+  show (Option n a b) =
+    "Option " ++ show n ++ " " ++ show a ++ " " ++ show b
+  show (OptionStack n s a b) =
+    "OptionStack " ++ show n ++ " " ++ show s ++ " " ++ show a ++ " " ++ show b
   show (Group n b o) =
     "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
 
@@ -98,30 +103,32 @@ parseUsage = do
       s' <- parseProgram
       guard (s == s') P.<?> "Program token " ++ s
 
+    parseElem :: TokenParser UsageNode
     parseElem = defer \_ -> do
           (indented *> parseOption)
       <|> (indented *> parsePositional)
       <|> (indented *> parseCommand)
       <|> (indented *> parseGroup)
 
+    parseLongOption :: TokenParser UsageNode
+    parseLongOption = Option
+        <$> lopt
+        <*> (tryMaybe $ equal *> (shoutName <|> angleName <|> name))
+        <*> parseRepetition
 
-    parseLongOption :: TokenParser (Maybe OptionArgument
-                                      -> IsRepeatable
-                                      -> UsageNode)
-    parseLongOption = flip Option Nothing
-      <$> (Just <$> lopt)
-
-    parseShortOption :: TokenParser (Maybe OptionArgument
-                                      -> IsRepeatable
-                                      -> UsageNode)
-    parseShortOption = Option Nothing
-      <$> (Just <<< fst <$> sopt)
+    parseShortOption :: TokenParser UsageNode
+    parseShortOption = do
+        { flag: flag, stack: stack, arg: arg } <- sopt
+        OptionStack flag stack
+            <$> (case arg of
+                    Just _  -> pure $ arg
+                    Nothing -> do
+                        (tryMaybe do
+                            equal *> (shoutName <|> angleName <|> name)))
+            <*> parseRepetition
 
     parseOption :: TokenParser UsageNode
-    parseOption =
-      (parseLongOption <|> parseShortOption)
-        <*> (maybe $ equal *> (angleName <|> shoutName))
-        <*> (pure true)
+    parseOption = (parseLongOption <|> parseShortOption)
 
     parsePositional :: TokenParser UsageNode
     parsePositional = Positional

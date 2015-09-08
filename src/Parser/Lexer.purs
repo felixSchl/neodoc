@@ -16,7 +16,7 @@ import Data.Char (toString, toLower, toUpper)
 import Data.String (fromCharArray, fromChar)
 import Data.List (List(..), (:), fromList, many)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Docopt.Parser.Base
 import Docopt.Parser.State
 import Data.Tuple
@@ -34,29 +34,32 @@ data Token
   | Equal
   | TripleDot
   | LOpt String
-  | SOpt Char (List Char)
+  | SOpt Char (List Char) String
   | ShoutName String
   | AngleName String
   | Name      String
 
 prettyPrintToken :: Token -> String
-prettyPrintToken LParen         = show '('
-prettyPrintToken RParen         = show ')'
-prettyPrintToken LSquare        = show '['
-prettyPrintToken RSquare        = show ']'
-prettyPrintToken LAngle         = show '<'
-prettyPrintToken RAngle         = show '>'
-prettyPrintToken Dash           = show '-'
-prettyPrintToken VBar           = show '|'
-prettyPrintToken Colon          = show ':'
-prettyPrintToken Equal          = show '='
-prettyPrintToken TripleDot      = show "..."
-prettyPrintToken (Name      n)  = "Name "      ++ show n
-prettyPrintToken (ShoutName n)  = "ShoutName " ++ show n
-prettyPrintToken (AngleName n)  = "AngleName " ++ show n
-prettyPrintToken (LOpt n)       = show $ "--" ++ n
-prettyPrintToken (SOpt n stack) =
-  show $ "-" ++ (fromChar n) ++ (fromCharArray $ fromList stack)
+prettyPrintToken LParen        = show '('
+prettyPrintToken RParen        = show ')'
+prettyPrintToken LSquare       = show '['
+prettyPrintToken RSquare       = show ']'
+prettyPrintToken LAngle        = show '<'
+prettyPrintToken RAngle        = show '>'
+prettyPrintToken Dash          = show '-'
+prettyPrintToken VBar          = show '|'
+prettyPrintToken Colon         = show ':'
+prettyPrintToken Equal         = show '='
+prettyPrintToken TripleDot     = show "..."
+prettyPrintToken (Name      n) = "Name "      ++ show n
+prettyPrintToken (ShoutName n) = "ShoutName " ++ show n
+prettyPrintToken (AngleName n) = "AngleName " ++ show n
+prettyPrintToken (LOpt n)      = show $ "--" ++ n
+prettyPrintToken (SOpt n s a)  =
+  show $ "-"
+    ++ (fromChar n)
+    ++ (fromCharArray $ fromList s)
+    ++ a
 
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position
@@ -67,23 +70,23 @@ instance showToken :: Show Token where
   show = show <<< prettyPrintToken
 
 instance eqToken :: Eq Token where
-  eq LParen        LParen         = true
-  eq RParen        RParen         = true
-  eq LSquare       LSquare        = true
-  eq RSquare       RSquare        = true
-  eq LAngle        LAngle         = true
-  eq RAngle        RAngle         = true
-  eq VBar          VBar           = true
-  eq Colon         Colon          = true
-  eq Dash          Dash           = true
-  eq Equal         Equal          = true
-  eq TripleDot     TripleDot      = true
-  eq (AngleName n) (AngleName n') = n == n'
-  eq (ShoutName n) (ShoutName n') = n == n'
-  eq (Name n)      (Name n')      = n == n'
-  eq (LOpt n)      (LOpt n')      = (n == n')
-  eq (SOpt n ns)   (SOpt n' ns')  = (n == n') && (ns' == ns')
-  eq _ _                          = false
+  eq LParen        LParen           = true
+  eq RParen        RParen           = true
+  eq LSquare       LSquare          = true
+  eq RSquare       RSquare          = true
+  eq LAngle        LAngle           = true
+  eq RAngle        RAngle           = true
+  eq VBar          VBar             = true
+  eq Colon         Colon            = true
+  eq Dash          Dash             = true
+  eq Equal         Equal            = true
+  eq TripleDot     TripleDot        = true
+  eq (AngleName n) (AngleName n')   = n == n'
+  eq (ShoutName n) (ShoutName n')   = n == n'
+  eq (Name n)      (Name n')        = n == n'
+  eq (LOpt n)      (LOpt n')        = (n == n')
+  eq (SOpt n ns a) (SOpt n' ns' a') = (n == n') && (ns' == ns') && (a == a')
+  eq _ _                            = false
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
@@ -142,7 +145,10 @@ parseToken = P.choice
   parseShortOption :: P.Parser String Token
   parseShortOption =
     P.char '-' *> do
-      SOpt <$> alphaNum <*> (many $ P.try alphaNum)
+      SOpt
+        <$> lowerAlphaNum
+        <*> (many lowerAlphaNum)
+        <*> (fromCharArray <$> (A.many upperAlphaNum))
 
   parseLongOption :: P.Parser String Token
   parseLongOption =
@@ -154,6 +160,9 @@ parseToken = P.choice
 
   identLetter :: P.Parser String Char
   identLetter = alphaNum <|> P.oneOf ['_', '-']
+
+  flag :: P.Parser String Char
+  flag = lowerAlphaNum
 
 -- | Parser that  parses a stream of tokens
 type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
@@ -223,11 +232,19 @@ lopt = token go P.<?> "long-option"
     go (LOpt n) = Just n
     go _        = Nothing
 
-sopt :: TokenParser (Tuple Char (List Char))
+sopt :: TokenParser { flag  :: Char
+                    , stack :: List Char
+                    , arg   :: Maybe String }
 sopt = token go P.<?> "short-option"
   where
-    go (SOpt n xs) = Just (Tuple n xs)
-    go _           = Nothing
+    go (SOpt n s a) = Just {
+      flag: n
+    , stack: s
+    , arg: case a of
+                "" -> Nothing
+                _  -> Just a
+    }
+    go _ = Nothing
 
 name :: TokenParser String
 name = token go P.<?> "name"
