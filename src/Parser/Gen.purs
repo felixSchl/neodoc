@@ -24,9 +24,7 @@ generateParser usages = do
 
     generateMutexParser :: List UsageNode -> P.Parser String Unit
     generateMutexParser nodes = do
-      foldM step unit nodes
-      where
-        step _ n = generateNodeParser n
+      foldM (const generateNodeParser) unit nodes
 
     generateNodeParser :: UsageNode -> P.Parser String Unit
     generateNodeParser _ = P.fail "Node parser generation not implemented"
