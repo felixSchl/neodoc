@@ -1,3 +1,7 @@
+-- |
+-- | This module defines commonly used TokenParser-combinators
+-- |
+
 module Docopt.Parser.Common where
 
 import Prelude
