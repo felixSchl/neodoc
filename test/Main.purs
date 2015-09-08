@@ -7,7 +7,7 @@ import qualified Docopt.Parser.Docopt as Docopt
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Data.String as Str
 
-input =
+source =
 """
 Naval-Fate. Usage: varies.
 
@@ -29,19 +29,7 @@ Options:
 """
 
 main = do
-
-  let x = Docopt.docopt input
+  let x = Docopt.docopt
+            source
+            "naval_fate"
   log $ show x
-
-  -- let x = runParser
-  --           input
-  --           Docopt.prelex
-  -- log $ show x
-  --
-  -- let x = runParser
-  --           "<arg-name> HELLO-WORLD"
-  --           Lexer.parseTokens
-  --     y = flip Lexer.runTokenParser (Lexer.lparen) <$> x
-  -- -- log $ show x
-  -- log  show x
-  -- log $ show y

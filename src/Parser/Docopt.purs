@@ -31,12 +31,12 @@ instance showError :: Show DocoptError where
   show (GenError msg)   = "GenError "   ++ show msg
   show (RunError err)   = "RunError "   ++ show err
 
-docopt :: String -> Either DocoptError Unit
-docopt input = do
+docopt :: String -> String -> Either DocoptError Unit
+docopt source input = do
 
   debug "Scanning..."
   Scanner.Docopt usageSrc _ <- wrapParseError ScanError do
-    P.runParser input Scanner.scanDocopt
+    P.runParser source Scanner.scanDocopt
   debug usageSrc
 
   debug "Lexing..."
@@ -49,12 +49,10 @@ docopt input = do
     flip Lexer.runTokenParser Usage.parseUsage usageToks
   debug usages
 
-  debug "Generating..."
-  parser <- either (Left <<< GenError) return do
-    Gen.generateParser usages
-
-  debug "Applying parser..."
-  result <- wrapParseError RunError $ flip P.runParser parser "blah"
+  debug "Generating and applying parser..."
+  result <- wrapParseError RunError $ flip P.runParser
+    (Gen.generateParser usages)
+    input
   debug result
 
   where
