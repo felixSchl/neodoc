@@ -14,19 +14,51 @@ import qualified Text.Parsing.Parser.String as P
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Usage as Usage
 import qualified Docopt.Parser.Scanner as Scanner
+import qualified Docopt.Parser.Gen as Gen
 import Docopt.Parser.Base (debug)
 
-docopt :: String -> Either P.ParseError Unit
+data DocoptError
+  = ScanError  P.ParseError
+  | LexError   P.ParseError
+  | ParseError P.ParseError
+  | GenError   String
+  | RunError   P.ParseError
+
+instance showError :: Show DocoptError where
+  show (ScanError err)  = "ScanError "  ++ show err
+  show (LexError err)   = "LexError "   ++ show err
+  show (ParseError err) = "ParseError " ++ show err
+  show (GenError msg)   = "GenError "   ++ show msg
+  show (RunError err)   = "RunError "   ++ show err
+
+docopt :: String -> Either DocoptError Unit
 docopt input = do
 
   debug "Scanning..."
-  Scanner.Docopt usageSrc _ <- P.runParser input Scanner.scanDocopt
+  Scanner.Docopt usageSrc _ <- wrapParseError ScanError do
+    P.runParser input Scanner.scanDocopt
   debug usageSrc
 
   debug "Lexing..."
-  usageToks         <- P.runParser usageSrc Lexer.parseTokens
+  usageToks <- wrapParseError LexError do
+    flip P.runParser Lexer.parseTokens usageSrc
   debug usageToks
 
   debug "Parsing..."
-  usage             <- Lexer.runTokenParser usageToks Usage.parseUsage
-  debug usage
+  usages <- wrapParseError ParseError do
+    flip Lexer.runTokenParser Usage.parseUsage usageToks
+  debug usages
+
+  debug "Generating..."
+  parser <- either (Left <<< GenError) return do
+    Gen.generateParser usages
+
+  debug "Applying parser..."
+  result <- wrapParseError RunError $ flip P.runParser parser "blah"
+  debug result
+
+  where
+    wrapParseError :: forall a. (P.ParseError -> DocoptError)
+                             -> Either P.ParseError a
+                             -> Either DocoptError  a
+    wrapParseError f = either (Left <<< f) return

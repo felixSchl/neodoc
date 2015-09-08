@@ -71,20 +71,19 @@ instance showUsageNode :: Show UsageNode where
     "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
 
 -- | Parse the usage section
-parseUsage :: TokenParser Unit
+parseUsage :: TokenParser (List Usage)
 parseUsage = do
 
   -- Calculate the leading start indentation.
-  -- The first usage line is indicative of of the start indentation of every
-  -- other usage line!
+  -- The first usage line is indicative of the
+  -- start indentation of every other usage line!
   name <- parseProgram
   col' <- getCol
   let startCol = col' - (length name) - 1
 
-  usages <- mark' startCol $ P.manyTill
+  mark' startCol $ P.manyTill
     (P.try $ Usage name <$> (parseElems name))
     eof
-  debug usages
 
   where
 
