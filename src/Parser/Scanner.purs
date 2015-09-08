@@ -44,9 +44,9 @@ scanDocopt = do
   P.manyTill P.anyChar (P.lookAhead anySectionHeader)
   sections <- many parseSection
   usage <- case findUsages sections of
-    Nil               -> P.fail "No usage section found!"
-    Cons _ (Cons _ _) -> P.fail "More than one usage section found!"
-    Cons x Nil        -> pure x
+    Nil        -> P.fail "No usage section found!"
+    Cons x Nil -> pure x
+    _          -> P.fail "More than one usage section found!"
 
   return $ Docopt
     (unSection usage)
