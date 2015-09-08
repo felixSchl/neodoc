@@ -148,7 +148,7 @@ parseUsage = do
       <$> (P.between
             (indented *> lsquare)
             (indented *> rsquare)
-            (some parseElem))
+            (concat <$> ((some parseElem) `P.sepBy` vbar)))
       <*> parseRepetition
 
     parseReqGroup :: TokenParser UsageNode
@@ -156,7 +156,7 @@ parseUsage = do
       <$> (P.between
             (indented *> lparen)
             (indented *> rparen)
-            (some parseElem))
+            (concat <$> ((some parseElem) `P.sepBy` vbar)))
       <*> parseRepetition
 
     parseRepetition :: TokenParser Boolean
