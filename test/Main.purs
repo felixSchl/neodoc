@@ -13,7 +13,8 @@ Naval-Fate. Usage: varies.
 
 UsAgE: 
 
-  naval_fate (<foo> ... | -fooFILE ... ) ...
+  naval_fate ask <question> | (foo|bar)
+  naval_fate   run <command>
 
 The program can be used in many ways.
 Consider, for example:

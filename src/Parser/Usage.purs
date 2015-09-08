@@ -39,7 +39,7 @@ data UsageNode
                 (Maybe OptionArgument)
                 IsRepeatable
   | Group       IsOptional
-                (List UsageNode)
+                (List (List UsageNode))
                 IsRepeatable
 
 -- | Represent a single program usage.
@@ -87,79 +87,87 @@ parseUsage = do
 
   where
 
-    parseElems :: String -> TokenParser (List (List UsageNode))
-    parseElems programName = do
-      concat <$> P.manyTill
-        ((some parseElem) `P.sepBy` vbar)
-        ((void $ same *>
-          parseKnownProgram programName) <|> (P.lookAhead eof))
-
     parseProgram :: TokenParser String
     parseProgram = name
 
-    parseKnownProgram :: String -> TokenParser Unit
-    parseKnownProgram s = do
-      s' <- parseProgram
-      guard (s == s') P.<?> "Program token " ++ s
+    parseElems :: String -> TokenParser (List (List UsageNode))
+    parseElems programName = do
 
-    parseElem :: TokenParser UsageNode
-    parseElem = defer \_ -> do
-          (indented *> parseOption)
-      <|> (indented *> parsePositional)
-      <|> (indented *> parseCommand)
-      <|> (indented *> parseGroup)
+      concat <$> P.manyTill
+        ((some parseElem) `P.sepBy1` vbar)
+        (matchProgram <|> (P.lookAhead eof))
 
-    parseLongOption :: TokenParser UsageNode
-    parseLongOption = Option
-        <$> lopt
-        <*> (tryMaybe $ equal *> (shoutName <|> angleName <|> name))
-        <*> parseRepetition
+      where
 
-    parseShortOption :: TokenParser UsageNode
-    parseShortOption = do
-        { flag: flag, stack: stack, arg: arg } <- sopt
-        OptionStack flag stack
-            <$> (case arg of
-                    Just _  -> pure $ arg
-                    Nothing -> do
-                        (tryMaybe do
-                            equal *> (shoutName <|> angleName <|> name)))
+        matchProgram :: TokenParser Unit
+        matchProgram = do
+          same
+          s <- parseProgram
+          guard (s == programName) P.<?> "Program token " ++ s
+
+        parseElem :: TokenParser UsageNode
+        parseElem = defer \_ -> do
+          P.notFollowedBy matchProgram
+          P.choice $ map (indented *>)
+            [ parseOption
+            , parsePositional
+            , parseCommand
+            , parseGroup
+            ] P.<?> "Option, Positional, Command or Group"
+
+        parseLongOption :: TokenParser UsageNode
+        parseLongOption = Option
+            <$> lopt
+            <*> (tryMaybe do
+                  equal
+                  (shoutName <|> angleName <|> name))
             <*> parseRepetition
 
-    parseOption :: TokenParser UsageNode
-    parseOption = (parseLongOption <|> parseShortOption)
+        parseShortOption :: TokenParser UsageNode
+        parseShortOption = do
+            { flag: flag, stack: stack, arg: arg } <- sopt
+            OptionStack flag stack
+                <$> (case arg of
+                      Just _  -> pure $ arg
+                      Nothing -> do
+                        (tryMaybe do
+                          equal
+                          (shoutName <|> angleName <|> name)))
+                <*> parseRepetition
 
-    parsePositional :: TokenParser UsageNode
-    parsePositional = Positional
-      <$> (angleName <|> shoutName)
-      <*> parseRepetition
+        parseOption :: TokenParser UsageNode
+        parseOption = (parseLongOption <|> parseShortOption)
 
-    parseCommand :: TokenParser UsageNode
-    parseCommand = Command <$> name
+        parsePositional :: TokenParser UsageNode
+        parsePositional = Positional
+          <$> (angleName <|> shoutName)
+          <*> parseRepetition
 
-    parseGroup :: TokenParser UsageNode
-    parseGroup = defer \_ ->
-          parseReqGroup
-      <|> parseOptGroup
+        parseCommand :: TokenParser UsageNode
+        parseCommand = Command <$> name
 
-    parseOptGroup :: TokenParser UsageNode
-    parseOptGroup = defer \_ -> Group true
-      <$> (P.between
-            (indented *> lsquare)
-            (indented *> rsquare)
-            (concat <$> ((some parseElem) `P.sepBy` vbar)))
-      <*> parseRepetition
+        parseGroup :: TokenParser UsageNode
+        parseGroup = defer \_ -> P.choice
+          [ parseReqGroup
+          , parseOptGroup ]
 
-    parseReqGroup :: TokenParser UsageNode
-    parseReqGroup = defer \_ -> Group false
-      <$> (P.between
-            (indented *> lparen)
-            (indented *> rparen)
-            (concat <$> ((some parseElem) `P.sepBy` vbar)))
-      <*> parseRepetition
+        parseOptGroup :: TokenParser UsageNode
+        parseOptGroup = defer \_ -> Group true
+          <$> (P.between
+                (indented *> lsquare)
+                (indented *> rsquare)
+                ((some parseElem) `P.sepBy1` vbar))
+          <*> parseRepetition
 
-    parseRepetition :: TokenParser Boolean
-    parseRepetition = P.choice
-      [ P.try $ indented *> tripleDot *> pure true
-      , pure false
-      ]
+        parseReqGroup :: TokenParser UsageNode
+        parseReqGroup = defer \_ -> Group false
+          <$> (P.between
+                (indented *> lparen)
+                (indented *> rparen)
+                ((some parseElem) `P.sepBy1` vbar))
+          <*> parseRepetition
+
+        parseRepetition :: TokenParser Boolean
+        parseRepetition = P.choice
+          [ P.try $ indented *> tripleDot *> pure true
+          , pure false ]
