@@ -8,10 +8,12 @@ import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
-import Data.List (List(..), many, toList, fromList, (:), length, filter)
+import Data.List (List(..), many, toList, fromList, (:), length, filter
+                 , takeWhile, sort, head)
 import qualified Data.Array as A
 import Data.String (toCharArray, fromCharArray)
 import qualified Data.String as Str
+import Data.Maybe
 import Data.Either
 import Docopt.Parser.Base
 import qualified Docopt.Parser.Lexer as Lexer
@@ -39,7 +41,25 @@ instance showSection :: Show Section where
 
 -- | Pre-parse the docopt string and break it into sections.
 scanDocopt :: String -> Either P.ParseError Docopt
-scanDocopt = flip P.runParser docoptScanner
+scanDocopt = (flip P.runParser docoptScanner) <<< dedent
+
+dedent :: String -> String
+dedent txt =
+  let lines :: Array String
+      lines = Str.split "\n" txt
+      nonEmpty :: String -> Boolean
+      nonEmpty = (/= 0) <<< Str.length <<< Str.trim
+      shortestLeading :: Int
+      shortestLeading = maybe 0 id (A.head $ A.sort $ countLeading
+                               <$> (A.filter nonEmpty lines))
+      isWhitespace :: Char -> Boolean
+      isWhitespace ' '  = true
+      isWhitespace '\n' = true
+      isWhitespace '\t' = true
+      isWhitespace _    = false
+      countLeading :: String -> Int
+      countLeading line = A.length $ A.takeWhile isWhitespace (toCharArray line)
+   in Str.joinWith "\n" ((Str.drop shortestLeading) <$> lines)
 
 docoptScanner :: P.Parser String Docopt
 docoptScanner = do
