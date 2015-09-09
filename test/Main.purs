@@ -41,6 +41,7 @@ main = run [consoleReporter] do
         naval_fate -xvzf FIle
         """
         )
+  describe "docopt lexer" do
     it "lexes options" do
       either
         (throwError <<< error <<< show)
