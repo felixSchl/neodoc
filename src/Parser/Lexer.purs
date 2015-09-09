@@ -184,7 +184,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
             , result: Right a
             , position: nextpos }
         -- XXX: Fix this error message, it makes no sense!
-        Nothing -> P.parseFailed toks pos "expected token, met EOF"
+        Nothing -> P.parseFailed toks pos "a better error message!"
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
 -- | Match the token at the head of the stream

@@ -38,10 +38,13 @@ instance showSection :: Show Section where
   show (Options  x) = "Options: "  ++ show x
 
 -- | Pre-parse the docopt string and break it into sections.
-scanDocopt :: P.Parser String Docopt
-scanDocopt = do
+scanDocopt :: String -> Either P.ParseError Docopt
+scanDocopt = flip P.runParser docoptScanner
 
-  P.manyTill P.anyChar (P.lookAhead anySectionHeader)
+docoptScanner :: P.Parser String Docopt
+docoptScanner = do
+
+  P.manyTill P.anyChar ((void $ P.lookAhead anySectionHeader) <|> P.eof)
   sections <- many parseSection
   usage <- case findUsages sections of
     Nil        -> P.fail "No usage section found!"
@@ -92,12 +95,12 @@ scanDocopt = do
       -- encountered OR until a new section is found OR the EOF
       -- is encountered.
 
-      source <- fromCharArray <<< fromList <$> P.manyTill
+      source <- fromCharArray <<< fromList <$> (P.manyTill
         P.anyChar
         (P.try $ P.lookAhead do
               emptyLine
           <|> void anySectionHeader
-          <|> P.eof)
+          <|> P.eof)) P.<?> "Section source"
 
       P.eof <|> (void $ P.try $ do
         emptyLine
@@ -110,4 +113,4 @@ scanDocopt = do
     parseSection = P.choice
       [ Usage   <$> (usageSectionHeader   *> extractSectionSource)
       , Options <$> (optionsSectionHeader *> extractSectionSource)
-      ]
+      ] P.<?> "Usage or Options section"

@@ -39,7 +39,7 @@ docopt source input = do
 
   debug "Scanning..."
   Scanner.Docopt usageSrc _ <- wrapParseError ScanError do
-    P.runParser source Scanner.scanDocopt
+    Scanner.scanDocopt source
   debug usageSrc
 
   debug "Lexing usage..."
