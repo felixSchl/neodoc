@@ -38,6 +38,7 @@ data Token
   | ShoutName String
   | AngleName String
   | Name      String
+  | Garbage   Char
 
 prettyPrintToken :: Token -> String
 prettyPrintToken LParen        = show '('
@@ -51,6 +52,7 @@ prettyPrintToken VBar          = show '|'
 prettyPrintToken Colon         = show ':'
 prettyPrintToken Equal         = show '='
 prettyPrintToken TripleDot     = show "..."
+prettyPrintToken (Garbage   c) = "Garbage "   ++ show c
 prettyPrintToken (Name      n) = "Name "      ++ show n
 prettyPrintToken (ShoutName n) = "ShoutName " ++ show n
 prettyPrintToken (AngleName n) = "AngleName " ++ show n
@@ -83,6 +85,7 @@ instance eqToken :: Eq Token where
   eq TripleDot     TripleDot        = true
   eq (AngleName n) (AngleName n')   = n == n'
   eq (ShoutName n) (ShoutName n')   = n == n'
+  eq (Garbage c)   (Garbage c')     = c == c'
   eq (Name n)      (Name n')        = n == n'
   eq (LOpt n)      (LOpt n')        = (n == n')
   eq (SOpt n ns a) (SOpt n' ns' a') = (n == n') && (ns' == ns') && (a == a')
@@ -114,14 +117,15 @@ parseToken = P.choice
   , P.try $ P.char   ':'   *> pure Colon
   , P.try $ parseLongOption
   , P.try $ parseShortOption
-  , AngleName <$> parseAngleName
+  , P.try $ AngleName <$> parseAngleName
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
   , P.try $ P.char   '-'   *> pure Dash
   , P.try $ P.char   '='   *> pure Equal
   , P.try $ P.string "..." *> pure TripleDot
-  , ShoutName <$> parseShoutName
-  , Name      <$> parseName
+  , P.try $ ShoutName <$> parseShoutName
+  , P.try $ Name      <$> parseName
+  , P.try $ Garbage   <$> P.anyChar
   ] <* P.skipSpaces
 
  where
@@ -140,7 +144,10 @@ parseToken = P.choice
   parseShoutName = fromCharArray <$> do
     A.cons
       <$> upperAlpha
-      <*> (A.many $ regex "[A-Z_-]")
+      <*> (A.many $ do
+        c <- regex "[A-Z_-]"
+        P.lookAhead (void space <|> P.eof)
+        return c)
 
   parseShortOption :: P.Parser String Token
   parseShortOption =

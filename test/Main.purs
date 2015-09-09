@@ -1,14 +1,17 @@
 module Test.Main where
 
 import Prelude
+import Debug.Trace
 import Control.Monad.Eff.Console (log)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans (lift)
-import Text.Parsing.Parser (runParser)
+import qualified Text.Parsing.Parser as P
 import qualified Docopt.Parser.Docopt as Docopt
+import qualified Docopt.Textwrap as Textwrap
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Scanner as Scanner
+import Docopt.Parser.Base (debug)
 import Data.Either (either)
 
 import Test.Spec (describe, it)
@@ -20,41 +23,34 @@ main = run [consoleReporter] do
     it "breaks apart the input" do
       either
         (throwError <<< error <<< show)
-        (const $ pure unit)
+        (traceShowA)
         (Scanner.scanDocopt
           """
           Naval Fate.
 
           Usage:
-          naval_fate -xvzf FILE
+          naval_fate -xvzf FIle
           """
         )
-
--- source =
--- """
--- Naval-Fate. Usage: varies.
---
--- UsAgE: 
---
---   naval_fate ask <question> | (foo
---     bar)
---   naval_fate   run <command>
---
--- The program can be used in many ways.
--- Consider, for example:
--- Blah.
---
--- Options:
---
---   -h --help     Show this screen.
---   --version     Show version.
---   --speed=<kn>  Speed in knots [default: 10].
---   --moored      Moored (anchored) mine.
---   --drifting    Drifting mine.
--- """
---
--- main = do
---   let x = Docopt.docopt
---             source
---             "naval_fate"
---   log $ show x
+    it "lexes usages" do
+      either
+        (throwError <<< error <<< show)
+        (traceShowA)
+        (flip P.runParser Lexer.parseTokens $ Textwrap.dedent
+        """
+        naval_fate -xvzf FIle
+        """
+        )
+    it "lexes options" do
+      either
+        (throwError <<< error <<< show)
+        (traceShowA)
+        (flip P.runParser Lexer.parseTokens $ Textwrap.dedent
+        """
+        -h --help     Show this screen.
+        --version     Show version.
+        --speed=<kn>  Speed in knots [default: 10].
+        --moored      Moored (anchored) mine.
+        --drifting    Drifting mine.
+        """
+        )

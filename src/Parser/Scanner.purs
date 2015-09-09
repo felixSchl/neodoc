@@ -18,6 +18,7 @@ import Data.Either
 import Docopt.Parser.Base
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Usage as Usage
+import Docopt.Textwrap (dedent)
 
 data Section
   = Preamble String
@@ -42,24 +43,6 @@ instance showSection :: Show Section where
 -- | Pre-parse the docopt string and break it into sections.
 scanDocopt :: String -> Either P.ParseError Docopt
 scanDocopt = (flip P.runParser docoptScanner) <<< dedent
-
-dedent :: String -> String
-dedent txt =
-  let lines :: Array String
-      lines = Str.split "\n" txt
-      nonEmpty :: String -> Boolean
-      nonEmpty = (/= 0) <<< Str.length <<< Str.trim
-      shortestLeading :: Int
-      shortestLeading = maybe 0 id (A.head $ A.sort $ countLeading
-                               <$> (A.filter nonEmpty lines))
-      isWhitespace :: Char -> Boolean
-      isWhitespace ' '  = true
-      isWhitespace '\n' = true
-      isWhitespace '\t' = true
-      isWhitespace _    = false
-      countLeading :: String -> Int
-      countLeading line = A.length $ A.takeWhile isWhitespace (toCharArray line)
-   in Str.joinWith "\n" ((Str.drop shortestLeading) <$> lines)
 
 docoptScanner :: P.Parser String Docopt
 docoptScanner = do

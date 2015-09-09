@@ -7,6 +7,7 @@ module Docopt.Parser.Docopt where
 
 import Prelude
 import Data.Either
+import Data.Traversable (traverse)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -38,11 +39,21 @@ docopt :: String -> String -> Either DocoptError Unit
 docopt source input = do
 
   debug "Scanning..."
-  Scanner.Docopt usageSrc _ <- wrapParseError ScanError do
+  Scanner.Docopt usageSrc optsSrcs <- wrapParseError ScanError do
     Scanner.scanDocopt source
   debug usageSrc
 
   debug "Lexing usage..."
+  usageToks <- wrapParseError LexError do
+    flip P.runParser Lexer.parseTokens usageSrc
+  debug usageToks
+
+  debug "Lexing options..."
+  optsToks <- traverse
+    (\opt -> wrapParseError LexError $ flip P.runParser Lexer.parseTokens opt)
+    optsSrcs
+  debug optsToks
+
   usageToks <- wrapParseError LexError do
     flip P.runParser Lexer.parseTokens usageSrc
   debug usageToks
