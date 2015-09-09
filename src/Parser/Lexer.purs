@@ -144,10 +144,7 @@ parseToken = P.choice
   parseShoutName = fromCharArray <$> do
     A.cons
       <$> upperAlpha
-      <*> (A.many $ do
-        c <- regex "[A-Z_-]"
-        P.lookAhead (void space <|> P.eof)
-        return c)
+      <*> (A.many $ regex "[A-Z_-]" <* P.notFollowedBy lowerAlpha)
 
   parseShortOption :: P.Parser String Token
   parseShortOption =
