@@ -31,6 +31,7 @@ data Token
   | Dash
   | VBar
   | Colon
+  | Comma
   | Equal
   | TripleDot
   | LOpt String
@@ -50,6 +51,7 @@ prettyPrintToken RAngle        = show '>'
 prettyPrintToken Dash          = show '-'
 prettyPrintToken VBar          = show '|'
 prettyPrintToken Colon         = show ':'
+prettyPrintToken Comma         = show ','
 prettyPrintToken Equal         = show '='
 prettyPrintToken TripleDot     = show "..."
 prettyPrintToken (Garbage   c) = "Garbage "   ++ show c
@@ -80,6 +82,7 @@ instance eqToken :: Eq Token where
   eq RAngle        RAngle           = true
   eq VBar          VBar             = true
   eq Colon         Colon            = true
+  eq Comma         Comma            = true
   eq Dash          Dash             = true
   eq Equal         Equal            = true
   eq TripleDot     TripleDot        = true
@@ -115,6 +118,7 @@ parseToken = P.choice
   , P.try $ P.char   ']'   *> pure RSquare
   , P.try $ P.char   '|'   *> pure VBar
   , P.try $ P.char   ':'   *> pure Colon
+  , P.try $ P.char   ','   *> pure Comma
   , P.try $ parseLongOption
   , P.try $ parseShortOption
   , P.try $ AngleName <$> parseAngleName
