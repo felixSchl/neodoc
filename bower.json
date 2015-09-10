@@ -19,6 +19,10 @@
     "purescript-aff": "0.11.1"
   },
   "resolutions": {
-    "purescript-transformers": "^0.7.1"
+    "purescript-transformers": "^0.7.1",
+    "purescript-strings": "~0.7.0"
+  },
+  "devDependencies": {
+    "purescript-spec": "~0.7.1"
   }
 }
