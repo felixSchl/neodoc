@@ -35,7 +35,8 @@ import Prelude
 import Control.Lazy (defer)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
-import Data.List (List(..), some, (:), toList)
+import Control.MonadPlus (guard)
+import Data.List (List(..), some, (:), toList, length, singleton)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -45,4 +46,19 @@ import Data.Maybe hiding (maybe)
 import Docopt.Parser.Base
 import Docopt.Parser.Lexer
 
+data Option = Option {
+  short :: Maybe Char
+, long  :: Maybe String
+, arg   :: Maybe String
+}
 
+parseOptions :: TokenParser Unit
+parseOptions = do
+  parseShortOption
+  where
+    parseShortOption :: TokenParser Unit
+    parseShortOption = do
+      { flag: flag, stack: stack, arg: arg } <- sopt
+      (guard $ (length stack == 0))
+        P.<?> "No stacked options"
+      pure unit
