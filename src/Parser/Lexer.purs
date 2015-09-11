@@ -231,6 +231,9 @@ vbar = match VBar
 comma :: TokenParser Unit
 comma = match Comma
 
+colon :: TokenParser Unit
+colon = match Colon
+
 tripleDot :: TokenParser Unit
 tripleDot = match TripleDot
 

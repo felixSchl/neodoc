@@ -64,7 +64,10 @@ main = run [consoleReporter] do
           toks <- flip P.runParser Lexer.parseTokens $ Textwrap.dedent
             """
             -h --help=KN  Show this screen.
-            --version     Show version.
+                          Du bist wieder dran.
+                          Das Spiel beginnt von vorne und sie grinsen dich an.
+                          [Default: 100]
+            --version     Show version. --version
             --speed=<kn>  Speed in knots [default: 10].
             --moored      Moored (anchored) mine.
             --drifting    Drifting mine.

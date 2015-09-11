@@ -36,7 +36,7 @@ import Control.Lazy (defer)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.MonadPlus (guard)
-import Data.List (List(..), some, (:), toList, length, singleton)
+import Data.List (List(..), some, (:), toList, length, singleton, many)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -44,14 +44,17 @@ import qualified Text.Parsing.Parser.String as P
 import Data.Either
 import Data.Maybe hiding (maybe)
 import Data.Generic
+import Data.String (toLower)
 import Docopt.Parser.Base
 import Docopt.Parser.Lexer
+import Docopt.Parser.Common
 
 data ShortOption = ShortOption Char (Maybe String)
 data LongOption = LongOption String (Maybe String)
 data Option = Option {
-  short :: Maybe ShortOption
-, long  :: Maybe LongOption
+  short   :: Maybe ShortOption
+, long    :: Maybe LongOption
+, default :: Maybe String
 }
 
 derive instance genericOption :: Generic Option
@@ -65,30 +68,54 @@ instance showLongOption  :: Show LongOption  where show = gShow
 parseOptions :: TokenParser Unit
 parseOptions = do
 
-  x <- P.choice
-    [ shortAndLong
-    , onlyLong
-    , onlyShort
-    ]
-  debug x
+  P.Position { column: col } <- getTokenPosition
+
+  as <- markIndent' col do
+    many $ P.try do
+      -- XXX: Add scan for `[defaults: ...]`
+      P.manyTill anyToken $ P.lookAhead do
+        parseOptionLine
+  debug as
 
   where
+
+    anyName :: TokenParser String
+    anyName = angleName <|> shoutName <|> name
+
+    defaults :: TokenParser String
+    defaults = do
+      lsquare
+      anyName >>= \n -> guard $ toLower n == "default"
+      x <- P.choice
+        [ colon *> P.manyTill anyToken rsquare
+        , P.manyTill anyToken rsquare
+        ]
+      debug "x:" *> debug x
+      pure "XXX"
+
+    parseOptionLine :: TokenParser Option
+    parseOptionLine = sameIndent *> do
+      opt <- P.choice
+        [ shortAndLong
+        , onlyLong
+        , onlyShort ]
+      pure opt
 
     onlyShort :: TokenParser Option
     onlyShort = do
       short <- parseShortOption
       return $ Option {
-        short: Just short
-      , long:  Nothing
-      }
+        short:   Just short
+      , long:    Nothing
+      , default: Nothing }
 
     onlyLong :: TokenParser Option
     onlyLong = do
-      short <- parseLongOption
+      long <- parseLongOption
       return $ Option {
-        short:  Nothing
-      , long: Just short
-      }
+        short:   Nothing
+      , long:    Just long
+      , default: Nothing }
 
     shortAndLong :: TokenParser Option
     shortAndLong = do
@@ -97,9 +124,9 @@ parseOptions = do
         [ P.try comma *> parseLongOption
         , parseLongOption ]
       return $ Option {
-        short: Just short
-      , long:  Just long
-      }
+        short:   Just short
+      , long:    Just long
+      , default: Nothing }
 
     parseShortOption :: TokenParser ShortOption
     parseShortOption = do
