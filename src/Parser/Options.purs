@@ -43,22 +43,73 @@ import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 import Data.Either
 import Data.Maybe hiding (maybe)
+import Data.Generic
 import Docopt.Parser.Base
 import Docopt.Parser.Lexer
 
+data ShortOption = ShortOption Char (Maybe String)
+data LongOption = LongOption String (Maybe String)
 data Option = Option {
-  short :: Maybe Char
-, long  :: Maybe String
-, arg   :: Maybe String
+  short :: Maybe ShortOption
+, long  :: Maybe LongOption
 }
+
+derive instance genericOption :: Generic Option
+derive instance genericShortOption :: Generic ShortOption
+derive instance genericLongOption :: Generic LongOption
+
+instance showOption      :: Show Option      where show = gShow
+instance showShortOption :: Show ShortOption where show = gShow
+instance showLongOption  :: Show LongOption  where show = gShow
 
 parseOptions :: TokenParser Unit
 parseOptions = do
-  parseShortOption
+
+  x <- P.choice
+    [ shortAndLong
+    , onlyLong
+    , onlyShort
+    ]
+  debug x
+
   where
-    parseShortOption :: TokenParser Unit
+
+    onlyShort :: TokenParser Option
+    onlyShort = do
+      short <- parseShortOption
+      return $ Option {
+        short: Just short
+      , long:  Nothing
+      }
+
+    onlyLong :: TokenParser Option
+    onlyLong = do
+      short <- parseLongOption
+      return $ Option {
+        short:  Nothing
+      , long: Just short
+      }
+
+    shortAndLong :: TokenParser Option
+    shortAndLong = do
+      short <- parseShortOption
+      long <- P.choice
+        [ P.try comma *> parseLongOption
+        , parseLongOption ]
+      return $ Option {
+        short: Just short
+      , long:  Just long
+      }
+
+    parseShortOption :: TokenParser ShortOption
     parseShortOption = do
       { flag: flag, stack: stack, arg: arg } <- sopt
       (guard $ (length stack == 0))
         P.<?> "No stacked options"
-      pure unit
+      return $ ShortOption flag arg
+
+    parseLongOption :: TokenParser LongOption
+    parseLongOption = do
+      opt <- lopt
+      arg <- (tryMaybe $ equal *> (shoutName <|> angleName <|> name))
+      return $ LongOption opt arg

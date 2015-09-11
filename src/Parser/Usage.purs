@@ -81,7 +81,7 @@ parseUsage = do
   col' <- getCol
   let startCol = col' - (length name) - 1
 
-  mark' startCol $ P.manyTill
+  markIndent' startCol $ P.manyTill
     (P.try $ Usage name <$> (parseElems name))
     eof
 
@@ -101,7 +101,7 @@ parseUsage = do
 
         matchProgram :: TokenParser Unit
         matchProgram = do
-          same
+          sameIndent
           s <- parseProgram
           guard (s == programName) P.<?> "Program token " ++ s
 

@@ -42,18 +42,18 @@ main = run [consoleReporter] do
         (flip P.runParser Lexer.parseTokens $ Textwrap.dedent
         """ naval_fate -xvzf FIle""")
 
-    it "lexes options" do
-      either
-        (throwError <<< error <<< show)
-        (traceShowA)
-        (flip P.runParser Lexer.parseTokens $ Textwrap.dedent
-        """
-        -h --help     Show this screen.
-        --version     Show version.
-        --speed=<kn>  Speed in knots [default: 10].
-        --moored      Moored (anchored) mine.
-        --drifting    Drifting mine.
-        """)
+    -- it "lexes options" do
+    --   either
+    --     (throwError <<< error <<< show)
+    --     (traceShowA)
+    --     (flip P.runParser Lexer.parseTokens $ Textwrap.dedent
+    --     """
+    --     -h --help     Show this screen.
+    --     --version     Show version.
+    --     --speed=<kn>  Speed in knots [default: 10].
+    --     --moored      Moored (anchored) mine.
+    --     --drifting    Drifting mine.
+    --     """)
 
   describe "docopt parser" do
     it "parses options" do
@@ -63,10 +63,11 @@ main = run [consoleReporter] do
         do
           toks <- flip P.runParser Lexer.parseTokens $ Textwrap.dedent
             """
-            -h --help     Show this screen.
+            -h --help=KN  Show this screen.
             --version     Show version.
             --speed=<kn>  Speed in knots [default: 10].
             --moored      Moored (anchored) mine.
             --drifting    Drifting mine.
             """
+          debug toks
           flip Lexer.runTokenParser Options.parseOptions toks

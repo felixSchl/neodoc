@@ -20,8 +20,8 @@ import qualified Text.Parsing.Parser.String as P
 -- |
 -- Mark the current indentation level
 --
-mark :: forall a. TokenParser a -> TokenParser a
-mark p = do
+markIndent :: forall a. TokenParser a -> TokenParser a
+markIndent p = do
   ParserState { indentation: current } <- lift get
   P.Position { column: pos } <- getPosition
   lift $ modify \(ParserState st) -> ParserState { indentation: pos }
@@ -32,8 +32,8 @@ mark p = do
 -- |
 -- Mark a custom  indentation level
 --
-mark' :: forall a. Int -> TokenParser a -> TokenParser a
-mark' level p = do
+markIndent' :: forall a. Int -> TokenParser a -> TokenParser a
+markIndent' level p = do
   ParserState { indentation: current } <- lift get
   lift $ modify \(ParserState st) -> ParserState { indentation: level }
   a <- p
@@ -65,5 +65,5 @@ lessIndented = checkIndentation (<) P.<?> "less indentation"
 -- Check that the current indentation level is at the same indentation as the
 -- current mark
 --
-same :: TokenParser Unit
-same = checkIndentation (==) P.<?> "no indentation"
+sameIndent :: TokenParser Unit
+sameIndent = checkIndentation (==) P.<?> "no indentation"

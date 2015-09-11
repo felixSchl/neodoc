@@ -228,6 +228,9 @@ dash = match Dash
 vbar :: TokenParser Unit
 vbar = match VBar
 
+comma :: TokenParser Unit
+comma = match Comma
+
 tripleDot :: TokenParser Unit
 tripleDot = match TripleDot
 

@@ -16,7 +16,8 @@
     "purescript-parsing": "~0.6.1",
     "purescript-debug": "~0.1.0",
     "purescript-console": "~0.1.1",
-    "purescript-aff": "0.11.1"
+    "purescript-aff": "0.11.1",
+    "purescript-generics": "~0.5.1"
   },
   "resolutions": {
     "purescript-transformers": "^0.7.1",
