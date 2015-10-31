@@ -135,8 +135,8 @@ parseToken = P.choice
   , P.try $ P.string "..." *> pure TripleDot
   , P.try $ parseStringLiteral
   , P.try $ ShoutName <$> (parseShoutName <* P.notFollowedBy foo)
-  , P.try $ Word      <$> (parseWord      <* P.notFollowedBy foo)
   , P.try $ Name      <$> (parseName      <* P.notFollowedBy foo)
+  , P.try $ Word      <$> (parseWord      <* P.notFollowedBy foo)
   , P.try $ Garbage   <$> P.anyChar
   ] <* P.skipSpaces
 
