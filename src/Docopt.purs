@@ -3,7 +3,7 @@
 -- | compiler.
 -- |
 
-module Docopt.Parser.Docopt where
+module Docopt where
 
 import Prelude
 import Data.Either
@@ -82,3 +82,4 @@ docopt source input = do
                              -> Either P.ParseError a
                              -> Either DocoptError  a
     wrapParseError f = either (Left <<< f) return
+
