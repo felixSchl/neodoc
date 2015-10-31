@@ -38,29 +38,33 @@ data Token
   | SOpt Char (List Char) String
   | ShoutName String
   | AngleName String
-  | Name      String
-  | Garbage   Char
+  | Name String
+  | Word String
+  | StringLiteral String
+  | Garbage Char
 
 prettyPrintToken :: Token -> String
-prettyPrintToken LParen        = show '('
-prettyPrintToken RParen        = show ')'
-prettyPrintToken LSquare       = show '['
-prettyPrintToken RSquare       = show ']'
-prettyPrintToken LAngle        = show '<'
-prettyPrintToken RAngle        = show '>'
-prettyPrintToken Dash          = show '-'
-prettyPrintToken VBar          = show '|'
-prettyPrintToken Colon         = show ':'
-prettyPrintToken Comma         = show ','
-prettyPrintToken Equal         = show '='
-prettyPrintToken TripleDot     = show "..."
-prettyPrintToken (Garbage   c) = "Garbage "   ++ show c
-prettyPrintToken (Name      n) = "Name "      ++ show n
-prettyPrintToken (ShoutName n) = "ShoutName " ++ show n
-prettyPrintToken (AngleName n) = "AngleName " ++ show n
-prettyPrintToken (LOpt n)      = show $ "--" ++ n
-prettyPrintToken (SOpt n s a)  =
-  show $ "-"
+prettyPrintToken LParen            = show '('
+prettyPrintToken RParen            = show ')'
+prettyPrintToken LSquare           = show '['
+prettyPrintToken RSquare           = show ']'
+prettyPrintToken LAngle            = show '<'
+prettyPrintToken RAngle            = show '>'
+prettyPrintToken Dash              = show '-'
+prettyPrintToken VBar              = show '|'
+prettyPrintToken Colon             = show ':'
+prettyPrintToken Comma             = show ','
+prettyPrintToken Equal             = show '='
+prettyPrintToken TripleDot         = show "..."
+prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
+prettyPrintToken (Name      n)     = "Name "      ++ show n
+prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
+prettyPrintToken (AngleName n)     = "AngleName " ++ show n
+prettyPrintToken (StringLiteral s) = "StrLit " ++ show s
+prettyPrintToken (Word w)          = "Word " ++ show w
+prettyPrintToken (LOpt n)          = "LOpt --" ++ n
+prettyPrintToken (SOpt n s a)      =
+  "SOpt -"
     ++ (fromChar n)
     ++ (fromCharArray $ fromList s)
     ++ a
@@ -74,25 +78,27 @@ instance showToken :: Show Token where
   show = show <<< prettyPrintToken
 
 instance eqToken :: Eq Token where
-  eq LParen        LParen           = true
-  eq RParen        RParen           = true
-  eq LSquare       LSquare          = true
-  eq RSquare       RSquare          = true
-  eq LAngle        LAngle           = true
-  eq RAngle        RAngle           = true
-  eq VBar          VBar             = true
-  eq Colon         Colon            = true
-  eq Comma         Comma            = true
-  eq Dash          Dash             = true
-  eq Equal         Equal            = true
-  eq TripleDot     TripleDot        = true
-  eq (AngleName n) (AngleName n')   = n == n'
-  eq (ShoutName n) (ShoutName n')   = n == n'
-  eq (Garbage c)   (Garbage c')     = c == c'
-  eq (Name n)      (Name n')        = n == n'
-  eq (LOpt n)      (LOpt n')        = (n == n')
-  eq (SOpt n ns a) (SOpt n' ns' a') = (n == n') && (ns' == ns') && (a == a')
-  eq _ _                            = false
+  eq LParen            LParen             = true
+  eq RParen            RParen             = true
+  eq LSquare           LSquare            = true
+  eq RSquare           RSquare            = true
+  eq LAngle            LAngle             = true
+  eq RAngle            RAngle             = true
+  eq VBar              VBar               = true
+  eq Colon             Colon              = true
+  eq Comma             Comma              = true
+  eq Dash              Dash               = true
+  eq Equal             Equal              = true
+  eq TripleDot         TripleDot          = true
+  eq (LOpt n)          (LOpt n')          = (n == n')
+  eq (SOpt n s a)      (SOpt n' s' a')    = (n == n') && (s' == s') && (a == a')
+  eq (StringLiteral s) (StringLiteral s') = s == s'
+  eq (AngleName n)     (AngleName n')     = n == n'
+  eq (ShoutName n)     (ShoutName n')     = n == n'
+  eq (Word w)          (Word w')          = w == w'
+  eq (Name n)          (Name n')          = n == n'
+  eq (Garbage c)       (Garbage c')       = c == c'
+  eq _ _                                  = false
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
@@ -120,19 +126,45 @@ parseToken = P.choice
   , P.try $ P.char   ':'   *> pure Colon
   , P.try $ P.char   ','   *> pure Comma
   , P.try $ parseLongOption
-  , P.try $ parseShortOption
+  , P.try $ (parseShortOption <* spaceOrEOF)
   , P.try $ AngleName <$> parseAngleName
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
   , P.try $ P.char   '-'   *> pure Dash
   , P.try $ P.char   '='   *> pure Equal
   , P.try $ P.string "..." *> pure TripleDot
-  , P.try $ ShoutName <$> parseShoutName
-  , P.try $ Name      <$> parseName
+  , P.try $ parseStringLiteral
+  , P.try $ ShoutName <$> (parseShoutName <* P.notFollowedBy foo)
+  , P.try $ Word      <$> (parseWord      <* P.notFollowedBy foo)
+  , P.try $ Name      <$> (parseName      <* P.notFollowedBy foo)
   , P.try $ Garbage   <$> P.anyChar
   ] <* P.skipSpaces
 
  where
+
+  foo :: P.Parser String Unit
+  foo = do
+    regex "[a-zA-Z]"
+    pure unit
+
+  whitespace :: P.Parser String Unit
+  whitespace = do
+    P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
+    pure unit
+
+  spaceOrEOF :: P.Parser String Unit
+  spaceOrEOF = P.choice [ whitespace, P.eof ]
+
+  parseStringLiteral :: P.Parser String Token
+  parseStringLiteral = StringLiteral <$> do
+    P.choice [
+      P.between (P.char '\'') (P.char '\'') (p '\'')
+    , P.between (P.char '"') (P.char '"') (p '"')
+    ]
+    where
+      p :: Char -> P.Parser String String
+      p c = fromCharArray <$> do
+        A.many $ P.noneOf [c]
 
   parseName :: P.Parser String String
   parseName = fromCharArray <$> do
@@ -140,15 +172,27 @@ parseToken = P.choice
       <$> identStart
       <*> A.many identLetter
 
+  parseWord :: P.Parser String String
+  parseWord = fromCharArray <$> do
+    A.cons
+      <$> identStart
+      <*> (A.many $ P.choice [
+        identLetter
+      , P.oneOf [ '.', '-', '_' ]
+      ])
+
   parseAngleName :: P.Parser String String
   parseAngleName =
     P.char '<' *> parseName <* P.char '>'
 
   parseShoutName :: P.Parser String String
-  parseShoutName = fromCharArray <$> do
-    A.cons
-      <$> upperAlpha
-      <*> (A.many $ regex "[A-Z_-]" <* P.notFollowedBy lowerAlpha)
+  parseShoutName = do
+    name <- fromCharArray <$> do
+      A.cons
+        <$> upperAlpha
+        <*> (A.many $ regex "[A-Z_-]")
+    P.notFollowedBy lowerAlpha
+    pure name
 
   parseShortOption :: P.Parser String Token
   parseShortOption =
