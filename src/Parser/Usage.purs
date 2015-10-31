@@ -27,6 +27,18 @@ type OptionArgument = String
 type IsOptional     = Boolean
 type IsRepeatable   = Boolean
 
+-- | Represent a single program usage.
+-- | A single usage is made up of a list of mutually exclusive groups,
+-- | separated by a vertical bar `|`. Each of those groups can contain
+-- | one or more `UsageNode`.
+-- |
+-- | node node | node | node
+-- | ^^^^ ^^^^   ^^^^   ^^^^
+-- |   |   |      |      |
+-- | [ 0 , 1 ]  [ 0 ]  [ 0 ]
+-- |    \ /       |      |
+-- | [   0    ,   1   ,  2 ]
+data Usage = Usage String (List (List UsageNode))
 data UsageNode
   = Command     String
   | Positional  String
@@ -41,19 +53,6 @@ data UsageNode
   | Group       IsOptional
                 (List (List UsageNode))
                 IsRepeatable
-
--- | Represent a single program usage.
--- | A single usage is made up of a list of mutually exclusive groups,
--- | separated by a vertical bar `|`. Each of those groups can contain
--- | one or more `UsageNode`.
--- |
--- | node node | node | node
--- | ^^^^ ^^^^   ^^^^   ^^^^
--- |   |   |      |      |
--- | [ 0 , 1 ]  [ 0 ]  [ 0 ]
--- |    \ /       |      |
--- | [   0    ,   1   ,  2 ]
-data Usage = Usage String (List (List UsageNode))
 
 instance showUsage :: Show Usage where
   show (Usage n xs) = "Usage " ++ show n ++ " " ++ show xs
@@ -92,7 +91,6 @@ parseUsage = do
 
     parseElems :: String -> TokenParser (List (List UsageNode))
     parseElems programName = do
-
       concat <$> P.manyTill
         ((some parseElem) `P.sepBy1` vbar)
         (matchProgram <|> (P.lookAhead eof))
