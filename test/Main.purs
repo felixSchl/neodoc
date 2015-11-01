@@ -9,10 +9,11 @@ import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans (lift)
 import qualified Text.Parsing.Parser as P
-import Data.Either (isRight, isLeft, either)
+import Data.Either (Either(..), isRight, isLeft, either)
 import Data.Either.Unsafe (fromLeft, fromRight)
 import Data.List (length, (!!))
 import Data.Maybe.Unsafe (fromJust)
+import Test.Assert.Simple
 
 import Docopt
 import qualified Docopt.Parser.Usage as Usage
@@ -27,8 +28,6 @@ import Test.Spec (describe, it)
 import Test.Spec.Runner (run)
 import Test.Spec.Reporter.Console (consoleReporter)
 
-runLexer = flip P.runParser
-
 main = run [consoleReporter] do
   describe "scanner" do
     it "should scan sections" do
@@ -40,10 +39,28 @@ main = run [consoleReporter] do
             Advanced Options: qux
             """
       liftEff do
-        assert $ docopt.usage == " foo\n"
+        assert $ docopt.usage == "foo\n"
         assert $ length docopt.options == 2
         assert $ fromJust (docopt.options !! 0) == " bar\n"
         assert $ fromJust (docopt.options !! 1) == " qux\n"
+      pure unit
+
+    it "should scan sections with new line after colon" do
+      let docopt = fromRight $ Scanner.scan $
+          Textwrap.dedent
+            """
+            Usage:
+              foo
+            Options:
+              bar
+            Advanced Options:
+              qux
+            """
+      liftEff do
+        assert $ docopt.usage == "foo\n"
+        assert $ length docopt.options == 2
+        assert $ fromJust (docopt.options !! 0) == "\n  bar\n"
+        assert $ fromJust (docopt.options !! 1) == "\n  qux\n"
       pure unit
 
     it "should fail w/o a usage section" do
@@ -87,3 +104,33 @@ main = run [consoleReporter] do
       liftEff $ do
         assert $ isLeft result
       pure unit
+
+  describe "parser" do
+    it "should parse usage sections" do
+
+      let result = run'
+      liftEff do
+        assertEqual true (isRight result)
+
+      let usage = fromRight result
+      liftEff do
+        assertEqual 2 (length usage)
+
+      let usage_0 = fromJust $ usage !! 0
+          usage_1 = fromJust $ usage !! 1
+
+      pure unit
+        where
+          run' = do
+            docopt <- Scanner.scan $
+              Textwrap.dedent
+                """
+                Usage: foo -x -f -z [
+                   foo | <blah> (foo|qux)
+                   ]
+                       foo <qux>
+
+                NOT PART OF SECTION
+                """
+            toks <- Lexer.lex docopt.usage
+            Usage.parse toks

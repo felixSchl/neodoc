@@ -21,6 +21,9 @@ import Docopt.Parser.Base
 import Docopt.Parser.State
 import Data.Tuple
 
+lex :: String -> Either P.ParseError (List PositionedToken)
+lex = flip P.runParser parseTokens
+
 data Token
   = LParen
   | RParen
@@ -134,18 +137,13 @@ parseToken = P.choice
   , P.try $ P.char   '='   *> pure Equal
   , P.try $ P.string "..." *> pure TripleDot
   , P.try $ parseStringLiteral
-  , P.try $ ShoutName <$> (parseShoutName <* P.notFollowedBy foo)
-  , P.try $ Name      <$> (parseName      <* P.notFollowedBy foo)
-  , P.try $ Word      <$> (parseWord      <* P.notFollowedBy foo)
+  , P.try $ ShoutName <$> (parseShoutName <* P.notFollowedBy alpha)
+  , P.try $ Name      <$> (parseName      <* P.notFollowedBy alpha)
+  , P.try $ Word      <$> (parseWord      <* space)
   , P.try $ Garbage   <$> P.anyChar
   ] <* P.skipSpaces
 
  where
-
-  foo :: P.Parser String Unit
-  foo = do
-    regex "[a-zA-Z]"
-    pure unit
 
   whitespace :: P.Parser String Unit
   whitespace = do
@@ -174,12 +172,10 @@ parseToken = P.choice
 
   parseWord :: P.Parser String String
   parseWord = fromCharArray <$> do
-    A.cons
-      <$> identStart
-      <*> (A.many $ P.choice [
-        identLetter
-      , P.oneOf [ '.', '-', '_' ]
-      ])
+    (A.some $ P.choice [
+      identLetter
+    , P.oneOf [ '.', '-', '_' ]
+    ])
 
   parseAngleName :: P.Parser String String
   parseAngleName =
@@ -308,6 +304,12 @@ name :: TokenParser String
 name = token go P.<?> "name"
   where
     go (Name n) = Just n
+    go _        = Nothing
+
+word :: TokenParser String
+word = token go P.<?> "word"
+  where
+    go (Word n) = Just n
     go _        = Nothing
 
 angleName :: TokenParser String

@@ -5,6 +5,7 @@
 module Docopt.Parser.Common where
 
 import Prelude
+import Debug.Trace
 import Control.Monad.Trans (lift)
 import Control.MonadPlus (guard)
 import Control.Monad.State
@@ -67,6 +68,12 @@ checkIndentation rel = do
 --
 indented :: TokenParser Unit
 indented = checkIndentation (>=) P.<?> "indentation"
+
+-- |
+-- Check that the current indentation level is before the current mark
+--
+moreIndented :: TokenParser Unit
+moreIndented = checkIndentation (>) P.<?> "more indentation"
 
 -- |
 -- Check that the current indentation level is before the current mark

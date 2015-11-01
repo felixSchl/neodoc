@@ -21,11 +21,8 @@ import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Usage as Usage
 import Docopt.Textwrap (dedent)
 
-data Docopt = Docopt Section (List Section)
+type Docopt = { usage :: Section, options :: List Section }
 type Section = String
-
-instance showDocopt :: Show Docopt where
-  show (Docopt x xs) = "Docopt " ++ show x ++ " " ++ show xs
 
 -- | Pre-parse the docopt string and break it into sections.
 scan :: String -> Either P.ParseError Docopt
@@ -44,10 +41,16 @@ docoptScanner = do
   -- | Parse the usage section
   label <- sectionLabel
   guard ((toLower label) == "usage")
+
+  -- "Fix" the section by replacing the original section header with whitespace
+  -- to maintain proper offsets.
+  fixColOffset <- (P.char '\n' *> pure 0)
+              <|> (pure $ Str.length label + 1) -- + 1 for the colon
   usage <- fromCharArray <<< fromList <$> do
     P.manyTill
       P.anyChar
       ((void $ P.lookAhead sectionLabel) <|> P.eof)
+  let fixedUsage = (fromCharArray $ A.replicate fixColOffset ' ') ++ usage
 
   -- | Parse any option sections
   options <- many do
@@ -59,7 +62,7 @@ docoptScanner = do
         P.anyChar
         ((void $ P.lookAhead sectionLabel) <|> P.eof)
 
-  pure $ Docopt usage options
+  pure { usage: dedent fixedUsage, options: options }
 
   where
     sectionLabel :: P.Parser String String

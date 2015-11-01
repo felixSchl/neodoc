@@ -17,11 +17,14 @@
     "purescript-debug": "~0.1.0",
     "purescript-console": "~0.1.1",
     "purescript-aff": "0.11.1",
-    "purescript-generics": "~0.5.1"
+    "purescript-generics": "~0.6.0",
+    "purescript-assert": "~0.1.1",
+    "purescript-simple-assert": "~0.3.0",
+    "purescript-transformers": "~0.8.1"
   },
   "resolutions": {
     "purescript-transformers": "^0.7.1",
-    "purescript-strings": "~0.7.0"
+    "purescript-strings": "^0.7.0"
   },
   "devDependencies": {
     "purescript-spec": "~0.7.1"
