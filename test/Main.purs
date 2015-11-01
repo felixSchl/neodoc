@@ -112,12 +112,14 @@ main = run [consoleReporter] do
 
       liftEff do
 
+        -- Scan, lex and parse the usage section
         usage <- runEitherEff do
           docopt <- Scanner.scan $
             Textwrap.dedent
               """
-              Usage: foo foo | bar
+              Usage: foo foo | bar aux
                     foo (bar qux)
+              NOT PART OF SECTION
               """
           toks <- Lexer.lex docopt.usage
           Usage.parse toks
@@ -127,9 +129,20 @@ main = run [consoleReporter] do
         (Usage.Usage _ u0) <- runMaybeEff $ usage !! 0
         assertEqual 2 (length u0)
 
+        -- Validate the left half of the mutex group
+        u0g0 <- runMaybeEff $ u0 !! 0
+        assertEqual 1 (length u0g0)
+
+        -- Validate the right half of the mutex group
+        u0g1 <- runMaybeEff $ u0 !! 1
+        assertEqual 2 (length u0g1)
+
         -- Validate the second usage
         (Usage.Usage _ u1) <- runMaybeEff $ usage !! 1
         assertEqual 1 (length u1)
+
+        u1g0 <- runMaybeEff $ u1 !! 0
+        assertEqual 1 (length u1g0)
 
 
       pure unit
