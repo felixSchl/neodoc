@@ -4,8 +4,9 @@ import Prelude
 import Debug.Trace
 import Control.MonadPlus (guard)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Console (log)
-import Control.Monad.Eff.Exception (error)
+import Control.Monad.Eff.Exception (EXCEPTION(), error, throwException)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans (lift)
 import qualified Text.Parsing.Parser as P
@@ -13,6 +14,7 @@ import Data.Either (Either(..), isRight, isLeft, either)
 import Data.Either.Unsafe (fromLeft, fromRight)
 import Data.List (length, (!!))
 import Data.Maybe.Unsafe (fromJust)
+import Data.Maybe (Maybe(..))
 import Test.Assert.Simple
 
 import Docopt
@@ -108,29 +110,45 @@ main = run [consoleReporter] do
   describe "parser" do
     it "should parse usage sections" do
 
-      let result = run'
       liftEff do
-        assertEqual true (isRight result)
 
-      let usage = fromRight result
-      liftEff do
+        usage <- runEitherEff do
+          docopt <- Scanner.scan $
+            Textwrap.dedent
+              """
+              Usage: foo foo | bar
+                    foo (bar qux)
+              """
+          toks <- Lexer.lex docopt.usage
+          Usage.parse toks
         assertEqual 2 (length usage)
 
-      let usage_0 = fromJust $ usage !! 0
-          usage_1 = fromJust $ usage !! 1
+        -- Validate the first usage
+        (Usage.Usage _ u0) <- runMaybeEff $ usage !! 0
+        assertEqual 2 (length u0)
+
+        -- Validate the second usage
+        (Usage.Usage _ u1) <- runMaybeEff $ usage !! 1
+        assertEqual 1 (length u1)
+
 
       pure unit
-        where
-          run' = do
-            docopt <- Scanner.scan $
-              Textwrap.dedent
-                """
-                Usage: foo -x -f -z [
-                   foo | <blah> (foo|qux)
-                   ]
-                       foo <qux>
 
-                NOT PART OF SECTION
-                """
-            toks <- Lexer.lex docopt.usage
-            Usage.parse toks
+  where
+
+    runMaybeEff :: forall a eff.
+      Maybe a ->
+      Eff (err :: EXCEPTION | eff) a
+    runMaybeEff m =
+      case m of
+        Just v  -> pure v
+        Nothing -> throwException (error "Nothing")
+
+    runEitherEff :: forall err a eff. (Show err, Show a) =>
+      Either err a ->
+      Eff (err :: EXCEPTION | eff) a
+    runEitherEff m =
+      case m of
+        Right v  -> pure v
+        Left err -> throwException (error $ show err)
+

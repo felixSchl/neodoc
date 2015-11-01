@@ -96,13 +96,12 @@ usageParser = do
   name <- parseProgram
   col' <- getCol
   let startCol = col' - (length name) - 1
-  xss <- markIndent' startCol $ do
+  markIndent' startCol $ do
     Cons
     <$> (parseSingleUsage name)
-    <*> some do
+    <*> many do
           parseProgram
           (parseSingleUsage name)
-  pure $ xss
 
   where
 
