@@ -38,8 +38,8 @@ data Token
   | Comma
   | Equal
   | TripleDot
-  | LOpt String
-  | SOpt Char (Array Char) String
+  | LOpt String (Maybe String)
+  | SOpt Char (Array Char) (Maybe String)
   | ShoutName String
   | AngleName String
   | Name String
@@ -66,12 +66,12 @@ prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
 prettyPrintToken (AngleName n)     = "AngleName " ++ show n
 prettyPrintToken (StringLiteral s) = "StrLit " ++ show s
 prettyPrintToken (Word w)          = "Word " ++ show w
-prettyPrintToken (LOpt n)          = "LOpt --" ++ n
+prettyPrintToken (LOpt n a)        = "LOpt --" ++ n ++ (show a)
 prettyPrintToken (SOpt n s a)      =
   "SOpt -"
     ++ (fromChar n)
     ++ (fromCharArray s)
-    ++ a
+    ++ (show a)
 
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position
@@ -94,7 +94,7 @@ instance eqToken :: Eq Token where
   eq Dash              Dash               = true
   eq Equal             Equal              = true
   eq TripleDot         TripleDot          = true
-  eq (LOpt n)          (LOpt n')          = (n == n')
+  eq (LOpt n a)        (LOpt n' a')       = (n == n') && (a == a')
   eq (SOpt n s a)      (SOpt n' s' a')    = (n == n') && (s' == s') && (a == a')
   eq (StringLiteral s) (StringLiteral s') = s == s'
   eq (AngleName n)     (AngleName n')     = n == n'
@@ -130,8 +130,7 @@ parseToken = P.choice
   , P.try $ P.char   ':'   *> pure Colon
   , P.try $ P.char   ','   *> pure Comma
   , P.try $ parseLongOption
-   -- XXX: Add-hoc fix
-  , P.try $ parseShortOption <* (P.notFollowedBy $ P.oneOf [ '<', '>' ])
+  , P.try $ parseShortOption
   , P.try $ AngleName <$> parseAngleName
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
@@ -201,23 +200,76 @@ parseToken = P.choice
 
   parseShortOption :: P.Parser String Token
   parseShortOption = do
-    P.char '-' *> do
-      SOpt
-        <$> lowerAlphaNum
-        <*> (A.many lowerAlphaNum)
-        <*> P.choice [
-              P.try $ fromCharArray <$>
-                (A.cons
-                  <$> upperAlphaNum
-                  <*> (A.many $ lowerAlphaNum <|> upperAlphaNum))
-            , P.try $ parseAngleName
-            , pure "" -- XXX: use Maybe/Nothing?
-            ]
+    P.char '-'
+    x  <- lowerAlphaNum
+    xs <- A.many lowerAlphaNum
+    arg <- P.choice [
+
+      -- Parse <flag>=<value>, i.e.: `-foo=bar`
+      Just <$> do
+        -- XXX: Drop the spaces?
+        many space *> P.char '=' <* many space
+        P.choice [
+          P.try parseAngleName
+        , P.try parseShoutName
+        , P.try parseName
+        ]
+
+      -- Parse <flag><VALUE>, i.e.: `-fooBAR`
+    , Just <$> do
+        fromCharArray <$>
+          (A.cons
+            <$> upperAlphaNum
+            <*> (A.many $ lowerAlphaNum <|> upperAlphaNum))
+
+      -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
+    , Just <$> parseAngleName
+
+      -- Otherwise assume no argument given. We might be proven wrong at a later
+      -- stage (parsing / solving), but as far as the lexer is concerned, this
+      -- token bears no arguments.
+    , pure Nothing
+    ]
+    pure $ SOpt x xs arg
 
   parseLongOption :: P.Parser String Token
-  parseLongOption =
-    P.string "--" *> do
-      LOpt <$> parseName
+  parseLongOption = do
+    P.string "--"
+    name <- fromCharArray <$> do
+      A.cons
+        <$> lowerAlphaNum
+        <*> (A.many $ P.choice [
+              lowerAlphaNum
+            , P.oneOf [ '-' ] <* P.lookAhead lowerAlphaNum
+            ])
+    arg <- P.choice [
+
+      -- Parse <flag>=<value>, i.e.: `--foo=bar`
+      (Just <$> do
+        -- XXX: Drop the spaces?
+        many space *> P.char '=' <* many space
+        P.choice [
+          P.try parseAngleName
+        , P.try parseShoutName
+        , P.try parseName
+        ])
+
+      -- Parse <flag><VALUE>, i.e.: `--fooBAR`
+    , (Just <$> do
+        fromCharArray <$>
+          (A.cons
+            <$> upperAlphaNum
+            <*> (A.many $ lowerAlphaNum <|> upperAlphaNum)))
+
+      -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
+    , Just <$> parseAngleName
+
+      -- Otherwise assume no argument given. We might be proven wrong at a later
+      -- stage (parsing / solving), but as far as the lexer is concerned, this
+      -- token bears no arguments.
+    , pure Nothing
+    ]
+    pure $ LOpt name arg
 
   identStart :: P.Parser String Char
   identStart = alpha
@@ -296,24 +348,19 @@ tripleDot = match TripleDot
 equal :: TokenParser Unit
 equal = match Equal
 
-lopt :: TokenParser String
+lopt :: TokenParser { name :: String
+                    , arg  :: Maybe String }
 lopt = token go P.<?> "long-option"
   where
-    go (LOpt n) = Just n
-    go _        = Nothing
+    go (LOpt n a) = Just { name: n, arg: a }
+    go _          = Nothing
 
 sopt :: TokenParser { flag  :: Char
                     , stack :: Array Char
                     , arg   :: Maybe String }
 sopt = token go P.<?> "short-option"
   where
-    go (SOpt n s a) = Just {
-      flag: n
-    , stack: s
-    , arg: case a of
-                "" -> Nothing
-                _  -> Just a
-    }
+    go (SOpt n s a) = Just { flag: n , stack: s , arg: a }
     go _ = Nothing
 
 name :: TokenParser String

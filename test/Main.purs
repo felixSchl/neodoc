@@ -146,6 +146,7 @@ main = run [consoleReporter] do
         , pass "--bar=fOo"     $ lo "bar" (Just "fOo")
         , pass "--bar = fOo"   $ lo "bar" (Just "fOo")
         , pass "--bar = <foo>" $ lo "bar" (Just "foo")
+        , pass "--barFOO"      $ lo "bar" (Just "FOO")
         , fail "-- bar"
         , fail "- - bar"
         , fail "--bar="

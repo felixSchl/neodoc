@@ -138,6 +138,5 @@ parseOptions = do
 
     parseLongOption :: TokenParser LongOption
     parseLongOption = do
-      opt <- lopt
-      arg <- (tryMaybe $ equal *> (shoutName <|> angleName <|> name))
-      return $ LongOption opt arg
+      { name: name, arg: arg } <- lopt
+      return $ LongOption name arg

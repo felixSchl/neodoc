@@ -132,31 +132,16 @@ usageParser = do
         ] P.<?> "Option, Positional, Command or Group"
 
     parseLongOption :: TokenParser UsageNode
-    parseLongOption = Option
-      <$> lopt
-      <*> (tryMaybe do
-            equal
-            P.choice [
-              P.try shoutName
-            , P.try angleName
-            , P.try name
-            ])
-      <*> parseRepetition
+    parseLongOption = do
+      { name: name, arg: arg } <- lopt
+      Option name arg
+        <$> parseRepetition
 
     parseShortOption :: TokenParser UsageNode
     parseShortOption = do
       { flag: flag, stack: stack, arg: arg } <- sopt
-      OptionStack flag stack
-          <$> (case arg of
-                Just _  -> pure arg
-                Nothing -> tryMaybe do
-                  equal
-                  P.choice [
-                    P.try angleName
-                  , P.try shoutName
-                  , P.try name
-                  ])
-          <*> parseRepetition
+      OptionStack flag stack arg
+        <$> parseRepetition
 
     parseOption :: TokenParser UsageNode
     parseOption = (parseLongOption <|> parseShortOption)
