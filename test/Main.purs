@@ -12,7 +12,7 @@ import Control.Monad.Trans (lift)
 import qualified Text.Parsing.Parser as P
 import Data.Either (Either(..), isRight, isLeft, either)
 import Data.Either.Unsafe (fromLeft, fromRight)
-import Data.List (List(..), length, (!!))
+import Data.List (List(..), length, (!!), take)
 import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..))
 import Test.Assert.Simple
@@ -127,63 +127,62 @@ main = run [consoleReporter] do
     -- Each entry is run for both singular and repeated version.
     describe "positionals" do
       runSingleUsageNodeTests
-        [ { i: "BAR"       , o: P $ po "BAR"     }
-        , { i: "<foo-qux>" , o: P $ po "foo-qux" }
-        , { i: "<QUX>"     , o: P $ po "QUX"     }
-        , { i: "<QuX>"     , o: P $ po "QuX"     }
-        , { i: "<quux>"    , o: P $ po "quux"    }
+        [ pass "BAR"       $ po "BAR"
+        , pass "<foo-qux>" $ po "foo-qux"
+        , pass "<QUX>"     $ po "QUX"
+        , pass "<QuX>"     $ po "QuX"
+        , pass "<quux>"    $ po "quux"
         ]
 
     -- Test long options in various formats.
     -- Each entry is run for both singular and repeated version.
     describe "long options" do
       runSingleUsageNodeTests
-        [ { i: "--bar"         , o: P $ lo "bar" Nothing      }
-        , { i: "--bar = foo"   , o: P $ lo "bar" (Just "foo") }
-        , { i: "--bar=<foo>"   , o: P $ lo "bar" (Just "foo") }
-        , { i: "--bar=FOO"     , o: P $ lo "bar" (Just "FOO") }
-        , { i: "--bar = FOO"   , o: P $ lo "bar" (Just "FOO") }
-        , { i: "--bar=fOo"     , o: P $ lo "bar" (Just "fOo") }
-        , { i: "--bar = fOo"   , o: P $ lo "bar" (Just "fOo") }
-        , { i: "--bar = <foo>" , o: P $ lo "bar" (Just "foo") }
-        , { i: "-- bar"        , o: F                         }
-        , { i: "- - bar"       , o: F                         }
-        , { i: "--bar="        , o: F                         }
-        , { i: "--bar=<>"      , o: F                         }
-        , { i: "--bar=--foo"   , o: F                         }
-        , { i: "--bar=-foo"    , o: F                         }
+        [ pass "--bar"         $ lo "bar" Nothing
+        , pass "--bar = foo"   $ lo "bar" (Just "foo")
+        , pass "--bar=<foo>"   $ lo "bar" (Just "foo")
+        , pass "--bar=FOO"     $ lo "bar" (Just "FOO")
+        , pass "--bar = FOO"   $ lo "bar" (Just "FOO")
+        , pass "--bar=fOo"     $ lo "bar" (Just "fOo")
+        , pass "--bar = fOo"   $ lo "bar" (Just "fOo")
+        , pass "--bar = <foo>" $ lo "bar" (Just "foo")
+        , fail "-- bar"
+        , fail "- - bar"
+        , fail "--bar="
+        , fail "--bar=<>"
+        , fail "--bar=--foo"
+        , fail "--bar=-foo"
         ]
 
     -- Test stacked options in various formats.
     -- Each entry is run for both singular and repeated version.
     describe "stacked options" do
       runSingleUsageNodeTests
-        [ { i: "-b"          , o: P $ so 'b' [] Nothing      }
-        , { i: "-bFOO"       , o: P $ so 'b' [] (Just "FOO") }
-        , { i: "-bFoo"       , o: P $ so 'b' [] (Just "Foo") }
-        , { i: "-b<foo>"     , o: P $ so 'b' [] (Just "foo") }
-        , { i: "-b<foo>"     , o: P $ so 'b' [] (Just "foo") }
-        , { i: "-b=foo"      , o: P $ so 'b' [] (Just "foo") }
-        , { i: "-b=FOO"      , o: P $ so 'b' [] (Just "FOO") }
-        , { i: "-b=<foo>"    , o: P $ so 'b' [] (Just "foo") }
-        , { i: "-bar"        , o: P $ so 'b' ['a', 'r'] Nothing }
-        , { i: "-barFOO"     , o: P $ so 'b' ['a', 'r'] (Just "FOO") }
-        , { i: "-bar<foo>"   , o: P $ so 'b' ['a', 'r'] (Just "foo") }
-        , { i: "-barFoo"     , o: P $ so 'b' ['a', 'r'] (Just "Foo") }
-        , { i: "-bar=foo"    , o: P $ so 'b' ['a', 'r'] (Just "foo") }
-        , { i: "-bar=FOO"    , o: P $ so 'b' ['a', 'r'] (Just "FOO") }
-        , { i: "-bar=<foo>"  , o: P $ so 'b' ['a', 'r'] (Just "foo") }
-        , { i: "-bAR"        , o: P $ so 'b' [] (Just "AR") }
-        , { i: "-bARfoo"     , o: P $ so 'b' [] (Just "ARfoo") }
-        , { i: "-bAR=foo"    , o: F }
-        , { i: "-bAR=<foo>"  , o: F }
-        , { i: "-bAR<foo>"   , o: F }
+        [ pass "-b"          $ so 'b' [] Nothing
+        , pass "-bFOO"       $ so 'b' [] (Just "FOO")
+        , pass "-bFoo"       $ so 'b' [] (Just "Foo")
+        , pass "-b<foo>"     $ so 'b' [] (Just "foo")
+        , pass "-b<foo>"     $ so 'b' [] (Just "foo")
+        , pass "-b=foo"      $ so 'b' [] (Just "foo")
+        , pass "-b=FOO"      $ so 'b' [] (Just "FOO")
+        , pass "-b=<foo>"    $ so 'b' [] (Just "foo")
+        , pass "-bar"        $ so 'b' ['a', 'r'] Nothing
+        , pass "-barFOO"     $ so 'b' ['a', 'r'] (Just "FOO")
+        , pass "-bar<foo>"   $ so 'b' ['a', 'r'] (Just "foo")
+        , pass "-barFoo"     $ so 'b' ['a', 'r'] (Just "Foo")
+        , pass "-bar=foo"    $ so 'b' ['a', 'r'] (Just "foo")
+        , pass "-bar=FOO"    $ so 'b' ['a', 'r'] (Just "FOO")
+        , pass "-bar=<foo>"  $ so 'b' ['a', 'r'] (Just "foo")
+        , pass "-bAR"        $ so 'b' [] (Just "AR")
+        , pass "-bARfoo"     $ so 'b' [] (Just "ARfoo")
+        , fail "-bAR=foo"
+        , fail "-bAR=<foo>"
+        , fail "-bAR<foo>"
+        -- , pass "-b foo"      $ (so 'b' [] Nothing)
+        -- , pass "-b FOO"      $ (so 'b' [] Nothing)
+        -- , pass "-bar foo"    $ (so 'b' ['a', 'r'] Nothing
+        -- , pass "-bar FOO"    $ (so 'b' ['a', 'r'] Nothing
         ]
-
-                -- -b foo     -b FOO...
-                -- -b FOO     -b FOO...
-        --         -bar foo   -bar foo...
-        --         -bar FOO   -bar FOO...
 
     it "should parse scanned and lexed usage sections" do
       liftEff do
@@ -252,6 +251,10 @@ main = run [consoleReporter] do
     po :: String -> Boolean -> Usage.UsageNode
     po = Usage.Positional
 
+    kase i o = { i: i, o: o }
+    pass i o = kase i (P o)
+    fail i = kase i F
+
     runSingleUsageNodeTests xs =
       for_ xs \{ i: i, o: o } -> do
         for_ [ false, true ] \isRepeated -> do -- Append "..." ?
@@ -273,7 +276,7 @@ main = run [consoleReporter] do
                     g <- runMaybeEff $ u !! 0
 
                     -- Assert output matches expected
-                    flip assertEqual g (Cons expected Nil)
+                    flip assertEqual (take 1 g) (Cons expected Nil)
               _ -> do
                 it (input ++ " should fail") do
                 liftEff do
