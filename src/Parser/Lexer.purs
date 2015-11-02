@@ -180,10 +180,13 @@ parseToken = P.choice
   parseAngleName :: P.Parser String String
   parseAngleName = do
     P.char '<'
-    name <- P.choice [
-      P.try parseShoutName
-    , P.try parseName
-    ]
+    name <- fromCharArray <$> do
+      A.cons
+        <$> identStart
+        <*> (A.many $ P.choice [
+              identLetter
+            , P.oneOf [ '-' ]
+            ])
     P.char '>'
     pure name
 

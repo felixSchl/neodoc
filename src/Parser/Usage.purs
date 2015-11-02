@@ -136,7 +136,11 @@ usageParser = do
       <$> lopt
       <*> (tryMaybe do
             equal
-            (shoutName <|> angleName <|> name))
+            P.choice [
+              P.try shoutName
+            , P.try angleName
+            , P.try name
+            ])
       <*> parseRepetition
 
     parseShortOption :: TokenParser UsageNode

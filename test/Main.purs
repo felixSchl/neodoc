@@ -17,6 +17,7 @@ import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..))
 import Test.Assert.Simple
 import Data.Foldable (foldMap, traverse_, for_)
+import Data.Array ((..))
 
 import Docopt
 import qualified Docopt.Parser.Usage as Usage
@@ -122,32 +123,35 @@ main = run [consoleReporter] do
         g <- runMaybeEff $ u !! 0
         flip assertEqual g (Cons (Usage.Command "bar") Nil)
 
-    it "should parse positionals" do
-      liftEff do
-        usage <- runEitherEff do
-          toks <- Lexer.lex "foo BAR <foo-qux> <QUX> <QuX> <quux>... <quux> ..."
-          Usage.parse toks
-
-        -- There should only be one top-level mutex group
-        assertEqual 1 (length usage)
-        (Usage.Usage _ u) <- runMaybeEff $ usage !! 0
-        g <- runMaybeEff $ u !! 0
-
-        -- Make assertions about the group
-        flip assertEqual g
-          (Cons (Usage.Positional "BAR" false)
-          (Cons (Usage.Positional "foo-qux" false)
-          (Cons (Usage.Positional "QUX" false)
-          (Cons (Usage.Positional "QuX" false)
-          (Cons (Usage.Positional "quux" true)
-          (Cons (Usage.Positional "quux" true) Nil))))))
+    -- Test positionals in various formats.
+    -- Each entry is run for both singular and repeated version.
+    describe "positionals" do
+      runSingleUsageNodeTests
+        [ { i: "BAR"       , o: P $ po "BAR"     }
+        , { i: "<foo-qux>" , o: P $ po "foo-qux" }
+        , { i: "<QUX>"     , o: P $ po "QUX"     }
+        , { i: "<QuX>"     , o: P $ po "QuX"     }
+        , { i: "<quux>"    , o: P $ po "quux"    }
+        ]
 
     -- Test long options in various formats.
     -- Each entry is run for both singular and repeated version.
     describe "long options" do
       runSingleUsageNodeTests
-        [ { i: "--bar"          , o: P $ lo "bar" Nothing      }
-        , { i: "--bar = foo"    , o: P $ lo "bar" (Just "foo") }
+        [ { i: "--bar"         , o: P $ lo "bar" Nothing      }
+        , { i: "--bar = foo"   , o: P $ lo "bar" (Just "foo") }
+        , { i: "--bar=<foo>"   , o: P $ lo "bar" (Just "foo") }
+        , { i: "--bar=FOO"     , o: P $ lo "bar" (Just "FOO") }
+        , { i: "--bar = FOO"   , o: P $ lo "bar" (Just "FOO") }
+        , { i: "--bar=fOo"     , o: P $ lo "bar" (Just "fOo") }
+        , { i: "--bar = fOo"   , o: P $ lo "bar" (Just "fOo") }
+        , { i: "--bar = <foo>" , o: P $ lo "bar" (Just "foo") }
+        , { i: "-- bar"        , o: F                         }
+        , { i: "- - bar"       , o: F                         }
+        , { i: "--bar="        , o: F                         }
+        , { i: "--bar=<>"      , o: F                         }
+        , { i: "--bar=--foo"   , o: F                         }
+        , { i: "--bar=-foo"    , o: F                         }
         ]
 
     -- Test stacked options in various formats.
@@ -238,37 +242,44 @@ main = run [consoleReporter] do
 
     -- short hand to create a short option node
     so :: Char -> Array Char -> Maybe String -> Boolean -> Usage.UsageNode
-    so c cs a r = Usage.OptionStack c cs a r
+    so = Usage.OptionStack
 
     -- short hand to create a long option node
     lo :: String -> Maybe String -> Boolean -> Usage.UsageNode
-    lo s a r = Usage.Option  s a r
+    lo = Usage.Option
+
+    -- short hand to create a positional node
+    po :: String -> Boolean -> Usage.UsageNode
+    po = Usage.Positional
 
     runSingleUsageNodeTests xs =
       for_ xs \{ i: i, o: o } -> do
-        for_ [ false, true ] \isRepeated -> do
-          let input = "foo " ++ i ++ (if isRepeated then "..." else "")
-          case o of
-            P v -> do
-              let expected = v isRepeated
-              it (input ++ " -> " ++ show expected)  do
+        for_ [ false, true ] \isRepeated -> do -- Append "..." ?
+          for_ (1 .. 2) \q -> do -- "..." vs " ..." (note the space)
+            let input = "foo " ++ i ++ (if isRepeated
+                                       then (if q == 1 then "..." else " ...")
+                                       else "")
+            case o of
+              P v -> do
+                let expected = v isRepeated
+                it (input ++ " -> " ++ show expected)  do
+                  liftEff do
+                    usage <- runEitherEff do
+                      Lexer.lex input >>= Usage.parse
+
+                    -- There should only be one top-level mutex group
+                    assertEqual 1 (length usage)
+                    (Usage.Usage _ u) <- runMaybeEff $ usage !! 0
+                    g <- runMaybeEff $ u !! 0
+
+                    -- Assert output matches expected
+                    flip assertEqual g (Cons expected Nil)
+              _ -> do
+                it (input ++ " should fail") do
                 liftEff do
-                  usage <- runEitherEff do
-                    Lexer.lex input >>= Usage.parse
-
-                  -- There should only be one top-level mutex group
-                  assertEqual 1 (length usage)
-                  (Usage.Usage _ u) <- runMaybeEff $ usage !! 0
-                  g <- runMaybeEff $ u !! 0
-
-                  -- Assert output matches expected
-                  flip assertEqual g (Cons expected Nil)
-            _ -> do
-              it (input ++ " should fail") do
-              liftEff do
-                assertThrows (const true) do
-                  runEitherEff do
-                    toks <- Lexer.lex input 
-                    traceShowA input
-                    Usage.parse toks >>= debug
-                    pure unit
+                  assertThrows (const true) do
+                    runEitherEff do
+                      toks <- Lexer.lex input 
+                      traceShowA input
+                      Usage.parse toks >>= debug
+                      pure unit
