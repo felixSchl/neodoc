@@ -22,6 +22,8 @@ import Docopt.Parser.Base
 import Docopt.Parser.Common
 import Docopt.Parser.Lexer
 import Docopt.Parser.State
+import qualified Data.Array as A
+import qualified Data.String as Str
 
 type OptionAlias    = String
 type OptionArgument = String
@@ -116,7 +118,9 @@ usageParser = do
 
     parseSingleUsage :: String -> TokenParser Usage
     parseSingleUsage name = Usage name <$> do
-      (some $ moreIndented *> parseElem) `P.sepBy1` vbar
+      x <- (some $ moreIndented *> parseElem) `P.sepBy1` vbar
+      eof <|> (P.lookAhead $ lessIndented)
+      pure x
 
     parseElem :: TokenParser UsageNode
     parseElem = defer \_ -> do
@@ -138,18 +142,15 @@ usageParser = do
     parseShortOption :: TokenParser UsageNode
     parseShortOption = do
       { flag: flag, stack: stack, arg: arg } <- sopt
-      traceShowA flag
-      traceShowA stack
-      traceShowA arg
       OptionStack flag stack
           <$> (case arg of
                 Just _  -> pure arg
                 Nothing -> tryMaybe do
                   equal
                   P.choice [
-                    P.try shoutName 
-                  , P.try angleName
-                  , P.try name 
+                    P.try angleName
+                  , P.try shoutName
+                  , P.try name
                   ])
           <*> parseRepetition
 

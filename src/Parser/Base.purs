@@ -35,6 +35,13 @@ getCol = do
   P.Position { column: col } <- getPosition
   return col
 
+-- | Return the current parser row
+-- | XXX: Use either `line` or `row` - not both!
+getRow :: forall a m. (Monad m) => P.ParserT a m Int
+getRow = do
+  P.Position { line: row } <- getPosition
+  return row
+
 tryMaybe :: forall s m a. (Monad m) => P.ParserT s m a -> P.ParserT s m (Maybe a)
 tryMaybe p = (Just <$> p) <|> (pure Nothing)
 

@@ -16,6 +16,7 @@ import Data.List (List(..), length, (!!))
 import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..))
 import Test.Assert.Simple
+import Data.Foldable (foldMap, traverse_, for_)
 
 import Docopt
 import qualified Docopt.Parser.Usage as Usage
@@ -29,6 +30,8 @@ import Test.Assert (assert)
 import Test.Spec (describe, it)
 import Test.Spec.Runner (run)
 import Test.Spec.Reporter.Console (consoleReporter)
+
+data Expected a = F | P a
 
 main = run [consoleReporter] do
   describe "scanner" do
@@ -139,116 +142,44 @@ main = run [consoleReporter] do
           (Cons (Usage.Positional "quux" true)
           (Cons (Usage.Positional "quux" true) Nil))))))
 
-    it "should parse long options" do
-      liftEff do
-        usage <- runEitherEff do
-          toks <- Lexer.lex $ Textwrap.dedent
-            """
-            foo --bar
-                --bar=<foo-bar>
-                --bar=FOO
-                --bar=fOo
-                --bar = foo
-                --bar...
-                --bar = baz...
-                --bar=<baz>...
-            """
-          Usage.parse toks
+    -- Test long options in various formats.
+    -- Each entry is run for both singular and repeated version.
+    describe "long options" do
+      runSingleUsageNodeTests
+        [ { i: "--bar"          , o: P $ lo "bar" Nothing      }
+        , { i: "--bar = foo"    , o: P $ lo "bar" (Just "foo") }
+        ]
 
-        -- There should only be one top-level mutex group
-        assertEqual 1 (length usage)
-        (Usage.Usage _ u) <- runMaybeEff $ usage !! 0
-        g <- runMaybeEff $ u !! 0
+    -- Test stacked options in various formats.
+    -- Each entry is run for both singular and repeated version.
+    describe "stacked options" do
+      runSingleUsageNodeTests
+        [ { i: "-b"          , o: P $ so 'b' [] Nothing      }
+        , { i: "-bFOO"       , o: P $ so 'b' [] (Just "FOO") }
+        , { i: "-bFoo"       , o: P $ so 'b' [] (Just "Foo") }
+        , { i: "-b<foo>"     , o: P $ so 'b' [] (Just "foo") }
+        , { i: "-b<foo>"     , o: P $ so 'b' [] (Just "foo") }
+        , { i: "-b=foo"      , o: P $ so 'b' [] (Just "foo") }
+        , { i: "-b=FOO"      , o: P $ so 'b' [] (Just "FOO") }
+        , { i: "-b=<foo>"    , o: P $ so 'b' [] (Just "foo") }
+        , { i: "-bar"        , o: P $ so 'b' ['a', 'r'] Nothing }
+        , { i: "-barFOO"     , o: P $ so 'b' ['a', 'r'] (Just "FOO") }
+        , { i: "-bar<foo>"   , o: P $ so 'b' ['a', 'r'] (Just "foo") }
+        , { i: "-barFoo"     , o: P $ so 'b' ['a', 'r'] (Just "Foo") }
+        , { i: "-bar=foo"    , o: P $ so 'b' ['a', 'r'] (Just "foo") }
+        , { i: "-bar=FOO"    , o: P $ so 'b' ['a', 'r'] (Just "FOO") }
+        , { i: "-bar=<foo>"  , o: P $ so 'b' ['a', 'r'] (Just "foo") }
+        , { i: "-bAR"        , o: P $ so 'b' [] (Just "AR") }
+        , { i: "-bARfoo"     , o: P $ so 'b' [] (Just "ARfoo") }
+        , { i: "-bAR=foo"    , o: F }
+        , { i: "-bAR=<foo>"  , o: F }
+        , { i: "-bAR<foo>"   , o: F }
+        ]
 
-        -- Make assertions about the group
-        flip assertEqual g
-          (Cons (Usage.Option "bar" Nothing false)
-          (Cons (Usage.Option "bar" (Just "foo-bar") false)
-          (Cons (Usage.Option "bar" (Just "FOO") false)
-          (Cons (Usage.Option "bar" (Just "fOo") false)
-          (Cons (Usage.Option "bar" (Just "foo") false)
-          (Cons (Usage.Option "bar" Nothing true)
-          (Cons (Usage.Option "bar" (Just "baz") true)
-          (Cons (Usage.Option "bar" (Just "baz") true) Nil))))))))
-
-    it "should parse option stacks" do
-      liftEff do
-        usage <- runEitherEff do
-          toks <- Lexer.lex $ Textwrap.dedent
-            """
-            foo -b         -b...
-                -bFOO      -bFOO...
-                -bFoo      -bFoo...
-                -b<foo>    -b<foo>...
-                -b foo     -b foo
-                -b FOO     -b FOO...
-                -b=foo     -b=foo...
-                -b=FOO     -b=FOO...
-                -b=<foo>   -b=<foo>...
-                -bar       -bar...
-                -barFOO    -barFOO...
-                -bar<foo>  -bar<foo>...
-                -barFoo    -barFoo...
-                -bar foo   -bar foo...
-                -bar FOO   -bar FOO...
-                -bar=foo   -bar=foo...
-                -bar=FOO   -bar=FOO...
-                -bar=<foo> -bar=<foo>...
-            """
-                -- -bAR       -bAR...
-                -- -bARfoo    -bARfoo...
-                -- -bAR=foo   -bAR=foo...
-                -- -bAR=<foo> -bAR=<foo>...
-                -- -bAR<foo>  -bAR<foo>...
-          Usage.parse toks
-
-        -- There should only be one top-level mutex group
-        assertEqual 1 (length usage)
-        (Usage.Usage _ u) <- runMaybeEff $ usage !! 0
-        g <- runMaybeEff $ u !! 0
-
-        -- Make assertions about the group
-        flip assertEqual g
-          (Cons (so 'b' [] Nothing false)
-          (Cons (so 'b' [] Nothing true)
-          (Cons (so 'b' [] (Just "FOO") false)
-          (Cons (so 'b' [] (Just "FOO") true)
-          (Cons (so 'b' [] (Just "Foo") false)
-          (Cons (so 'b' [] (Just "Foo") true)
-          (Cons (so 'b' [] (Just "foo") false)
-          (Cons (so 'b' [] (Just "foo") true)
-          (Cons (so 'b' [] Nothing false) (Cons (Usage.Command "foo")
-          (Cons (so 'b' [] Nothing false) (Cons (Usage.Command "foo")
-          (Cons (so 'b' [] Nothing false) (Cons (Usage.Positional "FOO" false)
-          (Cons (so 'b' [] Nothing false) (Cons (Usage.Positional "FOO" true)
-          (Cons (so 'b' [] (Just "foo") false)
-          (Cons (so 'b' [] (Just "foo") true)
-          (Cons (so 'b' [] (Just "FOO") false)
-          (Cons (so 'b' [] (Just "FOO") true)
-          (Cons (so 'b' [] (Just "foo") false)
-          (Cons (so 'b' [] (Just "foo") true)
-          (Cons (so 'b' ['a', 'r'] Nothing false)
-          (Cons (so 'b' ['a', 'r'] Nothing true)
-          (Cons (so 'b' ['a', 'r'] (Just "FOO") false)
-          (Cons (so 'b' ['a', 'r'] (Just "FOO") true)
-          (Cons (so 'b' ['a', 'r'] (Just "Foo") false)
-          (Cons (so 'b' ['a', 'r'] (Just "Foo") true)
-          (Cons (so 'b' ['a', 'r'] (Just "foo") false)
-          (Cons (so 'b' ['a', 'r'] (Just "foo") true)
-          (Cons (so 'b' ['a', 'r'] Nothing false) (Cons (Usage.Command "foo")
-          (Cons (so 'b' ['a', 'r'] Nothing false) (Cons (Usage.Command "foo")
-          (Cons (so 'b' ['a', 'r'] Nothing false) (Cons (Usage.Positional "FOO" false)
-          (Cons (so 'b' ['a', 'r'] Nothing false) (Cons (Usage.Positional "FOO" true)
-          (Cons (so 'b' ['a', 'r'] (Just "foo") false)
-          (Cons (so 'b' ['a', 'r'] (Just "foo") true)
-          (Cons (so 'b' ['a', 'r'] (Just "FOO") false)
-          (Cons (so 'b' ['a', 'r'] (Just "FOO") true)
-          (Cons (so 'b' ['a', 'r'] (Just "foo") false)
-          (Cons (so 'b' ['a', 'r'] (Just "foo") true)
-          Nil))))))))))))))))))))))))))))))))))))))))))))
-
-        pure unit
-
+                -- -b foo     -b FOO...
+                -- -b FOO     -b FOO...
+        --         -bar foo   -bar foo...
+        --         -bar FOO   -bar FOO...
 
     it "should parse scanned and lexed usage sections" do
       liftEff do
@@ -305,5 +236,39 @@ main = run [consoleReporter] do
         Right v  -> pure v
         Left err -> throwException (error $ show err)
 
+    -- short hand to create a short option node
     so :: Char -> Array Char -> Maybe String -> Boolean -> Usage.UsageNode
     so c cs a r = Usage.OptionStack c cs a r
+
+    -- short hand to create a long option node
+    lo :: String -> Maybe String -> Boolean -> Usage.UsageNode
+    lo s a r = Usage.Option  s a r
+
+    runSingleUsageNodeTests xs =
+      for_ xs \{ i: i, o: o } -> do
+        for_ [ false, true ] \isRepeated -> do
+          let input = "foo " ++ i ++ (if isRepeated then "..." else "")
+          case o of
+            P v -> do
+              let expected = v isRepeated
+              it (input ++ " -> " ++ show expected)  do
+                liftEff do
+                  usage <- runEitherEff do
+                    Lexer.lex input >>= Usage.parse
+
+                  -- There should only be one top-level mutex group
+                  assertEqual 1 (length usage)
+                  (Usage.Usage _ u) <- runMaybeEff $ usage !! 0
+                  g <- runMaybeEff $ u !! 0
+
+                  -- Assert output matches expected
+                  flip assertEqual g (Cons expected Nil)
+            _ -> do
+              it (input ++ " should fail") do
+              liftEff do
+                assertThrows (const true) do
+                  runEitherEff do
+                    toks <- Lexer.lex input 
+                    traceShowA input
+                    Usage.parse toks >>= debug
+                    pure unit

@@ -130,7 +130,8 @@ parseToken = P.choice
   , P.try $ P.char   ':'   *> pure Colon
   , P.try $ P.char   ','   *> pure Comma
   , P.try $ parseLongOption
-  , P.try $ parseShortOption
+   -- XXX: Add-hoc fix
+  , P.try $ parseShortOption <* (P.notFollowedBy $ P.oneOf [ '<', '>' ])
   , P.try $ AngleName <$> parseAngleName
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
@@ -142,7 +143,8 @@ parseToken = P.choice
   , P.try $ Name      <$> (parseName      <* P.notFollowedBy alpha)
   , P.try $ Word      <$> (parseWord      <* space)
   , P.try $ Garbage   <$> P.anyChar
-  ] <* P.skipSpaces
+  ]
+  <* P.skipSpaces
 
  where
 
@@ -150,9 +152,6 @@ parseToken = P.choice
   whitespace = do
     P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     pure unit
-
-  spaceOrEOF :: P.Parser String Unit
-  spaceOrEOF = P.choice [ whitespace, P.eof ]
 
   parseStringLiteral :: P.Parser String Token
   parseStringLiteral = StringLiteral <$> do
