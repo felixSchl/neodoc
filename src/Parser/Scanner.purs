@@ -55,7 +55,6 @@ docoptScanner = do
   -- | Parse any option sections
   options <- many do
     label <- sectionLabel
-    traceShowA $ toLower label
     guard $ endsWith ("options") (toLower label)
     fromCharArray <<< fromList <$> do
       P.manyTill

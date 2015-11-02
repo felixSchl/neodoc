@@ -1,5 +1,6 @@
 module Docopt.Parser.Lexer where
 
+import Debug.Trace
 import Prelude
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
@@ -38,7 +39,7 @@ data Token
   | Equal
   | TripleDot
   | LOpt String
-  | SOpt Char (List Char) String
+  | SOpt Char (Array Char) String
   | ShoutName String
   | AngleName String
   | Name String
@@ -69,7 +70,7 @@ prettyPrintToken (LOpt n)          = "LOpt --" ++ n
 prettyPrintToken (SOpt n s a)      =
   "SOpt -"
     ++ (fromChar n)
-    ++ (fromCharArray $ fromList s)
+    ++ (fromCharArray s)
     ++ a
 
 data PositionedToken = PositionedToken
@@ -129,7 +130,7 @@ parseToken = P.choice
   , P.try $ P.char   ':'   *> pure Colon
   , P.try $ P.char   ','   *> pure Comma
   , P.try $ parseLongOption
-  , P.try $ (parseShortOption <* spaceOrEOF)
+  , P.try $ parseShortOption
   , P.try $ AngleName <$> parseAngleName
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
@@ -178,8 +179,14 @@ parseToken = P.choice
     ])
 
   parseAngleName :: P.Parser String String
-  parseAngleName =
-    P.char '<' *> parseName <* P.char '>'
+  parseAngleName = do
+    P.char '<'
+    name <- P.choice [
+      P.try parseShoutName
+    , P.try parseName
+    ]
+    P.char '>'
+    pure name
 
   parseShoutName :: P.Parser String String
   parseShoutName = do
@@ -191,12 +198,19 @@ parseToken = P.choice
     pure name
 
   parseShortOption :: P.Parser String Token
-  parseShortOption =
+  parseShortOption = do
     P.char '-' *> do
       SOpt
         <$> lowerAlphaNum
-        <*> (many lowerAlphaNum)
-        <*> (fromCharArray <$> (A.many upperAlphaNum))
+        <*> (A.many lowerAlphaNum)
+        <*> P.choice [
+              P.try $ fromCharArray <$>
+                (A.cons
+                  <$> upperAlphaNum
+                  <*> (A.many $ lowerAlphaNum <|> upperAlphaNum))
+            , P.try $ parseAngleName
+            , pure "" -- XXX: use Maybe/Nothing?
+            ]
 
   parseLongOption :: P.Parser String Token
   parseLongOption =
@@ -287,7 +301,7 @@ lopt = token go P.<?> "long-option"
     go _        = Nothing
 
 sopt :: TokenParser { flag  :: Char
-                    , stack :: List Char
+                    , stack :: Array Char
                     , arg   :: Maybe String }
 sopt = token go P.<?> "short-option"
   where

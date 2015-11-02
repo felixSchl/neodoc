@@ -51,7 +51,7 @@ data UsageNode
                 (Maybe OptionArgument)
                 IsRepeatable
   | OptionStack Char
-                (List Char)
+                (Array Char)
                 (Maybe OptionArgument)
                 IsRepeatable
   | Group       IsOptional
@@ -72,6 +72,15 @@ instance showUsageNode :: Show UsageNode where
     "OptionStack " ++ show n ++ " " ++ show s ++ " " ++ show a ++ " " ++ show b
   show (Group n b o) =
     "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
+
+instance eqUsageNode :: Eq UsageNode where
+  eq (Command s)            (Command s')               = (s == s')
+  eq (Positional s r)       (Positional s' r')         = (s == s') && (r == r')
+  eq (Option s a r)         (Option s' a' r')          = (s == s') && (a == a') && (r == r')
+  eq (Group b xs r)         (Group b' xs' r')          = (b == b') && (xs == xs') && (r == r')
+  eq (OptionStack c cs a r) (OptionStack c' cs' a' r') = (c == c') && (cs == cs') && (a == a') && (r == r')
+  eq _                      _                          = false
+
 
 -- | TokenParser to parse the usage section
 -- |
@@ -120,23 +129,29 @@ usageParser = do
 
     parseLongOption :: TokenParser UsageNode
     parseLongOption = Option
-        <$> lopt
-        <*> (tryMaybe do
-              equal
-              (shoutName <|> angleName <|> name))
-        <*> parseRepetition
+      <$> lopt
+      <*> (tryMaybe do
+            equal
+            (shoutName <|> angleName <|> name))
+      <*> parseRepetition
 
     parseShortOption :: TokenParser UsageNode
     parseShortOption = do
-        { flag: flag, stack: stack, arg: arg } <- sopt
-        OptionStack flag stack
-            <$> (case arg of
-                  Just _  -> pure $ arg
-                  Nothing -> do
-                    (tryMaybe do
-                      equal
-                      (shoutName <|> angleName <|> name)))
-            <*> parseRepetition
+      { flag: flag, stack: stack, arg: arg } <- sopt
+      traceShowA flag
+      traceShowA stack
+      traceShowA arg
+      OptionStack flag stack
+          <$> (case arg of
+                Just _  -> pure arg
+                Nothing -> tryMaybe do
+                  equal
+                  P.choice [
+                    P.try shoutName 
+                  , P.try angleName
+                  , P.try name 
+                  ])
+          <*> parseRepetition
 
     parseOption :: TokenParser UsageNode
     parseOption = (parseLongOption <|> parseShortOption)
@@ -147,7 +162,10 @@ usageParser = do
       <*> parseRepetition
 
     parseCommand :: TokenParser UsageNode
-    parseCommand = Command <$> name
+    parseCommand = do
+      cmd <- Command <$> name
+      P.notFollowedBy tripleDot -- Commands may not repeat!
+      pure cmd
 
     parseGroup :: TokenParser UsageNode
     parseGroup = defer \_ -> P.choice

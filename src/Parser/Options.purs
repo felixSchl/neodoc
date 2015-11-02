@@ -48,6 +48,7 @@ import Data.String (toLower)
 import Docopt.Parser.Base
 import Docopt.Parser.Lexer
 import Docopt.Parser.Common
+import qualified Data.Array as A
 
 data ShortOption = ShortOption Char (Maybe String)
 data LongOption = LongOption String (Maybe String)
@@ -131,7 +132,7 @@ parseOptions = do
     parseShortOption :: TokenParser ShortOption
     parseShortOption = do
       { flag: flag, stack: stack, arg: arg } <- sopt
-      (guard $ (length stack == 0))
+      (guard $ (A.length stack == 0))
         P.<?> "No stacked options"
       return $ ShortOption flag arg
 
