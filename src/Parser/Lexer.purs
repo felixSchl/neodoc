@@ -206,7 +206,7 @@ parseToken = P.choice
     arg <- P.choice [
 
       -- Parse <flag>=<value>, i.e.: `-foo=bar`
-      Just <$> do
+      P.try $ Just <$> do
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
         P.choice [
@@ -216,14 +216,14 @@ parseToken = P.choice
         ]
 
       -- Parse <flag><VALUE>, i.e.: `-fooBAR`
-    , Just <$> do
+    , P.try $ Just <$> do
         fromCharArray <$>
           (A.cons
             <$> upperAlphaNum
             <*> (A.many $ lowerAlphaNum <|> upperAlphaNum))
 
       -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
-    , Just <$> parseAngleName
+    , P.try $ Just <$> parseAngleName
 
       -- Otherwise assume no argument given. We might be proven wrong at a later
       -- stage (parsing / solving), but as far as the lexer is concerned, this
@@ -245,24 +245,24 @@ parseToken = P.choice
     arg <- P.choice [
 
       -- Parse <flag>=<value>, i.e.: `--foo=bar`
-      (Just <$> do
+      P.try $ Just <$> do
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
         P.choice [
           P.try parseAngleName
         , P.try parseShoutName
         , P.try parseName
-        ])
+        ]
 
       -- Parse <flag><VALUE>, i.e.: `--fooBAR`
-    , (Just <$> do
+    , P.try $ Just <$> do
         fromCharArray <$>
           (A.cons
             <$> upperAlphaNum
-            <*> (A.many $ lowerAlphaNum <|> upperAlphaNum)))
+            <*> (A.many $ lowerAlphaNum <|> upperAlphaNum))
 
       -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
-    , Just <$> parseAngleName
+    , P.try $ Just <$> parseAngleName
 
       -- Otherwise assume no argument given. We might be proven wrong at a later
       -- stage (parsing / solving), but as far as the lexer is concerned, this

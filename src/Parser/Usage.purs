@@ -144,7 +144,7 @@ usageParser = do
         <$> parseRepetition
 
     parseOption :: TokenParser UsageNode
-    parseOption = (parseLongOption <|> parseShortOption)
+    parseOption = parseLongOption <|> parseShortOption
 
     parsePositional :: TokenParser UsageNode
     parsePositional = Positional

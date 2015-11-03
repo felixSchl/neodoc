@@ -147,7 +147,6 @@ main = run [consoleReporter] do
         , pass "--bar = fOo"   $ lo "bar" (Just "fOo")
         , pass "--bar = <foo>" $ lo "bar" (Just "foo")
         , pass "--barFOO"      $ lo "bar" (Just "FOO")
-        , fail "-- bar"
         , fail "- - bar"
         , fail "--bar="
         , fail "--bar=<>"
@@ -259,7 +258,8 @@ main = run [consoleReporter] do
     runSingleUsageNodeTests xs =
       for_ xs \{ i: i, o: o } -> do
         for_ [ false, true ] \isRepeated -> do -- Append "..." ?
-          for_ (1 .. 2) \q -> do -- "..." vs " ..." (note the space)
+          let ys = if isRepeated then (1 .. 2) else (1 .. 1)
+          for_ ys \q -> do -- "..." vs " ..." (note the space)
             let input = "foo " ++ i ++ (if isRepeated
                                        then (if q == 1 then "..." else " ...")
                                        else "")
@@ -283,7 +283,7 @@ main = run [consoleReporter] do
                 liftEff do
                   assertThrows (const true) do
                     runEitherEff do
-                      toks <- Lexer.lex input 
-                      traceShowA input
-                      Usage.parse toks >>= debug
+                      toks  <- Lexer.lex input
+                      usage <- Usage.parse toks
+                      debug usage
                       pure unit
