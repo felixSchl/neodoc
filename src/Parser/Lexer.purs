@@ -230,6 +230,17 @@ parseToken = P.choice
       -- token bears no arguments.
     , pure Nothing
     ]
+
+    -- Ensure the argument is correctly bounded
+    P.lookAhead $ P.choice [
+      P.eof
+    , P.try $ void $ space
+    , P.try $ void $ P.char '|' 
+    , P.try $ void $ P.char '['
+    , P.try $ void $ P.char '('
+    , P.try $ void $ P.string "..."
+    ]
+
     pure $ SOpt x xs arg
 
   parseLongOption :: P.Parser String Token
@@ -269,6 +280,17 @@ parseToken = P.choice
       -- token bears no arguments.
     , pure Nothing
     ]
+
+    -- Ensure the argument is correctly bounded
+    P.lookAhead $ P.choice [
+      P.eof
+    , P.try $ void $ space
+    , P.try $ void $ P.char '|' 
+    , P.try $ void $ P.char '['
+    , P.try $ void $ P.char '('
+    , P.try $ void $ P.string "..."
+    ]
+
     pure $ LOpt name arg
 
   identStart :: P.Parser String Char
