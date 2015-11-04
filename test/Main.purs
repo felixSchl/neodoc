@@ -12,7 +12,7 @@ import Control.Monad.Trans (lift)
 import qualified Text.Parsing.Parser as P
 import Data.Either (Either(..), isRight, isLeft, either)
 import Data.Either.Unsafe (fromLeft, fromRight)
-import Data.List (List(..), length, (!!), take)
+import Data.List (List(..), length, (!!), take, toList)
 import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..))
 import Test.Assert.Simple
@@ -184,6 +184,32 @@ main = run [consoleReporter] do
         -- , pass "-bar FOO"    $ (so 'b' ['a', 'r'] Nothing
         ]
 
+    describe "required groups" do
+      runSingleUsageNodeTests
+        [ fail "()"
+        , pass "(foo)"          $ gr [[ co "foo" ]]
+        , pass "(foo|bar)"      $ gr [[ co "foo" ], [co "bar"]]
+        , pass "(foo bar|bar)"  $ gr [[ co "foo", co "bar"], [co "bar"]]
+        , pass "((foo)|bar)"    $ gr [[ gr [[ co "foo" ]] false ], [co "bar"]]
+        , pass "((foo)...|bar)" $ gr [[ gr [[ co "foo" ]] true ], [co "bar"]]
+        , fail "(()|bar)"
+        , fail "(bar|())"
+        , fail "(...)"
+        ]
+
+    describe "optional groups" do
+      runSingleUsageNodeTests
+        [ fail "[]"
+        , pass "[foo]"          $ go [[ co "foo" ]]
+        , pass "[foo|bar]"      $ go [[ co "foo" ], [co "bar"]]
+        , pass "[foo bar|bar]"  $ go [[ co "foo", co "bar"], [co "bar"]]
+        , pass "[[foo]|bar]"    $ go [[ go [[ co "foo" ]] false ], [co "bar"]]
+        , pass "[[foo]...|bar]" $ go [[ go [[ co "foo" ]] true ], [co "bar"]]
+        , fail "[[]|bar]"
+        , fail "[bar|[]]"
+        , fail "[...]"
+        ]
+
     it "should parse scanned and lexed usage sections" do
       liftEff do
 
@@ -239,6 +265,10 @@ main = run [consoleReporter] do
         Right v  -> pure v
         Left err -> throwException (error $ show err)
 
+    -- short hand to create a command node
+    co :: String -> Usage.UsageNode
+    co = Usage.Command
+
     -- short hand to create a short option node
     so :: Char -> Array Char -> Maybe String -> Boolean -> Usage.UsageNode
     so = Usage.OptionStack
@@ -250,6 +280,16 @@ main = run [consoleReporter] do
     -- short hand to create a positional node
     po :: String -> Boolean -> Usage.UsageNode
     po = Usage.Positional
+
+    -- short hand to create a required group node
+    gr :: Array (Array Usage.UsageNode) -> Boolean -> Usage.UsageNode
+    gr xs r = Usage.Group false ls r
+      where ls = toList <$> (toList xs)
+
+    -- short hand to create a optional group node
+    go :: Array (Array Usage.UsageNode) -> Boolean -> Usage.UsageNode
+    go xs r = Usage.Group true ls r
+      where ls = toList <$> (toList xs)
 
     kase i o = { i: i, o: o }
     pass i o = kase i (P o)
