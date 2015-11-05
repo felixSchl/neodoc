@@ -18,6 +18,7 @@ import Test.Assert (assert)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
+import Test.Support (vliftEff)
 
 scannerSpec =
   describe "scanner" do
@@ -29,7 +30,7 @@ scannerSpec =
             Options: bar
             Advanced Options: qux
             """
-      void $ liftEff' do
+      vliftEff do
         assert $ docopt.usage == "foo\n"
         assert $ length docopt.options == 2
         assert $ fromJust (docopt.options !! 0) == " bar\n"
@@ -46,7 +47,7 @@ scannerSpec =
             Advanced Options:
               qux
             """
-      void $ liftEff' do
+      vliftEff do
         assert $ docopt.usage == "foo\n"
         assert $ length docopt.options == 2
         assert $ fromJust (docopt.options !! 0) == "\n  bar\n"
@@ -58,7 +59,7 @@ scannerSpec =
             """
             Options: bar
             """
-      void $ liftEff' do
+      vliftEff do
         assert $ isLeft result
 
     it "should fail multiple usage sections" do
@@ -69,7 +70,7 @@ scannerSpec =
             Options: foo
             Usage: qux
             """
-      void $ liftEff' do
+      vliftEff do
         assert $ isLeft result
 
     it "should fail if usage section is not the first section" do
@@ -79,7 +80,7 @@ scannerSpec =
             Options: foo
             Usage: qux
             """
-      void $ liftEff' do
+      vliftEff do
         assert $ isLeft result
 
     it "should fail w/o any sections" do
@@ -87,5 +88,5 @@ scannerSpec =
           Textwrap.dedent
             """
             """
-      void $ liftEff' do
+      vliftEff do
         assert $ isLeft result

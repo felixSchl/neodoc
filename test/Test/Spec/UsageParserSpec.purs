@@ -1,7 +1,7 @@
 module Test.Spec.UsageParserSpec (usageParserSpec) where
 
 import Prelude
-import Control.Monad.Aff
+import Control.Monad.Aff (liftEff')
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION(), error, throwException)
@@ -26,6 +26,7 @@ import Test.Assert (assert)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
+import Test.Support (vliftEff, runMaybeEff, runEitherEff)
 
 data Expected a = F | P a
 
@@ -38,7 +39,7 @@ usageParserSpec =
     -- option, it defaults to being a command (given that the
     -- command parer succeeds).
     it "should parse commands" do
-      void $ liftEff' do
+      vliftEff do
         usage <- runEitherEff do
           toks <- Lexer.lex "foo bar"
           Usage.parse toks
@@ -138,7 +139,7 @@ usageParserSpec =
     -- | This validates that the program source can successfully extracted
     -- | from the - possibly - unstructured usage description text.
     it "should parse scanned and lexed usage sections" do
-      void $ liftEff' do
+      vliftEff do
 
         -- Scan, lex and parse the usage section
         usage <- runEitherEff do
@@ -173,22 +174,6 @@ usageParserSpec =
         assertEqual 1 (length u1g0)
 
   where
-
-    runMaybeEff :: forall a eff.
-      Maybe a ->
-      Eff (err :: EXCEPTION | eff) a
-    runMaybeEff m =
-      case m of
-        Just v  -> pure v
-        Nothing -> throwException (error "Nothing")
-
-    runEitherEff :: forall err a eff. (Show err, Show a) =>
-      Either err a ->
-      Eff (err :: EXCEPTION | eff) a
-    runEitherEff m =
-      case m of
-        Right v  -> pure v
-        Left err -> throwException (error $ show err)
 
     -- short hand to create a command node
     co :: String -> Usage.UsageNode
@@ -232,7 +217,7 @@ usageParserSpec =
               P v -> do
                 let expected = v isRepeated
                 it (input ++ " -> " ++ show expected)  do
-                  void $ liftEff' do
+                  vliftEff do
                     usage <- runEitherEff do
                       Lexer.lex input >>= Usage.parse
 
@@ -245,7 +230,7 @@ usageParserSpec =
                     flip assertEqual (take 1 g) (Cons expected Nil)
               _ -> do
                 it (input ++ " should fail") do
-                void $ liftEff' do
+                vliftEff do
                   assertThrows (const true) do
                     runEitherEff do
                       toks  <- Lexer.lex input
