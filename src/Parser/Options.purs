@@ -66,17 +66,24 @@ instance showOption      :: Show Option      where show = gShow
 instance showShortOption :: Show ShortOption where show = gShow
 instance showLongOption  :: Show LongOption  where show = gShow
 
-parseOptions :: TokenParser Unit
-parseOptions = do
+parse :: (List PositionedToken) -> Either P.ParseError Unit
+parse = flip runTokenParser optionsParser
+
+optionsParser :: TokenParser Unit
+optionsParser = do
 
   P.Position { column: col } <- getTokenPosition
+  x <- markIndent' col do
+    optionLine
 
-  as <- markIndent' col do
-    many $ P.try do
-      -- XXX: Add scan for `[defaults: ...]`
-      P.manyTill anyToken $ P.lookAhead do
-        parseOptionLine
-  debug as
+  debug x
+
+  -- as <- markIndent' col do
+  --   many $ P.try do
+  --     -- XXX: Add scan for `[defaults: ...]`
+  --     P.manyTill anyToken $ P.lookAhead do
+  --       optionLine
+  -- debug as
 
   where
 
@@ -94,43 +101,49 @@ parseOptions = do
       debug "x:" *> debug x
       pure "XXX"
 
-    parseOptionLine :: TokenParser Option
-    parseOptionLine = sameIndent *> do
+    optionLine :: TokenParser Option
+    optionLine = sameIndent *> do
       opt <- P.choice
-        [ shortAndLong
-        , onlyLong
-        , onlyShort ]
+        [ P.try shortAndLong
+        , P.try onlyLong
+        , P.try onlyShort
+        ]
       pure opt
 
     onlyShort :: TokenParser Option
     onlyShort = do
-      short <- parseShortOption
+      short <- shortOption
       return $ Option {
         short:   Just short
       , long:    Nothing
-      , default: Nothing }
+      , default: Nothing
+      }
 
     onlyLong :: TokenParser Option
     onlyLong = do
       long <- parseLongOption
-      return $ Option {
+      pure $ Option {
         short:   Nothing
       , long:    Just long
-      , default: Nothing }
+      , default: Nothing
+      }
 
     shortAndLong :: TokenParser Option
     shortAndLong = do
-      short <- parseShortOption
+      getInput >>= debug
+      short <- shortOption
       long <- P.choice
         [ P.try comma *> parseLongOption
-        , parseLongOption ]
-      return $ Option {
+        , parseLongOption
+        ]
+      pure $ Option {
         short:   Just short
       , long:    Just long
-      , default: Nothing }
+      , default: Nothing
+      }
 
-    parseShortOption :: TokenParser ShortOption
-    parseShortOption = do
+    shortOption :: TokenParser ShortOption
+    shortOption = do
       { flag: flag, stack: stack, arg: arg } <- sopt
       (guard $ (A.length stack == 0))
         P.<?> "No stacked options"

@@ -129,18 +129,18 @@ parseToken = P.choice
   , P.try $ P.char   '|'   *> pure VBar
   , P.try $ P.char   ':'   *> pure Colon
   , P.try $ P.char   ','   *> pure Comma
-  , P.try $ parseLongOption
-  , P.try $ parseShortOption
-  , P.try $ AngleName <$> parseAngleName
+  , P.try $ longOption
+  , P.try $ shortOption
+  , P.try $ AngleName <$> angleName
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
   , P.try $ P.char   '-'   *> pure Dash
   , P.try $ P.char   '='   *> pure Equal
   , P.try $ P.string "..." *> pure TripleDot
-  , P.try $ parseStringLiteral
-  , P.try $ ShoutName <$> (parseShoutName <* P.notFollowedBy alpha)
-  , P.try $ Name      <$> (parseName      <* P.notFollowedBy alpha)
-  , P.try $ Word      <$> (parseWord      <* space)
+  , P.try $ stringLiteral
+  , P.try $ ShoutName <$> (shoutName <* P.notFollowedBy alpha)
+  , P.try $ Name      <$> (name      <* P.notFollowedBy alpha)
+  , P.try $ Word      <$> (word      <* space)
   , P.try $ Garbage   <$> P.anyChar
   ]
   <* P.skipSpaces
@@ -152,8 +152,8 @@ parseToken = P.choice
     P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     pure unit
 
-  parseStringLiteral :: P.Parser String Token
-  parseStringLiteral = StringLiteral <$> do
+  stringLiteral :: P.Parser String Token
+  stringLiteral = StringLiteral <$> do
     P.choice [
       P.between (P.char '\'') (P.char '\'') (p '\'')
     , P.between (P.char '"') (P.char '"') (p '"')
@@ -163,21 +163,21 @@ parseToken = P.choice
       p c = fromCharArray <$> do
         A.many $ P.noneOf [c]
 
-  parseName :: P.Parser String String
-  parseName = fromCharArray <$> do
+  name :: P.Parser String String
+  name = fromCharArray <$> do
     A.cons
       <$> identStart
       <*> A.many identLetter
 
-  parseWord :: P.Parser String String
-  parseWord = fromCharArray <$> do
+  word :: P.Parser String String
+  word = fromCharArray <$> do
     (A.some $ P.choice [
       identLetter
     , P.oneOf [ '.', '-', '_' ]
     ])
 
-  parseAngleName :: P.Parser String String
-  parseAngleName = do
+  angleName :: P.Parser String String
+  angleName = do
     P.char '<'
     name <- fromCharArray <$> do
       A.cons
@@ -189,8 +189,8 @@ parseToken = P.choice
     P.char '>'
     pure name
 
-  parseShoutName :: P.Parser String String
-  parseShoutName = do
+  shoutName :: P.Parser String String
+  shoutName = do
     name <- fromCharArray <$> do
       A.cons
         <$> upperAlpha
@@ -198,8 +198,8 @@ parseToken = P.choice
     P.notFollowedBy lowerAlpha
     pure name
 
-  parseShortOption :: P.Parser String Token
-  parseShortOption = do
+  shortOption :: P.Parser String Token
+  shortOption = do
     P.char '-'
     x  <- lowerAlphaNum
     xs <- A.many lowerAlphaNum
@@ -210,9 +210,9 @@ parseToken = P.choice
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
         P.choice [
-          P.try parseAngleName
-        , P.try parseShoutName
-        , P.try parseName
+          P.try angleName
+        , P.try shoutName
+        , P.try name
         ]
 
       -- Parse <flag><VALUE>, i.e.: `-fooBAR`
@@ -223,7 +223,7 @@ parseToken = P.choice
             <*> (A.many $ lowerAlphaNum <|> upperAlphaNum))
 
       -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
-    , P.try $ Just <$> parseAngleName
+    , P.try $ Just <$> angleName
 
       -- Otherwise assume no argument given. We might be proven wrong at a later
       -- stage (parsing / solving), but as far as the lexer is concerned, this
@@ -243,10 +243,10 @@ parseToken = P.choice
 
     pure $ SOpt x xs arg
 
-  parseLongOption :: P.Parser String Token
-  parseLongOption = do
+  longOption :: P.Parser String Token
+  longOption = do
     P.string "--"
-    name <- fromCharArray <$> do
+    name' <- fromCharArray <$> do
       A.cons
         <$> lowerAlphaNum
         <*> (A.many $ P.choice [
@@ -260,9 +260,9 @@ parseToken = P.choice
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
         P.choice [
-          P.try parseAngleName
-        , P.try parseShoutName
-        , P.try parseName
+          P.try angleName
+        , P.try shoutName
+        , P.try name
         ]
 
       -- Parse <flag><VALUE>, i.e.: `--fooBAR`
@@ -273,7 +273,7 @@ parseToken = P.choice
             <*> (A.many $ lowerAlphaNum <|> upperAlphaNum))
 
       -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
-    , P.try $ Just <$> parseAngleName
+    , P.try $ Just <$> angleName
 
       -- Otherwise assume no argument given. We might be proven wrong at a later
       -- stage (parsing / solving), but as far as the lexer is concerned, this
@@ -291,7 +291,7 @@ parseToken = P.choice
     , P.try $ void $ P.string "..."
     ]
 
-    pure $ LOpt name arg
+    pure $ LOpt name' arg
 
   identStart :: P.Parser String Char
   identStart = alpha

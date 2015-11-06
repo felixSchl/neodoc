@@ -104,84 +104,82 @@ usageParser :: TokenParser (List Usage)
 usageParser = do
 
   -- Calculate and mark the original program indentation.
-  name <- parseProgram
+  name <- program
   col' <- getCol
   let startCol = col' - (length name) - 1
   markIndent' startCol $ do
     Cons
-    <$> (parseSingleUsage name)
-    <*> many do
-          parseProgram
-          (parseSingleUsage name)
+    <$> (usageLine name)
+    <*> many do program *> usageLine name
 
   where
 
-    parseSingleUsage :: String -> TokenParser Usage
-    parseSingleUsage name = Usage name <$> do
-      x <- (some $ moreIndented *> parseElem) `P.sepBy1` vbar
+    usageLine :: String -> TokenParser Usage
+    usageLine name = Usage name <$> do
+      x <- (some $ moreIndented *> elem) `P.sepBy1` vbar
       eof <|> (P.lookAhead $ lessIndented)
       pure x
 
-    parseElem :: TokenParser UsageNode
-    parseElem = defer \_ -> do
+    elem :: TokenParser UsageNode
+    elem = defer \_ -> do
       P.choice
-        [ parseOption
-        , parsePositional
-        , parseCommand
-        , parseGroup
+        [ option
+        , positional
+        , command
+        , group
         ] P.<?> "Option, Positional, Command or Group"
 
-    parseLongOption :: TokenParser UsageNode
-    parseLongOption = do
+    longOption :: TokenParser UsageNode
+    longOption = do
       { name: name, arg: arg } <- lopt
       Option name arg
-        <$> parseRepetition
+        <$> repetition
 
-    parseShortOption :: TokenParser UsageNode
-    parseShortOption = do
+    shortOption :: TokenParser UsageNode
+    shortOption = do
       { flag: flag, stack: stack, arg: arg } <- sopt
       OptionStack flag stack arg
-        <$> parseRepetition
+        <$> repetition
 
-    parseOption :: TokenParser UsageNode
-    parseOption = parseLongOption <|> parseShortOption
+    option :: TokenParser UsageNode
+    option = longOption <|> shortOption
 
-    parsePositional :: TokenParser UsageNode
-    parsePositional = Positional
+    positional :: TokenParser UsageNode
+    positional = Positional
       <$> (angleName <|> shoutName)
-      <*> parseRepetition
+      <*> repetition
 
-    parseCommand :: TokenParser UsageNode
-    parseCommand = do
+    command :: TokenParser UsageNode
+    command = do
       cmd <- Command <$> name
       P.notFollowedBy tripleDot -- Commands may not repeat!
       pure cmd
 
-    parseGroup :: TokenParser UsageNode
-    parseGroup = defer \_ -> P.choice
-      [ parseReqGroup
-      , parseOptGroup ]
+    group :: TokenParser UsageNode
+    group = defer \_ -> P.choice
+      [ reqGroup
+      , optGroup ]
 
-    parseOptGroup :: TokenParser UsageNode
-    parseOptGroup = defer \_ -> Group true
+    optGroup :: TokenParser UsageNode
+    optGroup = defer \_ -> Group true
       <$> (P.between
             (indented *> lsquare)
             (rsquare)
-            ((some parseElem) `P.sepBy1` vbar))
-      <*> parseRepetition
+            ((some elem) `P.sepBy1` vbar))
+      <*> repetition
 
-    parseReqGroup :: TokenParser UsageNode
-    parseReqGroup = defer \_ -> Group false
+    reqGroup :: TokenParser UsageNode
+    reqGroup = defer \_ -> Group false
       <$> (P.between
             (indented *> lparen)
             (rparen)
-            ((some parseElem) `P.sepBy1` vbar))
-      <*> parseRepetition
+            ((some elem) `P.sepBy1` vbar))
+      <*> repetition
 
-    parseRepetition :: TokenParser Boolean
-    parseRepetition = P.choice
+    repetition :: TokenParser Boolean
+    repetition = P.choice
       [ P.try $ indented *> tripleDot *> pure true
       , pure false ]
 
-    parseProgram :: TokenParser String
-    parseProgram = name <|> word
+    program :: TokenParser String
+    program = name <|> word
