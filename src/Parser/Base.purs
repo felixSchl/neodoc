@@ -50,6 +50,9 @@ getInput :: forall a m. (Monad m, Show a) => P.ParserT a m a
 getInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
   return { input: s, result: Right s, consumed: false, position: pos }
 
+traceInput :: forall a m. (Show a, Monad m) => P.ParserT a m Unit
+traceInput = getInput >>= debug
+
 regex :: String -> P.Parser String Char
 regex s = P.satisfy \c ->
   Regex.test (Regex.regex s Regex.noFlags) (toString c)

@@ -50,17 +50,18 @@ import Docopt.Parser.Lexer
 import Docopt.Parser.Common
 import qualified Data.Array as A
 
-data ShortOption = ShortOption Char (Maybe String)
-data LongOption = LongOption String (Maybe String)
+type Argument = String
+data ShortOption = ShortOption Char (Maybe Argument)
+data LongOption = LongOption String (Maybe Argument)
 data Option = Option {
   short   :: Maybe ShortOption
 , long    :: Maybe LongOption
-, default :: Maybe String
+, default :: Maybe Argument
 }
 
-derive instance genericOption :: Generic Option
+derive instance genericOption      :: Generic Option
 derive instance genericShortOption :: Generic ShortOption
-derive instance genericLongOption :: Generic LongOption
+derive instance genericLongOption  :: Generic LongOption
 
 instance showOption      :: Show Option      where show = gShow
 instance showShortOption :: Show ShortOption where show = gShow

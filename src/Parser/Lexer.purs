@@ -66,11 +66,12 @@ prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
 prettyPrintToken (AngleName n)     = "AngleName " ++ show n
 prettyPrintToken (StringLiteral s) = "StrLit " ++ show s
 prettyPrintToken (Word w)          = "Word " ++ show w
-prettyPrintToken (LOpt n a)        = "LOpt --" ++ n ++ (show a)
+prettyPrintToken (LOpt n a)        = "LOpt --" ++ n ++ " " ++ (show a)
 prettyPrintToken (SOpt n s a)      =
   "SOpt -"
     ++ (fromChar n)
     ++ (fromCharArray s)
+    ++ " "
     ++ (show a)
 
 data PositionedToken = PositionedToken
@@ -234,8 +235,9 @@ parseToken = P.choice
     -- Ensure the argument is correctly bounded
     P.lookAhead $ P.choice [
       P.eof
-    , P.try $ void $ space
-    , P.try $ void $ P.char '|' 
+    , P.try $ void $ P.whiteSpace
+    , P.try $ void $ P.char ','
+    , P.try $ void $ P.char '|'
     , P.try $ void $ P.char '['
     , P.try $ void $ P.char '('
     , P.try $ void $ P.string "..."
@@ -284,8 +286,9 @@ parseToken = P.choice
     -- Ensure the argument is correctly bounded
     P.lookAhead $ P.choice [
       P.eof
-    , P.try $ void $ space
-    , P.try $ void $ P.char '|' 
+    , P.try $ void $ P.whiteSpace
+    , P.try $ void $ P.char ','
+    , P.try $ void $ P.char '|'
     , P.try $ void $ P.char '['
     , P.try $ void $ P.char '('
     , P.try $ void $ P.string "..."
