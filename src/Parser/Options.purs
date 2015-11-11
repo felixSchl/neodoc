@@ -36,7 +36,9 @@ import Control.Lazy (defer)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.MonadPlus (guard)
-import Data.List (List(..), some, (:), toList, length, singleton, many)
+import Data.List (
+  List(..), some, (:), toList, length
+, singleton, many, head, catMaybes)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -115,18 +117,16 @@ optionsParser = do
         , P.try onlyLong
         , P.try onlyShort
         ]
-      markLine do
-        -- Ignore any token that is not either a `default`
-        -- token or another option.
-        P.manyTill L.anyToken $ P.choice [
-          P.lookAhead $ void defaults
-        , P.lookAhead $ void (successiveLine *> option)
-        , L.eof
-        ]
-        f <$> P.choice [
-          Just <$> P.try defaults
-        , pure Nothing
-        ]
+
+      -- Parse one token at a time towards the next option or the eof.
+      -- If a `[default: ...]` token is met, list it.
+      default <- head <<< catMaybes <$> do
+        flip P.manyTill (L.eof <|> (P.try $ P.lookAhead $ void option)) do
+          P.choice [
+            P.try $ Just <$> defaults
+          , L.anyToken *> pure Nothing
+          ]
+      pure $ f default
 
     onlyShort :: L.TokenParser PartialOption
     onlyShort = Option

@@ -25,7 +25,10 @@ optionsParserSpec =
         options <- runEitherEff do
           toks <- Lexer.lex $ Textwrap.dedent
             """
-            -f, --foo     [default: 100.0]
+            -f, --foo
+              this is som much text about -foo, and -f, and --foo
+              --bar, baz
+              [default: 100.0]
             -f       x [default: 200.0]
             --foo    -a [default: 300.0]
             -b
