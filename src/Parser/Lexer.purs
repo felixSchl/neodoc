@@ -47,9 +47,10 @@ data Token
   | TripleDot
   | LOpt String (Maybe String)
   | SOpt Char (Array Char) (Maybe String)
+  | Defaults String
+  | Name String
   | ShoutName String
   | AngleName String
-  | Name String
   | Word String
   | StringLiteral String
   | NumberLiteral NumberLiteral
@@ -69,19 +70,19 @@ prettyPrintToken Comma             = show ','
 prettyPrintToken Equal             = show '='
 prettyPrintToken TripleDot         = show "..."
 prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
+prettyPrintToken (Defaults  s)     = "Default "   ++ s
 prettyPrintToken (Name      n)     = "Name "      ++ show n
 prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
 prettyPrintToken (AngleName n)     = "AngleName " ++ show n
-prettyPrintToken (StringLiteral s) = "String " ++ show s
-prettyPrintToken (NumberLiteral n) = "Number " ++ show n
-prettyPrintToken (Word w)          = "Word " ++ show w
-prettyPrintToken (LOpt n a)        = "LOpt --" ++ n ++ " " ++ (show a)
-prettyPrintToken (SOpt n s a)      =
-  "SOpt -"
-    ++ (fromChar n)
-    ++ (fromCharArray s)
-    ++ " "
-    ++ (show a)
+prettyPrintToken (StringLiteral s) = "String "    ++ show s
+prettyPrintToken (NumberLiteral n) = "Number "    ++ show n
+prettyPrintToken (Word w)          = "Word "      ++ show w
+prettyPrintToken (LOpt n a)        = "--" ++ n ++ " " ++ (show a)
+prettyPrintToken (SOpt n s a)      = "-"
+                                        ++ (fromChar n)
+                                        ++ (fromCharArray s)
+                                        ++ " "
+                                        ++ (show a)
 
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position
@@ -143,6 +144,7 @@ parseToken :: P.Parser String Token
 parseToken = P.choice
   [ P.try $ P.char   '('   *> pure LParen
   , P.try $ P.char   ')'   *> pure RParen
+  , P.try $ defaults
   , P.try $ P.char   '['   *> pure LSquare
   , P.try $ P.char   ']'   *> pure RSquare
   , P.try $ P.char   '|'   *> pure VBar
@@ -171,6 +173,19 @@ parseToken = P.choice
   whitespace = do
     P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     pure unit
+
+  defaults :: P.Parser String Token
+  defaults = Defaults <<< fromCharArray <$>  do
+    P.between
+      (P.char '[')
+      (P.char ']')
+      do
+        A.many whitespace
+        string' "default"
+        (void $ P.try $ P.char ':') <|> pure unit
+        val <- A.some $ P.noneOf [']']
+        A.many whitespace
+        pure val
 
   stringLiteral :: P.Parser String Token
   stringLiteral = StringLiteral <$> do
