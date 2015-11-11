@@ -4,8 +4,10 @@ import Debug.Trace
 import Prelude
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
+import Control.Plus (empty)
 import Control.Monad.State (State(), evalState, get)
 import Control.Monad.Trans
+import Data.Foldable (foldl)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Token as P
@@ -21,9 +23,14 @@ import Data.Maybe (Maybe(..), maybe)
 import Docopt.Parser.Base
 import Docopt.Parser.State
 import Data.Tuple
+import Data.Int
+import qualified Data.Int as I
+import Global (isNaN, readFloat)
 
 lex :: String -> Either P.ParseError (List PositionedToken)
 lex = flip P.runParser parseTokens
+
+data NumberLiteral = FloatLiteral Number | IntLiteral Int
 
 data Token
   = LParen
@@ -45,6 +52,7 @@ data Token
   | Name String
   | Word String
   | StringLiteral String
+  | NumberLiteral NumberLiteral
   | Garbage Char
 
 prettyPrintToken :: Token -> String
@@ -64,7 +72,8 @@ prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
 prettyPrintToken (Name      n)     = "Name "      ++ show n
 prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
 prettyPrintToken (AngleName n)     = "AngleName " ++ show n
-prettyPrintToken (StringLiteral s) = "StrLit " ++ show s
+prettyPrintToken (StringLiteral s) = "String " ++ show s
+prettyPrintToken (NumberLiteral n) = "Number " ++ show n
 prettyPrintToken (Word w)          = "Word " ++ show w
 prettyPrintToken (LOpt n a)        = "LOpt --" ++ n ++ " " ++ (show a)
 prettyPrintToken (SOpt n s a)      =
@@ -78,6 +87,14 @@ data PositionedToken = PositionedToken
   { sourcePos :: P.Position
   , token     :: Token
   }
+
+instance eqNumberLiteral :: Eq NumberLiteral where
+  eq (FloatLiteral n) (FloatLiteral n') = eq n n'
+  eq (IntLiteral n)   (IntLiteral n')   = eq n n'
+
+instance showNumberLiteral :: Show NumberLiteral where
+  show (FloatLiteral n) = show n
+  show (IntLiteral n)   = show n
 
 instance showToken :: Show Token where
   show = show <<< prettyPrintToken
@@ -103,6 +120,7 @@ instance eqToken :: Eq Token where
   eq (Word w)          (Word w')          = w == w'
   eq (Name n)          (Name n')          = n == n'
   eq (Garbage c)       (Garbage c')       = c == c'
+  eq (NumberLiteral n) (NumberLiteral n') = n == n'
   eq _ _                                  = false
 
 instance showPositionedToken :: Show PositionedToken where
@@ -138,6 +156,7 @@ parseToken = P.choice
   , P.try $ P.char   '-'   *> pure Dash
   , P.try $ P.char   '='   *> pure Equal
   , P.try $ P.string "..." *> pure TripleDot
+  , P.try $ numberLiteral
   , P.try $ stringLiteral
   , P.try $ ShoutName <$> (shoutName <* P.notFollowedBy alpha)
   , P.try $ Name      <$> (name      <* P.notFollowedBy alpha)
@@ -163,6 +182,32 @@ parseToken = P.choice
       p :: Char -> P.Parser String String
       p c = fromCharArray <$> do
         A.many $ P.noneOf [c]
+
+  numberLiteral :: P.Parser String Token
+  numberLiteral = NumberLiteral <$> do
+    P.choice [
+      P.try $ FloatLiteral <$> floatLiteral
+    , P.try $ IntLiteral   <$> intLiteral
+    ]
+    where
+      floatLiteral = do
+        x <- fromCharArray <$> (A.some num)
+        P.char '.'
+        xs <- fromCharArray <$> (A.some num)
+
+        -- there is no "safe" version yet, afaik
+        let n = readFloat $ x ++ "." ++ xs
+        if isNaN n
+           then P.fail "Could not parse float"
+           else pure n
+
+      intLiteral = do
+        x <- fromCharArray <$> (A.some num)
+        case (I.fromString x) of
+          Just n  -> return n
+          Nothing -> P.fail "Could not parse integer"
+
+
 
   name :: P.Parser String String
   name = fromCharArray <$> do
@@ -335,6 +380,7 @@ match tok = token (\tok' -> if (tok' == tok) then Just unit else Nothing)
 
 anyToken = token $ Just
 
+eof :: TokenParser Unit
 eof = P.notFollowedBy anyToken
 
 lparen :: TokenParser Unit

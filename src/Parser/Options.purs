@@ -53,17 +53,18 @@ import qualified Data.Array as A
 type Argument = String
 data ShortOption = ShortOption Char (Maybe Argument)
 data LongOption = LongOption String (Maybe Argument)
-data Option = Option {
+data OptionSpec = OptionSpec {
   short   :: Maybe ShortOption
 , long    :: Maybe LongOption
 , default :: Maybe Argument
 }
+type PartialOptionSpec = (Maybe Argument) -> OptionSpec
 
-derive instance genericOption      :: Generic Option
+derive instance genericOptionSpec  :: Generic OptionSpec
 derive instance genericShortOption :: Generic ShortOption
 derive instance genericLongOption  :: Generic LongOption
 
-instance showOption      :: Show Option      where show = gShow
+instance showOptionSpec  :: Show OptionSpec  where show = gShow
 instance showShortOption :: Show ShortOption where show = gShow
 instance showLongOption  :: Show LongOption  where show = gShow
 
@@ -75,7 +76,18 @@ optionsParser = do
 
   P.Position { column: col } <- getTokenPosition
   x <- markIndent' col do
-    optionLine
+    partial <- partialOptionSpec
+    -- XXX: Add scan for `[defaults: ...]`
+    debug "scanning"
+    toks <- P.manyTill anyToken $ P.choice [
+      P.try $ P.lookAhead $ void partialOptionSpec
+    , eof
+    ]
+    debug toks
+    debug "here"
+
+
+
 
   debug x
 
@@ -102,8 +114,8 @@ optionsParser = do
       debug "x:" *> debug x
       pure "XXX"
 
-    optionLine :: TokenParser Option
-    optionLine = sameIndent *> do
+    partialOptionSpec :: TokenParser PartialOptionSpec
+    partialOptionSpec = sameIndent *> do
       opt <- P.choice
         [ P.try shortAndLong
         , P.try onlyLong
@@ -111,25 +123,27 @@ optionsParser = do
         ]
       pure opt
 
-    onlyShort :: TokenParser Option
+    onlyShort :: TokenParser PartialOptionSpec
     onlyShort = do
       short <- shortOption
-      return $ Option {
-        short:   Just short
-      , long:    Nothing
-      , default: Nothing
-      }
+      return \default ->
+        OptionSpec {
+          short:   Just short
+        , long:    Nothing
+        , default: default
+        }
 
-    onlyLong :: TokenParser Option
+    onlyLong :: TokenParser PartialOptionSpec
     onlyLong = do
       long <- parseLongOption
-      pure $ Option {
-        short:   Nothing
-      , long:    Just long
-      , default: Nothing
-      }
+      return \default ->
+        OptionSpec {
+          short:   Nothing
+        , long:    Just long
+        , default: default
+        }
 
-    shortAndLong :: TokenParser Option
+    shortAndLong :: TokenParser PartialOptionSpec
     shortAndLong = do
       getInput >>= debug
       short <- shortOption
@@ -137,11 +151,12 @@ optionsParser = do
         [ P.try comma *> parseLongOption
         , parseLongOption
         ]
-      pure $ Option {
-        short:   Just short
-      , long:    Just long
-      , default: Nothing
-      }
+      return \default->
+        OptionSpec {
+          short:   Just short
+        , long:    Just long
+        , default: default
+        }
 
     shortOption :: TokenParser ShortOption
     shortOption = do
