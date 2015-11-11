@@ -20,6 +20,11 @@ import qualified Text.Parsing.Parser.Token as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 
+traceState :: TokenParser Unit
+traceState = do
+  (st :: ParserState) <- lift get
+  debug $ "(" ++ (show st.line) ++ "|" ++ (show st.indentation) ++ ")"
+
 -- |
 -- Get the position of the token at the head of the stream.
 --
@@ -36,22 +41,34 @@ getTokenPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 --
 markIndent :: forall a. TokenParser a -> TokenParser a
 markIndent p = do
-  ParserState { indentation: current } <- lift get
+  { indentation: current } <- lift get
   P.Position { column: pos } <- getTokenPosition
-  lift $ modify \(ParserState st) -> ParserState { indentation: pos }
+  lift $ modify \st -> ((st { indentation = pos }) :: ParserState)
   a <- p
-  lift $ modify \(ParserState st) -> ParserState { indentation: current }
+  lift $ modify \st -> ((st { indentation = current }) :: ParserState)
   return a
 
 -- |
--- Mark a custom  indentation level
+-- Mark the current line
+--
+markLine :: forall a. TokenParser a -> TokenParser a
+markLine p = do
+  { line: current } <- lift get
+  P.Position { line: pos } <- getTokenPosition
+  lift $ modify \st -> ((st { line = pos }) :: ParserState)
+  a <- p
+  lift $ modify \st -> ((st { line = current }) :: ParserState)
+  return a
+
+-- |
+-- Mark a custom indentation level
 --
 markIndent' :: forall a. Int -> TokenParser a -> TokenParser a
 markIndent' level p = do
-  ParserState { indentation: current } <- lift get
-  lift $ modify \(ParserState st) -> ParserState { indentation: level }
+  { indentation: current } <- lift get
+  lift $ modify \st -> ((st { indentation = level }) :: ParserState)
   a <- p
-  lift $ modify \(ParserState st) -> ParserState { indentation: current }
+  lift $ modify \st -> ((st { indentation = current }) :: ParserState)
   return a
 
 -- |
@@ -60,7 +77,7 @@ markIndent' level p = do
 checkIndentation :: (Int -> Int -> Boolean) -> TokenParser Unit
 checkIndentation rel = do
   P.Position { column: col } <- getTokenPosition
-  ParserState { indentation: current } <- lift get
+  { indentation: current } <- lift get
   guard (col `rel` current)
 
 -- |
@@ -93,3 +110,18 @@ lessIndented = checkIndentation (<) P.<?> "less indentation"
 --
 sameIndent :: TokenParser Unit
 sameIndent = checkIndentation (==) P.<?> "no indentation"
+
+-- |
+-- Check that the current line matches a predicate
+--
+checkLine :: (Int -> Int -> Boolean) -> TokenParser Unit
+checkLine rel = do
+  P.Position { line: line } <- getTokenPosition
+  { line: current } <- lift get
+  guard (line `rel` current)
+
+sameLine :: TokenParser Unit
+sameLine = checkLine (==) P.<?> "same line"
+
+successiveLine :: TokenParser Unit
+successiveLine = checkLine (>) P.<?> "successive line"

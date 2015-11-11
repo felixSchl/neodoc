@@ -7,6 +7,8 @@ module Docopt.Parser.Base where
 import Prelude
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
+import Control.Monad.State (get)
+import Control.Monad.Trans (lift)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P

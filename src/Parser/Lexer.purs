@@ -16,7 +16,7 @@ import qualified Text.Parsing.Parser.String as P
 import qualified Data.List as L
 import qualified Data.Array as A
 import Data.Char (toString, toLower, toUpper)
-import Data.String (fromCharArray, fromChar)
+import Data.String (fromCharArray, fromChar, trim)
 import Data.List (List(..), (:), fromList, many)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
@@ -47,7 +47,7 @@ data Token
   | TripleDot
   | LOpt String (Maybe String)
   | SOpt Char (Array Char) (Maybe String)
-  | Defaults String
+  | Default String
   | Name String
   | ShoutName String
   | AngleName String
@@ -70,19 +70,17 @@ prettyPrintToken Comma             = show ','
 prettyPrintToken Equal             = show '='
 prettyPrintToken TripleDot         = show "..."
 prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
-prettyPrintToken (Defaults  s)     = "Default "   ++ s
+prettyPrintToken (Default   s)     = "Default "   ++ s
 prettyPrintToken (Name      n)     = "Name "      ++ show n
 prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
 prettyPrintToken (AngleName n)     = "AngleName " ++ show n
 prettyPrintToken (StringLiteral s) = "String "    ++ show s
 prettyPrintToken (NumberLiteral n) = "Number "    ++ show n
 prettyPrintToken (Word w)          = "Word "      ++ show w
-prettyPrintToken (LOpt n a)        = "--" ++ n ++ " " ++ (show a)
-prettyPrintToken (SOpt n s a)      = "-"
-                                        ++ (fromChar n)
-                                        ++ (fromCharArray s)
-                                        ++ " "
-                                        ++ (show a)
+prettyPrintToken (LOpt n a)        = "--" ++ n
+                                          ++ " " ++ (show a)
+prettyPrintToken (SOpt n s a)      = "-"  ++ (fromCharArray (A.cons n s))
+                                          ++ " " ++ (show a)
 
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position
@@ -144,7 +142,7 @@ parseToken :: P.Parser String Token
 parseToken = P.choice
   [ P.try $ P.char   '('   *> pure LParen
   , P.try $ P.char   ')'   *> pure RParen
-  , P.try $ defaults
+  , P.try $ default
   , P.try $ P.char   '['   *> pure LSquare
   , P.try $ P.char   ']'   *> pure RSquare
   , P.try $ P.char   '|'   *> pure VBar
@@ -174,8 +172,8 @@ parseToken = P.choice
     P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     pure unit
 
-  defaults :: P.Parser String Token
-  defaults = Defaults <<< fromCharArray <$>  do
+  default :: P.Parser String Token
+  default = Default <<< trim <<< fromCharArray <$>  do
     P.between
       (P.char '[')
       (P.char ']')
@@ -434,6 +432,12 @@ tripleDot = match TripleDot
 equal :: TokenParser Unit
 equal = match Equal
 
+garbage :: TokenParser Unit
+garbage = token go P.<?> "garbage"
+  where
+    go (Garbage _) = Just unit
+    go _           = Nothing
+
 lopt :: TokenParser { name :: String
                     , arg  :: Maybe String }
 lopt = token go P.<?> "long-option"
@@ -454,6 +458,12 @@ name = token go P.<?> "name"
   where
     go (Name n) = Just n
     go _        = Nothing
+
+default :: TokenParser String
+default = token go P.<?> "default"
+  where
+    go (Default s) = Just s
+    go _         = Nothing
 
 word :: TokenParser String
 word = token go P.<?> "word"
@@ -479,6 +489,6 @@ runTokenParser :: forall a.
                 -> Either P.ParseError a
 runTokenParser s =
   flip evalState
-  (ParserState { indentation: 0 })
+  ({ indentation: 0, line: 0 })
   <<< P.runParserT
   (P.PState { input: s, position: P.initialPos })

@@ -41,131 +41,120 @@ import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
-import Data.Either
-import Data.Maybe hiding (maybe)
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..), maybe, isJust)
 import Data.Generic
-import Data.String (toLower)
-import Docopt.Parser.Base
-import Docopt.Parser.Lexer
-import Docopt.Parser.Common
+import Data.String (toLower, fromChar)
 import qualified Data.Array as A
 
+import Docopt.Parser.Base
+import Docopt.Parser.Common
+import qualified Docopt.Parser.Lexer as L
+
 type Argument = String
+type Default = String
 data ShortOption = ShortOption Char (Maybe Argument)
 data LongOption = LongOption String (Maybe Argument)
-data OptionSpec = OptionSpec {
-  short   :: Maybe ShortOption
-, long    :: Maybe LongOption
-, default :: Maybe Argument
-}
-type PartialOptionSpec = (Maybe Argument) -> OptionSpec
+data Option = Option
+                (Maybe ShortOption)
+                (Maybe LongOption)
+                (Maybe Default)
+type PartialOption = (Maybe Argument) -> Option
 
-derive instance genericOptionSpec  :: Generic OptionSpec
+derive instance genericOptionSpec  :: Generic Option
 derive instance genericShortOption :: Generic ShortOption
 derive instance genericLongOption  :: Generic LongOption
 
-instance showOptionSpec  :: Show OptionSpec  where show = gShow
-instance showShortOption :: Show ShortOption where show = gShow
-instance showLongOption  :: Show LongOption  where show = gShow
+instance showShortOption :: Show ShortOption where
+  show (ShortOption c a) = "-" ++ (fromChar c)
+                               ++ (case a of
+                                        Just a -> "=" ++ a
+                                        _      -> "")
 
-parse :: (List PositionedToken) -> Either P.ParseError Unit
-parse = flip runTokenParser optionsParser
+instance showlongOption :: Show LongOption where
+  show (LongOption s a) = "--" ++ s
+                               ++ (case a of
+                                        Just a -> "=" ++ a
+                                        _      -> "")
 
-optionsParser :: TokenParser Unit
+instance showOptionSpec  :: Show Option where
+  show (Option s l d) =
+    let hasLong    = isJust l
+        hasShort   = isJust s
+        hasDefault = isJust d
+        short      = maybe "" show s
+        long       = maybe "" (\x -> (if hasShort then ", " else "") ++ show x) l
+        default    = maybe "" (\x -> " [" ++ x ++ "]") d
+     in show $ short ++ long ++ default
+
+parse :: (List L.PositionedToken) -> Either P.ParseError Unit
+parse = flip L.runTokenParser optionsParser
+
+optionsParser :: L.TokenParser Unit
 optionsParser = do
 
   P.Position { column: col } <- getTokenPosition
   x <- markIndent' col do
-    partial <- partialOptionSpec
-    -- XXX: Add scan for `[defaults: ...]`
-    debug "scanning"
-    toks <- P.manyTill anyToken $ P.choice [
-      P.try $ P.lookAhead $ void partialOptionSpec
-    , eof
-    ]
-    debug toks
-    debug "here"
-
-
-
-
+    A.many do
+      option' <- option
+      pure option'
   debug x
-
-  -- as <- markIndent' col do
-  --   many $ P.try do
-  --     -- XXX: Add scan for `[defaults: ...]`
-  --     P.manyTill anyToken $ P.lookAhead do
-  --       optionLine
-  -- debug as
 
   where
 
-    anyName :: TokenParser String
-    anyName = angleName <|> shoutName <|> name
+    anyName :: L.TokenParser String
+    anyName = L.angleName <|> L.shoutName <|> L.name
 
-    defaults :: TokenParser String
-    defaults = do
-      lsquare
-      anyName >>= \n -> guard $ toLower n == "default"
-      x <- P.choice
-        [ colon *> P.manyTill anyToken rsquare
-        , P.manyTill anyToken rsquare
-        ]
-      debug "x:" *> debug x
-      pure "XXX"
+    defaults :: L.TokenParser String
+    defaults = L.default
 
-    partialOptionSpec :: TokenParser PartialOptionSpec
-    partialOptionSpec = sameIndent *> do
-      opt <- P.choice
+    option :: L.TokenParser Option
+    option = sameIndent *> do
+      f <- P.choice
         [ P.try shortAndLong
         , P.try onlyLong
         , P.try onlyShort
         ]
-      pure opt
-
-    onlyShort :: TokenParser PartialOptionSpec
-    onlyShort = do
-      short <- shortOption
-      return \default ->
-        OptionSpec {
-          short:   Just short
-        , long:    Nothing
-        , default: default
-        }
-
-    onlyLong :: TokenParser PartialOptionSpec
-    onlyLong = do
-      long <- parseLongOption
-      return \default ->
-        OptionSpec {
-          short:   Nothing
-        , long:    Just long
-        , default: default
-        }
-
-    shortAndLong :: TokenParser PartialOptionSpec
-    shortAndLong = do
-      getInput >>= debug
-      short <- shortOption
-      long <- P.choice
-        [ P.try comma *> parseLongOption
-        , parseLongOption
+      markLine do
+        -- Ignore any token that is not either a `default`
+        -- token or another option.
+        P.manyTill L.anyToken $ P.choice [
+          P.lookAhead $ void defaults
+        , P.lookAhead $ void (successiveLine *> option)
+        , L.eof
         ]
-      return \default->
-        OptionSpec {
-          short:   Just short
-        , long:    Just long
-        , default: default
-        }
+        f <$> P.choice [
+          Just <$> P.try defaults
+        , pure Nothing
+        ]
 
-    shortOption :: TokenParser ShortOption
+    onlyShort :: L.TokenParser PartialOption
+    onlyShort = Option
+        <$> (Just <$> shortOption)
+        <*> (pure Nothing)
+
+    onlyLong :: L.TokenParser PartialOption
+    onlyLong = Option
+        <$> (pure Nothing)
+        <*> (Just <$> longOption)
+
+    shortAndLong :: L.TokenParser PartialOption
+    shortAndLong = markLine do
+      Option
+        <$> (Just <$> shortOption)
+        <*> (Just <$> (sameLine *> P.choice
+              [ P.try L.comma *> longOption
+              , longOption
+              ]))
+
+    shortOption :: L.TokenParser ShortOption
     shortOption = do
-      { flag: flag, stack: stack, arg: arg } <- sopt
+      { flag: flag, stack: stack, arg: arg } <- L.sopt
       (guard $ (A.length stack == 0))
         P.<?> "No stacked options"
       return $ ShortOption flag arg
 
-    parseLongOption :: TokenParser LongOption
-    parseLongOption = do
-      { name: name, arg: arg } <- lopt
+    longOption :: L.TokenParser LongOption
+    longOption = do
+      { name: name, arg: arg } <- L.lopt
       return $ LongOption name arg

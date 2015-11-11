@@ -25,8 +25,13 @@ optionsParserSpec =
         options <- runEitherEff do
           toks <- Lexer.lex $ Textwrap.dedent
             """
-            -f, --foo This is some garbage text [default: 100.0].
+            -f, --foo     [default: 100.0]
+            -f       x [default: 200.0]
+            --foo    -a [default: 300.0]
+            -b
+            --foo<x> / [default: 400.0]
             """
+          traceShowA toks
           Options.parse toks
         traceShowA options
 
