@@ -18,12 +18,13 @@ import Data.String (length)
 import Data.Either
 import Data.Tuple
 import Data.Maybe hiding (maybe)
+import qualified Data.Array as A
+import qualified Data.String as Str
+
 import Docopt.Parser.Base
 import Docopt.Parser.Common
 import Docopt.Parser.Lexer
 import Docopt.Parser.State
-import qualified Data.Array as A
-import qualified Data.String as Str
 
 type OptionAlias    = String
 type OptionArgument = String
