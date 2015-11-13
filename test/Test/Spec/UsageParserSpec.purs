@@ -71,7 +71,7 @@ usageParserSpec =
         , pass "--bar=fOo"     $ lo "bar" (Just "fOo")
         , pass "--bar = fOo"   $ lo "bar" (Just "fOo")
         , pass "--bar = <foo>" $ lo "bar" (Just "foo")
-        , pass "--barFOO"      $ lo "bar" (Just "FOO")
+        , pass "--barFOO"      $ lo "barFOO" Nothing
         , fail "- - bar"
         , fail "--bar="
         , fail "--bar=<>"
@@ -84,25 +84,22 @@ usageParserSpec =
     describe "stacked options" do
       runSingleUsageNodeTests
         [ pass "-b"          $ so 'b' [] Nothing
-        , pass "-bFOO"       $ so 'b' [] (Just "FOO")
-        , pass "-bFoo"       $ so 'b' [] (Just "Foo")
+        , pass "-bFOO"       $ so 'b' ['F', 'O', 'O'] Nothing
+        , pass "-bFoo"       $ so 'b' ['F', 'o', 'o'] Nothing
         , pass "-b<foo>"     $ so 'b' [] (Just "foo")
         , pass "-b<foo>"     $ so 'b' [] (Just "foo")
         , pass "-b=foo"      $ so 'b' [] (Just "foo")
         , pass "-b=FOO"      $ so 'b' [] (Just "FOO")
         , pass "-b=<foo>"    $ so 'b' [] (Just "foo")
         , pass "-bar"        $ so 'b' ['a', 'r'] Nothing
-        , pass "-barFOO"     $ so 'b' ['a', 'r'] (Just "FOO")
+        , pass "-barFOO"     $ so 'b' ['a', 'r', 'F', 'O', 'O'] Nothing
         , pass "-bar<foo>"   $ so 'b' ['a', 'r'] (Just "foo")
-        , pass "-barFoo"     $ so 'b' ['a', 'r'] (Just "Foo")
+        , pass "-barFoo"     $ so 'b' ['a', 'r', 'F', 'o', 'o'] Nothing
         , pass "-bar=foo"    $ so 'b' ['a', 'r'] (Just "foo")
         , pass "-bar=FOO"    $ so 'b' ['a', 'r'] (Just "FOO")
         , pass "-bar=<foo>"  $ so 'b' ['a', 'r'] (Just "foo")
-        , pass "-bAR"        $ so 'b' [] (Just "AR")
-        , pass "-bARfoo"     $ so 'b' [] (Just "ARfoo")
-        , fail "-bAR=foo"
-        , fail "-bAR=<foo>"
-        , fail "-bAR<foo>"
+        , pass "-bAR"        $ so 'b' ['A', 'R'] Nothing
+        , pass "-bARfoo"     $ so 'b' ['A', 'R', 'f', 'o', 'o'] Nothing
         ]
 
     -- Test required groups in various formats.

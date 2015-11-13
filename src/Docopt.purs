@@ -28,6 +28,8 @@ data Argument
 
 --------------------------------------------------------------------------------
 
+import qualified Text.Parsing.Parser as P
+
 data DocoptError
   = ScanError   P.ParseError
   | LexError    P.ParseError

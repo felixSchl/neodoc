@@ -260,8 +260,8 @@ parseToken = P.choice
   shortOption :: P.Parser String Token
   shortOption = do
     P.char '-'
-    x  <- lowerAlphaNum
-    xs <- A.many lowerAlphaNum
+    x  <- alphaNum
+    xs <- A.many alphaNum
     arg <- P.choice [
 
       -- Parse <flag>=<value>, i.e.: `-foo=bar`
@@ -273,13 +273,6 @@ parseToken = P.choice
         , P.try shoutName
         , P.try name
         ]
-
-      -- Parse <flag><VALUE>, i.e.: `-fooBAR`
-    , P.try $ Just <$> do
-        fromCharArray <$>
-          (A.cons
-            <$> upperAlphaNum
-            <*> (A.many $ lowerAlphaNum <|> upperAlphaNum))
 
       -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
     , P.try $ Just <$> angleName
@@ -308,10 +301,10 @@ parseToken = P.choice
     P.string "--"
     name' <- fromCharArray <$> do
       A.cons
-        <$> lowerAlphaNum
+        <$> alphaNum
         <*> (A.many $ P.choice [
-              lowerAlphaNum
-            , P.oneOf [ '-' ] <* P.lookAhead lowerAlphaNum
+              alphaNum
+            , P.oneOf [ '-' ] <* P.lookAhead alphaNum
             ])
     arg <- P.choice [
 
@@ -324,13 +317,6 @@ parseToken = P.choice
         , P.try shoutName
         , P.try name
         ]
-
-      -- Parse <flag><VALUE>, i.e.: `--fooBAR`
-    , P.try $ Just <$> do
-        fromCharArray <$>
-          (A.cons
-            <$> upperAlphaNum
-            <*> (A.many $ lowerAlphaNum <|> upperAlphaNum))
 
       -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
     , P.try $ Just <$> angleName
