@@ -66,16 +66,11 @@ instance showUsage :: Show Usage where
   show (Usage n xs) = "Usage " ++ show n ++ " " ++ show xs
 
 instance showUsageNode :: Show UsageNode where
-  show (Command n) =
-    "Command " ++ n
-  show (Positional n b) =
-    "Positional " ++ n ++ " " ++ show b
-  show (Option n a b) =
-    "Option " ++ show n ++ " " ++ show a ++ " " ++ show b
-  show (OptionStack n s a b) =
-    "OptionStack " ++ show n ++ " " ++ show s ++ " " ++ show a ++ " " ++ show b
-  show (Group n b o) =
-    "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
+  show (Command n)           = "Command " ++ n
+  show (Positional n b)      = "Positional " ++ n ++ " " ++ show b
+  show (Option n a b)        = "Option " ++ show n ++ " " ++ show a ++ " " ++ show b
+  show (OptionStack n s a b) = "OptionStack " ++ show n ++ " " ++ show s ++ " " ++ show a ++ " " ++ show b
+  show (Group n b o)         = "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
 
 instance eqUsageNode :: Eq UsageNode where
   eq (Command s)            (Command s')               = (s == s')

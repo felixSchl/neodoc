@@ -4,7 +4,7 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Data.List (List(..), filter)
 
-import Docopt (Argument(..), Application(), Branch())
+import Docopt (Argument(..), Application(..), Branch(..))
 import qualified Docopt.Parser.Options as O
 import qualified Docopt.Parser.Usage   as U
 
@@ -16,7 +16,7 @@ solve us os = solveUsage os <$> us
   solveUsage os (U.Usage _ bs) = Application $ solveBranch os <$> bs
 
   solveBranch :: (List O.Option) -> (List U.UsageNode) -> Branch
-  solveBranch os us = solveNode os <$> us
+  solveBranch os us = Branch $ solveNode os <$> us
 
   solveNode :: (List O.Option) -> U.UsageNode -> Argument
   solveNode os (U.Command name)      = Command name

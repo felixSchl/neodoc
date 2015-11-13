@@ -26,7 +26,7 @@ solverSpec =
         , options: options } <- scan'
           """
           Usage:
-            foo --bar
+            foo (blah|bar)
           Options:
             -b, --bar
           """
