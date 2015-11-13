@@ -24,32 +24,33 @@ data Argument
   | Positional  String IsRepeatable
   | Option      (Maybe Flag)
                 (Maybe Name)
-                TakesArgument
+                (Maybe String)
                 (Maybe Default)
                 IsRepeatable
   | Group       IsOptional (List Branch) IsRepeatable
-
-instance showArgument :: Show Argument where
-  show (Command name)      = name
-  show (Positional name r) = name ++ (if r then "..." else "")
-  show (Option flag name arg def r) = short ++ long ++ repetition ++ default
-    where
-      short      = maybe "" (\f -> "-" ++ (show f)) flag
-      long       = maybe "" ("--" ++) name
-      repetition = if r then "..." else ""
-      default    = maybe "" (\d -> "[default: " ++ d ++  "]") def
-  show (Group o bs r) = open ++ inner ++ close ++ repetition
-    where
-      open       = if o then "[" else "("
-      close      = if o then "]" else ")"
-      inner      = intercalate " | " (show <$> bs)
-      repetition = if r then "..." else ""
 
 instance showBranch :: Show Branch where
   show (Branch xs) = intercalate " " (show <$> xs)
 
 instance showApplication :: Show Application where
   show (Application xs) = intercalate " | " (show <$> xs)
+
+instance showArgument :: Show Argument where
+  show (Command name)      = name
+  show (Positional name r) = name ++ (if r then "..." else "")
+  show (Option flag name arg def r) = short ++ long ++ arg' ++ rep ++ default
+    where
+      short   = maybe "" (\f -> "-" ++ (show f)) flag
+      long    = maybe "" ("--" ++) name
+      arg'    = maybe "" ("="  ++) arg
+      rep     = if r then "..." else ""
+      default = maybe "" (\d -> " [default: " ++ d ++  "]") def
+  show (Group o bs r) = open ++ inner ++ close ++ repetition
+    where
+      open       = if o then "[" else "("
+      close      = if o then "]" else ")"
+      inner      = intercalate " | " (show <$> bs)
+      repetition = if r then "..." else ""
 
 --------------------------------------------------------------------------------
 

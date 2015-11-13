@@ -26,9 +26,9 @@ solverSpec =
         , options: options } <- scan'
           """
           Usage:
-            foo (blah|bar)
+            foo --foo | --bar<ARG>
           Options:
-            -b, --bar
+            -b, --bar=ARG  aasdfasdf
           """
         usages <- runEitherEff (U.parse =<< lex usage)
         let solved = solve usages Nil
