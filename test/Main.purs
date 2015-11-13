@@ -11,6 +11,6 @@ import Test.Spec.GeneratorSpec (generatorSpec)
 
 main = run [consoleReporter] do
   generatorSpec
-  -- scannerSpec
-  -- usageParserSpec
-  -- optionsParserSpec
+  scannerSpec
+  usageParserSpec
+  optionsParserSpec

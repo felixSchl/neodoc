@@ -30,6 +30,7 @@ type OptionAlias    = String
 type OptionArgument = String
 type IsOptional     = Boolean
 type IsRepeatable   = Boolean
+type Branch         = List UsageNode
 
 parse :: (List PositionedToken) -> Either P.ParseError (List Usage)
 parse = flip runTokenParser usageParser
@@ -45,7 +46,7 @@ parse = flip runTokenParser usageParser
 -- | [ 0 , 1 ]  [ 0 ]  [ 0 ]
 -- |    \ /       |      |
 -- | [   0    ,   1   ,  2 ]
-data Usage = Usage String (List (List UsageNode))
+data Usage = Usage String (List Branch)
 data UsageNode
   = Command     String
   | Positional  String
@@ -58,7 +59,7 @@ data UsageNode
                 (Maybe OptionArgument)
                 IsRepeatable
   | Group       IsOptional
-                (List (List UsageNode))
+                (List Branch)
                 IsRepeatable
 
 instance showUsage :: Show Usage where

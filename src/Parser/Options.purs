@@ -53,14 +53,19 @@ import Docopt.Parser.Base
 import Docopt.Parser.Common
 import qualified Docopt.Parser.Lexer as L
 
-type Argument = String
-type Default = String
-data ShortOption = ShortOption Char (Maybe Argument)
-data LongOption = LongOption String (Maybe Argument)
-data Option = Option
-                (Maybe ShortOption)
-                (Maybe LongOption)
-                (Maybe Default)
+type Argument    = String
+type Default     = String
+data ShortOption = ShortOption Char  (Maybe Argument)
+data LongOption  = LongOption String (Maybe Argument)
+
+-- XXX: Option should have a `Maybe Argument`, pulled
+--      from it's short and long option.
+--      Need to decide what happens if both options
+--      specifiy a different argument!
+data Option = Option (Maybe ShortOption)
+                     (Maybe LongOption)
+                     (Maybe Default)
+
 type PartialOption = (Maybe Argument) -> Option
 
 derive instance genericOptionSpec  :: Generic Option
@@ -89,18 +94,13 @@ instance showOptionSpec  :: Show Option where
         default    = maybe "" (\x -> " [" ++ x ++ "]") d
      in show $ short ++ long ++ default
 
-parse :: (List L.PositionedToken) -> Either P.ParseError Unit
+parse :: (List L.PositionedToken) -> Either P.ParseError (List Option)
 parse = flip L.runTokenParser optionsParser
 
-optionsParser :: L.TokenParser Unit
+optionsParser :: L.TokenParser (List Option)
 optionsParser = do
 
-  P.Position { column: col } <- getTokenPosition
-  x <- markIndent' col do
-    A.many do
-      option' <- option
-      pure option'
-  debug x
+  many option
 
   where
 
