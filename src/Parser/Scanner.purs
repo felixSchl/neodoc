@@ -24,21 +24,16 @@ import Docopt.Textwrap (dedent)
 type Docopt = { usage :: Section, options :: List Section }
 type Section = String
 
--- | Pre-parse the docopt string and break it into sections.
 scan :: String -> Either P.ParseError Docopt
 scan = (flip P.runParser docoptScanner) <<< dedent
 
 docoptScanner :: P.Parser String Docopt
 docoptScanner = do
 
-  -- | Break the input string into sections.
-  -- | A section header is defined as a line starting with a label - that is
-  -- | string followed by a colon.
   P.manyTill
     P.anyChar
     ((void $ P.lookAhead sectionLabel) <|> P.eof)
 
-  -- | Parse the usage section
   label <- sectionLabel
   guard ((toLower label) == "usage")
 
@@ -52,7 +47,6 @@ docoptScanner = do
       ((void $ P.lookAhead sectionLabel) <|> P.eof)
   let fixedUsage = (fromCharArray $ A.replicate fixColOffset ' ') ++ usage
 
-  -- | Parse any option sections
   options <- many do
     label <- sectionLabel
     guard $ endsWith ("options") (toLower label)
