@@ -1,23 +1,32 @@
--- |
--- | This module defines the entry point and surface area of the Docopt
--- | compiler.
--- |
-
 module Docopt where
 
 import Prelude
 import Data.Either
-import Data.Traversable (traverse)
-import qualified Text.Parsing.Parser as P
-import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Pos as P
-import qualified Text.Parsing.Parser.String as P
-import qualified Docopt.Parser.Lexer as Lexer
-import qualified Docopt.Parser.Usage as Usage
-import qualified Docopt.Parser.Scanner as Scanner
-import qualified Docopt.Parser.Solver as Solver
-import qualified Docopt.Parser.Gen as Gen
-import Docopt.Parser.Base (debug)
+import Data.Maybe
+import Data.List
+
+--------------------------------------------------------------------------------
+
+type ProgramSpecification = List ProgramApplication
+type ProgramApplication   = List Branch
+type Branch               = List Argument
+type Name                 = String
+type IsRepeatable         = Boolean
+type IsOptional           = Boolean
+type TakesArgument        = Boolean
+type Flag                 = Char
+
+data Argument
+  = Command     String
+  | Positional  String IsRepeatable
+  | Option      (Maybe Flag)
+                (Maybe Name)
+                (TakesArgument)
+                (Maybe String)
+                IsRepeatable
+  | Group       IsOptional (List Branch) IsRepeatable
+
+--------------------------------------------------------------------------------
 
 data DocoptError
   = ScanError   P.ParseError
@@ -34,52 +43,3 @@ instance showError :: Show DocoptError where
   show (GenError msg)    = "GenError "    ++ show msg
   show (SolverError msg) = "SolverError " ++ show msg
   show (RunError err)    = "RunError "    ++ show err
-
--- docopt :: String -> String -> Either DocoptError Unit
--- docopt source input = do
---
---   debug "Scanning..."
---   Scanner.Docopt usageSrc optsSrcs <- wrapParseError ScanError do
---     Scanner.scan source
---   debug usageSrc
---
---   debug "Lexing usage..."
---   usageToks <- wrapParseError LexError do
---     flip P.runParser Lexer.parseTokens usageSrc
---   debug usageToks
---
---   debug "Lexing options..."
---   optsToks <- traverse
---     (\opt -> wrapParseError LexError $ flip P.runParser Lexer.parseTokens opt)
---     optsSrcs
---   debug optsToks
---
---   usageToks <- wrapParseError LexError do
---     flip P.runParser Lexer.parseTokens usageSrc
---   debug usageToks
---
---   debug "Parsing usage..."
---   usages <- wrapParseError ParseError do
---     flip Lexer.runTokenParser Usage.parseUsage usageToks
---   debug usages
---
---   -- XXX: TODO: Lex/Parse options
---
---   debug "Solving..."
---   usageSpec <- either (Left <<< SolverError) return $
---     Solver.solve usages
---   debug usageSpec
---
---   -- XXX: Put this on hold until the solver has been finished
---   -- debug "Generating and applying parser..."
---   -- result <- wrapParseError RunError $ flip P.runParser
---   --   (Gen.generateParser $ usageSpec)
---   --   input
---   -- debug result
---
---   where
---     wrapParseError :: forall a. (P.ParseError -> DocoptError)
---                              -> Either P.ParseError a
---                              -> Either DocoptError  a
---     wrapParseError f = either (Left <<< f) return
---
