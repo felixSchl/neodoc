@@ -8,9 +8,11 @@ import Test.Spec.ScannerSpec (scannerSpec)
 import Test.Spec.UsageParserSpec (usageParserSpec)
 import Test.Spec.OptionsParserSpec (optionsParserSpec)
 import Test.Spec.GeneratorSpec (generatorSpec)
+import Test.Spec.SolverSpec (solverSpec)
 
 main = run [consoleReporter] do
-  generatorSpec
-  scannerSpec
-  usageParserSpec
-  optionsParserSpec
+  solverSpec
+  -- generatorSpec
+  -- scannerSpec
+  -- usageParserSpec
+  -- optionsParserSpec

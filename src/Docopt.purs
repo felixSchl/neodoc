@@ -15,6 +15,7 @@ type IsRepeatable         = Boolean
 type IsOptional           = Boolean
 type TakesArgument        = Boolean
 type Flag                 = Char
+type Application          = List Branch
 
 data Argument
   = Command     String
@@ -25,6 +26,8 @@ data Argument
                 (Maybe String)
                 IsRepeatable
   | Group       IsOptional (List Branch) IsRepeatable
+
+
 
 --------------------------------------------------------------------------------
 
