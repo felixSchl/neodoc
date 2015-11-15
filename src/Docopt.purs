@@ -5,6 +5,7 @@ import Data.Either
 import Data.Maybe
 import Data.List
 import Data.Foldable (intercalate)
+import Data.Monoid (Monoid)
 
 --------------------------------------------------------------------------------
 
@@ -51,6 +52,12 @@ instance showArgument :: Show Argument where
       close      = if o then "]" else ")"
       inner      = intercalate " | " (show <$> bs)
       repetition = if r then "..." else ""
+
+instance semigroupApplication :: Semigroup Application where
+  append (Application xs) (Application ys) = Application (xs <> ys)
+
+instance monoidApplication :: Monoid Application where
+  mempty = Application Nil
 
 --------------------------------------------------------------------------------
 

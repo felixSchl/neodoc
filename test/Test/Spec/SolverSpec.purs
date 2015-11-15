@@ -2,8 +2,9 @@ module Test.Spec.SolverSpec (solverSpec) where
 
 import Prelude
 import Debug.Trace
-import Control.Bind((=<<))
+import Control.Bind ((=<<))
 import Data.List (List(..))
+import Control.Plus (empty)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
@@ -31,7 +32,7 @@ solverSpec =
             -b, --bar=ARG  aasdfasdf
           """
         usages <- runEitherEff (U.parse =<< lex usage)
-        let solved = solve usages Nil
+        solved <- runEitherEff $ solve usages empty
         traceShowA solved
         pure unit
 
