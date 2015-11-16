@@ -5,6 +5,7 @@ import Debug.Trace
 import Control.Monad.Aff (liftEff')
 import Control.Monad.State (State(), evalState)
 import Data.Maybe (Maybe(..))
+import Data.Either (Either(..))
 import Data.List (List(..), toList)
 
 import Docopt
@@ -14,6 +15,7 @@ import qualified Docopt.Parser.Options as Options
 import qualified Docopt.Textwrap as Textwrap
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Scanner as Scanner
+import Docopt.Generate
 import Docopt.Parser.Base (debug)
 
 import Test.Assert (assert)
@@ -56,6 +58,15 @@ br :: (Array Argument) -> Branch
 br xs = Branch (toList xs)
 
 generatorSpec =
-  describe "options parser" do
+  describe "generator" do
     it "should have some tests..." do
-      pure unit
+      let branch = br [ co "foo" ]
+          parser = mkBranchParser branch
+      vliftEff do
+        res <- runEitherEff do
+          flip runCliParser parser
+            (toList [
+              "foo"
+            ])
+        traceShowA res
+        pure unit
