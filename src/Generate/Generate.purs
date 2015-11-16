@@ -6,7 +6,7 @@ module Docopt.Generate (
 import Prelude
 import Control.Monad.State (State(), evalState)
 import Data.Either (Either(..), either)
-import Data.List (List(..), foldM, (:))
+import Data.List (List(..), foldM, (:), singleton)
 import qualified Data.List as L
 
 import qualified Text.Parsing.Parser as P
@@ -52,16 +52,60 @@ mkBranchParser (Branch xs) = do
     (\_ -> pure unit)
     (foldM step (Free $ pure unit) xs)
   where
-    -- TODO: Implement parser generation for all terminal arguments
-    step (Free p) n = Right $ Free p
+    -- Options always transition to the `Pending state`
+    step (Free p) x@(Option _ _ _ _ _) = Right $ Pending p (singleton x)
 
+    -- Any other argument causes immediate evaluation
+    step (Free p) x = Right $ Free do
+      a  <- p
+      as <- (mkP x)
+      -- XXX: Do sth with `a` and `as` here!
+      pure unit
+
+    -- Options always keep accumulating
     step (Pending p xs) x@(Option _ _ _ _ _) = Right $
       Pending p (x:xs)
 
+    -- Any non-options always leaves the pending state
     step (Pending p xs) y = Right $
       Free do
         a  <- p
         -- TODO: Create a parser that continues to consume elements from a list
-        --       until the list is exhausted.
+        --       until the list is exhausted! The parser for each `x` in `xs`
+        --       can be retrieved by `mkP <$> xs`, however the tricky part is
+        --       parsing the list until it has been totally consumed.
         -- as <- ???
         pure unit
+
+    mkP (Command n) = do
+      -- XXX: Match string against input here!
+      pure unit
+    mkP (Positional n r) = do
+      -- XXX: Match against "valid" input here! "Valid" is any string that
+      --      that is not an option.
+      -- XXX: Consider `r` here - we must either return a list, always, or
+      --      a data type that ensures that at least one value is present:
+      --      `X Xs`, where both `X` and `Xs` are data constructors.
+      pure unit
+    mkP (Option f n a d r) = do
+      -- XXX: Match against input:
+      --    ["--fooBAR", ...] == ["--foo", "BAR"]
+      --    ["-fFILE", ...]   == ["-f", "FILE", ...]
+      --
+      --    1. See if this option's long name exists and if it is a substring
+      --        of the input, or
+      --    2. see if this option's long name exists and if it is a substring
+      --        of the input.
+      --    3. If match is found, consume next input string from stream.
+      -- XXX: Consider `r` here - we must either return a list, always, or
+      --      a data type that ensures that at least one value is present:
+      --      `X Xs`, where both `X` and `Xs` are data constructors.
+      pure unit
+    mkP (Group o bs r) = 
+      -- XXX: Recursively generate a parser.
+      --      NOTE: THIS COMPUTATION MAY FAIL:
+      --            `mkP` must be in the Either monad
+      -- XXX: Consider `r` here - we must either return a list, always, or
+      --      a data type that ensures that at least one value is present:
+      --      `X Xs`, where both `X` and `Xs` are data constructors.
+      pure unit
