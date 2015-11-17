@@ -1,22 +1,29 @@
 module Docopt.Generate (
   mkBranchParser
 , runCliParser
+, Value(..)
 ) where
 
 import Prelude
+import Debug.Trace
 import Control.Monad.State (State(), evalState)
 import Data.Either (Either(..), either)
+import Data.Maybe (Maybe(..))
 import Data.List (List(..), foldM, (:), singleton)
 import qualified Data.List as L
+import Data.Tuple (Tuple(..))
+import Data.Monoid (mempty)
 
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
-
 import Docopt
 
-type CliParseState = {}
+data Value
+  = StringValue String
+  | BoolValue   Boolean
+type CliParseState = { mapped :: List (Tuple Argument Value) }
 type CliParser a = P.ParserT (List String) (State CliParseState) a
 
 runCliParser :: forall a.
@@ -25,13 +32,40 @@ runCliParser :: forall a.
               -> Either P.ParseError a
 runCliParser s =
   flip evalState
-  ({})
+  { mapped: Nil }
   <<< P.runParserT
   (P.PState { input: s, position: P.initialPos })
+
+-- | Test the string at the head of the stream
+token :: forall a. (String -> Maybe a) -> CliParser a
+token test = P.ParserT $ \(P.PState { input: strs, position: pos }) ->
+  return $ case strs of
+    Cons str xs ->
+      case test str of
+        Just a ->
+          let nextpos = pos -- neglect pos
+          in
+            { consumed: true
+            , input:    xs
+            , result:   Right a
+            , position: nextpos }
+        -- XXX: Fix this error message, it makes no sense!
+        Nothing -> P.parseFailed strs pos "a better error message!"
+    _ -> P.parseFailed strs pos "expected token, met EOF"
+
+instance showValue :: Show Value where
+  show (StringValue s) = "StringValue " ++ s
+  show (BoolValue b)   = "BoolValue "   ++ (show b)
 
 data Acc a
   = Free (CliParser a)
   | Pending (CliParser a) (List Argument)
+
+command :: String -> CliParser Value
+command n = token go P.<?> "command"
+  where
+    go s | s == n = Just (BoolValue true)
+    go _          = Nothing
 
 -- Notes and thoughts:
 --
@@ -57,8 +91,10 @@ mkBranchParser (Branch xs) = do
 
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
-      a  <- p
-      as <- (mkP x)
+      traceShowA "1"
+      traceShowA "2"
+      -- a  <- p
+      -- as <- (mkP x)
       -- XXX: Do sth with `a` and `as` here!
       pure unit
 
@@ -78,7 +114,8 @@ mkBranchParser (Branch xs) = do
         pure unit
 
     mkP (Command n) = do
-      -- XXX: Match string against input here!
+      x <- command n
+      traceShowA x
       pure unit
     mkP (Positional n r) = do
       -- XXX: Match against "valid" input here! "Valid" is any string that
