@@ -30,28 +30,46 @@ data Argument
                 IsRepeatable
   | Group       IsOptional (List Branch) IsRepeatable
 
-instance showBranch :: Show Branch where
-  show (Branch xs) = intercalate " " (show <$> xs)
+prettyPrintArg :: Argument -> String
+prettyPrintArg (Command name)      = name
+prettyPrintArg (Positional name r) = name ++ (if r then "..." else "")
+prettyPrintArg (Option flag name arg def r)
+  = short ++ long ++ arg' ++ rep ++ default
+  where
+    short   = maybe "" (\f -> "-" ++ (show f)) flag
+    long    = maybe "" ("--" ++) name
+    arg'    = maybe "" ("="  ++) arg
+    rep     = if r then "..." else ""
+    default = maybe "" (\d -> " [default: " ++ d ++  "]") def
+prettyPrintArg (Group o bs r) = open ++ inner ++ close ++ repetition
+  where
+    open       = if o then "[" else "("
+    close      = if o then "]" else ")"
+    inner      = intercalate " | " (show <$> bs)
+    repetition = if r then "..." else ""
+
+prettyPrintBranch :: Branch -> String
+prettyPrintBranch (Branch xs) = intercalate " " (prettyPrintArg <$> xs)
+
+prettyPrintApplication :: Application -> String
+prettyPrintApplication (Application xs)
+  = intercalate " | " (prettyPrintBranch <$> xs)
 
 instance showApplication :: Show Application where
-  show (Application xs) = intercalate " | " (show <$> xs)
+  show (Application xs) = "Application " ++ show (show <$> xs)
+
+instance showBranch :: Show Branch where
+  show (Branch xs) = "Branch " ++ show (show <$> xs)
 
 instance showArgument :: Show Argument where
-  show (Command name)      = name
-  show (Positional name r) = name ++ (if r then "..." else "")
-  show (Option flag name arg def r) = short ++ long ++ arg' ++ rep ++ default
-    where
-      short   = maybe "" (\f -> "-" ++ (show f)) flag
-      long    = maybe "" ("--" ++) name
-      arg'    = maybe "" ("="  ++) arg
-      rep     = if r then "..." else ""
-      default = maybe "" (\d -> " [default: " ++ d ++  "]") def
-  show (Group o bs r) = open ++ inner ++ close ++ repetition
-    where
-      open       = if o then "[" else "("
-      close      = if o then "]" else ")"
-      inner      = intercalate " | " (show <$> bs)
-      repetition = if r then "..." else ""
+  show (Command n)
+    = intercalate " " [ "Command", show n ]
+  show (Positional n r)
+    = intercalate " " [ "Positional", show n, show r ]
+  show (Group o bs r) 
+    = intercalate " " [ "Group", show o, show bs, show r ]
+  show (Option f n a d r)
+    = intercalate " " [ "Option", show f, show n, show a, show d, show r ]
 
 instance semigroupApplication :: Semigroup Application where
   append (Application xs) (Application ys) = Application (xs <> ys)
