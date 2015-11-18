@@ -1,16 +1,22 @@
 module Docopt.Generate (
   mkBranchParser
 , runCliParser
+, lexArgv
 , Value(..)
+, Token(..)
 ) where
 
 import Prelude
 import Debug.Trace
 import Control.Monad.State (State(), evalState)
+import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..))
 import Data.List (List(..), foldM, (:), singleton)
+import Data.String (fromCharArray)
+import Data.List (many)
 import qualified Data.List as L
+import qualified Data.Array as A
 import Data.Tuple (Tuple(..))
 import Data.Monoid (mempty)
 
@@ -18,7 +24,71 @@ import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
+
 import Docopt
+import Docopt.Parser.Base (alphaNum, space)
+
+--------------------------------------------------------------------------------
+-- Input Lexer
+--------------------------------------------------------------------------------
+
+data Token
+  = LOpt String (Maybe String)
+  | SOpt Char (Array Char) (Maybe String)
+  | Lit  String
+
+prettyPrintToken :: Token -> String
+prettyPrintToken (LOpt n a)   = "--" ++ n ++ " " ++ (show a)
+prettyPrintToken (SOpt n s a) = "-"  ++ (fromCharArray (A.cons n s)) ++ " " ++ (show a)
+prettyPrintToken (Lit s)      = show s
+
+instance showToken :: Show Token where
+  show = show <<< prettyPrintToken
+
+parseToken :: P.Parser String Token
+parseToken = do
+  P.choice $ P.try <$> [ sopt, lopt, lit ]
+  <* P.eof
+  where
+    sopt :: P.Parser String Token
+    sopt = do
+      P.char '-'
+      x  <- alphaNum
+      xs <- A.many alphaNum
+      arg <- P.choice $ P.try <$> [
+        Just <$> do
+          many space *> P.char '=' <* many space
+          fromCharArray <$> do A.many P.anyChar
+      , pure Nothing
+      ]
+      pure $ SOpt x xs arg
+    lopt :: P.Parser String Token
+    lopt = do
+      P.string "--"
+      xs <- fromCharArray <$> do
+        A.many alphaNum
+      arg <- P.choice $ P.try <$> [
+        Just <$> do
+          many space *> P.char '=' <* many space
+          fromCharArray <$> do A.many P.anyChar
+      , pure Nothing
+      ]
+      pure $ LOpt xs arg
+    lit :: P.Parser String Token
+    lit = Lit <<< fromCharArray <$> do
+      A.many P.anyChar
+
+lexArgv :: (List String) -> Either P.ParseError (List Token)
+lexArgv = foldM step Nil
+  where
+    step :: List Token -> String -> Either P.ParseError (List Token)
+    step a b = do
+      x <- flip P.runParser parseToken b
+      pure (x:a)
+
+--------------------------------------------------------------------------------
+-- Input Token Parser
+--------------------------------------------------------------------------------
 
 data Value
   = StringValue String
