@@ -15,7 +15,7 @@ import qualified Docopt.Parser.Options as Options
 import qualified Docopt.Textwrap as Textwrap
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Scanner as Scanner
-import Docopt.Generate (lexArgv)
+import Docopt.Generate (lexArgv, mkBranchParser, runCliParser)
 import Docopt.Parser.Base (debug)
 
 import Test.Assert (assert)
@@ -57,7 +57,9 @@ grr = gr false
 br :: (Array Argument) -> Branch
 br xs = Branch (toList xs)
 
-generatorSpec =
+generatorSpec = describe "generator" do
+
+  -- XXX: Move this
   describe "cli lexer" do
     it "should lex cli input..." do
       vliftEff do
@@ -71,16 +73,15 @@ generatorSpec =
           ])
         traceShowA res
 
-
-  -- describe "generator" do
-  --   it "should have some tests..." do
-  --     let branch = br [ co "foo" ]
-  --         parser = mkBranchParser branch
-  --     vliftEff do
-  --       res <- runEitherEff do
-  --         flip runCliParser parser
-  --           (toList [
-  --             "foo"
-  --           ])
-  --       traceShowA res
-  --       pure unit
+  describe "generator" do
+    it "should have some tests..." do
+      let branch = br [ co "foo" ]
+          parser = mkBranchParser branch
+      vliftEff do
+        res <- runEitherEff do
+          toks <- lexArgv (toList [
+            "foo"
+          ])
+          flip runCliParser parser toks
+        traceShowA res
+        pure unit

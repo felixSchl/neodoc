@@ -7,12 +7,13 @@ module Docopt.Generate (
 ) where
 
 import Prelude
+import Control.Plus (empty)
 import Debug.Trace
 import Control.Monad.State (State(), evalState)
 import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..))
-import Data.List (List(..), foldM, (:), singleton)
+import Data.List (List(..), foldM, (:), singleton, some)
 import Data.String (fromCharArray)
 import Data.List (many)
 import qualified Data.List as L
@@ -94,24 +95,24 @@ data Value
   = StringValue String
   | BoolValue   Boolean
 type CliParseState = { mapped :: List (Tuple Argument Value) }
-type CliParser a = P.ParserT (List String) (State CliParseState) a
+type CliParser a = P.ParserT (List Token) (State CliParseState) a
 
 runCliParser :: forall a.
-                (List String)
+                (List Token)
               -> CliParser a
               -> Either P.ParseError a
-runCliParser s =
+runCliParser input =
   flip evalState
   { mapped: Nil }
   <<< P.runParserT
-  (P.PState { input: s, position: P.initialPos })
+  (P.PState { input: input, position: P.initialPos })
 
 -- | Test the string at the head of the stream
-token :: forall a. (String -> Maybe a) -> CliParser a
-token test = P.ParserT $ \(P.PState { input: strs, position: pos }) ->
-  return $ case strs of
-    Cons str xs ->
-      case test str of
+token :: forall a. (Token -> Maybe a) -> CliParser a
+token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+  return $ case toks of
+    Cons tok xs ->
+      case test tok of
         Just a ->
           let nextpos = pos -- neglect pos
           in
@@ -120,8 +121,8 @@ token test = P.ParserT $ \(P.PState { input: strs, position: pos }) ->
             , result:   Right a
             , position: nextpos }
         -- XXX: Fix this error message, it makes no sense!
-        Nothing -> P.parseFailed strs pos "a better error message!"
-    _ -> P.parseFailed strs pos "expected token, met EOF"
+        Nothing -> P.parseFailed toks pos "a better error message!"
+    _ -> P.parseFailed toks pos "expected token, met EOF"
 
 instance showValue :: Show Value where
   show (StringValue s) = "StringValue " ++ s
@@ -134,8 +135,14 @@ data Acc a
 command :: String -> CliParser Value
 command n = token go P.<?> "command"
   where
-    go s | s == n = Just (BoolValue true)
-    go _          = Nothing
+    go (Lit s) | s == n = Just (BoolValue true)
+    go _                = Nothing
+
+positional :: CliParser Value
+positional = token go P.<?> "positional"
+  where
+    go (Lit _) = Just (BoolValue true)
+    go _       = Nothing
 
 -- Notes and thoughts:
 --
@@ -149,24 +156,21 @@ command n = token go P.<?> "command"
 --      GRP => Generate parser recursively
 --      OPT => Start accumlating
 --
-mkBranchParser :: Branch -> CliParser Unit
+mkBranchParser :: Branch -> CliParser (List (Tuple Argument Value))
 mkBranchParser (Branch xs) = do
   either
-    (\_ -> pure unit)
-    (\_ -> pure unit)
-    (foldM step (Free $ pure unit) xs)
+    (\_ -> pure empty)
+    (\_ -> pure empty)
+    (foldM step (Free $ pure empty) xs)
   where
     -- Options always transition to the `Pending state`
     step (Free p) x@(Option _ _ _ _ _) = Right $ Pending p (singleton x)
 
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
-      traceShowA "1"
-      traceShowA "2"
-      -- a  <- p
-      -- as <- (mkP x)
-      -- XXX: Do sth with `a` and `as` here!
-      pure unit
+      a  <- p
+      as <- (mkParser x)
+      pure (a ++ as)
 
     -- Options always keep accumulating
     step (Pending p xs) x@(Option _ _ _ _ _) = Right $
@@ -178,23 +182,22 @@ mkBranchParser (Branch xs) = do
         a  <- p
         -- TODO: Create a parser that continues to consume elements from a list
         --       until the list is exhausted! The parser for each `x` in `xs`
-        --       can be retrieved by `mkP <$> xs`, however the tricky part is
+        --       can be retrieved by `mkParser <$> xs`, however the tricky part is
         --       parsing the list until it has been totally consumed.
         -- as <- ???
-        pure unit
+        pure empty
 
-    mkP (Command n) = do
-      x <- command n
-      traceShowA x
-      pure unit
-    mkP (Positional n r) = do
-      -- XXX: Match against "valid" input here! "Valid" is any string that
-      --      that is not an option.
-      -- XXX: Consider `r` here - we must either return a list, always, or
-      --      a data type that ensures that at least one value is present:
-      --      `X Xs`, where both `X` and `Xs` are data constructors.
-      pure unit
-    mkP (Option f n a d r) = do
+    mkParser :: Argument -> CliParser (List (Tuple Argument Value))
+
+    mkParser x@(Command n) = do
+      singleton <<< Tuple x <$> do
+        command n
+
+    mkParser x@(Positional n r) = do
+      if r then (some go) else (singleton <$> go)
+      where go = Tuple x <$> positional
+
+    mkParser (Option f n a d r) = do
       -- XXX: Match against input:
       --    ["--fooBAR", ...] == ["--foo", "BAR"]
       --    ["-fFILE", ...]   == ["-f", "FILE", ...]
@@ -207,12 +210,13 @@ mkBranchParser (Branch xs) = do
       -- XXX: Consider `r` here - we must either return a list, always, or
       --      a data type that ensures that at least one value is present:
       --      `X Xs`, where both `X` and `Xs` are data constructors.
-      pure unit
-    mkP (Group o bs r) = 
+      pure empty
+
+    mkParser (Group o bs r) = 
       -- XXX: Recursively generate a parser.
       --      NOTE: THIS COMPUTATION MAY FAIL:
-      --            `mkP` must be in the Either monad
+      --            `mkParser` must be in the Either monad
       -- XXX: Consider `r` here - we must either return a list, always, or
       --      a data type that ensures that at least one value is present:
       --      `X Xs`, where both `X` and `Xs` are data constructors.
-      pure unit
+      pure empty
