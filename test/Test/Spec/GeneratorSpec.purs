@@ -74,12 +74,15 @@ generatorSpec = describe "generator" do
 
   describe "generator" do
     it "should have some tests..." do
-      let branch = br [ co "foo" ]
+      let branch = br [
+            co "foo"
+          , opt (Just 'f') (Just "foo") Nothing true
+          ]
           parser = mkBranchParser branch
       vliftEff do
         res <- runEitherEff do
           toks <- lexArgv (toList [
-            "foo"
+            "foo", "-fobar"
           ])
           flip runCliParser parser toks
         traceShowA res

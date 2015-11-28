@@ -11,12 +11,13 @@ import Debug.Trace
 import Control.Monad.State (State(), evalState)
 import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..))
-import Data.List (List(..), foldM, (:), singleton, some)
+import Data.Maybe (Maybe(..), isJust)
+import Data.List (List(..), foldM, (:), singleton, some, toList)
 import Data.String (fromCharArray)
 import Data.List (many)
 import qualified Data.List as L
 import qualified Data.Array as A
+import Data.Array (uncons)
 import Data.Tuple (Tuple(..))
 import Data.Monoid (mempty)
 
@@ -138,10 +139,74 @@ positional = token go P.<?> "positional"
     go (Lit _) = Just (BoolValue true)
     go _       = Nothing
 
--- longOption :: CliParser Value
--- longOption :: token go P.<?> "long option"
---   where
---     go (LOpt n v) 
+longOption :: Name -> TakesArgument -> CliParser Value
+longOption n b = token go P.<?> "long option"
+  where
+    -- TOOD: `StringValue` is invalid here! `LOpt` should either have
+    --       analysed the type of argument already, so we should be
+    --       able to just return `v` / or we need to parse it here?
+    go (LOpt n' (Just v)) | (b == true)  && (n' == n) = Just $ StringValue v
+    go (LOpt n' Nothing)  | (b == false) && (n' == n) = Just $ BoolValue   true
+    go _                                              = Nothing
+
+-- XXX: This may have to return the token instead of the value, so that we
+--      refer to it multiple times until the input has been exhausted.
+shortOption :: Char -> TakesArgument -> CliParser Value
+shortOption f b = token go P.<?> "short option"
+  where
+    -- case 1:
+    -- The leading flag matches, there are no stacked options, but an explicit
+    -- argument has been passed.
+    go (SOpt f' xs (Just v)) | (f' == f) && (b == true)
+      = case uncons xs of
+            Nothing -> Just $ StringValue v
+            _       -> Nothing
+
+    -- case 2:
+    -- The leading flag matches, there are stacked options and no explicit
+    -- argument has been passed
+    go (SOpt f' xs Nothing) | (f' == f) && (b == true)
+      = case uncons xs of
+             Just _ -> Just $ StringValue $ fromCharArray xs
+             _      -> Nothing
+
+    -- case 3:
+    -- The leading flag matches and the option takes no argument
+    go (SOpt f' xs v) | (f' == f) && (b == false)
+      = case uncons xs of
+             Just _ -> Nothing
+             _      -> case v of
+                            Just _ -> Nothing
+                            _      -> Just $ BoolValue true
+
+    -- case 4:
+    -- A option in the stack matches and takes no argument
+    go (SOpt _ xs v) | (b == false) && (isJust (A.elemIndex f xs))
+      = case v of
+             Just _ -> Nothing
+             _      -> Just $ BoolValue true
+
+    -- case 5:
+    -- A option in the stack matches and takes an argument, however
+    -- an explicit argument is present
+    go (SOpt _ xs (Just v)) | (b == true)
+      = case A.elemIndex f xs of
+             Just i | (i == (A.length xs - 1)) -> Just $ StringValue v
+             _                                 -> Nothing
+
+    -- case 6:
+    -- A option in the stack matches and takes an argument and no
+    -- explicit argument is present
+    go (SOpt _ xs Nothing) | (b == true)
+      = case A.elemIndex f xs of
+             Just i ->
+                let ys = A.drop (i + 1) xs
+                 in if (A.length ys > 0)
+                        then Just $ StringValue (fromCharArray ys)
+                        else Nothing
+             _      -> Nothing
+
+    go _ = Nothing
 
 -- Notes and thoughts:
 --
@@ -196,11 +261,19 @@ mkBranchParser (Branch xs) = do
       if r then (some go) else (singleton <$> go)
       where go = Tuple x <$> positional
 
-    mkParser (Option f n a r) = do
+    mkParser x@(Option f n a r) = do
+      P.choice $ P.try <$> [
+        Tuple x <$> mkLoptParser n a
+      , Tuple x <$> mkSoptParser f a
+      ]
+      pure empty
 
-      -- We have a spec that defines an option that:
-      --    * has a long name
-      --    * takes no argument
+      where
+        mkLoptParser (Just n) a = longOption n (isJust a)
+        mkLoptParser Nothing _  = P.fail "no long name"
+
+        mkSoptParser (Just f) a = shortOption f (isJust a)
+        mkSoptParser Nothing _  = P.fail "no flag"
 
       -- P.choice [
       --   maybe (P.fail "no name") (\n' -> longOption n a)
@@ -218,7 +291,6 @@ mkBranchParser (Branch xs) = do
       -- XXX: Consider `r` here - we must either return a list, always, or
       --      a data type that ensures that at least one value is present:
       --      `X Xs`, where both `X` and `Xs` are data constructors.
-      pure empty
 
     mkParser (Group o bs r) = 
       -- XXX: Recursively generate a parser.
