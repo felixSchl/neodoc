@@ -11,7 +11,7 @@ import Debug.Trace
 import Control.Monad.State (State(), evalState)
 import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.List (List(..), foldM, (:), singleton, some, toList)
 import Data.String (fromCharArray)
 import Data.List (many)
@@ -149,64 +149,91 @@ longOption n b = token go P.<?> "long option"
     go (LOpt n' Nothing)  | (b == false) && (n' == n) = Just $ BoolValue   true
     go _                                              = Nothing
 
--- XXX: This may have to return the token instead of the value, so that we
---      refer to it multiple times until the input has been exhausted.
+-- | Parse the token at the head of the input stream and possibly replace
+-- | it with another token. Consider, e.g. an option was parsed but has a
+-- | valid remainder, that remainder should be offered to subsequent parsers.
+token' :: forall a. (Token -> Tuple (Maybe Token) (Maybe a)) -> CliParser a
+token' f = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+  return $ case toks of
+    Cons tok xs ->
+      case f tok of
+        Tuple remainder (Just a) ->
+          let nextpos = pos -- neglect pos
+          in {
+            consumed: maybe true (const false) remainder
+          , input:    maybe xs (\r -> (r:xs)) remainder
+          , result:   Right a
+          , position: nextpos
+          }
+        _ -> P.parseFailed toks pos "bad token"
+    _ -> P.parseFailed toks pos "expected token, met EOF"
+
 shortOption :: Char -> TakesArgument -> CliParser Value
-shortOption f b = token go P.<?> "short option"
+shortOption f b = token' go P.<?> "short option"
   where
+
     -- case 1:
     -- The leading flag matches, there are no stacked options, but an explicit
     -- argument has been passed.
     go (SOpt f' xs (Just v)) | (f' == f) && (b == true)
       = case uncons xs of
-            Nothing -> Just $ StringValue v
-            _       -> Nothing
+            Nothing -> Tuple Nothing (Just $ StringValue v)
+            _       -> Tuple Nothing Nothing
 
     -- case 2:
     -- The leading flag matches, there are stacked options and no explicit
     -- argument has been passed
     go (SOpt f' xs Nothing) | (f' == f) && (b == true)
       = case uncons xs of
-             Just _ -> Just $ StringValue $ fromCharArray xs
-             _      -> Nothing
+             Just _ -> Tuple Nothing (Just $ StringValue $ fromCharArray xs)
+             _      -> Tuple Nothing Nothing
 
     -- case 3:
     -- The leading flag matches and the option takes no argument
-    go (SOpt f' xs v) | (f' == f) && (b == false)
+    go (SOpt f' xs Nothing) | (f' == f) && (b == false)
       = case uncons xs of
-             Just _ -> Nothing
-             _      -> case v of
-                            Just _ -> Nothing
-                            _      -> Just $ BoolValue true
+          Just _  -> Tuple Nothing Nothing
+          Nothing -> Tuple Nothing (Just $ BoolValue true)
 
     -- case 4:
     -- A option in the stack matches and takes no argument
-    go (SOpt _ xs v) | (b == false) && (isJust (A.elemIndex f xs))
-      = case v of
-             Just _ -> Nothing
-             _      -> Just $ BoolValue true
+    go (SOpt f xs v) | (b == false)
+      = case A.elemIndex f xs of
+          Just i  ->
+            maybe
+              (Tuple Nothing Nothing)
+              (\xs' -> Tuple (Just $ SOpt f xs' v) (Just $ BoolValue true))
+              (A.deleteAt i xs)
+          Nothing -> Tuple Nothing Nothing
 
     -- case 5:
     -- A option in the stack matches and takes an argument, however
-    -- an explicit argument is present
-    go (SOpt _ xs (Just v)) | (b == true)
+    -- an explicit argument is present. In this case, the only valid option is
+    -- the last element in the option stack!
+    go (SOpt f xs (Just v)) | (b == true)
       = case A.elemIndex f xs of
-             Just i | (i == (A.length xs - 1)) -> Just $ StringValue v
-             _                                 -> Nothing
+          Just i | (i == (A.length xs - 1)) ->
+            Tuple
+              (Just $ SOpt f (maybe [] id (A.init xs)) Nothing)
+              (Just $ StringValue v)
+          _ -> Tuple Nothing Nothing
 
     -- case 6:
     -- A option in the stack matches and takes an argument and no
     -- explicit argument is present
-    go (SOpt _ xs Nothing) | (b == true)
+    go (SOpt f xs Nothing) | (b == true)
       = case A.elemIndex f xs of
-             Just i ->
-                let ys = A.drop (i + 1) xs
-                 in if (A.length ys > 0)
-                        then Just $ StringValue (fromCharArray ys)
-                        else Nothing
-             _      -> Nothing
+          Just i ->
+            let ys = A.drop (i + 1) xs
+            in if (A.length ys > 0)
+              then
+                Tuple
+                  (Just $ SOpt f (A.take i xs) Nothing)
+                  (Just $ StringValue $ fromCharArray ys)
+              else Tuple Nothing Nothing
+          _ -> Tuple Nothing Nothing
 
-    go _ = Nothing
+    go o = Tuple (Just o) Nothing
 
 -- Notes and thoughts:
 --
@@ -264,7 +291,7 @@ mkBranchParser (Branch xs) = do
     mkParser x@(Option f n a r) = do
       P.choice $ P.try <$> [
         Tuple x <$> mkLoptParser n a
-      , Tuple x <$> mkSoptParser f a
+      -- , Tuple x <$> mkSoptParser f a
       ]
       pure empty
 
@@ -272,8 +299,8 @@ mkBranchParser (Branch xs) = do
         mkLoptParser (Just n) a = longOption n (isJust a)
         mkLoptParser Nothing _  = P.fail "no long name"
 
-        mkSoptParser (Just f) a = shortOption f (isJust a)
-        mkSoptParser Nothing _  = P.fail "no flag"
+        -- mkSoptParser (Just f) a = P.fail "not implemented"
+        -- mkSoptParser Nothing _  = P.fail "no flag"
 
       -- P.choice [
       --   maybe (P.fail "no name") (\n' -> longOption n a)
