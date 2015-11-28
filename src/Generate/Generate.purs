@@ -168,14 +168,14 @@ token' f = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         _ -> P.parseFailed toks pos "bad token"
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
-shortOption :: Char -> TakesArgument -> CliParser Value
-shortOption f b = token' go P.<?> "short option"
+shortOption :: Char -> TakesArgument -> Maybe Value -> CliParser Value
+shortOption f takesArg def = token' go P.<?> "short option"
   where
 
     -- case 1:
     -- The leading flag matches, there are no stacked options, but an explicit
     -- argument has been passed.
-    go (SOpt f' xs (Just v)) | (f' == f) && (b == true)
+    go (SOpt f' xs (Just v)) | (f' == f) && takesArg
       = case uncons xs of
             Nothing -> Tuple Nothing (Just $ StringValue v)
             _       -> Tuple Nothing Nothing
@@ -183,21 +183,23 @@ shortOption f b = token' go P.<?> "short option"
     -- case 2:
     -- The leading flag matches, there are stacked options and no explicit
     -- argument has been passed
-    go (SOpt f' xs Nothing) | (f' == f) && (b == true)
+    go (SOpt f' xs Nothing) | (f' == f) && takesArg
       = case uncons xs of
-             Just _ -> Tuple Nothing (Just $ StringValue $ fromCharArray xs)
-             _      -> Tuple Nothing Nothing
+          Just _  -> Tuple Nothing (Just $ StringValue $ fromCharArray xs)
+          Nothing -> case def of
+            Just val -> Tuple Nothing (Just val)
+            Nothing  -> Tuple Nothing Nothing
 
     -- case 3:
     -- The leading flag matches and the option takes no argument
-    go (SOpt f' xs Nothing) | (f' == f) && (b == false)
+    go (SOpt f' xs Nothing) | (f' == f) && (takesArg == false)
       = case uncons xs of
           Just _  -> Tuple Nothing Nothing
           Nothing -> Tuple Nothing (Just $ BoolValue true)
 
     -- case 4:
     -- A option in the stack matches and takes no argument
-    go (SOpt f xs v) | (b == false)
+    go (SOpt f xs v) | (takesArg == false)
       = case A.elemIndex f xs of
           Just i  ->
             maybe
@@ -210,7 +212,7 @@ shortOption f b = token' go P.<?> "short option"
     -- A option in the stack matches and takes an argument, however
     -- an explicit argument is present. In this case, the only valid option is
     -- the last element in the option stack!
-    go (SOpt f xs (Just v)) | (b == true)
+    go (SOpt f xs (Just v)) | takesArg
       = case A.elemIndex f xs of
           Just i | (i == (A.length xs - 1)) ->
             Tuple
@@ -221,7 +223,7 @@ shortOption f b = token' go P.<?> "short option"
     -- case 6:
     -- A option in the stack matches and takes an argument and no
     -- explicit argument is present
-    go (SOpt f xs Nothing) | (b == true)
+    go (SOpt f xs Nothing) | takesArg
       = case A.elemIndex f xs of
           Just i ->
             let ys = A.drop (i + 1) xs
@@ -230,7 +232,9 @@ shortOption f b = token' go P.<?> "short option"
                 Tuple
                   (Just $ SOpt f (A.take i xs) Nothing)
                   (Just $ StringValue $ fromCharArray ys)
-              else Tuple Nothing Nothing
+              else case def of
+                Just val -> Tuple Nothing (Just val)
+                Nothing  -> Tuple Nothing Nothing
           _ -> Tuple Nothing Nothing
 
     go o = Tuple (Just o) Nothing
