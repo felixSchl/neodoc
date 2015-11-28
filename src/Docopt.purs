@@ -18,6 +18,12 @@ type TakesArgument        = Boolean
 type Flag                 = Char
 type Default              = String
 
+data Value
+  = StringValue String
+  | BoolValue   Boolean
+
+data OptionArgument = OptionArgument Name (Maybe Value)
+
 data Branch      = Branch (List Argument)
 data Application = Application (List Branch)
 data Argument
@@ -25,22 +31,25 @@ data Argument
   | Positional  String IsRepeatable
   | Option      (Maybe Flag)
                 (Maybe Name)
-                (Maybe String)
-                (Maybe Default)
+                (Maybe OptionArgument)
                 IsRepeatable
   | Group       IsOptional (List Branch) IsRepeatable
+
+--------------------------------------------------------------------------------
 
 prettyPrintArg :: Argument -> String
 prettyPrintArg (Command name)      = name
 prettyPrintArg (Positional name r) = name ++ (if r then "..." else "")
-prettyPrintArg (Option flag name arg def r)
+prettyPrintArg (Option flag name arg r)
   = short ++ long ++ arg' ++ rep ++ default
   where
     short   = maybe "" (\f -> "-" ++ (show f)) flag
     long    = maybe "" ("--" ++) name
-    arg'    = maybe "" ("="  ++) arg
     rep     = if r then "..." else ""
-    default = maybe "" (\d -> " [default: " ++ d ++  "]") def
+    arg'    = flip (maybe "") arg \(OptionArgument n _) -> "="  ++ n
+    default = flip (maybe "") arg \(OptionArgument _ d) ->
+                flip (maybe "") d \d' -> " [default: " ++ (show d') ++  "]"
+
 prettyPrintArg (Group o bs r) = open ++ inner ++ close ++ repetition
   where
     open       = if o then "[" else "("
@@ -55,6 +64,12 @@ prettyPrintApplication :: Application -> String
 prettyPrintApplication (Application xs)
   = intercalate " | " (prettyPrintBranch <$> xs)
 
+prettyPrintValue :: Value -> String
+prettyPrintValue (StringValue s) = s
+prettyPrintValue (BoolValue b)   = (show b)
+
+--------------------------------------------------------------------------------
+
 instance showApplication :: Show Application where
   show (Application xs) = "Application " ++ show (show <$> xs)
 
@@ -68,8 +83,15 @@ instance showArgument :: Show Argument where
     = intercalate " " [ "Positional", show n, show r ]
   show (Group o bs r) 
     = intercalate " " [ "Group", show o, show bs, show r ]
-  show (Option f n a d r)
-    = intercalate " " [ "Option", show f, show n, show a, show d, show r ]
+  show (Option f n a r)
+    = intercalate " " [ "Option", show f, show n, show a, show r ]
+
+instance showOptionArgument :: Show OptionArgument where
+  show (OptionArgument n a) = (show n) ++ " " ++ (show a)
+
+instance showValue :: Show Value where
+  show (StringValue s) = "StringValue " ++ s
+  show (BoolValue b)   = "BoolValue "   ++ (show b)
 
 instance semigroupApplication :: Semigroup Application where
   append (Application xs) (Application ys) = Application (xs <> ys)

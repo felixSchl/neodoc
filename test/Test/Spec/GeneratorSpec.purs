@@ -35,8 +35,7 @@ po = Positional
 -- short hand to create an Option argument
 opt :: (Maybe Flag)
     -> (Maybe Name)
-    -> (Maybe String)
-    -> (Maybe Default)
+    -> (Maybe OptionArgument)
     -> IsRepeatable
     -> Argument
 opt = Option

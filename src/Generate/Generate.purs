@@ -2,7 +2,6 @@ module Docopt.Generate (
   mkBranchParser
 , runCliParser
 , lexArgv
-, Value(..)
 , Token(..)
 ) where
 
@@ -39,9 +38,11 @@ data Token
   | Lit  String
 
 prettyPrintToken :: Token -> String
-prettyPrintToken (LOpt n a)   = "--" ++ n ++ " " ++ (show a)
-prettyPrintToken (SOpt n s a) = "-"  ++ (fromCharArray (A.cons n s)) ++ " " ++ (show a)
-prettyPrintToken (Lit s)      = show s
+prettyPrintToken (Lit s) = show s
+prettyPrintToken (LOpt n a)
+  = "--" ++ n ++ " " ++ (show a)
+prettyPrintToken (SOpt n s a)
+  = "-"  ++ (fromCharArray (A.cons n s)) ++ " " ++ (show a)
 
 instance showToken :: Show Token where
   show = show <<< prettyPrintToken
@@ -91,9 +92,6 @@ lexArgv = foldM step Nil
 -- Input Token Parser
 --------------------------------------------------------------------------------
 
-data Value
-  = StringValue String
-  | BoolValue   Boolean
 type CliParseState = { mapped :: List (Tuple Argument Value) }
 type CliParser a = P.ParserT (List Token) (State CliParseState) a
 
@@ -124,10 +122,6 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         Nothing -> P.parseFailed toks pos "a better error message!"
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
-instance showValue :: Show Value where
-  show (StringValue s) = "StringValue " ++ s
-  show (BoolValue b)   = "BoolValue "   ++ (show b)
-
 data Acc a
   = Free (CliParser a)
   | Pending (CliParser a) (List Argument)
@@ -143,6 +137,11 @@ positional = token go P.<?> "positional"
   where
     go (Lit _) = Just (BoolValue true)
     go _       = Nothing
+
+-- longOption :: CliParser Value
+-- longOption :: token go P.<?> "long option"
+--   where
+--     go (LOpt n v) 
 
 -- Notes and thoughts:
 --
@@ -164,7 +163,7 @@ mkBranchParser (Branch xs) = do
     (foldM step (Free $ pure empty) xs)
   where
     -- Options always transition to the `Pending state`
-    step (Free p) x@(Option _ _ _ _ _) = Right $ Pending p (singleton x)
+    step (Free p) x@(Option _ _ _ _) = Right $ Pending p (singleton x)
 
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
@@ -173,7 +172,7 @@ mkBranchParser (Branch xs) = do
       pure (a ++ as)
 
     -- Options always keep accumulating
-    step (Pending p xs) x@(Option _ _ _ _ _) = Right $
+    step (Pending p xs) x@(Option _ _ _ _) = Right $
       Pending p (x:xs)
 
     -- Any non-options always leaves the pending state
@@ -197,7 +196,16 @@ mkBranchParser (Branch xs) = do
       if r then (some go) else (singleton <$> go)
       where go = Tuple x <$> positional
 
-    mkParser (Option f n a d r) = do
+    mkParser (Option f n a r) = do
+
+      -- We have a spec that defines an option that:
+      --    * has a long name
+      --    * takes no argument
+
+      -- P.choice [
+      --   maybe (P.fail "no name") (\n' -> longOption n a)
+      -- ]
+
       -- XXX: Match against input:
       --    ["--fooBAR", ...] == ["--foo", "BAR"]
       --    ["-fFILE", ...]   == ["-f", "FILE", ...]
