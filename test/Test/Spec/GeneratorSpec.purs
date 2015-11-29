@@ -84,6 +84,7 @@ generatorSpec = describe "generator" do
           toks <- lexArgv (toList [
             "foo", "-fobar"
           ])
+          traceShowA toks
           flip runCliParser parser toks
         traceShowA res
         pure unit

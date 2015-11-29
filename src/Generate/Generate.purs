@@ -27,7 +27,7 @@ import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 
 import Docopt
-import Docopt.Parser.Base (alphaNum, space)
+import Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
 --------------------------------------------------------------------------------
 -- Input Lexer
@@ -87,7 +87,7 @@ lexArgv = foldM step Nil
     step :: List Token -> String -> Either P.ParseError (List Token)
     step a b = do
       x <- flip P.runParser parseToken b
-      pure (x:a)
+      return (a ++ (Cons x Nil))
 
 --------------------------------------------------------------------------------
 -- Input Token Parser
@@ -123,6 +123,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         Nothing -> P.parseFailed toks pos "a better error message!"
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
+-- XXX: Should the `Pending` constructor store a list of `Parsers` instead?
 data Acc a
   = Free (CliParser a)
   | Pending (CliParser a) (List Argument)
@@ -168,9 +169,12 @@ token' f = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         _ -> P.parseFailed toks pos "bad token"
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
-shortOption :: Char -> TakesArgument -> Maybe Value -> CliParser Value
-shortOption f takesArg def = token' go P.<?> "short option"
+shortOption :: Char -> (Maybe OptionArgument) -> CliParser Value
+shortOption f a = token' go P.<?> "short option"
   where
+
+    takesArg = isJust a
+    def      = maybe Nothing (\(OptionArgument _ v) -> v) a
 
     -- case 1:
     -- The leading flag matches, there are no stacked options, but an explicit
@@ -254,10 +258,25 @@ shortOption f takesArg def = token' go P.<?> "short option"
 mkBranchParser :: Branch -> CliParser (List (Tuple Argument Value))
 mkBranchParser (Branch xs) = do
   either
-    (\_ -> pure empty)
-    (\_ -> pure empty)
+    (\_ -> P.fail "Failed to generate parser")
+    (\acc -> case acc of
+      Free p       -> p
+      Pending p xs -> do
+        a  <- p
+        as <- mkExaustiveParser xs
+        return (a ++ as))
     (foldM step (Free $ pure empty) xs)
   where
+
+    -- Given a list of arguments, try parse them all in any order.
+    -- The only requirement is that all input is consumed in the end.
+    mkExaustiveParser :: List Argument
+                      -> CliParser (List (Tuple Argument Value))
+    mkExaustiveParser Nil = pure empty
+
+    -- XXX: IMPLEMENT THIS!
+    mkExaustiveParser ps  = pure empty
+
     -- Options always transition to the `Pending state`
     step (Free p) x@(Option _ _ _ _) = Right $ Pending p (singleton x)
 
@@ -282,47 +301,36 @@ mkBranchParser (Branch xs) = do
         -- as <- ???
         pure empty
 
+    -- Parser generator for a single `Argument`
     mkParser :: Argument -> CliParser (List (Tuple Argument Value))
 
+    -- Generate a parser for a `Command` argument
     mkParser x@(Command n) = do
       singleton <<< Tuple x <$> do
         command n
 
+    -- Generate a parser for a `Positional` argument
     mkParser x@(Positional n r) = do
       if r then (some go) else (singleton <$> go)
       where go = Tuple x <$> positional
 
+    -- Generate a parser for a `Option` argument
     mkParser x@(Option f n a r) = do
-      P.choice $ P.try <$> [
-        Tuple x <$> mkLoptParser n a
-      -- , Tuple x <$> mkSoptParser f a
-      ]
-      pure empty
-
+      if r then (some go) else (singleton <$> go)
       where
+        go = do
+          P.choice $ P.try <$> [
+            Tuple x <$> (mkLoptParser n a)
+          , Tuple x <$> (mkSoptParser f a)
+          ]
+
         mkLoptParser (Just n) a = longOption n (isJust a)
         mkLoptParser Nothing _  = P.fail "no long name"
 
-        -- mkSoptParser (Just f) a = P.fail "not implemented"
-        -- mkSoptParser Nothing _  = P.fail "no flag"
+        mkSoptParser Nothing _  = P.fail "not no flag"
+        mkSoptParser (Just f) a = shortOption f a
 
-      -- P.choice [
-      --   maybe (P.fail "no name") (\n' -> longOption n a)
-      -- ]
-
-      -- XXX: Match against input:
-      --    ["--fooBAR", ...] == ["--foo", "BAR"]
-      --    ["-fFILE", ...]   == ["-f", "FILE", ...]
-      --
-      --    1. See if this option's long name exists and if it is a substring
-      --        of the input, or
-      --    2. see if this option's long name exists and if it is a substring
-      --        of the input.
-      --    3. If match is found, consume next input string from stream.
-      -- XXX: Consider `r` here - we must either return a list, always, or
-      --      a data type that ensures that at least one value is present:
-      --      `X Xs`, where both `X` and `Xs` are data constructors.
-
+    -- Generate a parser for a argument `Group`
     mkParser (Group o bs r) = 
       -- XXX: Recursively generate a parser.
       --      NOTE: THIS COMPUTATION MAY FAIL:
