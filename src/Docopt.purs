@@ -76,6 +76,9 @@ instance showApplication :: Show Application where
 instance showBranch :: Show Branch where
   show (Branch xs) = "Branch " ++ show (show <$> xs)
 
+instance eqBranch :: Eq Branch where
+  eq (Branch xs) (Branch xs') = (xs == xs')
+
 instance showArgument :: Show Argument where
   show (Command n)
     = intercalate " " [ "Command", show n ]
@@ -86,12 +89,25 @@ instance showArgument :: Show Argument where
   show (Option f n a r)
     = intercalate " " [ "Option", show f, show n, show a, show r ]
 
+instance eqArgument :: Eq Argument where
+  eq (Command n)      (Command n')         = (n == n')
+  eq (Positional n r) (Positional n' r')   = (n == n') && (r == r')
+  eq (Group o bs r)   (Group o' bs' r')    = (o == o') && (bs == bs') && (r == r')
+  eq (Option f n a r) (Option f' n' a' r') = (f == f') && (n == n') && (a == a') && (r == r')
+
 instance showOptionArgument :: Show OptionArgument where
   show (OptionArgument n a) = (show n) ++ " " ++ (show a)
+
+instance eqOptionArgument :: Eq OptionArgument where
+  eq (OptionArgument n a) (OptionArgument n' a') = (n == n') && (a == a')
 
 instance showValue :: Show Value where
   show (StringValue s) = "StringValue " ++ s
   show (BoolValue b)   = "BoolValue "   ++ (show b)
+
+instance eqValue :: Eq Value where
+  eq (StringValue s) (StringValue s') = (s == s')
+  eq (BoolValue b)   (BoolValue b')   = (b == b')
 
 instance semigroupApplication :: Semigroup Application where
   append (Application xs) (Application ys) = Application (xs <> ys)

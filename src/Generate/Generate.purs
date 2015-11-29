@@ -12,7 +12,8 @@ import Control.Monad.State (State(), evalState)
 import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), isJust, maybe)
-import Data.List (List(..), foldM, (:), singleton, some, toList)
+import Data.List (List(..), foldM, (:), singleton, some, toList, delete)
+import Data.Foldable (foldl)
 import Data.String (fromCharArray)
 import Data.List (many)
 import qualified Data.List as L
@@ -272,10 +273,24 @@ mkBranchParser (Branch xs) = do
     -- The only requirement is that all input is consumed in the end.
     mkExaustiveParser :: List Argument
                       -> CliParser (List (Tuple Argument Value))
-    mkExaustiveParser Nil = pure empty
-
     -- XXX: IMPLEMENT THIS!
-    mkExaustiveParser ps  = pure empty
+    mkExaustiveParser Nil = pure empty
+    mkExaustiveParser ps  = do
+      let ls = reduce <$> (permute ps)
+      P.choice $ P.try <$> ls
+      where
+          reduce :: List Argument -> CliParser (List (Tuple Argument Value))
+          reduce ls = foldM step (pure empty) ls
+            where step p acc = do
+              -- XXX: Reduce the list of parsers into a parser that applies
+              --      each element after the other.
+              pure empty
+
+          permute :: forall a. (Eq a) => List a -> List (List a)
+          permute xs = do
+              x  <- xs
+              ys <- permute $ delete x xs
+              return (x:ys)
 
     -- Options always transition to the `Pending state`
     step (Free p) x@(Option _ _ _ _) = Right $ Pending p (singleton x)
@@ -284,7 +299,7 @@ mkBranchParser (Branch xs) = do
     step (Free p) x = Right $ Free do
       a  <- p
       as <- (mkParser x)
-      pure (a ++ as)
+      return (a ++ as)
 
     -- Options always keep accumulating
     step (Pending p xs) x@(Option _ _ _ _) = Right $
@@ -294,12 +309,8 @@ mkBranchParser (Branch xs) = do
     step (Pending p xs) y = Right $
       Free do
         a  <- p
-        -- TODO: Create a parser that continues to consume elements from a list
-        --       until the list is exhausted! The parser for each `x` in `xs`
-        --       can be retrieved by `mkParser <$> xs`, however the tricky part is
-        --       parsing the list until it has been totally consumed.
-        -- as <- ???
-        pure empty
+        as <- mkExaustiveParser xs
+        return (a ++ as)
 
     -- Parser generator for a single `Argument`
     mkParser :: Argument -> CliParser (List (Tuple Argument Value))
