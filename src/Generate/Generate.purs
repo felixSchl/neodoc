@@ -47,7 +47,9 @@ prettyPrintToken (SOpt n s a)
   = "-"  ++ (fromCharArray (A.cons n s)) ++ " " ++ (show a)
 
 instance showToken :: Show Token where
-  show = show <<< prettyPrintToken
+  show (LOpt s a)    = "LOpt " ++ show s ++ " " ++ show a
+  show (SOpt c cs a) = "SOpt " ++ show c ++ " " ++ show cs ++ " " ++ show a
+  show (Lit  s)      = "Lit "  ++ show s
 
 parseToken :: P.Parser String Token
 parseToken = do
@@ -273,21 +275,21 @@ mkBranchParser (Branch xs) = do
     -- The only requirement is that all input is consumed in the end.
     mkExaustiveParser :: List Argument
                       -> CliParser (List (Tuple Argument Value))
-    -- XXX: IMPLEMENT THIS!
     mkExaustiveParser Nil = pure empty
     mkExaustiveParser ps  = do
       let ls = reduce <$> (permute ps)
       P.choice $ P.try <$> ls
       where
           reduce :: List Argument -> CliParser (List (Tuple Argument Value))
-          reduce ls = foldM step (pure empty) ls
-            where step p acc = do
-              -- XXX: Reduce the list of parsers into a parser that applies
-              --      each element after the other.
-              pure empty
+          reduce ls = foldl step (pure empty) ls
+            where step acc p = do
+                    as <- acc
+                    a  <- mkParser p
+                    return (as ++ a)
 
           permute :: forall a. (Eq a) => List a -> List (List a)
-          permute xs = do
+          permute Nil = Cons Nil Nil
+          permute xs  = do
               x  <- xs
               ys <- permute $ delete x xs
               return (x:ys)
@@ -330,6 +332,7 @@ mkBranchParser (Branch xs) = do
       if r then (some go) else (singleton <$> go)
       where
         go = do
+          getInput >>= debug
           P.choice $ P.try <$> [
             Tuple x <$> (mkLoptParser n a)
           , Tuple x <$> (mkSoptParser f a)
