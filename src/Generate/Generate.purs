@@ -12,12 +12,14 @@ import Control.Monad.State (State(), evalState)
 import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), isJust, maybe)
-import Data.List (List(..), foldM, (:), singleton, some, toList, delete)
+import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
+                 , head, many, tail)
 import Data.Foldable (foldl)
 import Data.String (fromCharArray)
-import Data.List (many)
 import qualified Data.List as L
+import qualified Data.List.Unsafe as LU
 import qualified Data.Array as A
+import qualified Data.Array.Unsafe as AU
 import Data.Array (uncons)
 import Data.Tuple (Tuple(..))
 import Data.Monoid (mempty)
@@ -172,79 +174,108 @@ token' f = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         _ -> P.parseFailed toks pos "bad token"
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
+(\\) :: forall a b. a -> b -> Tuple a b
+(\\) = Tuple
+
+type HasConsumedArg = Boolean
+data SOptParse = SOptParse Value (Maybe Token) HasConsumedArg
+
 shortOption :: Char -> (Maybe OptionArgument) -> CliParser Value
-shortOption f a = token' go P.<?> "short option"
+shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+  return $ case toks of
+    Cons tok xs ->
+      case go tok (head xs) of
+        Left e -> P.parseFailed toks pos e
+        Right (SOptParse v newtok hasConsumedArg) ->
+          { consumed: maybe true (const false) newtok
+          , input:    (maybe Nil singleton newtok) ++
+                      (if hasConsumedArg then (LU.tail xs) else xs)
+          , result:   Right v
+          , position: pos -- ignore pos
+          }
+    _ -> P.parseFailed toks pos "expected token, met EOF"
+
   where
 
     takesArg = isJust a
     def      = maybe Nothing (\(OptionArgument _ v) -> v) a
 
+    go :: Token
+        -> (Maybe Token)
+        -> Either String SOptParse
+
     -- case 1:
-    -- The leading flag matches, there are no stacked options, but an explicit
-    -- argument has been passed.
-    go (SOpt f' xs (Just v)) | (f' == f) && takesArg
-      = case uncons xs of
-            Nothing -> Tuple Nothing (Just $ StringValue v)
-            _       -> Tuple Nothing Nothing
+    -- The leading flag matches, there are no stacked options, and an explicit
+    -- argument may have been passed.
+    go (SOpt f' xs v) atok | (f' == f) && takesArg && (A.length xs == 0)
+      = case v of
+          Just val -> return $ SOptParse (StringValue val) Nothing false
+          _  -> case atok of
+            -- XXX: The lit needs to be parsed into a `Value`
+            Just (Lit s) -> return $ SOptParse (StringValue s) Nothing true
+            _ -> case def of
+              Just defval -> return $ SOptParse defval Nothing false
+              _ -> Left "Argument required"
 
     -- case 2:
     -- The leading flag matches, there are stacked options and no explicit
     -- argument has been passed
-    go (SOpt f' xs Nothing) | (f' == f) && takesArg
-      = case uncons xs of
-          Just _  -> Tuple Nothing (Just $ StringValue $ fromCharArray xs)
-          Nothing -> case def of
-            Just val -> Tuple Nothing (Just val)
-            Nothing  -> Tuple Nothing Nothing
+    go (SOpt f' xs Nothing) _ | (f' == f) && takesArg && (A.length xs > 0)
+      = return $ SOptParse (StringValue $ fromCharArray xs) Nothing false
 
     -- case 3:
-    -- The leading flag matches and the option takes no argument
-    go (SOpt f' xs Nothing) | (f' == f) && (takesArg == false)
-      = case uncons xs of
-          Just _  -> Tuple Nothing Nothing
-          Nothing -> Tuple Nothing (Just $ BoolValue true)
+    -- The leading flag matches, there are no stacked options and the option
+    -- takes no argument
+    go (SOpt f' xs Nothing) _ | (f' == f) && (takesArg == false) && (A.length xs == 0)
+      = return $ SOptParse (BoolValue true) Nothing false
 
     -- case 4:
     -- A option in the stack matches and takes no argument
-    go (SOpt f xs v) | (takesArg == false)
+    go (SOpt f xs v) _ | (takesArg == false) && (isJust $ A.elemIndex f xs)
       = case A.elemIndex f xs of
-          Just i  ->
-            maybe
-              (Tuple Nothing Nothing)
-              (\xs' -> Tuple (Just $ SOpt f xs' v) (Just $ BoolValue true))
-              (A.deleteAt i xs)
-          Nothing -> Tuple Nothing Nothing
+          Just i  -> case A.deleteAt i xs of
+            Just xs' -> return $ SOptParse
+                          (BoolValue true)
+                          (Just $ SOpt f xs' v)
+                          false
+            _  -> Left "Failed to remove flag from stack"
+          _ -> Left "Flag not found in stack"
 
     -- case 5:
     -- A option in the stack matches and takes an argument, however
     -- an explicit argument is present. In this case, the only valid option is
     -- the last element in the option stack!
-    go (SOpt f xs (Just v)) | takesArg
+    go (SOpt f xs (Just v)) _ | takesArg && (isJust $ A.elemIndex f xs)
       = case A.elemIndex f xs of
           Just i | (i == (A.length xs - 1)) ->
-            Tuple
+            return $ SOptParse
+              (StringValue v)
               (Just $ SOpt f (maybe [] id (A.init xs)) Nothing)
-              (Just $ StringValue v)
-          _ -> Tuple Nothing Nothing
+              false
+          _ -> Left "Flag not found in stack"
 
     -- case 6:
     -- A option in the stack matches and takes an argument and no
     -- explicit argument is present
-    go (SOpt f xs Nothing) | takesArg
+    go (SOpt f xs Nothing) atok | takesArg && (isJust $ A.elemIndex f xs)
       = case A.elemIndex f xs of
           Just i ->
             let ys = A.drop (i + 1) xs
             in if (A.length ys > 0)
               then
-                Tuple
+                return $ SOptParse
+                  (StringValue $ fromCharArray ys)
                   (Just $ SOpt f (A.take i xs) Nothing)
-                  (Just $ StringValue $ fromCharArray ys)
-              else case def of
-                Just val -> Tuple Nothing (Just val)
-                Nothing  -> Tuple Nothing Nothing
-          _ -> Tuple Nothing Nothing
+                  false
+              else case atok of
+                -- XXX: The lit needs to be parsed into a `Value`
+                Just (Lit s) -> return $ SOptParse (StringValue s) Nothing true
+                _ -> case def of
+                  Just defval -> return $ SOptParse defval Nothing false
+                  _ -> Left "Argument required"
+          _ -> Left "Flag not found in stack"
 
-    go o = Tuple (Just o) Nothing
+    go _ _ = Left "Invalid token"
 
 -- Notes and thoughts:
 --
