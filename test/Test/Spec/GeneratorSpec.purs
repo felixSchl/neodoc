@@ -84,8 +84,9 @@ generatorSpec = describe "generator" do
         res <- runEitherEff do
           toks <- lexArgv (toList [
             "foo"
-          , "-f", "fox"
-          , "-b", "bax"
+          , "-f",    "fox"
+          , "--bar", "baxxer"
+          , "-b",    "bax"
           ])
           flip runCliParser parser toks
         traceShowA res

@@ -15,7 +15,7 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
                  , head, many, tail)
 import Data.Foldable (foldl)
-import Data.String (fromCharArray)
+import Data.String (fromCharArray, stripPrefix)
 import qualified Data.List as L
 import qualified Data.List.Unsafe as LU
 import qualified Data.Array as A
@@ -145,16 +145,6 @@ positional = token go P.<?> "positional"
     go (Lit _) = Just (BoolValue true)
     go _       = Nothing
 
-longOption :: Name -> TakesArgument -> CliParser Value
-longOption n b = token go P.<?> "long option"
-  where
-    -- TOOD: `StringValue` is invalid here! `LOpt` should either have
-    --       analysed the type of argument already, so we should be
-    --       able to just return `v` / or we need to parse it here?
-    go (LOpt n' (Just v)) | (b == true)  && (n' == n) = Just $ StringValue v
-    go (LOpt n' Nothing)  | (b == false) && (n' == n) = Just $ BoolValue   true
-    go _                                              = Nothing
-
 -- | Parse the token at the head of the input stream and possibly replace
 -- | it with another token. Consider, e.g. an option was parsed but has a
 -- | valid remainder, that remainder should be offered to subsequent parsers.
@@ -178,15 +168,15 @@ token' f = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 (\\) = Tuple
 
 type HasConsumedArg = Boolean
-data SOptParse = SOptParse Value (Maybe Token) HasConsumedArg
+data OptParse = OptParse Value (Maybe Token) HasConsumedArg
 
-shortOption :: Char -> (Maybe OptionArgument) -> CliParser Value
-shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+longOption :: Name -> (Maybe OptionArgument) -> CliParser Value
+longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
       case go tok (head xs) of
         Left e -> P.parseFailed toks pos e
-        Right (SOptParse v newtok hasConsumedArg) ->
+        Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
           , input:    (maybe Nil singleton newtok) ++
                       (if hasConsumedArg then (LU.tail xs) else xs)
@@ -202,39 +192,87 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     go :: Token
         -> (Maybe Token)
-        -> Either String SOptParse
+        -> Either String OptParse
+
+    -- case 1:
+    -- The name is an exact match
+    go (LOpt n' v) atok | takesArg  && (n' == n)
+      = case v of
+          -- XXX: The val needs to be parsed into a `Value`
+          Just val -> return $ OptParse (StringValue val) Nothing false
+          _  -> case atok of
+            -- XXX: The lit needs to be parsed into a `Value`
+            Just (Lit s) -> return $ OptParse (StringValue s) Nothing true
+            _ -> case def of
+              Just defval -> return $ OptParse defval Nothing false
+              _ -> Left "Argument required"
+
+    -- case 2:
+    -- The name is a substring of the input and no explicit argument has been
+    -- provdided.
+    go (LOpt n' Nothing) atok | takesArg
+      = case stripPrefix n n' of
+          Just s -> return $ OptParse (StringValue s) Nothing false
+          _      -> Left "Argument required"
+
+    go _ _ = Left "Invalid token"
+
+shortOption :: Char -> (Maybe OptionArgument) -> CliParser Value
+shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+  return $ case toks of
+    Cons tok xs ->
+      case go tok (head xs) of
+        Left e -> P.parseFailed toks pos e
+        Right (OptParse v newtok hasConsumedArg) ->
+          { consumed: maybe true (const false) newtok
+          , input:    (maybe Nil singleton newtok) ++
+                      (if hasConsumedArg then (LU.tail xs) else xs)
+          , result:   Right v
+          , position: pos -- ignore pos
+          }
+    _ -> P.parseFailed toks pos "expected token, met EOF"
+
+  where
+
+    takesArg = isJust a
+    def      = maybe Nothing (\(OptionArgument _ v) -> v) a
+
+    go :: Token
+        -> (Maybe Token)
+        -> Either String OptParse
 
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
     -- argument may have been passed.
     go (SOpt f' xs v) atok | (f' == f) && takesArg && (A.length xs == 0)
       = case v of
-          Just val -> return $ SOptParse (StringValue val) Nothing false
+          -- XXX: The val needs to be parsed into a `Value`
+          Just val -> return $ OptParse (StringValue val) Nothing false
           _  -> case atok of
             -- XXX: The lit needs to be parsed into a `Value`
-            Just (Lit s) -> return $ SOptParse (StringValue s) Nothing true
+            Just (Lit s) -> return $ OptParse (StringValue s) Nothing true
             _ -> case def of
-              Just defval -> return $ SOptParse defval Nothing false
+              Just defval -> return $ OptParse defval Nothing false
               _ -> Left "Argument required"
 
     -- case 2:
     -- The leading flag matches, there are stacked options and no explicit
     -- argument has been passed
     go (SOpt f' xs Nothing) _ | (f' == f) && takesArg && (A.length xs > 0)
-      = return $ SOptParse (StringValue $ fromCharArray xs) Nothing false
+      = return $ OptParse (StringValue $ fromCharArray xs) Nothing false
 
     -- case 3:
     -- The leading flag matches, there are no stacked options and the option
     -- takes no argument
     go (SOpt f' xs Nothing) _ | (f' == f) && (takesArg == false) && (A.length xs == 0)
-      = return $ SOptParse (BoolValue true) Nothing false
+      = return $ OptParse (BoolValue true) Nothing false
 
     -- case 4:
     -- A option in the stack matches and takes no argument
     go (SOpt f xs v) _ | (takesArg == false) && (isJust $ A.elemIndex f xs)
       = case A.elemIndex f xs of
           Just i  -> case A.deleteAt i xs of
-            Just xs' -> return $ SOptParse
+            Just xs' -> return $ OptParse
                           (BoolValue true)
                           (Just $ SOpt f xs' v)
                           false
@@ -248,7 +286,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     go (SOpt f xs (Just v)) _ | takesArg && (isJust $ A.elemIndex f xs)
       = case A.elemIndex f xs of
           Just i | (i == (A.length xs - 1)) ->
-            return $ SOptParse
+            return $ OptParse
               (StringValue v)
               (Just $ SOpt f (maybe [] id (A.init xs)) Nothing)
               false
@@ -263,32 +301,21 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
             let ys = A.drop (i + 1) xs
             in if (A.length ys > 0)
               then
-                return $ SOptParse
+                return $ OptParse
                   (StringValue $ fromCharArray ys)
                   (Just $ SOpt f (A.take i xs) Nothing)
                   false
               else case atok of
                 -- XXX: The lit needs to be parsed into a `Value`
-                Just (Lit s) -> return $ SOptParse (StringValue s) Nothing true
+                Just (Lit s) -> return $ OptParse (StringValue s) Nothing true
                 _ -> case def of
-                  Just defval -> return $ SOptParse defval Nothing false
+                  Just defval -> return $ OptParse defval Nothing false
                   _ -> Left "Argument required"
           _ -> Left "Flag not found in stack"
 
     go _ _ = Left "Invalid token"
 
--- Notes and thoughts:
---
--- CMD OPT POS OPT OPT OPT
---             ^---------^
---                  `- interchangeable
---
--- When needle is on
---      CMD => Generate parser
---      POS => Generate parser
---      GRP => Generate parser recursively
---      OPT => Start accumlating
---
+-- | Generate a parser for a single usage branch
 mkBranchParser :: Branch -> CliParser (List (Tuple Argument Value))
 mkBranchParser (Branch xs) = do
   either
@@ -363,17 +390,16 @@ mkBranchParser (Branch xs) = do
       if r then (some go) else (singleton <$> go)
       where
         go = do
-          getInput >>= debug
           P.choice $ P.try <$> [
             Tuple x <$> (mkLoptParser n a)
           , Tuple x <$> (mkSoptParser f a)
           ]
 
-        mkLoptParser (Just n) a = longOption n (isJust a)
+        mkLoptParser (Just n) a = longOption n a
         mkLoptParser Nothing _  = P.fail "no long name"
 
-        mkSoptParser Nothing _  = P.fail "not no flag"
         mkSoptParser (Just f) a = shortOption f a
+        mkSoptParser Nothing _  = P.fail "not no flag"
 
     -- Generate a parser for a argument `Group`
     mkParser (Group o bs r) = 
