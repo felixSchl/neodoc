@@ -2,11 +2,14 @@ module Test.Spec.GeneratorSpec (generatorSpec) where
 
 import Prelude
 import Debug.Trace
+import Control.Monad.Eff (Eff())
+import Control.Monad.Eff.Exception (EXCEPTION())
 import Control.Monad.Aff (liftEff')
 import Control.Monad.State (State(), evalState)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
-import Data.List (List(..), toList)
+import Data.List (List(..), toList, length)
+import qualified Data.Array as A
 
 import Docopt
 import Docopt.Parser.Usage (Usage(..))
@@ -33,12 +36,24 @@ po :: String -> Boolean -> Argument
 po = Positional
 
 -- short hand to create an Option argument
-opt :: (Maybe Flag)
-    -> (Maybe Name)
-    -> (Maybe OptionArgument)
-    -> IsRepeatable
-    -> Argument
-opt = Option
+opt :: Flag
+      -> Name
+      -> (Maybe OptionArgument)
+      -> IsRepeatable
+      -> Argument
+opt f name = Option (Just f) (Just name)
+
+sopt :: Flag
+      -> (Maybe OptionArgument)
+      -> IsRepeatable
+      -> Argument
+sopt f = Option (Just f) Nothing
+
+lopt :: Name
+      -> (Maybe OptionArgument)
+      -> IsRepeatable
+      -> Argument
+lopt name = Option Nothing (Just name)
 
 -- short hand to create a group
 gr :: Boolean -> (Array (Array Argument)) -> IsRepeatable -> Argument
@@ -55,6 +70,12 @@ grr = gr false
 -- short hand to create a whole branch
 br :: (Array Argument) -> Branch
 br xs = Branch (toList xs)
+
+oa :: String -> Maybe Value -> Maybe OptionArgument
+oa n v = Just $ OptionArgument n v
+
+oa_ :: String -> Maybe OptionArgument
+oa_ n = Just $ OptionArgument n Nothing
 
 generatorSpec = describe "generator" do
 
@@ -74,19 +95,29 @@ generatorSpec = describe "generator" do
 
   describe "generator" do
     it "should have some tests..." do
-      let branch = br [
-            co "foo"
-          , opt (Just 'f') (Just "foo") (Just $ OptionArgument "foz" Nothing) true
-          , opt (Just 'b') (Just "bar") (Just $ OptionArgument "baz" Nothing) true
-          ]
-          parser = mkBranchParser branch
+
+      let branch =
+            [ co "foo"
+            , opt 'f' "foo" (oa_ "foz") true
+            , opt 'b' "bar" (oa_ "baz") true ]
+      let input =
+            [ "foo"
+            , "-f", "fox"
+            , "--bar", "baxxer"
+            , "-b", "bax"
+            ]
+      let expected = [unit, unit, unit, unit]
+
       vliftEff do
+        validate branch input expected
+
+    where
+      validate :: forall eff. Array Argument
+                            -> Array String
+                            -> Array Unit
+                            -> Eff (err :: EXCEPTION | eff) Unit
+      validate args argv expected = do
         res <- runEitherEff do
-          toks <- lexArgv (toList [
-            "foo"
-          , "-f",    "fox"
-          , "--bar", "baxxer"
-          , "-b",    "bax"
-          ])
-          flip runCliParser parser toks
-        traceShowA res
+          toks <- lexArgv (toList argv)
+          flip runCliParser (mkBranchParser (br args)) toks
+        assertEqual (length res) (A.length expected)
