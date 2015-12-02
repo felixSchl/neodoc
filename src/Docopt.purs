@@ -9,23 +9,15 @@ import Data.Monoid (Monoid)
 
 --------------------------------------------------------------------------------
 
-type ProgramSpecification = List ProgramApplication
-type ProgramApplication   = List Branch
-type Name                 = String
-type IsRepeatable         = Boolean
-type IsOptional           = Boolean
-type TakesArgument        = Boolean
-type Flag                 = Char
-type Default              = String
+type Name          = String
+type IsRepeatable  = Boolean
+type IsOptional    = Boolean
+type TakesArgument = Boolean
+type Flag          = Char
 
-data Value
-  = StringValue String
-  | BoolValue   Boolean
-
-data OptionArgument = OptionArgument Name (Maybe Value)
-
-data Branch      = Branch (List Argument)
+data Program     = Program (List Application)
 data Application = Application (List Branch)
+data Branch      = Branch (List Argument)
 data Argument
   = Command     String
   | Positional  String IsRepeatable
@@ -34,6 +26,11 @@ data Argument
                 (Maybe OptionArgument)
                 IsRepeatable
   | Group       IsOptional (List Branch) IsRepeatable
+data OptionArgument = OptionArgument Name (Maybe Value)
+
+data Value
+  = StringValue String
+  | BoolValue   Boolean
 
 --------------------------------------------------------------------------------
 

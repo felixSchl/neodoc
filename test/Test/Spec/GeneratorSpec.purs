@@ -1,6 +1,7 @@
 module Test.Spec.GeneratorSpec (generatorSpec) where
 
 import Prelude
+import Data.Tuple (Tuple(..))
 import Debug.Trace
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Exception (EXCEPTION())
@@ -8,7 +9,7 @@ import Control.Monad.Aff (liftEff')
 import Control.Monad.State (State(), evalState)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
-import Data.List (List(..), toList, length)
+import Data.List (List(..), toList, length, fromList)
 import qualified Data.Array as A
 
 import Docopt
@@ -71,8 +72,8 @@ grr = gr false
 br :: (Array Argument) -> Branch
 br xs = Branch (toList xs)
 
-oa :: String -> Maybe Value -> Maybe OptionArgument
-oa n v = Just $ OptionArgument n v
+oa :: String -> Value -> Maybe OptionArgument
+oa n v = Just $ OptionArgument n (Just v)
 
 oa_ :: String -> Maybe OptionArgument
 oa_ n = Just $ OptionArgument n Nothing
@@ -96,17 +97,22 @@ generatorSpec = describe "generator" do
   describe "generator" do
     it "should have some tests..." do
 
-      let branch =
-            [ co "foo"
-            , opt 'f' "foo" (oa_ "foz") true
-            , opt 'b' "bar" (oa_ "baz") true ]
+      let cmdfoo = co "foo"
+          optfoo = opt 'f' "foo" (oa_ "FOZ") true
+          optbar = opt 'b' "bar" (oa  "BAZ" (StringValue "defbaz")) true
+      let branch = [ cmdfoo, optfoo, optbar ]
       let input =
             [ "foo"
             , "-f", "fox"
             , "--bar", "baxxer"
             , "-b", "bax"
-            ]
-      let expected = [unit, unit, unit, unit]
+            , "-b" ]
+      let expected =
+        [ Tuple cmdfoo (BoolValue true)
+        , Tuple optfoo (StringValue "fox")
+        , Tuple optbar (StringValue "baxxer")
+        , Tuple optbar (StringValue "bax")
+        , Tuple optbar (StringValue "defbaz") ]
 
       vliftEff do
         validate branch input expected
@@ -114,10 +120,11 @@ generatorSpec = describe "generator" do
     where
       validate :: forall eff. Array Argument
                             -> Array String
-                            -> Array Unit
+                            -> Array (Tuple Argument Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate args argv expected = do
         res <- runEitherEff do
           toks <- lexArgv (toList argv)
           flip runCliParser (mkBranchParser (br args)) toks
-        assertEqual (length res) (A.length expected)
+
+        assertEqual (fromList res) (expected)
