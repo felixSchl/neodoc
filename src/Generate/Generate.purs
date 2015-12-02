@@ -241,6 +241,12 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         -> (Maybe Token)
         -> Either String OptParse
 
+    -- case X:
+    -- XXX: Implement this (Maybe as part of case 3?)
+    -- The leading flag matches, there are stacked options and it takes no
+    -- argument.
+    -- In this case, take one and put the rest back on the stream.
+
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
     -- argument may have been passed.

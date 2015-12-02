@@ -11,6 +11,7 @@ import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
 import Data.List (List(..), toList, length, fromList)
 import qualified Data.Array as A
+import Data.Foldable (for_)
 
 import Docopt
 import Docopt.Parser.Usage (Usage(..))
@@ -99,23 +100,25 @@ generatorSpec = describe "generator" do
 
       let cmdfoo = co "foo"
           optfoo = opt 'f' "foo" (oa_ "FOZ") true
+          optqux = opt 'q' "qux" Nothing false
           optbar = opt 'b' "bar" (oa  "BAZ" (StringValue "defbaz")) true
-      let branch = [ cmdfoo, optfoo, optbar ]
-      let input =
-            [ "foo"
-            , "-f", "fox"
-            , "--bar", "baxxer"
-            , "-b", "bax"
-            , "-b" ]
-      let expected =
-        [ Tuple cmdfoo (BoolValue true)
-        , Tuple optfoo (StringValue "fox")
-        , Tuple optbar (StringValue "baxxer")
-        , Tuple optbar (StringValue "bax")
-        , Tuple optbar (StringValue "defbaz") ]
+
+      let branch = [ cmdfoo, optqux, optfoo, optbar ]
+          inputs = [
+            [ "foo" , "-f", "fox" , "--bar=baxxer" , "-b", "bax" , "-b" ]
+          , [ "foo" , "-qffox" , "--bar", "baxxer" , "-b", "bax" , "-b" ]
+          , [ "foo" , "-f=fox" , "--barbaxxer" , "-bbax" , "-b" ]
+          ]
+          expected =
+            [ Tuple cmdfoo (BoolValue true)
+            , Tuple optfoo (StringValue "fox")
+            , Tuple optbar (StringValue "baxxer")
+            , Tuple optbar (StringValue "bax")
+            , Tuple optbar (StringValue "defbaz") ]
 
       vliftEff do
-        validate branch input expected
+        for_ inputs \input ->
+          validate branch input expected
 
     where
       validate :: forall eff. Array Argument
