@@ -288,6 +288,13 @@ mkBranchParser (Branch xs) = do
 
     -- Given a list of arguments, try parse them all in any order.
     -- The only requirement is that all input is consumed in the end.
+    --
+    -- XXX: Replace this with a manual iteration - i.e. consume each
+    --      argument. Only fail if an argument has not been consumed
+    --      that was declared as *required*.
+    --
+    --      This will allow for repeating flags in any order, i.e.:
+    --      "-vbvbvb" would be equivalent to "-vvvbbb" (currenlty possible)
     mkExaustiveParser :: List Argument
                       -> CliParser (List (Tuple Argument Value))
     mkExaustiveParser Nil = pure empty
