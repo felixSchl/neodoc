@@ -241,12 +241,6 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         -> (Maybe Token)
         -> Either String OptParse
 
-    -- case X:
-    -- XXX: Implement this (Maybe as part of case 3?)
-    -- The leading flag matches, there are stacked options and it takes no
-    -- argument.
-    -- In this case, take one and put the rest back on the stream.
-
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
     -- argument may have been passed.
@@ -262,64 +256,21 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
               _ -> Left "Argument required"
 
     -- case 2:
-    -- The leading flag matches, there are stacked options and no explicit
-    -- argument has been passed
+    -- The leading flag matches, there are stacked options, no explicit
+    -- argument has been passed and the option takes an argument.
     go (SOpt f' xs Nothing) _ | (f' == f) && takesArg && (A.length xs > 0)
       = return $ OptParse (StringValue $ fromCharArray xs) Nothing false
 
     -- case 3:
-    -- The leading flag matches, there are no stacked options and the option
-    -- takes no argument
-    go (SOpt f' xs Nothing) _ | (f' == f) && (takesArg == false) && (A.length xs == 0)
-      = return $ OptParse (BoolValue true) Nothing false
+    -- The leading flag matches, there are stacked options, the option takes
+    -- no argument and an explicit argument has not been provided.
+    go (SOpt f' xs v) _ | (f' == f) && (takesArg == false) && (A.length xs > 0)
+      = return $ OptParse
+                (BoolValue true)
+                (Just $ SOpt (AU.head xs) (AU.tail xs) v)
+                false
 
-    -- case 4:
-    -- A option in the stack matches and takes no argument
-    go (SOpt f xs v) _ | (takesArg == false) && (isJust $ A.elemIndex f xs)
-      = case A.elemIndex f xs of
-          Just i  -> case A.deleteAt i xs of
-            Just xs' -> return $ OptParse
-                          (BoolValue true)
-                          (Just $ SOpt f xs' v)
-                          false
-            _  -> Left "Failed to remove flag from stack"
-          _ -> Left "Flag not found in stack"
-
-    -- case 5:
-    -- A option in the stack matches and takes an argument, however
-    -- an explicit argument is present. In this case, the only valid option is
-    -- the last element in the option stack!
-    go (SOpt f xs (Just v)) _ | takesArg && (isJust $ A.elemIndex f xs)
-      = case A.elemIndex f xs of
-          Just i | (i == (A.length xs - 1)) ->
-            return $ OptParse
-              (StringValue v)
-              (Just $ SOpt f (maybe [] id (A.init xs)) Nothing)
-              false
-          _ -> Left "Flag not found in stack"
-
-    -- case 6:
-    -- A option in the stack matches and takes an argument and no
-    -- explicit argument is present
-    go (SOpt f xs Nothing) atok | takesArg && (isJust $ A.elemIndex f xs)
-      = case A.elemIndex f xs of
-          Just i ->
-            let ys = A.drop (i + 1) xs
-            in if (A.length ys > 0)
-              then
-                return $ OptParse
-                  (StringValue $ fromCharArray ys)
-                  (Just $ SOpt f (A.take i xs) Nothing)
-                  false
-              else case atok of
-                -- XXX: The lit needs to be parsed into a `Value`
-                Just (Lit s) -> return $ OptParse (StringValue s) Nothing true
-                _ -> case def of
-                  Just defval -> return $ OptParse defval Nothing false
-                  _ -> Left "Argument required"
-          _ -> Left "Flag not found in stack"
-
-    go _ _ = Left "Invalid token"
+    go a b = Left $ "Invalid token" ++ show a ++ " / " ++ show b
 
 -- | Generate a parser for a single usage branch
 mkBranchParser :: Branch -> CliParser (List (Tuple Argument Value))

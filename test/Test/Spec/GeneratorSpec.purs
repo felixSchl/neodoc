@@ -100,21 +100,27 @@ generatorSpec = describe "generator" do
 
       let cmdfoo = co "foo"
           optfoo = opt 'f' "foo" (oa_ "FOZ") true
-          optqux = opt 'q' "qux" Nothing false
-          optbar = opt 'b' "bar" (oa  "BAZ" (StringValue "defbaz")) true
+          optqux = opt 'q' "qux" Nothing true
+          optbaz = opt 'b' "baz" Nothing true
 
-      let branch = [ cmdfoo, optqux, optfoo, optbar ]
+      let branch = [ cmdfoo, optfoo, optbaz, optqux ]
           inputs = [
-            [ "foo" , "-f", "fox" , "--bar=baxxer" , "-b", "bax" , "-b" ]
-          , [ "foo" , "-qffox" , "--bar", "baxxer" , "-b", "bax" , "-b" ]
-          , [ "foo" , "-f=fox" , "--barbaxxer" , "-bbax" , "-b" ]
+            [ "foo" , "-qqqbf=ox"]
+
+          -- , [ "foo" , "-qffox" , "--bar", "baxxer" , "-b", "bax" , "-b" ]
+          -- , [ "foo" , "-f=fox" , "--barbaxxer" , "-bbax" , "-b" ]
           ]
           expected =
             [ Tuple cmdfoo (BoolValue true)
-            , Tuple optfoo (StringValue "fox")
-            , Tuple optbar (StringValue "baxxer")
-            , Tuple optbar (StringValue "bax")
-            , Tuple optbar (StringValue "defbaz") ]
+            , Tuple optqux (BoolValue true)
+            , Tuple optqux (BoolValue true)
+            , Tuple optqux (BoolValue true)
+            , Tuple optbaz (BoolValue true)
+            , Tuple optfoo (StringValue "ox")
+            ]
+            -- , Tuple optbar (StringValue "baxxer")
+            -- , Tuple optbar (StringValue "bax")
+            -- , Tuple optbar (StringValue "defbaz") ]
 
       vliftEff do
         for_ inputs \input ->
@@ -130,4 +136,4 @@ generatorSpec = describe "generator" do
           toks <- lexArgv (toList argv)
           flip runCliParser (mkBranchParser (br args)) toks
 
-        assertEqual (fromList res) (expected)
+        assertEqual (expected) (fromList res)
