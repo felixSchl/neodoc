@@ -37,10 +37,6 @@ data Option = Option (Maybe ShortOption)
 
 type PartialOption = (Maybe Argument) -> Option
 
-derive instance genericOptionSpec  :: Generic Option
-derive instance genericShortOption :: Generic ShortOption
-derive instance genericLongOption  :: Generic LongOption
-
 instance showShortOption :: Show ShortOption where
   show (ShortOption c a) = "-" ++ (fromChar c)
                                ++ (case a of

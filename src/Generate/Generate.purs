@@ -1,8 +1,9 @@
 module Docopt.Generate (
   mkBranchParser
 , runCliParser
+, CliParser ()
 , lexArgv
-, Token(..)
+, Token (..)
 ) where
 
 import Prelude
@@ -13,8 +14,8 @@ import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
-                 , head, many, tail)
-import Data.Foldable (foldl)
+                 , head, many, tail, fromList)
+import Data.Foldable (foldl, intercalate)
 import Data.String (fromCharArray, stripPrefix)
 import qualified Data.List as L
 import qualified Data.List.Unsafe as LU
@@ -98,18 +99,13 @@ lexArgv = foldM step Nil
 -- Input Token Parser
 --------------------------------------------------------------------------------
 
-type CliParseState = { mapped :: List (Tuple Argument Value) }
-type CliParser a = P.ParserT (List Token) (State CliParseState) a
+type CliParser a = P.Parser (List Token) a
 
 runCliParser :: forall a.
                 (List Token)
               -> CliParser a
               -> Either P.ParseError a
-runCliParser input =
-  flip evalState
-  { mapped: Nil }
-  <<< P.runParserT
-  (P.PState { input: input, position: P.initialPos })
+runCliParser input = P.runParser input
 
 -- | Test the string at the head of the stream
 token :: forall a. (Token -> Maybe a) -> CliParser a
@@ -270,7 +266,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                 (Just $ SOpt (AU.head xs) (AU.tail xs) v)
                 false
 
-    go a b = Left $ "Invalid token" ++ show a ++ " / " ++ show b
+    go a b = Left $ "Invalid token " ++ show a ++ " (input: " ++ show b ++ ")"
 
 -- | Generate a parser for a single usage branch
 mkBranchParser :: Branch -> CliParser (List (Tuple Argument Value))
@@ -294,7 +290,8 @@ mkBranchParser (Branch xs) = do
     --      that was declared as *required*.
     --
     --      This will allow for repeating flags in any order, i.e.:
-    --      "-vbvbvb" would be equivalent to "-vvvbbb" (currenlty possible)
+    --      "-vbvbvb" would be equivalent to "-vvvbbb" (only the latter being
+    --                                                 currenlty possible)
     mkExaustiveParser :: List Argument
                       -> CliParser (List (Tuple Argument Value))
     mkExaustiveParser Nil = pure empty
@@ -303,11 +300,13 @@ mkBranchParser (Branch xs) = do
       P.choice $ P.try <$> ls
       where
           reduce :: List Argument -> CliParser (List (Tuple Argument Value))
-          reduce ls = foldl step (pure empty) ls
+          reduce ls = (foldl step (pure empty) ls) P.<?> errormsg
             where step acc p = do
                     as <- acc
                     a  <- mkParser p
                     return (as ++ a)
+                  errormsg = "at least one of each of "
+                    ++ (intercalate ", " $ prettyPrintArg <$> ps)
 
           permute :: forall a. (Eq a) => List a -> List (List a)
           permute Nil = Cons Nil Nil

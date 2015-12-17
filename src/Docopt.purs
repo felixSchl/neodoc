@@ -6,6 +6,7 @@ import Data.Maybe
 import Data.List
 import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
+import Data.String (fromChar)
 
 --------------------------------------------------------------------------------
 
@@ -40,8 +41,8 @@ prettyPrintArg (Positional name r) = name ++ (if r then "..." else "")
 prettyPrintArg (Option flag name arg r)
   = short ++ long ++ arg' ++ rep ++ default
   where
-    short   = maybe "" (\f -> "-" ++ (show f)) flag
-    long    = maybe "" ("--" ++) name
+    short   = maybe "" (\f -> "-" ++ (fromChar f)) flag
+    long    = maybe "" (const ", ") flag ++ maybe "" ("--" ++) name
     rep     = if r then "..." else ""
     arg'    = flip (maybe "") arg \(OptionArgument n _) -> "="  ++ n
     default = flip (maybe "") arg \(OptionArgument _ d) ->
@@ -62,7 +63,7 @@ prettyPrintApplication (Application xs)
   = intercalate " | " (prettyPrintBranch <$> xs)
 
 prettyPrintValue :: Value -> String
-prettyPrintValue (StringValue s) = s
+prettyPrintValue (StringValue s) = (show s)
 prettyPrintValue (BoolValue b)   = (show b)
 
 --------------------------------------------------------------------------------

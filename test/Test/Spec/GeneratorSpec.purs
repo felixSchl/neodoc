@@ -11,7 +11,8 @@ import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
 import Data.List (List(..), toList, length, fromList)
 import qualified Data.Array as A
-import Data.Foldable (for_)
+import Data.Foldable (for_, intercalate)
+import Control.Monad.Eff.Exception (error, throwException)
 
 import Docopt
 import Docopt.Parser.Usage (Usage(..))
@@ -79,61 +80,62 @@ oa n v = Just $ OptionArgument n (Just v)
 oa_ :: String -> Maybe OptionArgument
 oa_ n = Just $ OptionArgument n Nothing
 
-generatorSpec = describe "generator" do
+type Input    = Array String
+type Output   = Array (Tuple Argument Value)
+data TestCase = TestCase (Array Argument) (Array Input) Output
 
-  -- XXX: Move this
-  describe "cli lexer" do
-    it "should lex cli input..." do
-      vliftEff do
-        res <- runEitherEff do
-          lexArgv (toList [
-            "-foo"
-          , "-bazQUX"
-          , "-baz=QUX"
-          , "bar"
-          , "--foobar=QUX"
-          ])
-        traceShowA res
+test :: Array Argument -> Array Input -> Output -> TestCase
+test = TestCase
 
-  describe "generator" do
-    it "should have some tests..." do
+generatorSpec = describe "The generator" do
 
-      let cmdfoo = co "foo"
-          optfoo = opt 'f' "foo" (oa_ "FOZ") true
-          optqux = opt 'q' "qux" Nothing true
-          optbaz = opt 'b' "baz" Nothing true
+  -- Some options that will be used for these tests
+  let cmd_foo          = co "foo"
+      opt_f_foo_FOZ__r = opt 'f' "foo" (oa_ "FOZ") true
+      opt_q_qux___r    = opt 'q' "qux" Nothing true
+      opt_b_baz___r    = opt 'b' "baz" Nothing true
 
-      let branch = [ cmdfoo, optfoo, optbaz, optqux ]
-          inputs = [
-            [ "foo" , "-qqqbf=ox"]
+  let testCases = [
+    test  -- specification:
+          [  cmd_foo, opt_q_qux___r, opt_b_baz___r ]
 
-          -- , [ "foo" , "-qffox" , "--bar", "baxxer" , "-b", "bax" , "-b" ]
-          -- , [ "foo" , "-f=fox" , "--barbaxxer" , "-bbax" , "-b" ]
+          -- input:
+          [ [ "foo" , "-qqqbf=ox"] ]
+
+          -- expected:
+          [ Tuple cmd_foo          (BoolValue true)
+          , Tuple opt_q_qux___r    (BoolValue true)
+          , Tuple opt_q_qux___r    (BoolValue true)
+          , Tuple opt_q_qux___r    (BoolValue true)
+          , Tuple opt_b_baz___r    (BoolValue true)
+          , Tuple opt_f_foo_FOZ__r (StringValue "ox")
           ]
-          expected =
-            [ Tuple cmdfoo (BoolValue true)
-            , Tuple optqux (BoolValue true)
-            , Tuple optqux (BoolValue true)
-            , Tuple optqux (BoolValue true)
-            , Tuple optbaz (BoolValue true)
-            , Tuple optfoo (StringValue "ox")
-            ]
-            -- , Tuple optbar (StringValue "baxxer")
-            -- , Tuple optbar (StringValue "bax")
-            -- , Tuple optbar (StringValue "defbaz") ]
+  ]
 
-      vliftEff do
-        for_ inputs \input ->
-          validate branch input expected
+  for_ testCases \(TestCase branch inputs expected) -> do
+
+    describe (prettyPrintBranch $ br branch) do
+      for_ inputs \input ->
+        it (intercalate " " input ++ " -> " ++ prettyPrintExpected expected) do
+          vliftEff do
+            validate branch input expected
 
     where
+
+      prettyPrintExpected :: Output -> String
+      prettyPrintExpected expected = ("\n\t" ++) $ intercalate "\n\t" $
+                      flip map expected \(Tuple arg val) ->
+                        prettyPrintArg arg ++ ": " ++ prettyPrintValue val
+
       validate :: forall eff. Array Argument
-                            -> Array String
-                            -> Array (Tuple Argument Value)
+                            -> Input
+                            -> Output
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate args argv expected = do
-        res <- runEitherEff do
+        result <- fromList <$> runEitherEff do
           toks <- lexArgv (toList argv)
-          flip runCliParser (mkBranchParser (br args)) toks
+          runCliParser toks $ mkBranchParser $ br args
 
-        assertEqual (expected) (fromList res)
+        if (expected /= result)
+           then throwException (error $ prettyPrintExpected result)
+           else return unit
