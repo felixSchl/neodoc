@@ -107,14 +107,14 @@ runCliParser :: forall a.
               -> Either P.ParseError a
 runCliParser input = P.runParser input
 
--- | Test the string at the head of the stream
+-- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> CliParser a
 token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
       case test tok of
         Just a ->
-          let nextpos = pos -- neglect pos
+          let nextpos = pos -- neglect pos (for now)
           in
             { consumed: true
             , input:    xs
@@ -124,7 +124,6 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         Nothing -> P.parseFailed toks pos "a better error message!"
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
--- XXX: Should the `Pending` constructor store a list of `Parsers` instead?
 data Acc a
   = Free (CliParser a)
   | Pending (CliParser a) (List Argument)
@@ -140,28 +139,6 @@ positional = token go P.<?> "positional"
   where
     go (Lit _) = Just (BoolValue true)
     go _       = Nothing
-
--- | Parse the token at the head of the input stream and possibly replace
--- | it with another token. Consider, e.g. an option was parsed but has a
--- | valid remainder, that remainder should be offered to subsequent parsers.
-token' :: forall a. (Token -> Tuple (Maybe Token) (Maybe a)) -> CliParser a
-token' f = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
-  return $ case toks of
-    Cons tok xs ->
-      case f tok of
-        Tuple remainder (Just a) ->
-          let nextpos = pos -- neglect pos
-          in {
-            consumed: maybe true (const false) remainder
-          , input:    maybe xs (\r -> (r:xs)) remainder
-          , result:   Right a
-          , position: nextpos
-          }
-        _ -> P.parseFailed toks pos "bad token"
-    _ -> P.parseFailed toks pos "expected token, met EOF"
-
-(\\) :: forall a b. a -> b -> Tuple a b
-(\\) = Tuple
 
 type HasConsumedArg = Boolean
 data OptParse = OptParse Value (Maybe Token) HasConsumedArg
@@ -185,10 +162,6 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     takesArg = isJust a
     def      = maybe Nothing (\(OptionArgument _ v) -> v) a
-
-    go :: Token
-        -> (Maybe Token)
-        -> Either String OptParse
 
     -- case 1:
     -- The name is an exact match
@@ -233,10 +206,6 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     takesArg = isJust a
     def      = maybe Nothing (\(OptionArgument _ v) -> v) a
 
-    go :: Token
-        -> (Maybe Token)
-        -> Either String OptParse
-
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
     -- argument may have been passed.
@@ -272,7 +241,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 mkBranchParser :: Branch -> CliParser (List (Tuple Argument Value))
 mkBranchParser (Branch xs) = do
   either
-    (\_ -> P.fail "Failed to generate parser")
+    (\_   -> P.fail "Failed to generate parser")
     (\acc -> case acc of
       Free p       -> p
       Pending p xs -> do
