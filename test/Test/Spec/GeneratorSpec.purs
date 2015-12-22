@@ -100,7 +100,7 @@ generatorSpec = describe "The generator" do
           [  cmd_foo, opt_q_qux___r, opt_b_baz___r, opt_f_foo_FOZ__r ]
 
           -- input:
-          [ [ "foo" , "-qqqb", "--foo=ox" ] ]
+          [ [ "foo" , "-qqq", "-b", "--baz", "--foo=ox"] ]
 
           -- expected:
           [ Tuple cmd_foo          (BoolValue true)

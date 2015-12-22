@@ -113,6 +113,11 @@ instance semigroupApplication :: Semigroup Application where
 instance monoidApplication :: Monoid Application where
   mempty = Application Nil
 
+isRepeatable :: Argument -> Boolean
+isRepeatable (Option _ _ _ r) = r
+isRepeatable (Positional _ r) = r
+isRepeatable _                = false
+
 --------------------------------------------------------------------------------
 
 import qualified Text.Parsing.Parser as P

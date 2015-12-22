@@ -14,7 +14,7 @@ import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
-                 , head, many, tail, fromList)
+                 , head, many, tail, fromList, filter)
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Data.Foldable (foldl, intercalate)
@@ -36,7 +36,7 @@ import Docopt
 import Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
 --------------------------------------------------------------------------------
--- Input Lexer
+-- Input Lexer -----------------------------------------------------------------
 --------------------------------------------------------------------------------
 
 data Token
@@ -98,7 +98,7 @@ lexArgv = foldM step Nil
       return (a ++ (Cons x Nil))
 
 --------------------------------------------------------------------------------
--- Input Token Parser
+-- Input Token Parser ----------------------------------------------------------
 --------------------------------------------------------------------------------
 
 type CliParser a = P.Parser (List Token) a
@@ -249,6 +249,17 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     go a b = Left $ "Invalid token " ++ show a ++ " (input: " ++ show b ++ ")"
 
+eof :: CliParser Unit
+eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
+  return $ case s of
+    Nil -> { consumed: false, input: s, result: Right unit, position: pos }
+    _   -> P.parseFailed s pos "Expected EOF"
+
+-- | Generate a parser for a single program application (Usage).
+mkApplicationParser :: Application -> CliParser (List ValueMapping)
+mkApplicationParser (Application xs)
+  = P.choice $ P.try <<< mkBranchParser <$> xs
+
 -- | Generate a parser for a single usage branch
 mkBranchParser :: Branch -> CliParser (List ValueMapping)
 mkBranchParser (Branch xs) = do
@@ -258,29 +269,35 @@ mkBranchParser (Branch xs) = do
       Free p       -> p
       Pending p xs -> do
         a  <- p
-        as <- mkExaustiveParser xs
+        as <- mkExhaustiveParser xs
         return (a ++ as))
     (foldM step (Free $ pure empty) xs)
+  <* eof
   where
 
     -- Given a list of arguments, try parse them all in any order.
     -- The only requirement is that all input is consumed in the end.
-    mkExaustiveParser :: List Argument -> CliParser (List ValueMapping)
-    mkExaustiveParser Nil = pure empty
-    mkExaustiveParser ps  = do
-      traceShowA ps
+    mkExhaustiveParser :: List Argument -> CliParser (List ValueMapping)
+    mkExhaustiveParser Nil = pure empty
+    mkExhaustiveParser ps  = do
       draw ps (length ps)
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
         -- apply `draw` until the parser fails, with a modified `ps`.
         draw :: List Argument -> Int -> CliParser (List ValueMapping)
-        draw (Cons p ps') n | n >= 0 = (do
-          input <- getInput
-          traceShowA $ "n: " ++ show n ++ " -- " ++ show p ++ " (input: " ++ show input ++ ")"
+        draw pss@(Cons p ps') n | n >= 0 = (do
           x  <- mkParser p
-          xs <- draw ps' (length ps')
+          xs <- draw pss (length pss)
           return $ x ++ xs
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
+        draw ps' n | (length ps' > 0) && (n < 0) = do
+          -- TODO: Also consider options that have defaults as optional
+          let rest = filter (not <<< isRepeatable) ps'
+          if (length rest > 0)
+            then P.fail $
+              "Missing required options: "
+                ++ intercalate "," (prettyPrintArg <$> rest)
+            else return Nil
         draw _ _ = return Nil
 
     -- Options always transition to the `Pending state`
@@ -300,7 +317,7 @@ mkBranchParser (Branch xs) = do
     step (Pending p xs) y = Right $
       Free do
         a  <- p
-        as <- mkExaustiveParser xs
+        as <- mkExhaustiveParser xs
         return (a ++ as)
 
     -- Parser generator for a single `Argument`
