@@ -15,6 +15,8 @@ import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
                  , head, many, tail, fromList)
+import Control.Alt ((<|>))
+import Control.Lazy (defer)
 import Data.Foldable (foldl, intercalate)
 import Data.String (fromCharArray, stripPrefix)
 import qualified Data.List as L
@@ -142,6 +144,7 @@ positional = token go P.<?> "positional"
 
 type HasConsumedArg = Boolean
 data OptParse = OptParse Value (Maybe Token) HasConsumedArg
+type ValueMapping = Tuple Argument Value
 
 longOption :: Name -> (Maybe OptionArgument) -> CliParser Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
@@ -154,7 +157,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
           , input:    (maybe Nil singleton newtok) ++
                       (if hasConsumedArg then (LU.tail xs) else xs)
           , result:   Right v
-          , position: pos -- ignore pos
+          , position: pos -- ignore pos (for now)
           }
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
@@ -235,10 +238,19 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                 (Just $ SOpt (AU.head xs) (AU.tail xs) v)
                 false
 
+    -- case 4:
+    -- The leading flag matches, there are no stacked options and the option
+    -- takes no argument - total consumption!
+    go (SOpt f' xs _) _ | (f' == f) && (takesArg == false) && (A.length xs == 0)
+      = return $ OptParse
+                (BoolValue true)
+                Nothing
+                false
+
     go a b = Left $ "Invalid token " ++ show a ++ " (input: " ++ show b ++ ")"
 
 -- | Generate a parser for a single usage branch
-mkBranchParser :: Branch -> CliParser (List (Tuple Argument Value))
+mkBranchParser :: Branch -> CliParser (List ValueMapping)
 mkBranchParser (Branch xs) = do
   either
     (\_   -> P.fail "Failed to generate parser")
@@ -253,36 +265,23 @@ mkBranchParser (Branch xs) = do
 
     -- Given a list of arguments, try parse them all in any order.
     -- The only requirement is that all input is consumed in the end.
-    --
-    -- XXX: Replace this with a manual iteration - i.e. consume each
-    --      argument. Only fail if an argument has not been consumed
-    --      that was declared as *required*.
-    --
-    --      This will allow for repeating flags in any order, i.e.:
-    --      "-vbvbvb" would be equivalent to "-vvvbbb" (only the latter being
-    --                                                 currenlty possible)
-    mkExaustiveParser :: List Argument
-                      -> CliParser (List (Tuple Argument Value))
+    mkExaustiveParser :: List Argument -> CliParser (List ValueMapping)
     mkExaustiveParser Nil = pure empty
     mkExaustiveParser ps  = do
-      let ls = reduce <$> (permute ps)
-      P.choice $ P.try <$> ls
+      traceShowA ps
+      draw ps (length ps)
       where
-          reduce :: List Argument -> CliParser (List (Tuple Argument Value))
-          reduce ls = (foldl step (pure empty) ls) P.<?> errormsg
-            where step acc p = do
-                    as <- acc
-                    a  <- mkParser p
-                    return (as ++ a)
-                  errormsg = "at least one of each of "
-                    ++ (intercalate ", " $ prettyPrintArg <$> ps)
-
-          permute :: forall a. (Eq a) => List a -> List (List a)
-          permute Nil = Cons Nil Nil
-          permute xs  = do
-              x  <- xs
-              ys <- permute $ delete x xs
-              return (x:ys)
+        -- iterate over `ps` until a match `x` is found, then, recursively
+        -- apply `draw` until the parser fails, with a modified `ps`.
+        draw :: List Argument -> Int -> CliParser (List ValueMapping)
+        draw (Cons p ps') n | n >= 0 = (do
+          input <- getInput
+          traceShowA $ "n: " ++ show n ++ " -- " ++ show p ++ " (input: " ++ show input ++ ")"
+          x  <- mkParser p
+          xs <- draw ps' (length ps')
+          return $ x ++ xs
+        ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
+        draw _ _ = return Nil
 
     -- Options always transition to the `Pending state`
     step (Free p) x@(Option _ _ _ _) = Right $ Pending p (singleton x)
@@ -290,8 +289,8 @@ mkBranchParser (Branch xs) = do
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
       a  <- p
-      as <- (mkParser x)
-      return (a ++ as)
+      as <- mkParser x
+      return $ a ++ as
 
     -- Options always keep accumulating
     step (Pending p xs) x@(Option _ _ _ _) = Right $
@@ -305,7 +304,7 @@ mkBranchParser (Branch xs) = do
         return (a ++ as)
 
     -- Parser generator for a single `Argument`
-    mkParser :: Argument -> CliParser (List (Tuple Argument Value))
+    mkParser :: Argument -> CliParser (List ValueMapping)
 
     -- Generate a parser for a `Command` argument
     mkParser x@(Command n) = do

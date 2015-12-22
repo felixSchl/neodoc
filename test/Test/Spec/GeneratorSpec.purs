@@ -97,10 +97,10 @@ generatorSpec = describe "The generator" do
 
   let testCases = [
     test  -- specification:
-          [  cmd_foo, opt_q_qux___r, opt_b_baz___r ]
+          [  cmd_foo, opt_q_qux___r, opt_b_baz___r, opt_f_foo_FOZ__r ]
 
           -- input:
-          [ [ "foo" , "-qqqbf=ox"] ]
+          [ [ "foo" , "-qqqb", "--foo=ox" ] ]
 
           -- expected:
           [ Tuple cmd_foo          (BoolValue true)
