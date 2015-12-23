@@ -131,7 +131,7 @@ data Acc a
   | Pending (CliParser a) (List Argument)
 
 command :: String -> CliParser Value
-command n = token go P.<?> "command"
+command n = token go P.<?> "command " ++ show n
   where
     go (Lit s) | s == n = Just (BoolValue true)
     go _                = Nothing
@@ -275,7 +275,6 @@ mkBranchParser (Branch xs) = do
         as <- mkExhaustiveParser xs
         return (a ++ as))
     (foldM step (Free $ pure empty) xs)
-  <* eof
   where
 
     -- Given a list of arguments, try parse them all in any order.
@@ -321,9 +320,10 @@ mkBranchParser (Branch xs) = do
     -- Any non-options always leaves the pending state
     step (Pending p xs) y = Right $
       Free do
-        a  <- p
-        as <- mkExhaustiveParser xs
-        return (a ++ as)
+        a   <- p
+        as  <- mkExhaustiveParser xs
+        ass <- mkParser y
+        return (a ++ as ++ ass)
 
     -- Parser generator for a single `Argument`
     mkParser :: Argument -> CliParser (List ValueMapping)

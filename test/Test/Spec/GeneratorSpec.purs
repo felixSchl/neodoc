@@ -105,6 +105,7 @@ generatorSpec = describe "The generator" do
       opt_b_baz___r    = opt 'b' "baz"   Nothing true
       opt_o_out        = opt 'o' "out"   Nothing false
       opt_i_input      = opt 'i' "input" Nothing false
+      cmd_baz          = co "baz"
 
   let testCases = [
       test
@@ -114,9 +115,10 @@ generatorSpec = describe "The generator" do
         , opt_b_baz___r
         , opt_i_input
         , opt_f_foo_FOZ__r
+        , cmd_baz
         ]
         [ pass
-          [ "foo" , "--out", "-qqq", "--foo=ox", "--baz", "--input" ]
+          [ "foo" , "--out", "-qqq", "--foo=ox", "--baz", "--input", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
             , Tuple opt_q_qux___r    (BoolValue true)
@@ -125,9 +127,10 @@ generatorSpec = describe "The generator" do
             , Tuple opt_f_foo_FOZ__r (StringValue "ox")
             , Tuple opt_b_baz___r    (BoolValue true)
             , Tuple opt_i_input      (BoolValue true)
+            , Tuple cmd_baz          (BoolValue true)
             ]
         , pass
-            [ "foo", "-q", "-o", "--qux", "-i", "--baz", "-f=ox" ]
+            [ "foo", "-q", "-o", "--qux", "-i", "--baz", "-f=ox", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_q_qux___r    (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
@@ -135,25 +138,32 @@ generatorSpec = describe "The generator" do
             , Tuple opt_i_input      (BoolValue true)
             , Tuple opt_b_baz___r    (BoolValue true)
             , Tuple opt_f_foo_FOZ__r (StringValue "ox")
+            , Tuple cmd_baz          (BoolValue true)
             ]
         , pass
-            [ "foo", "--baz", "-o", "-f=ox", "-i" ]
+            [ "foo", "--baz", "-o", "-f=ox", "-i", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_b_baz___r    (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
             , Tuple opt_f_foo_FOZ__r (StringValue "ox")
             , Tuple opt_i_input      (BoolValue true)
+            , Tuple cmd_baz          (BoolValue true)
             ]
         , pass
-            [ "foo", "-o", "-i" ]
+            [ "foo", "-o", "-i", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
             , Tuple opt_i_input      (BoolValue true)
+            , Tuple cmd_baz          (BoolValue true)
             ]
         , fail
             [ "foo" ]
             -- TODO: Create a more sophisticated way to test this
             "Missing required options: -i, --input, -o, --out"
+        , fail
+            [ "foo", "-o", "-i" ]
+            -- TODO: Create a more sophisticated way to test this
+            "Expected command \"baz\""
         ]
   ]
 
