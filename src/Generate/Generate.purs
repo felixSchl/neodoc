@@ -306,7 +306,10 @@ mkBranchParser (Branch xs) = do
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
         draw ps' n | (length ps' > 0) && (n < 0) = do
           -- TODO: Also consider options that have defaults as optional
-          let rest = filter (not <<< isRepeatable) (reverse ps')
+          let rest = filter
+                      (\p -> (not $ isRepeatable p)
+                          && (not $ hasDefault p))
+                      (reverse ps')
           if (length rest > 0)
             then P.fail $
               "Missing required options: "

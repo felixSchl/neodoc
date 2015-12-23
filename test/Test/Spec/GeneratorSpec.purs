@@ -161,8 +161,7 @@ generatorSpec = describe "The generator" do
             [ "foo" ]
             -- TODO: Create a more sophisticated way to test this
             $ "Missing required options: "
-                ++ "-o, --out, -b, "
-                ++ "--baz=BAZ [default: StringValue ax], "
+                ++ "-o, --out, "
                 ++ "-i, --input"
         , fail
             [ "foo", "-o", "-i", "-bax" ]

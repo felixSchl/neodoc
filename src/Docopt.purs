@@ -119,6 +119,10 @@ isRepeatable (Option _ _ _ r) = r
 isRepeatable (Positional _ r) = r
 isRepeatable _                = false
 
+hasDefault :: Argument -> Boolean
+hasDefault (Option _ _ (Just (OptionArgument _ (Just _))) _) = true
+hasDefault _                                                 = false
+
 takesArgument :: Argument -> Boolean
 takesArgument (Option _ _ (Just _) _) = true
 takesArgument _                       = false
