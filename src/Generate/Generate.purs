@@ -107,7 +107,7 @@ runCliParser :: forall a.
                 (List Token)
               -> CliParser a
               -> Either P.ParseError a
-runCliParser input = P.runParser input
+runCliParser = P.runParser
 
 -- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> CliParser a
@@ -301,7 +301,7 @@ mkBranchParser (Branch xs) = do
           if (length rest > 0)
             then P.fail $
               "Missing required options: "
-                ++ intercalate "," (prettyPrintArg <$> rest)
+                ++ intercalate ", " (prettyPrintArg <$> rest)
             else return Nil
         draw _ _ = return Nil
 

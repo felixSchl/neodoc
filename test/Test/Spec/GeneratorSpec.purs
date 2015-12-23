@@ -8,11 +8,13 @@ import Control.Monad.Eff.Exception (EXCEPTION())
 import Control.Monad.Aff (liftEff')
 import Control.Monad.State (State(), evalState)
 import Data.Maybe (Maybe(..))
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.List (List(..), toList, length, fromList)
 import qualified Data.Array as A
 import Data.Foldable (for_, intercalate)
-import Control.Monad.Eff.Exception (error, throwException)
+import Control.Monad.Eff.Exception (error, throwException, catchException
+                                   , message)
+import qualified Text.Parsing.Parser as P
 
 import Docopt
 import Docopt.Parser.Usage (Usage(..))
@@ -83,28 +85,38 @@ oa_ n = Just $ OptionArgument n Nothing
 type Input    = Array String
 type Output   = Array (Tuple Argument Value)
 data Test = Test (Array Argument) (Array Case)
-data Case = Case Input Output
+data Case = Case Input (Either String Output)
 
 test :: Array Argument -> Array Case -> Test
 test = Test
 
-kase :: Input -> Output -> Case
-kase = Case
+pass :: Input -> Output -> Case
+pass i o = Case i (Right o)
+
+fail :: Input -> String -> Case
+fail i e = Case i (Left e)
 
 generatorSpec = describe "The generator" do
 
   -- Some options that will be used for these tests
   let cmd_foo          = co "foo"
       opt_f_foo_FOZ__r = opt 'f' "foo" (oa_ "FOZ") true
-      opt_q_qux___r    = opt 'q' "qux" Nothing true
-      opt_b_baz___r    = opt 'b' "baz" Nothing true
-      opt_o_out        = opt 'o' "out" Nothing false
+      opt_q_qux___r    = opt 'q' "qux"   Nothing true
+      opt_b_baz___r    = opt 'b' "baz"   Nothing true
+      opt_o_out        = opt 'o' "out"   Nothing false
+      opt_i_input      = opt 'i' "input" Nothing false
 
   let testCases = [
       test
-        [ cmd_foo, opt_o_out, opt_q_qux___r, opt_b_baz___r, opt_f_foo_FOZ__r ]
-        [ kase
-            [ "foo" , "--out", "-qqq", "--foo=ox", "--baz" ]
+        [ cmd_foo
+        , opt_o_out
+        , opt_q_qux___r
+        , opt_b_baz___r
+        , opt_i_input
+        , opt_f_foo_FOZ__r
+        ]
+        [ pass
+          [ "foo" , "--out", "-qqq", "--foo=ox", "--baz", "--input" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
             , Tuple opt_q_qux___r    (BoolValue true)
@@ -112,37 +124,49 @@ generatorSpec = describe "The generator" do
             , Tuple opt_q_qux___r    (BoolValue true)
             , Tuple opt_f_foo_FOZ__r (StringValue "ox")
             , Tuple opt_b_baz___r    (BoolValue true)
+            , Tuple opt_i_input      (BoolValue true)
             ]
-        , kase
-            [ "foo", "-q", "-o", "--qux", "--baz", "-f=ox" ]
+        , pass
+            [ "foo", "-q", "-o", "--qux", "-i", "--baz", "-f=ox" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_q_qux___r    (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
             , Tuple opt_q_qux___r    (BoolValue true)
+            , Tuple opt_i_input      (BoolValue true)
             , Tuple opt_b_baz___r    (BoolValue true)
             , Tuple opt_f_foo_FOZ__r (StringValue "ox")
             ]
-        , kase
-            [ "foo", "--baz", "-o", "-f=ox" ]
+        , pass
+            [ "foo", "--baz", "-o", "-f=ox", "-i" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_b_baz___r    (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
             , Tuple opt_f_foo_FOZ__r (StringValue "ox")
+            , Tuple opt_i_input      (BoolValue true)
             ]
-        , kase
-            [ "foo", "-o" ]
+        , pass
+            [ "foo", "-o", "-i" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
+            , Tuple opt_i_input      (BoolValue true)
             ]
+        , fail
+            [ "foo" ]
+            -- TODO: Create a more sophisticated way to test this
+            "Missing required options: -i, --input, -o, --out"
         ]
   ]
 
   for_ testCases \(Test branch kases) -> do
     describe (prettyPrintBranch $ br branch) do
       for_ kases \(Case input expected) ->
-        it (intercalate " " input ++ " -> " ++ prettyPrintExpected expected) do
-          vliftEff do
-            validate branch input expected
+            let msg = either
+                  (\e -> "Should fail with \"" ++ e ++ "\"")
+                  (\e -> prettyPrintExpected e)
+                  expected
+            in it (intercalate " " input ++ " -> " ++ msg) do
+                  vliftEff do
+                    validate branch input expected
 
     where
 
@@ -153,14 +177,28 @@ generatorSpec = describe "The generator" do
 
       validate :: forall eff. Array Argument
                             -> Input
-                            -> Output
+                            -> Either String Output
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate args argv expected = do
-        result <- fromList <$> runEitherEff do
-          toks <- lexArgv (toList argv)
-          runCliParser toks $ mkBranchParser $ br args
-
-        if (expected /= result)
-          then throwException $ error $
-            "Unexpected output:\n" ++ prettyPrintExpected result
-          else return unit
+        let result = do
+              toks <- lexArgv (toList argv)
+              runCliParser toks $ mkBranchParser $ br args
+        case result of
+          Left (e@(P.ParseError { message: msg })) ->
+            either
+              (\e' ->
+                if (msg /= e')
+                  then throwException $ error $
+                    "Unexpected error:\n" ++ msg
+                  else return unit)
+              (const $ throwException $ error $ show e)
+              expected
+          Right r -> do
+            let r'' = fromList r
+            either
+              (throwException <<< error <<< show)
+              (\r' -> if (r'' /= r')
+                then throwException $ error $
+                  "Unexpected output:\n" ++ prettyPrintExpected r''
+                else return unit)
+              expected
