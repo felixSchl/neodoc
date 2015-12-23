@@ -82,10 +82,14 @@ oa_ n = Just $ OptionArgument n Nothing
 
 type Input    = Array String
 type Output   = Array (Tuple Argument Value)
-data TestCase = TestCase (Array Argument) (Array Input) Output
+data Test = Test (Array Argument) (Array Case)
+data Case = Case Input Output
 
-test :: Array Argument -> Array Input -> Output -> TestCase
-test = TestCase
+test :: Array Argument -> Array Case -> Test
+test = Test
+
+kase :: Input -> Output -> Case
+kase = Case
 
 generatorSpec = describe "The generator" do
 
@@ -94,27 +98,48 @@ generatorSpec = describe "The generator" do
       opt_f_foo_FOZ__r = opt 'f' "foo" (oa_ "FOZ") true
       opt_q_qux___r    = opt 'q' "qux" Nothing true
       opt_b_baz___r    = opt 'b' "baz" Nothing true
+      opt_o_out        = opt 'o' "out" Nothing false
 
   let testCases = [
-    test  -- specification:
-          [  cmd_foo, opt_q_qux___r, opt_b_baz___r, opt_f_foo_FOZ__r ]
-
-          [ [ "foo" , "-qqq", "--foo=ox", "--baz" ] ]
-
-          -- expected:
-          [ Tuple cmd_foo          (BoolValue true)
-          , Tuple opt_q_qux___r    (BoolValue true)
-          , Tuple opt_q_qux___r    (BoolValue true)
-          , Tuple opt_q_qux___r    (BoolValue true)
-          , Tuple opt_f_foo_FOZ__r (StringValue "ox")
-          , Tuple opt_b_baz___r    (BoolValue true)
-          ]
+      test
+        [ cmd_foo, opt_o_out, opt_q_qux___r, opt_b_baz___r, opt_f_foo_FOZ__r ]
+        [ kase
+            [ "foo" , "--out", "-qqq", "--foo=ox", "--baz" ]
+            [ Tuple cmd_foo          (BoolValue true)
+            , Tuple opt_o_out        (BoolValue true)
+            , Tuple opt_q_qux___r    (BoolValue true)
+            , Tuple opt_q_qux___r    (BoolValue true)
+            , Tuple opt_q_qux___r    (BoolValue true)
+            , Tuple opt_f_foo_FOZ__r (StringValue "ox")
+            , Tuple opt_b_baz___r    (BoolValue true)
+            ]
+        , kase
+            [ "foo", "-q", "-o", "--qux", "--baz", "-f=ox" ]
+            [ Tuple cmd_foo          (BoolValue true)
+            , Tuple opt_q_qux___r    (BoolValue true)
+            , Tuple opt_o_out        (BoolValue true)
+            , Tuple opt_q_qux___r    (BoolValue true)
+            , Tuple opt_b_baz___r    (BoolValue true)
+            , Tuple opt_f_foo_FOZ__r (StringValue "ox")
+            ]
+        , kase
+            [ "foo", "--baz", "-o", "-f=ox" ]
+            [ Tuple cmd_foo          (BoolValue true)
+            , Tuple opt_b_baz___r    (BoolValue true)
+            , Tuple opt_o_out        (BoolValue true)
+            , Tuple opt_f_foo_FOZ__r (StringValue "ox")
+            ]
+        , kase
+            [ "foo", "-o" ]
+            [ Tuple cmd_foo          (BoolValue true)
+            , Tuple opt_o_out        (BoolValue true)
+            ]
+        ]
   ]
 
-  for_ testCases \(TestCase branch inputs expected) -> do
-
+  for_ testCases \(Test branch kases) -> do
     describe (prettyPrintBranch $ br branch) do
-      for_ inputs \input ->
+      for_ kases \(Case input expected) ->
         it (intercalate " " input ++ " -> " ++ prettyPrintExpected expected) do
           vliftEff do
             validate branch input expected
@@ -136,5 +161,6 @@ generatorSpec = describe "The generator" do
           runCliParser toks $ mkBranchParser $ br args
 
         if (expected /= result)
-           then throwException (error $ prettyPrintExpected result)
-           else return unit
+          then throwException $ error $
+            "Unexpected output:\n" ++ prettyPrintExpected result
+          else return unit

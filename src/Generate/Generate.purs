@@ -290,7 +290,9 @@ mkBranchParser (Branch xs) = do
         draw :: List Argument -> Int -> CliParser (List ValueMapping)
         draw pss@(Cons p ps') n | n >= 0 = (do
           x  <- mkParser p
-          xs <- draw pss (length pss)
+          xs <- if isRepeatable p
+             then draw pss (length pss)
+             else draw (ps') (length ps')
           return $ x ++ xs
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
         draw ps' n | (length ps' > 0) && (n < 0) = do
