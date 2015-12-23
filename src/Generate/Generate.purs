@@ -168,18 +168,21 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     -- case 1:
     -- The name is an exact match
-    go (LOpt n' v) atok | takesArg  && (n' == n)
+    go (LOpt n' v) atok | takesArg && (n' == n)
       = case v of
-          -- XXX: The val needs to be parsed into a `Value`
           Just val -> return $ OptParse (StringValue val) Nothing false
           _  -> case atok of
-            -- XXX: The lit needs to be parsed into a `Value`
             Just (Lit s) -> return $ OptParse (StringValue s) Nothing true
             _ -> case def of
               Just defval -> return $ OptParse defval Nothing false
               _ -> Left "Argument required"
 
     -- case 2:
+    -- The name is an exact match and takes no argument
+    go (LOpt n' _) _ | (takesArg == false) && (n' == n)
+      = return $ OptParse (BoolValue true) Nothing false
+
+    -- case 3:
     -- The name is a substring of the input and no explicit argument has been
     -- provdided.
     go (LOpt n' Nothing) atok | takesArg

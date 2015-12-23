@@ -99,16 +99,15 @@ generatorSpec = describe "The generator" do
     test  -- specification:
           [  cmd_foo, opt_q_qux___r, opt_b_baz___r, opt_f_foo_FOZ__r ]
 
-          -- input:
-          [ [ "foo" , "-qqq", "-b", "--baz", "--foo=ox"] ]
+          [ [ "foo" , "-qqq", "--foo=ox", "--baz" ] ]
 
           -- expected:
           [ Tuple cmd_foo          (BoolValue true)
           , Tuple opt_q_qux___r    (BoolValue true)
           , Tuple opt_q_qux___r    (BoolValue true)
           , Tuple opt_q_qux___r    (BoolValue true)
-          , Tuple opt_b_baz___r    (BoolValue true)
           , Tuple opt_f_foo_FOZ__r (StringValue "ox")
+          , Tuple opt_b_baz___r    (BoolValue true)
           ]
   ]
 
