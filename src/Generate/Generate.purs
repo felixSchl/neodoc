@@ -14,10 +14,10 @@ import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
-                 , head, many, tail, fromList, filter)
+                 , head, many, tail, fromList, filter, reverse)
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
-import Data.Foldable (foldl, intercalate)
+import Data.Foldable (foldl, intercalate, for_)
 import Data.String (fromCharArray, stripPrefix)
 import qualified Data.List as L
 import qualified Data.List.Unsafe as LU
@@ -164,18 +164,17 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   where
 
     takesArg = isJust a
-    def      = maybe Nothing (\(OptionArgument _ v) -> v) a
 
     -- case 1:
     -- The name is an exact match
     go (LOpt n' v) atok | takesArg && (n' == n)
       = case v of
           Just val -> return $ OptParse (StringValue val) Nothing false
-          _  -> case atok of
-            Just (Lit s) -> return $ OptParse (StringValue s) Nothing true
-            _ -> case def of
-              Just defval -> return $ OptParse defval Nothing false
-              _ -> Left "Argument required"
+          _  -> return case atok of
+            Just (Lit s) -> OptParse (StringValue s) Nothing true
+            _            ->
+              -- return `true` as argument, let caller check
+              OptParse (BoolValue true) Nothing false
 
     -- case 2:
     -- The name is an exact match and takes no argument
@@ -188,7 +187,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     go (LOpt n' Nothing) atok | takesArg
       = case stripPrefix n n' of
           Just s -> return $ OptParse (StringValue s) Nothing false
-          _      -> Left "Argument required"
+          _      -> Left "Invalid substring"
 
     go _ _ = Left "Invalid token"
 
@@ -217,14 +216,10 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- argument may have been passed.
     go (SOpt f' xs v) atok | (f' == f) && takesArg && (A.length xs == 0)
       = case v of
-          -- XXX: The val needs to be parsed into a `Value`
           Just val -> return $ OptParse (StringValue val) Nothing false
-          _  -> case atok of
-            -- XXX: The lit needs to be parsed into a `Value`
-            Just (Lit s) -> return $ OptParse (StringValue s) Nothing true
-            _ -> case def of
-              Just defval -> return $ OptParse defval Nothing false
-              _ -> Left "Argument required"
+          _  -> return case atok of
+            Just (Lit s) -> OptParse (StringValue s) Nothing true
+            _ -> OptParse (BoolValue true) Nothing false
 
     -- case 2:
     -- The leading flag matches, there are stacked options, no explicit
@@ -288,15 +283,30 @@ mkBranchParser (Branch xs) = do
         -- apply `draw` until the parser fails, with a modified `ps`.
         draw :: List Argument -> Int -> CliParser (List ValueMapping)
         draw pss@(Cons p ps') n | n >= 0 = (do
-          x  <- mkParser p
-          xs <- if isRepeatable p
-             then draw pss (length pss)
-             else draw (ps') (length ps')
-          return $ x ++ xs
+          xs  <- mkParser p
+
+          -- verify the arguments for parsed set of options
+          -- when an option takes anything but a bool value, i.e. it is not
+          -- a switch, an explicit argument *must* be provided.
+          let ys = map (\(Tuple a _) -> a) $
+                    filter
+                      (\(Tuple a v) -> (takesArgument a)
+                                    && (not $ isFlag a)
+                                    && (isBoolValue v))
+                      xs
+          if (length ys > 0)
+            then P.fail $ "Missing required arguments for "
+                        ++ intercalate ", " (prettyPrintArg <$> ys)
+            else return unit
+
+          xss <- if isRepeatable p
+                      then draw pss (length pss)
+                      else draw (ps') (length ps')
+          return $ xs ++ xss
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
         draw ps' n | (length ps' > 0) && (n < 0) = do
           -- TODO: Also consider options that have defaults as optional
-          let rest = filter (not <<< isRepeatable) ps'
+          let rest = filter (not <<< isRepeatable) (reverse ps')
           if (length rest > 0)
             then P.fail $
               "Missing required options: "
@@ -355,7 +365,7 @@ mkBranchParser (Branch xs) = do
         mkSoptParser Nothing _  = P.fail "not no flag"
 
     -- Generate a parser for a argument `Group`
-    mkParser (Group o bs r) = 
+    mkParser (Group o bs r) =
       -- XXX: Recursively generate a parser.
       --      NOTE: THIS COMPUTATION MAY FAIL:
       --            `mkParser` must be in the Either monad

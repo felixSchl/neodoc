@@ -106,6 +106,7 @@ instance showValue :: Show Value where
 instance eqValue :: Eq Value where
   eq (StringValue s) (StringValue s') = (s == s')
   eq (BoolValue b)   (BoolValue b')   = (b == b')
+  eq _               _                = false
 
 instance semigroupApplication :: Semigroup Application where
   append (Application xs) (Application ys) = Application (xs <> ys)
@@ -117,6 +118,23 @@ isRepeatable :: Argument -> Boolean
 isRepeatable (Option _ _ _ r) = r
 isRepeatable (Positional _ r) = r
 isRepeatable _                = false
+
+takesArgument :: Argument -> Boolean
+takesArgument (Option _ _ (Just _) _) = true
+takesArgument _                       = false
+
+isFlag :: Argument -> Boolean
+isFlag (Option _ _ (Just (OptionArgument _ (Just (BoolValue _)))) _) = true
+isFlag _                                                             = false
+
+isSameValueType :: Value -> Value -> Boolean
+isSameValueType (StringValue _) (StringValue _) = true
+isSameValueType (BoolValue _)   (BoolValue _)   = true
+isSameValueType _               _               = false
+
+isBoolValue :: Value -> Boolean
+isBoolValue (BoolValue _) = true
+isBoolValue _             = false
 
 --------------------------------------------------------------------------------
 
