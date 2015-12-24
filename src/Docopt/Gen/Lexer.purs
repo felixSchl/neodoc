@@ -1,3 +1,10 @@
+-- | ARGV lexer
+-- |
+-- | > Given an argv array, i.e. `process.argv`, derive a stream of tokens
+-- | > suitable for parsing against a docopt specification.
+-- |
+-- | ===
+
 module Docopt.Gen.Lexer (lex) where
 
 import Prelude
@@ -5,8 +12,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
 import Data.String (fromCharArray)
-import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
-                 , head, many, tail, fromList, filter, reverse, concat)
+import Data.List (List(..), foldM, many)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -56,6 +62,8 @@ parseToken = do
     lit = Lit <<< fromCharArray <$> do
       A.many P.anyChar
 
+-- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
+-- | item individually.
 lex :: (List String) -> Either P.ParseError (List Token)
 lex = foldM step Nil
   where
