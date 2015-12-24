@@ -171,16 +171,10 @@ generatorSpec = describe "The generator" do
         ]
     , test
         [ gro [[ cmd_foo ]] false ]
-        [ fail
-            [ "goo" ]
-            "Trailing options: \"goo\""
-        ]
+        [ fail [ "goo" ] "Trailing options: \"goo\"" ]
     , test
         [ grr [[ cmd_foo ]] false ]
-        [ fail
-            [ "goo" ]
-            "Trailing options: \"goo\""
-        ]
+        [ fail [ "goo" ] "Expected command \"foo\"" ]
   ]
 
   for_ testCases \(Test branch kases) -> do

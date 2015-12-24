@@ -375,13 +375,9 @@ mkBranchParser (Branch xs) = do
         mkSoptParser Nothing _  = P.fail "not no flag"
 
     -- Generate a parser for a argument `Group`
-    mkParser (Group optional bs r) = do
-      P.choice [
-        P.try $ concat <$> if r
-          then some go
-          else singleton <$> go
-      , if optional
-          then return Nil
-          else P.fail "Invalid group"
-      ]
+    mkParser (Group optional bs repeated) = do
+      concat <$>
+        let mod    = if optional then P.option Nil else \p -> p
+            parser = if repeated then some go else singleton <$> go
+         in mod parser
       where go = P.choice $ P.try <<< mkBranchParser <$> bs
