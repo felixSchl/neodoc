@@ -9,6 +9,8 @@ import Data.Monoid (Monoid)
 import Data.String (fromChar)
 
 --------------------------------------------------------------------------------
+-- Types -----------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 type Name          = String
 type IsRepeatable  = Boolean
@@ -33,6 +35,8 @@ data Value
   = StringValue String
   | BoolValue   Boolean
 
+--------------------------------------------------------------------------------
+-- Pretty-printing -------------------------------------------------------------
 --------------------------------------------------------------------------------
 
 prettyPrintArg :: Argument -> String
@@ -66,6 +70,8 @@ prettyPrintValue :: Value -> String
 prettyPrintValue (StringValue s) = (show s)
 prettyPrintValue (BoolValue b)   = (show b)
 
+--------------------------------------------------------------------------------
+-- Instances -------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
 instance showApplication :: Show Application where
@@ -114,6 +120,10 @@ instance semigroupApplication :: Semigroup Application where
 instance monoidApplication :: Monoid Application where
   mempty = Application Nil
 
+--------------------------------------------------------------------------------
+-- Utilities -------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
 isRepeatable :: Argument -> Boolean
 isRepeatable (Option _ _ _ r) = r
 isRepeatable (Positional _ r) = r
@@ -140,6 +150,8 @@ isBoolValue :: Value -> Boolean
 isBoolValue (BoolValue _) = true
 isBoolValue _             = false
 
+--------------------------------------------------------------------------------
+-- Errors (XXX: needs migration and improvement) -------------------------------
 --------------------------------------------------------------------------------
 
 import qualified Text.Parsing.Parser as P

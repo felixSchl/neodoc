@@ -61,6 +61,7 @@ parseToken = do
   P.choice $ P.try <$> [ sopt, lopt, lit ]
   <* P.eof
   where
+    -- | Parse a short option
     sopt :: P.Parser String Token
     sopt = do
       P.char '-'
@@ -73,6 +74,8 @@ parseToken = do
       , pure Nothing
       ]
       pure $ SOpt x xs arg
+
+    -- | Parse a long option
     lopt :: P.Parser String Token
     lopt = do
       P.string "--"
@@ -85,6 +88,8 @@ parseToken = do
       , pure Nothing
       ]
       pure $ LOpt xs arg
+
+    -- | Parse a literal
     lit :: P.Parser String Token
     lit = Lit <<< fromCharArray <$> do
       A.many P.anyChar
