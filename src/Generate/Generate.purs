@@ -1,5 +1,5 @@
 module Docopt.Generate (
-  mkBranchParser
+  mkApplicationParser
 , runCliParser
 , CliParser ()
 , lexArgv
@@ -14,7 +14,7 @@ import Control.Apply ((*>), (<*))
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
-                 , head, many, tail, fromList, filter, reverse)
+                 , head, many, tail, fromList, filter, reverse, concat)
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Data.Foldable (foldl, intercalate, for_)
@@ -256,12 +256,15 @@ eof :: CliParser Unit
 eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
   return $ case s of
     Nil -> { consumed: false, input: s, result: Right unit, position: pos }
-    _   -> P.parseFailed s pos "Expected EOF"
+    _   -> P.parseFailed s pos $
+            "Trailing options: "
+            ++ (intercalate ", " $ prettyPrintToken <$> s)
 
 -- | Generate a parser for a single program application (Usage).
 mkApplicationParser :: Application -> CliParser (List ValueMapping)
-mkApplicationParser (Application xs)
-  = P.choice $ P.try <<< mkBranchParser <$> xs
+mkApplicationParser (Application xs) = do
+  P.choice $ P.try <<< mkBranchParser <$> xs
+  <* eof
 
 -- | Generate a parser for a single usage branch
 mkBranchParser :: Branch -> CliParser (List ValueMapping)
@@ -310,7 +313,6 @@ mkBranchParser (Branch xs) = do
           return $ xs ++ xss
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
         draw ps' n | (length ps' > 0) && (n < 0) = do
-          -- TODO: Also consider options that have defaults as optional
           let rest = filter
                       (\p -> (not $ isRepeatable p)
                           && (not $ hasDefault p))
@@ -373,11 +375,13 @@ mkBranchParser (Branch xs) = do
         mkSoptParser Nothing _  = P.fail "not no flag"
 
     -- Generate a parser for a argument `Group`
-    mkParser (Group o bs r) =
-      -- XXX: Recursively generate a parser.
-      --      NOTE: THIS COMPUTATION MAY FAIL:
-      --            `mkParser` must be in the Either monad
-      -- XXX: Consider `r` here - we must either return a list, always, or
-      --      a data type that ensures that at least one value is present:
-      --      `X Xs`, where both `X` and `Xs` are data constructors.
-      pure empty
+    mkParser (Group optional bs r) = do
+      P.choice [
+        P.try $ concat <$> if r
+          then some go
+          else singleton <$> go
+      , if optional
+          then return Nil
+          else P.fail "Invalid group"
+      ]
+      where go = P.choice $ P.try <<< mkBranchParser <$> bs

@@ -9,7 +9,7 @@ import Control.Monad.Aff (liftEff')
 import Control.Monad.State (State(), evalState)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), either)
-import Data.List (List(..), toList, length, fromList)
+import Data.List (List(..), toList, length, fromList, singleton)
 import qualified Data.Array as A
 import Data.Foldable (for_, intercalate)
 import Control.Monad.Eff.Exception (error, throwException, catchException
@@ -23,7 +23,7 @@ import qualified Docopt.Parser.Options as Options
 import qualified Docopt.Textwrap as Textwrap
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Scanner as Scanner
-import Docopt.Generate (lexArgv, mkBranchParser, runCliParser)
+import Docopt.Generate (lexArgv, mkApplicationParser, runCliParser)
 import Docopt.Parser.Base (debug)
 
 import Test.Assert (assert)
@@ -117,6 +117,7 @@ generatorSpec = describe "The generator" do
         , opt_f_foo_FOZ__r
         , cmd_baz
         ]
+
         [ pass
           [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
@@ -168,6 +169,18 @@ generatorSpec = describe "The generator" do
             -- TODO: Create a more sophisticated way to test this
             "Expected command \"baz\""
         ]
+    , test
+        [ gro [[ cmd_foo ]] false ]
+        [ fail
+            [ "goo" ]
+            "Trailing options: \"goo\""
+        ]
+    , test
+        [ grr [[ cmd_foo ]] false ]
+        [ fail
+            [ "goo" ]
+            "Trailing options: \"goo\""
+        ]
   ]
 
   for_ testCases \(Test branch kases) -> do
@@ -195,7 +208,9 @@ generatorSpec = describe "The generator" do
       validate args argv expected = do
         let result = do
               toks <- lexArgv (toList argv)
-              runCliParser toks $ mkBranchParser $ br args
+              runCliParser
+                (toks)
+                (mkApplicationParser $ Application $ singleton $ br args)
         case result of
           Left (e@(P.ParseError { message: msg })) ->
             either
