@@ -20,7 +20,6 @@ import Docopt
 import Docopt.Parser.Usage (Usage(..))
 import qualified Docopt.Parser.Usage as Usage
 import qualified Docopt.Parser.Options as Options
-import qualified Docopt.Textwrap as Textwrap
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Scanner as Scanner
 import Docopt.Generate (lexArgv, mkApplicationParser, runCliParser)

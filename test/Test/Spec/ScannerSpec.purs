@@ -12,7 +12,7 @@ import Data.Maybe (Maybe(..))
 
 import Docopt
 import qualified Docopt.Parser.Scanner as Scanner
-import qualified Docopt.Textwrap as Textwrap
+import Text.Wrap (dedent)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
@@ -24,7 +24,7 @@ scannerSpec =
   describe "scanner" do
     it "should scan sections" do
       let docopt = fromRight $ Scanner.scan $
-          Textwrap.dedent
+          dedent
             """
             Usage: foo
             Options: bar
@@ -38,7 +38,7 @@ scannerSpec =
 
     it "should scan sections with new line after colon" do
       let docopt = fromRight $ Scanner.scan $
-          Textwrap.dedent
+          dedent
             """
             Usage:
               foo
@@ -55,7 +55,7 @@ scannerSpec =
 
     it "should fail w/o a usage section" do
       let result = Scanner.scan $
-          Textwrap.dedent
+          dedent
             """
             Options: bar
             """
@@ -64,7 +64,7 @@ scannerSpec =
 
     it "should fail multiple usage sections" do
       let result = Scanner.scan $
-          Textwrap.dedent
+          dedent
             """
             Usage: bar
             Options: foo
@@ -75,7 +75,7 @@ scannerSpec =
 
     it "should fail if usage section is not the first section" do
       let result = Scanner.scan $
-          Textwrap.dedent
+          dedent
             """
             Options: foo
             Usage: qux
@@ -85,7 +85,7 @@ scannerSpec =
 
     it "should fail w/o any sections" do
       let result = Scanner.scan $
-          Textwrap.dedent
+          dedent
             """
             """
       vliftEff do

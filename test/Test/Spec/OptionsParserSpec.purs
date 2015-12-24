@@ -7,10 +7,10 @@ import Debug.Trace
 import Docopt
 import qualified Docopt.Parser.Usage as Usage
 import qualified Docopt.Parser.Options as Options
-import qualified Docopt.Textwrap as Textwrap
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Scanner as Scanner
 import Docopt.Parser.Base (debug)
+import Text.Wrap (dedent)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
@@ -23,7 +23,7 @@ optionsParserSpec =
     it "should have some tests..." do
       vliftEff do
         options <- runEitherEff do
-          toks <- Lexer.lex $ Textwrap.dedent
+          toks <- Lexer.lex $ dedent
             """
             -f, --foo
               this is som much text about -foo, and -f, and --foo

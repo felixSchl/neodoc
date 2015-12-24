@@ -17,7 +17,7 @@ import qualified Docopt.Parser.Usage as U
 import qualified Docopt.Parser.Options as O
 import Docopt.Parser.Scanner (scan)
 import Docopt.Parser.Lexer (lex)
-import Docopt.Textwrap (dedent)
+import Text.Wrap (dedent)
 
 solverSpec =
   describe "solver" do

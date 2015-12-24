@@ -17,10 +17,10 @@ import Data.Array ((..))
 import Docopt
 import qualified Docopt.Parser.Usage as Usage
 import qualified Docopt.Parser.Options as Options
-import qualified Docopt.Textwrap as Textwrap
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Scanner as Scanner
 import Docopt.Parser.Base (debug)
+import Text.Wrap (dedent)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
@@ -141,7 +141,7 @@ usageParserSpec =
         -- Scan, lex and parse the usage section
         usage <- runEitherEff do
           docopt <- Scanner.scan $
-            Textwrap.dedent
+            dedent
               """
               Usage: foo foo | bar aux
                     foo (bar qux)

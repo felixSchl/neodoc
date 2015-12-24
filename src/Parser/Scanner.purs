@@ -19,7 +19,7 @@ import Data.Either
 import Docopt.Parser.Base
 import qualified Docopt.Parser.Lexer as Lexer
 import qualified Docopt.Parser.Usage as Usage
-import Docopt.Textwrap (dedent)
+import Text.Wrap (dedent)
 
 type Docopt = { usage :: Section, options :: List Section }
 type Section = String

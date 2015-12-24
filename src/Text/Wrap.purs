@@ -1,4 +1,4 @@
-module Docopt.Textwrap where
+module Text.Wrap where
 
 import Prelude
 import qualified Data.Array as A
