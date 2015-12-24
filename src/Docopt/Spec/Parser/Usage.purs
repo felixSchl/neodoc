@@ -1,4 +1,4 @@
-module Docopt.Parser.Usage where
+module Docopt.Spec.Parser.Usage where
 
 import Prelude
 import Debug.Trace
@@ -21,10 +21,10 @@ import Data.Maybe hiding (maybe)
 import qualified Data.Array as A
 import qualified Data.String as Str
 
-import Docopt.Parser.Base
-import Docopt.Parser.Common
-import Docopt.Parser.Lexer
-import Docopt.Parser.State
+import Docopt.Spec.Parser.Base
+import Docopt.Spec.Parser.Common
+import Docopt.Spec.Parser.Lexer
+import Docopt.Spec.Parser.State
 
 type OptionAlias    = String
 type OptionArgument = String

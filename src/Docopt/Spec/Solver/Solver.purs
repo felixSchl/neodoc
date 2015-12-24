@@ -1,4 +1,4 @@
-module Docopt.Solver where
+module Docopt.Spec.Solver where
 
 import Prelude
 import Debug.Trace
@@ -11,8 +11,8 @@ import Control.Plus (empty)
 import Data.Monoid (mempty)
 
 import Docopt (Argument(..), Application(..), Branch(..))
-import qualified Docopt.Parser.Options as O
-import qualified Docopt.Parser.Usage   as U
+import qualified Docopt.Spec.Parser.Options as O
+import qualified Docopt.Spec.Parser.Usage   as U
 
 data SolveError = SolveError
 instance showSolveError :: Show SolveError where

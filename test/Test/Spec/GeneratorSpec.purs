@@ -17,13 +17,13 @@ import Control.Monad.Eff.Exception (error, throwException, catchException
 import qualified Text.Parsing.Parser as P
 
 import Docopt
-import Docopt.Parser.Usage (Usage(..))
-import qualified Docopt.Parser.Usage as Usage
-import qualified Docopt.Parser.Options as Options
-import qualified Docopt.Parser.Lexer as Lexer
-import qualified Docopt.Parser.Scanner as Scanner
-import Docopt.Generate (lexArgv, mkApplicationParser, runCliParser)
-import Docopt.Parser.Base (debug)
+import Docopt.Spec.Parser.Usage (Usage(..))
+import qualified Docopt.Spec.Parser.Usage as Usage
+import qualified Docopt.Spec.Parser.Options as Options
+import qualified Docopt.Spec.Parser.Lexer as Lexer
+import qualified Docopt.Spec.Parser.Scanner as Scanner
+import Docopt.Gen (lexArgv, mkApplicationParser, runCliParser)
+import Docopt.Spec.Parser.Base (debug)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)

@@ -1,4 +1,4 @@
-module Docopt.Parser.State where
+module Docopt.Spec.Parser.State where
 
 import Prelude
 

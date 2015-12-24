@@ -1,4 +1,4 @@
-module Docopt.Parser.Lexer where
+module Docopt.Spec.Parser.Lexer where
 
 import Debug.Trace
 import Prelude
@@ -20,8 +20,8 @@ import Data.String (fromCharArray, fromChar, trim)
 import Data.List (List(..), (:), fromList, many)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
-import Docopt.Parser.Base
-import Docopt.Parser.State
+import Docopt.Spec.Parser.Base
+import Docopt.Spec.Parser.State
 import Data.Tuple
 import Data.Int
 import qualified Data.Int as I

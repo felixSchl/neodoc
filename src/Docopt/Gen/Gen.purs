@@ -1,4 +1,4 @@
-module Docopt.Generate (
+module Docopt.Gen (
   mkApplicationParser
 , runCliParser
 , CliParser ()
@@ -33,7 +33,7 @@ import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 
 import Docopt
-import Docopt.Parser.Base (alphaNum, space, getInput, debug)
+import Docopt.Spec.Parser.Base (alphaNum, space, getInput, debug)
 
 --------------------------------------------------------------------------------
 -- Input Lexer -----------------------------------------------------------------

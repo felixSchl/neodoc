@@ -1,4 +1,4 @@
-module Docopt.Parser where
+module Docopt.Spec.Parser where
 
-import qualified Docopt.Parser.Options as Options
-import qualified Docopt.Parser.Usage   as Usage
+import qualified Docopt.Spec.Parser.Options as Options
+import qualified Docopt.Spec.Parser.Usage   as Usage

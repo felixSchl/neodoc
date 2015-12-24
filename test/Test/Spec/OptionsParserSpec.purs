@@ -5,11 +5,11 @@ import Control.Monad.Aff (liftEff')
 import Debug.Trace
 
 import Docopt
-import qualified Docopt.Parser.Usage as Usage
-import qualified Docopt.Parser.Options as Options
-import qualified Docopt.Parser.Lexer as Lexer
-import qualified Docopt.Parser.Scanner as Scanner
-import Docopt.Parser.Base (debug)
+import qualified Docopt.Spec.Parser.Usage as Usage
+import qualified Docopt.Spec.Parser.Options as Options
+import qualified Docopt.Spec.Parser.Lexer as Lexer
+import qualified Docopt.Spec.Parser.Scanner as Scanner
+import Docopt.Spec.Parser.Base (debug)
 import Text.Wrap (dedent)
 
 import Test.Assert (assert)

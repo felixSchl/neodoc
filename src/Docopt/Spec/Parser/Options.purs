@@ -1,4 +1,4 @@
-module Docopt.Parser.Options where
+module Docopt.Spec.Parser.Options where
 
 import Prelude
 import Control.Lazy (defer)
@@ -18,9 +18,9 @@ import Data.Generic
 import Data.String (toLower, fromChar)
 import qualified Data.Array as A
 
-import Docopt.Parser.Base
-import Docopt.Parser.Common
-import qualified Docopt.Parser.Lexer as L
+import Docopt.Spec.Parser.Base
+import Docopt.Spec.Parser.Common
+import qualified Docopt.Spec.Parser.Lexer as L
 
 type Argument    = String
 type Default     = String
