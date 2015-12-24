@@ -56,7 +56,7 @@ prettyPrintArg (Group o bs r) = open ++ inner ++ close ++ repetition
   where
     open       = if o then "[" else "("
     close      = if o then "]" else ")"
-    inner      = intercalate " | " (show <$> bs)
+    inner      = intercalate " | " (prettyPrintBranch <$> bs)
     repetition = if r then "..." else ""
 
 prettyPrintBranch :: Branch -> String
