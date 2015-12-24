@@ -1,9 +1,14 @@
-module Docopt.Gen (
+-- | Input Parser Generator for Docopt
+-- |
+-- | > Given a un-ambigious specification as input, generate a parser that can
+-- | > be applied to user input.
+-- |
+-- | ===
+
+module Docopt.Gen.Parser (
   mkApplicationParser
 , runCliParser
 , CliParser ()
-, lexArgv
-, Token (..)
 ) where
 
 import Prelude
@@ -33,74 +38,8 @@ import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 
 import Docopt
+import Docopt.Gen
 import Docopt.Spec.Parser.Base (alphaNum, space, getInput, debug)
-
---------------------------------------------------------------------------------
--- Input Lexer -----------------------------------------------------------------
---------------------------------------------------------------------------------
-
-data Token
-  = LOpt String (Maybe String)
-  | SOpt Char (Array Char) (Maybe String)
-  | Lit  String
-
-prettyPrintToken :: Token -> String
-prettyPrintToken (Lit s) = show s
-prettyPrintToken (LOpt n a)
-  = "--" ++ n ++ " " ++ (show a)
-prettyPrintToken (SOpt n s a)
-  = "-"  ++ (fromCharArray (A.cons n s)) ++ " " ++ (show a)
-
-instance showToken :: Show Token where
-  show (LOpt s a)    = "LOpt " ++ show s ++ " " ++ show a
-  show (SOpt c cs a) = "SOpt " ++ show c ++ " " ++ show cs ++ " " ++ show a
-  show (Lit  s)      = "Lit "  ++ show s
-
-parseToken :: P.Parser String Token
-parseToken = do
-  P.choice $ P.try <$> [ sopt, lopt, lit ]
-  <* P.eof
-  where
-    -- | Parse a short option
-    sopt :: P.Parser String Token
-    sopt = do
-      P.char '-'
-      x  <- alphaNum
-      xs <- A.many alphaNum
-      arg <- P.choice $ P.try <$> [
-        Just <$> do
-          many space *> P.char '=' <* many space
-          fromCharArray <$> do A.many P.anyChar
-      , pure Nothing
-      ]
-      pure $ SOpt x xs arg
-
-    -- | Parse a long option
-    lopt :: P.Parser String Token
-    lopt = do
-      P.string "--"
-      xs <- fromCharArray <$> do
-        A.many alphaNum
-      arg <- P.choice $ P.try <$> [
-        Just <$> do
-          many space *> P.char '=' <* many space
-          fromCharArray <$> do A.many P.anyChar
-      , pure Nothing
-      ]
-      pure $ LOpt xs arg
-
-    -- | Parse a literal
-    lit :: P.Parser String Token
-    lit = Lit <<< fromCharArray <$> do
-      A.many P.anyChar
-
-lexArgv :: (List String) -> Either P.ParseError (List Token)
-lexArgv = foldM step Nil
-  where
-    step :: List Token -> String -> Either P.ParseError (List Token)
-    step a b = do
-      x <- flip P.runParser parseToken b
-      return (a ++ (Cons x Nil))
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------

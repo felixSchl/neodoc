@@ -22,7 +22,8 @@ import qualified Docopt.Spec.Parser.Usage as Usage
 import qualified Docopt.Spec.Parser.Options as Options
 import qualified Docopt.Spec.Parser.Lexer as Lexer
 import qualified Docopt.Spec.Parser.Scanner as Scanner
-import Docopt.Gen (lexArgv, mkApplicationParser, runCliParser)
+import Docopt.Gen.Parser (mkApplicationParser)
+import Docopt.Gen.Lexer (lex)
 import Docopt.Spec.Parser.Base (debug)
 
 import Test.Assert (assert)
@@ -200,8 +201,8 @@ generatorSpec = describe "The generator" do
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate args argv expected = do
         let result = do
-              toks <- lexArgv (toList argv)
-              runCliParser
+              toks <- lex (toList argv)
+              P.runParser
                 (toks)
                 (mkApplicationParser $ Application $ singleton $ br args)
         case result of
