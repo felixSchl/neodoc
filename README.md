@@ -27,7 +27,7 @@ from the specification and in part applying it to the user input. Much of the
 work has been placed into testing the components, which in turn has helped to
 achieve faster turn-arounds and more lasting / solid results.
 
-The most urgent areas that need to be worked on are:
+The areas that need to be worked on are, in order of importance:
 
 * Specification solving: A pure function, roughly of shape:
   `Usage -> [ Option ] -> Either Error Specification`. This function needs
@@ -39,6 +39,8 @@ The most urgent areas that need to be worked on are:
 * Low priority: Options should be able to specify default values straight in the
   Usage section, i.e.: `Usage: foo --bar=100`. This *will* have an impact on the
   solver implementation, however.
+* Low priority: Rewrite recursive functions to be in tail position, using
+  `purescript-tailrec` and consider trampolining using `purescript-free`.
 
 ## Implementation ##
 
@@ -53,8 +55,23 @@ The project can roughly be broken up into 4 distinct areas of work:
 1. **Solve the parsed Specification into it's canonical, unambigious form**
 1. Generate a parser from the Specification
 1. Lex and parse the user input
+    1. Lex and parse the user input
+    1. **Transform into a usable form**
 
 <sub>Highlighted items are yet-to-be-done.</sub>
+
+## Contributing ##
+
+**Contributions are highly encouraged and welcome** &mdash; I really want to see
+this project finished so I can use it :smile:
+
+```sh
+$ bower install
+$ pulp test
+```
+
+During development, `pulp --watch test` (or `pulp -w test`) is extremely useful
+to get immediate feedback.
 
 ## Ideas for a future past the initial relase ##
 
