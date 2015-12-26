@@ -8,6 +8,7 @@
 module Docopt.Gen.Lexer (lex) where
 
 import Prelude
+import Debug.Trace
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
@@ -26,8 +27,11 @@ import Docopt.Spec.Parser.Base
 -- | to each item and derive a token.
 parseToken :: P.Parser String Token
 parseToken = do
-  P.choice $ P.try <$> [ sopt, lopt, lit ]
-  <* P.eof
+  -- each token must be bounded by a EOF.
+  P.choice $ (P.try <<< (<* P.eof)) <$> [ sopt
+                                        , lopt
+                                        , lit
+                                        ]
   where
     -- | Parse a short option
     sopt :: P.Parser String Token
@@ -41,6 +45,7 @@ parseToken = do
           fromCharArray <$> do A.many P.anyChar
       , pure Nothing
       ]
+      many space
       pure $ SOpt x xs arg
 
     -- | Parse a long option
@@ -55,6 +60,7 @@ parseToken = do
           fromCharArray <$> do A.many P.anyChar
       , pure Nothing
       ]
+      many space
       pure $ LOpt xs arg
 
     -- | Parse a literal

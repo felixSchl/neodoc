@@ -80,10 +80,10 @@ command n = token go P.<?> "command " ++ show n
     go (Lit s) | s == n = Just (BoolValue true)
     go _                = Nothing
 
-positional :: CliParser Value
-positional = token go P.<?> "positional"
+positional :: String -> CliParser Value
+positional n = token go P.<?> "positional argument " ++ show n
   where
-    go (Lit _) = Just (BoolValue true)
+    go (Lit v) = Just (StringValue v)
     go _       = Nothing
 
 type HasConsumedArg = Boolean
@@ -196,7 +196,7 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
   return $ case s of
     Nil -> { consumed: false, input: s, result: Right unit, position: pos }
     _   -> P.parseFailed s pos $
-            "Trailing options: "
+              "Trailing input: "
             ++ (intercalate ", " $ prettyPrintToken <$> s)
 
 -- | Generate a parser for a single program application (Usage).
@@ -295,7 +295,7 @@ mkBranchParser (Branch xs) = do
     -- Generate a parser for a `Positional` argument
     mkParser x@(Positional n r) = do
       if r then (some go) else (singleton <$> go)
-      where go = Tuple x <$> positional
+      where go = Tuple x <$> (positional n)
 
     -- Generate a parser for a `Option` argument
     mkParser x@(Option f n a r) = do

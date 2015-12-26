@@ -1,7 +1,7 @@
 module Docopt.Gen where
 
 import Prelude
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.String (fromCharArray)
 import qualified Data.Array as A
 
@@ -13,10 +13,10 @@ data Token
 
 prettyPrintToken :: Token -> String
 prettyPrintToken (Lit s) = show s
-prettyPrintToken (LOpt n a)
-  = "--" ++ n ++ " " ++ (show a)
-prettyPrintToken (SOpt n s a)
-  = "-"  ++ (fromCharArray (A.cons n s)) ++ " " ++ (show a)
+prettyPrintToken (LOpt n a) = "--" ++ n ++ arg
+  where arg = maybe "" ("=" ++) a
+prettyPrintToken (SOpt n s a) = "-"  ++ (fromCharArray (A.cons n s)) ++ arg
+  where arg = maybe "" ("=" ++) a
 
 instance showToken :: Show Token where
   show (LOpt s a)    = "LOpt " ++ show s ++ " " ++ show a

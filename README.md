@@ -73,6 +73,8 @@ $ pulp test
 During development, `pulp --watch test` (or `pulp -w test`) is extremely useful
 to get immediate feedback.
 
+---
+
 ## Ideas for a future past the initial relase ##
 
 * Write syntax plugin for vim

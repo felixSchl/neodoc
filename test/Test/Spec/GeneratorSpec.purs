@@ -37,8 +37,8 @@ co :: String -> Argument
 co = Command
 
 -- short hand to create a Positional argument
-po :: String -> Boolean -> Argument
-po = Positional
+pos :: String -> Boolean -> Argument
+pos = Positional
 
 -- short hand to create an Option argument
 opt :: Flag
@@ -105,10 +105,26 @@ generatorSpec = describe "The generator" do
       opt_b_baz___r    = opt 'b' "baz"   (oa "BAZ" $ StringValue "ax") false
       opt_o_out        = opt 'o' "out"   Nothing false
       opt_i_input      = opt 'i' "input" Nothing false
+      pos_arg_r        = pos "arg" true
       cmd_baz          = co "baz"
 
   let testCases = [
-      test
+
+      test [ pos_arg_r ]
+        [ pass
+            [ "a", "b", "c" ]
+            [ Tuple pos_arg_r (StringValue "a")
+            , Tuple pos_arg_r (StringValue "b")
+            , Tuple pos_arg_r (StringValue "c")
+            ]
+        , fail [ "--foo", "baz" ]
+            "Expected positional argument \"arg\""
+        , fail
+            [ "a", "--foo", "-f=10" ]
+            "Trailing input: --foo, -f=10"
+        ]
+
+    , test
         [ cmd_foo
         , opt_o_out
         , opt_q_qux___r
@@ -119,7 +135,7 @@ generatorSpec = describe "The generator" do
         ]
 
         [ pass
-          [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
+            [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
             , Tuple opt_q_qux___r    (BoolValue true)
@@ -171,7 +187,7 @@ generatorSpec = describe "The generator" do
         ]
     , test
         [ gro [[ cmd_foo ]] false ]
-        [ fail [ "goo" ] "Trailing options: \"goo\"" ]
+        [ fail [ "goo" ] "Trailing input: \"goo\"" ]
     , test
         [ grr [[ cmd_foo ]] false ]
         [ fail [ "goo" ] "Expected command \"foo\"" ]
