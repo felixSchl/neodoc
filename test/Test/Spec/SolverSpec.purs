@@ -22,19 +22,4 @@ import Text.Wrap (dedent)
 solverSpec =
   describe "solver" do
     it "should have tests..." do
-      vliftEff do
-        { usage:   usage
-        , options: options } <- scan'
-          """
-          Usage:
-            foo --foo | --bar<ARG>
-          Options:
-            -b, --bar=ARG  aasdfasdf
-          """
-        usages <- runEitherEff (U.parse =<< lex usage)
-        solved <- runEitherEff $ solve usages empty
-        traceShowA solved
         pure unit
-
- where
-  scan' = runEitherEff <<< scan <<< dedent

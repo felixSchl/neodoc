@@ -51,7 +51,7 @@ usageParserSpec =
     -- Test positionals in various formats.
     -- Each entry is run for both singular and repeated version.
     describe "positionals" do
-      runSingleUsageNodeTests
+      runSingleArgumentTests
         [ pass "BAR"       $ po "BAR"
         , pass "<foo-qux>" $ po "foo-qux"
         , pass "<QUX>"     $ po "QUX"
@@ -62,7 +62,7 @@ usageParserSpec =
     -- Test long options in various formats.
     -- Each entry is run for both singular and repeated version.
     describe "long options" do
-      runSingleUsageNodeTests
+      runSingleArgumentTests
         [ pass "--bar"         $ lo "bar" Nothing
         , pass "--bar = foo"   $ lo "bar" (Just "foo")
         , pass "--bar=<foo>"   $ lo "bar" (Just "foo")
@@ -82,7 +82,7 @@ usageParserSpec =
     -- Test stacked options in various formats.
     -- Each entry is run for both singular and repeated version.
     describe "stacked options" do
-      runSingleUsageNodeTests
+      runSingleArgumentTests
         [ pass "-b"          $ so 'b' [] Nothing
         , pass "-bFOO"       $ so 'b' ['F', 'O', 'O'] Nothing
         , pass "-bFoo"       $ so 'b' ['F', 'o', 'o'] Nothing
@@ -105,7 +105,7 @@ usageParserSpec =
     -- Test required groups in various formats.
     -- Each entry is run for both singular and repeated version.
     describe "required groups" do
-      runSingleUsageNodeTests
+      runSingleArgumentTests
         [ fail "()"
         , pass "(foo)"          $ gr [[ co "foo" ]]
         , pass "(foo|bar)"      $ gr [[ co "foo" ], [co "bar"]]
@@ -120,7 +120,7 @@ usageParserSpec =
     -- Test optional groups in various formats.
     -- Each entry is run for both singular and repeated version.
     describe "optional groups" do
-      runSingleUsageNodeTests
+      runSingleArgumentTests
         [ fail "[]"
         , pass "[foo]"          $ go [[ co "foo" ]]
         , pass "[foo|bar]"      $ go [[ co "foo" ], [co "bar"]]
@@ -173,28 +173,28 @@ usageParserSpec =
   where
 
     -- short hand to create a command node
-    co :: String -> Usage.UsageNode
+    co :: String -> Usage.Argument
     co = Usage.Command
 
     -- short hand to create a short option node
-    so :: Char -> Array Char -> Maybe String -> Boolean -> Usage.UsageNode
+    so :: Char -> Array Char -> Maybe String -> Boolean -> Usage.Argument
     so = Usage.OptionStack
 
     -- short hand to create a long option node
-    lo :: String -> Maybe String -> Boolean -> Usage.UsageNode
+    lo :: String -> Maybe String -> Boolean -> Usage.Argument
     lo = Usage.Option
 
     -- short hand to create a positional node
-    po :: String -> Boolean -> Usage.UsageNode
+    po :: String -> Boolean -> Usage.Argument
     po = Usage.Positional
 
     -- short hand to create a required group node
-    gr :: Array (Array Usage.UsageNode) -> Boolean -> Usage.UsageNode
+    gr :: Array (Array Usage.Argument) -> Boolean -> Usage.Argument
     gr xs r = Usage.Group false ls r
       where ls = toList <$> (toList xs)
 
     -- short hand to create a optional group node
-    go :: Array (Array Usage.UsageNode) -> Boolean -> Usage.UsageNode
+    go :: Array (Array Usage.Argument) -> Boolean -> Usage.Argument
     go xs r = Usage.Group true ls r
       where ls = toList <$> (toList xs)
 
@@ -202,7 +202,7 @@ usageParserSpec =
     pass i o = kase i (P o)
     fail i = kase i F
 
-    runSingleUsageNodeTests xs =
+    runSingleArgumentTests xs =
       for_ xs \{ i: i, o: o } -> do
         for_ [ false, true ] \isRepeated -> do -- Append "..." ?
           let ys = if isRepeated then (1 .. 2) else (1 .. 1)

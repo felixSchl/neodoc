@@ -23,67 +23,15 @@ data SolveError = SolveError
 instance showSolveError :: Show SolveError where
   show _ = "SolveError"
 
-data Step
-  = Pending (U.UsageNode -> List Argument)
-  | Idle    (List Argument)
-
--- | Solve each usage node by seeing if there are more information to be
--- | gathered from any of the options sections.
--- | This applies only to options, not for positional arguments or commands.
--- | For options, see if the option appears in any option section, and if so,
--- | merge the information into a valid Option construction of the
--- | `Docopt Argument` type.
--- |
--- | Problems to solved conceptually:
--- |    * Should the solver detect discrepancies, i.e. multiple option sections
--- |      talking about the same option in a different way. If compatible,
--- |      should the solver merge them?
--- |    * Can we have command-specific option sections? Such that each usage
--- |      branch may have a different interpretation, i.e. defaults and
--- |      description for a single option?
--- |    * Options should be able to specify their default option in the usage
--- |      section:
--- |
--- |      ```docopt
--- |      Usage: program foo=100
--- |      ```
--- |
--- |      Once implemented, how will the solver treat the case where the
--- |      description specifies another option?
--- |
--- | Other ideas that may need to solved before beginning implementation:
--- |    * Is it time to leave the docopt world and add more things, make the
--- |      language a bit more formal to allow for things like more meta
--- |      information about options. Consider, e.g.:
--- |
--- |      ```docopt
--- |      Usage:
--- |        program <command> --foo=BAR
--- |      Options:
--- |        -f, --foo=BAR lorem ipsum lorem ipsum lorem ipsum lorem
--- |                      ipsum.
--- |                      [Default: 100]
--- |                      [Implies: --qux=200, --verbos]
--- |        <command>     lorem ipsum lorem ipsum
--- |                      [Choices: qux|foo|bar]
--- |      ```
--- |
+-- | Given a Argument and an Option, unify them into a single Docopt
+--   specification Argument.
+unify :: U.Argument -> O.Desc -> Argument
+unify (U.Option _ _ _) (O.Desc _ _ _)
+  -- XXX: Actually write this:
+  = Option (Just 'f') Nothing Nothing true
 
 solve :: (List U.Usage)
-      -> (List O.Option)
+      -> (List O.Desc)
       -> Either SolveError (List Application)
-solve us os = traverse solveUsecase us
-
- where
-  solveUsecase :: U.Usage -> Either SolveError Application
-  solveUsecase (U.Usage _ bs) = Application <$> do
-    traverse solveBranch bs
-
-  solveBranch :: (List U.UsageNode) -> Either SolveError Branch
-  solveBranch ns = Branch <$> do
-    let x = foldl step (Idle empty) ns
-    return empty
-
-    where
-      step :: Step -> U.UsageNode -> Step
-      step acc u = Idle empty
+solve us os = do
+  Left SolveError

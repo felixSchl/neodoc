@@ -27,15 +27,16 @@ type Default     = String
 data ShortOption = ShortOption Char  (Maybe Argument)
 data LongOption  = LongOption String (Maybe Argument)
 
--- XXX: Option should have a `Maybe Argument`, pulled
+-- XXX: Desc should have a `Maybe Argument`, pulled
 --      from it's short and long option.
 --      Need to decide what happens if both options
 --      specifiy a different argument!
-data Option = Option (Maybe ShortOption)
+-- XXX: This type should be called `Desc`
+data Desc = Desc (Maybe ShortOption)
                      (Maybe LongOption)
                      (Maybe Default)
 
-type PartialOption = (Maybe Argument) -> Option
+type PartialDesc = (Maybe Argument) -> Desc
 
 instance showShortOption :: Show ShortOption where
   show (ShortOption c a) = "-" ++ (fromChar c)
@@ -49,8 +50,8 @@ instance showlongOption :: Show LongOption where
                                         Just a -> "=" ++ a
                                         _      -> "")
 
-instance showOptionSpec  :: Show Option where
-  show (Option s l d) =
+instance showOptionSpec  :: Show Desc where
+  show (Desc s l d) =
     let hasLong    = isJust l
         hasShort   = isJust s
         hasDefault = isJust d
@@ -59,10 +60,10 @@ instance showOptionSpec  :: Show Option where
         default    = maybe "" (\x -> " [" ++ x ++ "]") d
      in show $ short ++ long ++ default
 
-parse :: (List L.PositionedToken) -> Either P.ParseError (List Option)
+parse :: (List L.PositionedToken) -> Either P.ParseError (List Desc)
 parse = flip L.runTokenParser optionsParser
 
-optionsParser :: L.TokenParser (List Option)
+optionsParser :: L.TokenParser (List Desc)
 optionsParser = do
 
   many option
@@ -75,7 +76,7 @@ optionsParser = do
     defaults :: L.TokenParser String
     defaults = L.default
 
-    option :: L.TokenParser Option
+    option :: L.TokenParser Desc
     option = sameIndent *> do
       f <- P.choice
         [ P.try shortAndLong
@@ -93,19 +94,19 @@ optionsParser = do
           ]
       pure $ f default
 
-    onlyShort :: L.TokenParser PartialOption
-    onlyShort = Option
+    onlyShort :: L.TokenParser PartialDesc
+    onlyShort = Desc
         <$> (Just <$> shortOption)
         <*> (pure Nothing)
 
-    onlyLong :: L.TokenParser PartialOption
-    onlyLong = Option
+    onlyLong :: L.TokenParser PartialDesc
+    onlyLong = Desc
         <$> (pure Nothing)
         <*> (Just <$> longOption)
 
-    shortAndLong :: L.TokenParser PartialOption
+    shortAndLong :: L.TokenParser PartialDesc
     shortAndLong = markLine do
-      Option
+      Desc
         <$> (Just <$> shortOption)
         <*> (Just <$> (sameLine *> P.choice
               [ P.try L.comma *> longOption

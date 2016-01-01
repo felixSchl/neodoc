@@ -30,7 +30,7 @@ type OptionAlias    = String
 type OptionArgument = String
 type IsOptional     = Boolean
 type IsRepeatable   = Boolean
-type Branch         = List UsageNode
+type Branch         = List Argument
 
 parse :: (List PositionedToken) -> Either P.ParseError (List Usage)
 parse = flip runTokenParser usageParser
@@ -38,7 +38,7 @@ parse = flip runTokenParser usageParser
 -- | Represent a single program usage.
 -- | A single usage is made up of a list of mutually exclusive groups,
 -- | separated by a vertical bar `|`. Each of those groups can contain
--- | one or more `UsageNode`.
+-- | one or more `Argument`.
 -- |
 -- | node node | node | node
 -- | ^^^^ ^^^^   ^^^^   ^^^^
@@ -47,7 +47,7 @@ parse = flip runTokenParser usageParser
 -- |    \ /       |      |
 -- | [   0    ,   1   ,  2 ]
 data Usage = Usage String (List Branch)
-data UsageNode
+data Argument
   = Command     String
   | Positional  String
                 IsRepeatable
@@ -65,14 +65,14 @@ data UsageNode
 instance showUsage :: Show Usage where
   show (Usage n xs) = "Usage " ++ show n ++ " " ++ show xs
 
-instance showUsageNode :: Show UsageNode where
+instance showArgument :: Show Argument where
   show (Command n)           = "Command " ++ n
   show (Positional n b)      = "Positional " ++ n ++ " " ++ show b
   show (Option n a b)        = "Option " ++ show n ++ " " ++ show a ++ " " ++ show b
   show (OptionStack n s a b) = "OptionStack " ++ show n ++ " " ++ show s ++ " " ++ show a ++ " " ++ show b
   show (Group n b o)         = "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
 
-instance eqUsageNode :: Eq UsageNode where
+instance eqArgument :: Eq Argument where
   eq (Command s)            (Command s')               = (s == s')
   eq (Positional s r)       (Positional s' r')         = (s == s') && (r == r')
   eq (Option s a r)         (Option s' a' r')          = (s == s') && (a == a') && (r == r')
@@ -117,7 +117,7 @@ usageParser = do
       eof <|> (P.lookAhead $ lessIndented)
       pure x
 
-    elem :: TokenParser UsageNode
+    elem :: TokenParser Argument
     elem = defer \_ -> do
       P.choice
         [ option
@@ -126,38 +126,38 @@ usageParser = do
         , group
         ] P.<?> "Option, Positional, Command or Group"
 
-    longOption :: TokenParser UsageNode
+    longOption :: TokenParser Argument
     longOption = do
       { name: name, arg: arg } <- lopt
       Option name arg
         <$> repetition
 
-    shortOption :: TokenParser UsageNode
+    shortOption :: TokenParser Argument
     shortOption = do
       { flag: flag, stack: stack, arg: arg } <- sopt
       OptionStack flag stack arg
         <$> repetition
 
-    option :: TokenParser UsageNode
+    option :: TokenParser Argument
     option = longOption <|> shortOption
 
-    positional :: TokenParser UsageNode
+    positional :: TokenParser Argument
     positional = Positional
       <$> (angleName <|> shoutName)
       <*> repetition
 
-    command :: TokenParser UsageNode
+    command :: TokenParser Argument
     command = do
       cmd <- Command <$> name
       P.notFollowedBy tripleDot -- Commands may not repeat!
       pure cmd
 
-    group :: TokenParser UsageNode
+    group :: TokenParser Argument
     group = defer \_ -> P.choice
       [ reqGroup
       , optGroup ]
 
-    optGroup :: TokenParser UsageNode
+    optGroup :: TokenParser Argument
     optGroup = defer \_ -> Group true
       <$> (P.between
             (indented *> lsquare)
@@ -165,7 +165,7 @@ usageParser = do
             ((some elem) `P.sepBy1` vbar))
       <*> repetition
 
-    reqGroup :: TokenParser UsageNode
+    reqGroup :: TokenParser Argument
     reqGroup = defer \_ -> Group false
       <$> (P.between
             (indented *> lparen)
