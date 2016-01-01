@@ -1,4 +1,4 @@
-module Test.Spec.OptionsParserSpec (optionsParserSpec) where
+module Test.Spec.DescParserSpec (descParserSpec) where
 
 import Prelude
 import Control.Monad.Aff (liftEff')
@@ -6,7 +6,7 @@ import Debug.Trace
 
 import Docopt
 import qualified Docopt.Spec.Parser.Usage as Usage
-import qualified Docopt.Spec.Parser.Options as Options
+import qualified Docopt.Spec.Parser.Desc as Desc
 import qualified Docopt.Spec.Parser.Lexer as Lexer
 import qualified Docopt.Spec.Parser.Scanner as Scanner
 import Docopt.Spec.Parser.Base (debug)
@@ -18,7 +18,7 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
 
-optionsParserSpec =
+descParserSpec =
   describe "options parser" do
     it "should have some tests..." do
       vliftEff do
@@ -35,7 +35,7 @@ optionsParserSpec =
             --foo<x> / [default: 400.0]
             """
           traceShowA toks
-          Options.parse toks
+          Desc.parse toks
         traceShowA options
 
         -- assertEqual 1 (length usage)

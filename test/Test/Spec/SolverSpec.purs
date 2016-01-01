@@ -14,7 +14,7 @@ import Test.Support (vliftEff, runEitherEff)
 
 import Docopt.Spec.Solver (solve)
 import qualified Docopt.Spec.Parser.Usage as U
-import qualified Docopt.Spec.Parser.Options as O
+import qualified Docopt.Spec.Parser.Desc as D
 import Docopt.Spec.Parser.Scanner (scan)
 import Docopt.Spec.Parser.Lexer (lex)
 import Text.Wrap (dedent)

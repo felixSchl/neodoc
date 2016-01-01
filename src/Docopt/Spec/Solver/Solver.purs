@@ -16,8 +16,8 @@ import Control.Plus (empty)
 import Data.Monoid (mempty)
 
 import Docopt (Argument(..), Application(..), Branch(..))
-import qualified Docopt.Spec.Parser.Options as O
-import qualified Docopt.Spec.Parser.Usage   as U
+import qualified Docopt.Spec.Parser.Desc  as D
+import qualified Docopt.Spec.Parser.Usage as U
 
 data SolveError = SolveError
 instance showSolveError :: Show SolveError where
@@ -25,13 +25,13 @@ instance showSolveError :: Show SolveError where
 
 -- | Given a Argument and an Option, unify them into a single Docopt
 --   specification Argument.
-unify :: U.Argument -> O.Desc -> Argument
-unify (U.Option _ _ _) (O.Desc _ _ _)
+unify :: U.Argument -> D.Desc -> Argument
+unify (U.Option _ _ _) (D.Desc _ _ _)
   -- XXX: Actually write this:
   = Option (Just 'f') Nothing Nothing true
 
 solve :: (List U.Usage)
-      -> (List O.Desc)
+      -> (List D.Desc)
       -> Either SolveError (List Application)
 solve us os = do
   Left SolveError

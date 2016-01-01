@@ -1,4 +1,4 @@
-module Docopt.Spec.Parser.Options where
+module Docopt.Spec.Parser.Desc where
 
 import Prelude
 import Control.Lazy (defer)
@@ -33,8 +33,8 @@ data LongOption  = LongOption String (Maybe Argument)
 --      specifiy a different argument!
 -- XXX: This type should be called `Desc`
 data Desc = Desc (Maybe ShortOption)
-                     (Maybe LongOption)
-                     (Maybe Default)
+                 (Maybe LongOption)
+                 (Maybe Default)
 
 type PartialDesc = (Maybe Argument) -> Desc
 

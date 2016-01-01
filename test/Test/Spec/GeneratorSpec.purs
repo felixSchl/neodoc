@@ -19,7 +19,6 @@ import qualified Text.Parsing.Parser as P
 import Docopt
 import Docopt.Spec.Parser.Usage (Usage(..))
 import qualified Docopt.Spec.Parser.Usage as Usage
-import qualified Docopt.Spec.Parser.Options as Options
 import qualified Docopt.Spec.Parser.Lexer as Lexer
 import qualified Docopt.Spec.Parser.Scanner as Scanner
 import Docopt.Gen.Parser (mkApplicationParser)
