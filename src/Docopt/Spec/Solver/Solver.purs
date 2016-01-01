@@ -26,7 +26,7 @@ instance showSolveError :: Show SolveError where
 -- | Given a Argument and an Option, unify them into a single Docopt
 --   specification Argument.
 unify :: U.Argument -> D.Desc -> Argument
-unify (U.Option _ _ _) (D.Desc _ _ _)
+unify (U.Option _ _ _) (D.Option _ _ _)
   -- XXX: Actually write this:
   = Option (Just 'f') Nothing Nothing true
 
