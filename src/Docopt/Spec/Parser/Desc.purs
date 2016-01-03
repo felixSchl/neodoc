@@ -28,41 +28,62 @@ import Docopt.Spec.Parser.Common
 import Docopt.Spec.Parser.State
 import qualified Docopt.Spec.Parser.Lexer as L
 
-data Desc = OptionDesc { flag    :: Maybe Char
-                       , long    :: Maybe String
-                       , arg     :: Maybe String
-                       , default :: Maybe String }
+data Desc = OptionDesc Option
           | CommandDesc
 
-newtype Option = Option { flag :: Maybe Char
-                        , long :: Maybe String
-                        , arg  :: Maybe String }
+data Name        = Flag Char | Long String | Full Char String
+newtype Argument = Argument { name :: String, default :: Maybe String }
+newtype Option   = Option   { name :: Name, arg :: Maybe Argument }
 
-derive instance genericDesc :: Generic Desc
+derive instance genericDesc     :: Generic Desc
+derive instance genericArgument :: Generic Argument
+derive instance genericName     :: Generic Name
+derive instance genericOption   :: Generic Option
 
 instance showDesc :: Show Desc
   where show = gShow
+
+instance showOption :: Show Option
+  where show = gShow
+
+instance showArgument :: Show Argument
+  where show = gShow
+
+instance showName :: Show Name
+  where show = gShow
+
+instance eqOption :: Eq Option
+  where eq = gEq
+
+instance eqArgument :: Eq Argument
+  where eq = gEq
+
+instance eqName :: Eq Name
+  where eq = gEq
 
 instance eqDesc :: Eq Desc
   where eq = gEq
 
 prettyPrintDesc :: Desc -> String
-prettyPrintDesc (OptionDesc opt) = "" ++ rest
-  where rest = (if (Str.length name > 0) then name else "<no-name>")
-                  ++ arg
-                  ++ default
-        short     = maybe "" (\c -> "-" ++ Str.fromChar c) opt.flag
-        long      = maybe "" ((maybe "--" (const ", --") opt.flag) ++) opt.long
-        name      = short ++ long
-        arg       = maybe "" ("=" ++) opt.arg
-        extra n x = maybe "" (\v -> "\n       [" ++ n ++  ": " ++ v ++  "]") x
-        default   = extra "default" opt.default
+prettyPrintDesc (OptionDesc opt) = "Option " ++ prettyPrintOption opt
+
+prettyPrintOption :: Option -> String
+prettyPrintOption (Option opt) = name opt.name
+                              ++ maybe "" arg opt.arg
+  where name (Flag c)   = "-" ++ fromChar c
+        name (Long n)   = "--" ++ n
+        name (Full c n) = "-" ++ fromChar c ++ ", --" ++ n
+        arg  (Argument { name: n, default: d }) =
+          "=" ++ n ++ maybe "" (\v -> " [default:" ++ v ++  "]") d
+
+argument :: String -> Maybe String -> Argument
+argument name default = Argument { name: name, default: default }
 
 parse :: (List L.PositionedToken) -> Either P.ParseError (List Desc)
 parse = flip L.runTokenParser descParser
 
 descParser :: L.TokenParser (List Desc)
-descParser = do
+descParser =
   markIndent do
     opt  <- option
     opts <- many $ sameIndent *> option
@@ -77,7 +98,7 @@ descParser = do
 
     option :: L.TokenParser Desc
     option = do
-      (Option opt) <- start
+      opt <- start
 
       -- Parse one token at a time towards the next option or the eof.
       -- If a `[default: ...]` token is met, list it.
@@ -88,12 +109,17 @@ descParser = do
           , L.anyToken *> pure Nothing
           ]
 
-      return $ OptionDesc { flag:    opt.flag
-                          , long:    opt.long
-                          , arg:     opt.arg
-                          , default: default }
+      OptionDesc <$> do
+        either P.fail return $ setDefault opt default
 
       where
+
+        setDefault :: Option -> Maybe String -> Either String Option
+        setDefault (Option o) d = return $ Option $
+          o { arg = do
+                (Argument arg) <- o.arg
+                return $ Argument $ arg { default = d }
+            }
 
         start :: L.TokenParser Option
         start = do
@@ -102,33 +128,43 @@ descParser = do
         short :: L.TokenParser Option
         short = do
           opt <- sopt
-          return $ Option { flag: pure opt.flag
-                          , long: Nothing
-                          , arg:  opt.arg }
+          return $ Option { name: Flag opt.flag
+                          , arg:  do a <- opt.arg
+                                     return $ argument a Nothing }
 
         long :: L.TokenParser Option
         long = do
           opt <- lopt
-          return $ Option { flag: Nothing
-                          , long: pure opt.name
-                          , arg:  opt.arg }
+          return $ Option { name: Long opt.name
+                          , arg:  do a <- opt.arg
+                                     return $ argument a Nothing }
 
         both :: L.TokenParser Option
         both = markLine do
-          sopt' <- sopt
-          sameLine
-          lopt' <- P.choice $ P.try <$> [ L.comma *> lopt , lopt ]
-          arg   <- resolve sopt'.arg lopt'.arg
-          return $ Option { flag: pure sopt'.flag
-                          , long: pure lopt'.name
-                          , arg:  arg }
+          x <- short
+          y <- do sameLine
+                  P.choice $ P.try <$> [ L.comma *> long
+                                       , long
+                                       ]
+          combine x y
 
-          where resolve (Just a) (Just b) | (a == b) = return $ Just a
-                resolve Nothing  (Just b)            = return $ Just b
-                resolve (Just a) Nothing             = return $ Just a
-                resolve Nothing Nothing              = return $ Nothing
-                resolve (Just a) (Just b) | (a /= b) = P.fail $
-                  "Arguments mismatch: " ++ show a ++ " and " ++ show b
+          where
+            -- Combine two options into one. This function *does not* cover all
+            -- cases right now. It deals only with a known subset and can there-
+            -- fore make assumptions
+            combine :: Option -> Option -> L.TokenParser Option
+            combine (Option x@{ name: Flag f }) (Option y@{ name: Long n }) = do
+              either P.fail return do
+                arg <- combineArg x.arg y.arg
+                return $ Option { name: Full f n, arg: arg }
+
+              where
+                combineArg (Just a) (Just b) | (a == b) = Right $ Just a
+                combineArg Nothing  (Just b)            = Right $ Just b
+                combineArg (Just a) Nothing             = Right $ Just a
+                combineArg Nothing Nothing              = Right $ Nothing
+                combineArg (Just a) (Just b) | (a /= b) = Left  $
+                        "Arguments mismatch: " ++ show a ++ " and " ++ show b
 
     sopt :: L.TokenParser { flag :: Char, arg :: Maybe String }
     sopt = do

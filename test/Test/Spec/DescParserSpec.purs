@@ -33,7 +33,7 @@ pass input output = TestCase { input: input, output: Right output }
 fail :: String -> String -> TestCase
 fail input msg = TestCase { input: input, output: Left msg }
 
-o = Desc.OptionDesc
+o = Desc.OptionDesc <<< Desc.Option
 
 descParserSpec =
   describe "description parser" do
@@ -42,63 +42,52 @@ descParserSpec =
             """
             -f enable the --foo flag
             """)
-            [ o { flag:    Just 'f'
-                , long:    Nothing
-                , arg:     Nothing
-                , default: Nothing }
-            ]
+            [ o { name: Desc.Flag 'f', arg: Nothing } ]
         , pass (dedent
             """
             --foo enable the --foo flag
             """)
-            [ o { flag:    Nothing
-                , long:    Just "foo"
-                , arg:     Nothing
-                , default: Nothing }
-            ]
+            [ o { name: Desc.Long "foo", arg: Nothing } ]
         , pass (dedent
             """
             -f, --foo
             """)
-            [ o { flag:    Just 'f'
-                , long:    Just "foo"
-                , arg:     Nothing
-                , default: Nothing }
-            ]
+            [ o { name: Desc.Full 'f' "foo", arg: Nothing } ]
         , pass (dedent
             """
-            -f=baz, --foo=baz
+            -f=BAZ, --foo=BAZ
             """)
-            [ o { flag:    Just 'f'
-                , long:    Just "foo"
-                , arg:     Just "baz"
-                , default: Nothing }
-            ]
+            [ o { name: Desc.Full 'f' "foo"
+                , arg:  Just $ Desc.argument "BAZ" Nothing } ]
         , pass (dedent
             """
-            -f=baz, --foo=baz [default: 100]
+            -f=BAZ, --foo=BAZ [default: 100]
             """)
-            [ o { flag:    Just 'f'
-                , long:    Just "foo"
-                , arg:     Just "baz"
-                , default: Just "100" }
-            ]
+            [ o { name: Desc.Full 'f' "foo"
+                , arg:  Just $ Desc.argument "BAZ" (Just "100") } ]
         , pass (dedent
             """
-            -f=baz, --foo=baz [default: 100]
-            -q=baz, --qux=baz [default: 100]
+            -f=BAZ, --foo=BAZ [default: 100]
+            -q=BAZ, --qux=BAZ [default: 200]
             """)
-            [ o { flag:    Just 'f'
-                , long:    Just "foo"
-                , arg:     Just "baz"
-                , default: Just "100" }
-            , o { flag:    Just 'q'
-                , long:    Just "qux"
-                , arg:     Just "baz"
-                , default: Just "100" }
-            ]
+            [ o { name: Desc.Full 'f' "foo"
+                , arg:  Just $ Desc.argument "BAZ" (Just "100") }
+            , o { name: Desc.Full 'q' "qux"
+                , arg:  Just $ Desc.argument "BAZ" (Just "200") } ]
+        , pass (dedent
+            """
+            -f=BAZ, --foo=BAZ this is
+                              some more text
+                              [default: 100]
+            -q=QIZ, --qux=QIZ this is also more
+              text [default: 200]
+            """)
+            [ o { name: Desc.Full 'f' "foo"
+                , arg:  Just $ Desc.argument "BAZ" (Just "100") }
+            , o { name: Desc.Full 'q' "qux"
+                , arg:  Just $ Desc.argument "QIZ" (Just "200") } ]
         , fail -- XXX: Make this actually fail!
-              "-f=baz, --foo=qux"
+              "-f=BAZ, --foo=qux"
               "Arguments mismatch: \"baz\" \"qux\""
         ]
         runtest

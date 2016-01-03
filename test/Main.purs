@@ -11,8 +11,8 @@ import Test.Spec.GeneratorSpec (generatorSpec)
 import Test.Spec.SolverSpec (solverSpec)
 
 main = run [consoleReporter] do
-  solverSpec
-  generatorSpec
-  scannerSpec
-  usageParserSpec
+  -- solverSpec
+  -- generatorSpec
+  -- scannerSpec
+  -- usageParserSpec
   descParserSpec
