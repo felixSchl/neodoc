@@ -8,7 +8,7 @@ import Data.List (fromList)
 import Data.Either (Either(..), either)
 import Control.Bind ((=<<))
 import Data.Maybe (Maybe(..))
-import Data.Foldable (for_)
+import Data.Foldable (intercalate, for_)
 import Control.Monad.Eff.Exception (error, throwException)
 import qualified Text.Parsing.Parser as P
 
@@ -33,7 +33,7 @@ pass input output = TestCase { input: input, output: Right output }
 fail :: String -> String -> TestCase
 fail input msg = TestCase { input: input, output: Left msg }
 
-o = Desc.Option
+o = Desc.OptionDesc
 
 descParserSpec =
   describe "description parser" do
@@ -44,15 +44,28 @@ descParserSpec =
                 , arg:     Nothing
                 , default: Nothing }
             ]
-          ]
-          runtest
-
+        , pass
+              "-f=baz, --foo=baz"
+            [ o { flag:    Just 'f'
+                , long:    Just "foo"
+                , arg:     Just "baz"
+                , default: Nothing }
+            ]
+        , pass
+              "-f=baz, --foo=baz [default: 100]"
+            [ o { flag:    Just 'f'
+                , long:    Just "foo"
+                , arg:     Just "baz"
+                , default: Just "100" }
+            ]
+        ]
+        runtest
   where
     runtest (TestCase { input=input, output=output }) = do
       it (input ++ " " ++
-        (either (\msg -> "should fail with " ++ show msg)
-                (\out -> "should succeed with " ++
-                            (show $ Desc.prettyPrintDesc <$> out))
+        (either (\msg -> "should fail with:\n" ++ show msg)
+                (\out -> "should succeed with:\n" ++
+                  (intercalate "\n" $ Desc.prettyPrintDesc <$> out))
                 output)) do
         vliftEff $ evaltest (Desc.parse =<< Lexer.lex input) output
 
@@ -60,6 +73,7 @@ descParserSpec =
       = if msg == msg'
            then return unit
            else throwException $ error $ "Unexpected error:\n" ++ msg
+
     evaltest (Left e) _ = throwException $ error $ show e
 
     evaltest (Right out) (Left _)
