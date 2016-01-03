@@ -20,10 +20,10 @@ import qualified Text.Parsing.Parser.Token as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 
-traceState :: TokenParser Unit
+traceState :: TokenParser String
 traceState = do
   (st :: ParserState) <- lift get
-  debug $ "(" ++ (show st.line) ++ "|" ++ (show st.indentation) ++ ")"
+  return $ "(" ++ (show st.line) ++ "|" ++ (show st.indentation) ++ ")"
 
 -- |
 -- Get the position of the token at the head of the stream.
@@ -43,10 +43,11 @@ markIndent :: forall a. TokenParser a -> TokenParser a
 markIndent p = do
   { indentation: current } <- lift get
   P.Position { column: pos } <- getTokenPosition
-  lift $ modify \st -> ((st { indentation = pos }) :: ParserState)
-  a <- p
-  lift $ modify \st -> ((st { indentation = current }) :: ParserState)
-  return a
+  P.try do
+    lift $ modify \st -> ((st { indentation = pos }) :: ParserState)
+    a <- p
+    lift $ modify \st -> ((st { indentation = current }) :: ParserState)
+    return a
 
 -- |
 -- Mark the current line
@@ -55,10 +56,11 @@ markLine :: forall a. TokenParser a -> TokenParser a
 markLine p = do
   { line: current } <- lift get
   P.Position { line: pos } <- getTokenPosition
-  lift $ modify \st -> ((st { line = pos }) :: ParserState)
-  a <- p
-  lift $ modify \st -> ((st { line = current }) :: ParserState)
-  return a
+  P.try do
+    lift $ modify \st -> ((st { line = pos }) :: ParserState)
+    a <- p
+    lift $ modify \st -> ((st { line = current }) :: ParserState)
+    return a
 
 -- |
 -- Mark a custom indentation level

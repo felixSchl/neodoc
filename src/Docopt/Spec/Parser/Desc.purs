@@ -5,6 +5,7 @@ import Debug.Trace
 import Control.Lazy (defer)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
+import Control.Monad.State (get)
 import Control.MonadPlus (guard)
 import Control.Monad.Trans (lift)
 import Data.List (
@@ -24,6 +25,7 @@ import qualified Data.String as Str
 
 import Docopt.Spec.Parser.Base
 import Docopt.Spec.Parser.Common
+import Docopt.Spec.Parser.State
 import qualified Docopt.Spec.Parser.Lexer as L
 
 data Desc = OptionDesc { flag    :: Maybe Char
@@ -32,9 +34,9 @@ data Desc = OptionDesc { flag    :: Maybe Char
                        , default :: Maybe String }
           | CommandDesc
 
-type Option_ = { flag :: Maybe Char
-               , long :: Maybe String
-               , arg  :: Maybe String }
+newtype Option = Option { flag :: Maybe Char
+                        , long :: Maybe String
+                        , arg  :: Maybe String }
 
 derive instance genericDesc :: Generic Desc
 
@@ -60,8 +62,13 @@ parse :: (List L.PositionedToken) -> Either P.ParseError (List Desc)
 parse = flip L.runTokenParser descParser
 
 descParser :: L.TokenParser (List Desc)
-descParser = many option
+descParser = do
+  markIndent do
+    opt  <- option
+    opts <- many $ sameIndent *> option
+    return (opt : opts)
   where
+
     anyName :: L.TokenParser String
     anyName = L.angleName <|> L.shoutName <|> L.name
 
@@ -70,13 +77,12 @@ descParser = many option
 
     option :: L.TokenParser Desc
     option = do
-      -- sameIndent
-      opt <- P.choice $ P.try <$> [ both, long, short ]
+      (Option opt) <- start
 
       -- Parse one token at a time towards the next option or the eof.
       -- If a `[default: ...]` token is met, list it.
       default <- head <<< catMaybes <$> do
-        flip P.manyTill (L.eof <|> (P.try $ P.lookAhead $ void option)) do
+        flip P.manyTill (L.eof <|> (P.lookAhead $ P.try $ void start)) do
           P.choice $ P.try <$> [
             Just <$> defaults
           , L.anyToken *> pure Nothing
@@ -88,29 +94,34 @@ descParser = many option
                           , default: default }
 
       where
-        short :: L.TokenParser Option_
+
+        start :: L.TokenParser Option
+        start = do
+          P.choice $ P.try <$> [ both, long, short ]
+
+        short :: L.TokenParser Option
         short = do
           opt <- sopt
-          return $ { flag: pure opt.flag
-                   , long: Nothing
-                   , arg:  opt.arg }
+          return $ Option { flag: pure opt.flag
+                          , long: Nothing
+                          , arg:  opt.arg }
 
-        long :: L.TokenParser Option_
+        long :: L.TokenParser Option
         long = do
           opt <- lopt
-          return $ { flag: Nothing
-                   , long: pure opt.name
-                   , arg:  opt.arg }
+          return $ Option { flag: Nothing
+                          , long: pure opt.name
+                          , arg:  opt.arg }
 
-        both :: L.TokenParser Option_
+        both :: L.TokenParser Option
         both = markLine do
           sopt' <- sopt
           sameLine
           lopt' <- P.choice $ P.try <$> [ L.comma *> lopt , lopt ]
-          arg <- resolve sopt'.arg lopt'.arg
-          return $ { flag: pure sopt'.flag
-                   , long: pure lopt'.name
-                   , arg:  arg }
+          arg   <- resolve sopt'.arg lopt'.arg
+          return $ Option { flag: pure sopt'.flag
+                          , long: pure lopt'.name
+                          , arg:  arg }
 
           where resolve (Just a) (Just b) | (a == b) = return $ Just a
                 resolve Nothing  (Just b)            = return $ Just b

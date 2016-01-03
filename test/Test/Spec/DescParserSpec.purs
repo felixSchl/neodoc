@@ -37,33 +37,75 @@ o = Desc.OptionDesc
 
 descParserSpec =
   describe "description parser" do
-    for_ [ pass
-              "-f, --foo"
+    for_ [
+          pass (dedent
+            """
+            -f enable the --foo flag
+            """)
+            [ o { flag:    Just 'f'
+                , long:    Nothing
+                , arg:     Nothing
+                , default: Nothing }
+            ]
+        , pass (dedent
+            """
+            --foo enable the --foo flag
+            """)
+            [ o { flag:    Nothing
+                , long:    Just "foo"
+                , arg:     Nothing
+                , default: Nothing }
+            ]
+        , pass (dedent
+            """
+            -f, --foo
+            """)
             [ o { flag:    Just 'f'
                 , long:    Just "foo"
                 , arg:     Nothing
                 , default: Nothing }
             ]
-        , pass
-              "-f=baz, --foo=baz"
+        , pass (dedent
+            """
+            -f=baz, --foo=baz
+            """)
             [ o { flag:    Just 'f'
                 , long:    Just "foo"
                 , arg:     Just "baz"
                 , default: Nothing }
             ]
-        , pass
-              "-f=baz, --foo=baz [default: 100]"
+        , pass (dedent
+            """
+            -f=baz, --foo=baz [default: 100]
+            """)
             [ o { flag:    Just 'f'
                 , long:    Just "foo"
                 , arg:     Just "baz"
                 , default: Just "100" }
             ]
+        , pass (dedent
+            """
+            -f=baz, --foo=baz [default: 100]
+            -q=baz, --qux=baz [default: 100]
+            """)
+            [ o { flag:    Just 'f'
+                , long:    Just "foo"
+                , arg:     Just "baz"
+                , default: Just "100" }
+            , o { flag:    Just 'q'
+                , long:    Just "qux"
+                , arg:     Just "baz"
+                , default: Just "100" }
+            ]
+        , fail -- XXX: Make this actually fail!
+              "-f=baz, --foo=qux"
+              "Arguments mismatch: \"baz\" \"qux\""
         ]
         runtest
   where
     runtest (TestCase { input=input, output=output }) = do
       it (input ++ " " ++
-        (either (\msg -> "should fail with:\n" ++ show msg)
+        (either (\msg -> "should fail with \"" ++ msg ++ "\"")
                 (\out -> "should succeed with:\n" ++
                   (intercalate "\n" $ Desc.prettyPrintDesc <$> out))
                 output)) do
@@ -78,11 +120,13 @@ descParserSpec =
 
     evaltest (Right out) (Left _)
       = throwException $ error $
-          "Missing exception! Got: " ++ (show $ Desc.prettyPrintDesc <$> out)
+          "Missing exception! Got:\n"
+            ++ (intercalate "\n" $ Desc.prettyPrintDesc <$> out)
 
     evaltest (Right out) (Right expected)
       = let out' = fromList out
          in if (out' == expected)
               then return unit
               else throwException $ error $
-                    "Unexpected output:" ++ (show $ Desc.prettyPrintDesc <$> out')
+                    "Unexpected output:\n"
+                      ++ (intercalate "\n" $ Desc.prettyPrintDesc <$> out')
