@@ -5,7 +5,6 @@ import Data.Tuple (Tuple(..))
 import Debug.Trace
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Exception (EXCEPTION())
-import Control.Monad.Aff (liftEff')
 import Control.Monad.State (State(), evalState)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), either)

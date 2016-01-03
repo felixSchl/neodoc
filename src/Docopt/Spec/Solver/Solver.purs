@@ -27,10 +27,9 @@ findOptionDesc :: List D.Desc -> U.Argument -> Maybe D.Desc
 findOptionDesc _ (U.Command _)      = Nothing
 findOptionDesc _ (U.Positional _ _) = Nothing
 findOptionDesc _ (U.Option n _ _)   = head $ filter matches ds
-  where matches (D.Option _ (Just (D.LongOption n' _)) _) | (n == n') = true
-        matches _                                                     = false
+  where matches _ = false
 findOptionDesc ds arg = head $ filter matches ds
-  where matches d = false
+  where matches _ = false
 
 solveArg :: U.Argument -> List D.Desc -> Either SolveError Argument
 solveArg (U.Command s) _       = return (Command s)

@@ -5,6 +5,7 @@ import Control.Lazy (defer)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.MonadPlus (guard)
+import Control.Monad.Trans (lift)
 import Data.List (
   List(..), some, (:), toList, length
 , singleton, many, head, catMaybes)
@@ -12,58 +13,55 @@ import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
-import Data.Either (Either(..))
+import Data.Foldable (intercalate)
+import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe, isJust)
 import Data.Generic
 import Data.String (toLower, fromChar)
 import qualified Data.Array as A
+import qualified Data.String as Str
 
 import Docopt.Spec.Parser.Base
 import Docopt.Spec.Parser.Common
 import qualified Docopt.Spec.Parser.Lexer as L
 
-type Argument    = String
-type Default     = String
-data ShortOption = ShortOption Char  (Maybe Argument)
-data LongOption  = LongOption String (Maybe Argument)
+data Desc = Option { flag    :: Maybe Char
+                   , long    :: Maybe String
+                   , arg     :: Maybe String
+                   , default :: Maybe String }
+          | Command
 
--- XXX: Desc should have a `Maybe Argument`, pulled
---      from it's short and long option.
---      Need to decide what happens if both options
---      specifiy a different argument!
--- XXX: This type should be called `Desc`
-data Desc = Option (Maybe ShortOption)
-                   (Maybe LongOption)
-                   (Maybe Default)
+derive instance genericDesc :: Generic Desc
 
-type PartialDesc = (Maybe Argument) -> Desc
+instance showDesc :: Show Desc
+  where show = gShow
 
-instance showShortOption :: Show ShortOption where
-  show (ShortOption c a) = "-" ++ (fromChar c) ++ (maybe "" ("=" ++) a)
+instance eqDesc :: Eq Desc
+  where eq = gEq
 
-instance showlongOption :: Show LongOption where
-  show (LongOption s a) = "--" ++ s ++ (maybe "" ("=" ++) a)
+emptyOpt = Option { flag:    Nothing
+                  , long:    Nothing
+                  , arg:     Nothing
+                  , default: Nothing }
 
-instance showDesc  :: Show Desc where
-  show (Option s l d) =
-    let hasLong    = isJust l
-        hasShort   = isJust s
-        hasDefault = isJust d
-        short      = maybe "" show s
-        long       = maybe "" (\x -> (if hasShort then ", " else "") ++ show x) l
-        default    = maybe "" (\x -> " [" ++ x ++ "]") d
-     in show $ short ++ long ++ default
+prettyPrintDesc :: Desc -> String
+prettyPrintDesc (Option opt) = "Option " ++ rest
+  where rest = (if (Str.length name > 0) then name else "<no-name>")
+                  ++ arg
+                  ++ default
+        short     = maybe "" Str.fromChar opt.flag
+        long      = maybe "" ((maybe "" (const ", ") opt.flag) ++) opt.long
+        name      = short ++ long
+        arg       = maybe "" ("=" ++) opt.arg
+        extra n x = maybe "" (\v -> "\n       [" ++ n ++  ": " ++ v ++  "]") x
+        default   = extra "default" opt.default
 
 parse :: (List L.PositionedToken) -> Either P.ParseError (List Desc)
 parse = flip L.runTokenParser descParser
 
 descParser :: L.TokenParser (List Desc)
-descParser = do
-
-  many option
-
+descParser = many option
   where
-
     anyName :: L.TokenParser String
     anyName = L.angleName <|> L.shoutName <|> L.name
 
@@ -71,12 +69,9 @@ descParser = do
     defaults = L.default
 
     option :: L.TokenParser Desc
-    option = sameIndent *> do
-      f <- P.choice
-        [ P.try shortAndLong
-        , P.try onlyLong
-        , P.try onlyShort
-        ]
+    option = do
+      -- sameIndent
+      opt <- P.choice $ P.try <$> [ both, long, short ]
 
       -- Parse one token at a time towards the next option or the eof.
       -- If a `[default: ...]` token is met, list it.
@@ -86,35 +81,49 @@ descParser = do
             P.try $ Just <$> defaults
           , L.anyToken *> pure Nothing
           ]
-      pure $ f default
 
-    onlyShort :: L.TokenParser PartialDesc
-    onlyShort = Option
-        <$> (Just <$> shortOption)
-        <*> (pure Nothing)
+      return opt
 
-    onlyLong :: L.TokenParser PartialDesc
-    onlyLong = Option
-        <$> (pure Nothing)
-        <*> (Just <$> longOption)
+      where
+        short :: L.TokenParser Desc
+        short = do
+          opt <- sopt
+          return $ Option { flag:    pure opt.flag
+                          , long:    Nothing
+                          , arg:     opt.arg
+                          , default: Nothing }
 
-    shortAndLong :: L.TokenParser PartialDesc
-    shortAndLong = markLine do
-      Option
-        <$> (Just <$> shortOption)
-        <*> (Just <$> (sameLine *> P.choice
-              [ P.try L.comma *> longOption
-              , longOption
-              ]))
+        long :: L.TokenParser Desc
+        long = do
+          opt <- lopt
+          return $ Option { flag:    Nothing
+                          , long:    pure opt.name
+                          , arg:     opt.arg
+                          , default: Nothing }
 
-    shortOption :: L.TokenParser ShortOption
-    shortOption = do
-      { flag: flag, stack: stack, arg: arg } <- L.sopt
-      (guard $ (A.length stack == 0))
-        P.<?> "No stacked options"
-      return $ ShortOption flag arg
+        both :: L.TokenParser Desc
+        both = markLine do
+          sopt' <- sopt
+          sameLine
+          lopt' <- P.choice $ P.try <$> [ L.comma *> lopt , lopt ]
+          arg <- resolve sopt'.arg lopt'.arg
+          return $ Option { flag:    pure sopt'.flag
+                          , long:    pure lopt'.name
+                          , arg:     arg
+                          , default: Nothing }
 
-    longOption :: L.TokenParser LongOption
-    longOption = do
-      { name: name, arg: arg } <- L.lopt
-      return $ LongOption name arg
+          where resolve (Just a) (Just b) | (a == b) = return $ Just a
+                resolve Nothing  (Just b)            = return $ Just b
+                resolve (Just a) Nothing             = return $ Just a
+                resolve Nothing Nothing              = return $ Nothing
+                resolve (Just a) (Just b) | (a /= b) = P.fail $
+                  "Arguments mismatch: " ++ show a ++ " and " ++ show b
+
+    sopt :: L.TokenParser { flag :: Char, arg :: Maybe String }
+    sopt = do
+      opt <- L.sopt
+      (guard $ (A.length opt.stack == 0)) P.<?> "No stacked options"
+      return { flag: opt.flag, arg: opt.arg }
+
+    lopt :: L.TokenParser { name :: String, arg :: Maybe String }
+    lopt = L.lopt
