@@ -17,6 +17,7 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runEitherEff)
 import qualified Test.Support.Usage as U
+import qualified Test.Support.Docopt as D
 
 import Docopt
 import Docopt.Spec.Solver (solve, SolveError(..))
@@ -52,7 +53,7 @@ solverSpec =
     for_ [
       test ([ usage [ [ U.co "foo" ] ] ])
         [ pass  ([])
-                ([ application [] ])
+                ([ application [ [ D.co "foo" ] ] ])
         ]
     ] runtest
   where
