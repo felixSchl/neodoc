@@ -1,7 +1,8 @@
 *.un~
-*.sw[mnopqrstuvwx]
-/bower_components/
-/node_modules/
-/output/
-/.psci*
-/src/.webpack.js
+*.sw[a-z]
+bower_components/
+node_modules/
+output/
+.psci*
+src/.webpack.js
+.pulp-cache
