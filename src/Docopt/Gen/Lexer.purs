@@ -13,7 +13,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
 import Data.String (fromCharArray)
-import Data.List (List(..), foldM, many)
+import Data.List (List(..), foldM, many, singleton)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -76,5 +76,4 @@ lex = foldM step Nil
     step :: List Token -> String -> Either P.ParseError (List Token)
     step a b = do
       x <- flip P.runParser parseToken b
-      return (a ++ (Cons x Nil))
-
+      return $ a ++ (singleton x)

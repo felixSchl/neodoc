@@ -9,7 +9,7 @@ import Prelude
 import Debug.Trace
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust, maybe)
-import Data.List (List(..), filter, head, foldM, concat, (:))
+import Data.List (List(..), filter, head, foldM, concat, (:), singleton)
 import Data.Traversable (traverse)
 import Data.Foldable (foldl)
 import Control.Plus (empty)
@@ -37,7 +37,6 @@ solveArg (U.Positional s r) _  = return (Positional s r)
 solveArg o@(U.Option s a r) ds = do
   let ref = findOptionDesc ds o
   Left SolveError
-
 solveArg (U.Group o bs r) ds  = flip (Group o) r <$> do
   foldM go empty bs
     where go :: List Branch -> U.Branch -> Either SolveError (List Branch)
@@ -49,9 +48,19 @@ solveBranch :: U.Branch -> List D.Desc -> Either SolveError Branch
 solveBranch b ds = Left SolveError
 
 solveUsage :: U.Usage -> List D.Desc -> Either SolveError Application
-solveUsage u ds = Left SolveError
+solveUsage (U.Usage _ bs) ds = Application <$> (foldM step Nil bs)
+  where
+    step :: List Branch -> U.Branch -> Either SolveError (List Branch)
+    step bs b = do
+      x <- solveBranch b ds
+      return $ bs ++ (singleton x)
 
 solve :: (List U.Usage)
       -> (List D.Desc)
       -> Either SolveError (List Application)
-solve us ds = Left SolveError
+solve us ds = foldM step Nil us
+  where
+    step :: List Application -> U.Usage -> Either SolveError (List Application)
+    step as u = do
+      x <- solveUsage u ds
+      return $ as ++ (singleton x)

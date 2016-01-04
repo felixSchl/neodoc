@@ -56,7 +56,9 @@ solverSpec =
                 ([ application [ [ D.co "foo" ] ] ])
         ]
     ] runtest
+
   where
+
     runtest (TestSuite { usages, cases }) = do
       (flip traverseWithIndex_) (toList cases)
         \j (TestCase { descs, expected }) -> do
