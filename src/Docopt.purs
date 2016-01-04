@@ -77,6 +77,9 @@ prettyPrintValue (BoolValue b)   = (show b)
 instance showApplication :: Show Application where
   show (Application xs) = "Application " ++ show (show <$> xs)
 
+instance eqApplication :: Eq Application where
+  eq (Application xs) (Application ys) = xs == ys
+
 instance showBranch :: Show Branch where
   show (Branch xs) = "Branch " ++ show (show <$> xs)
 

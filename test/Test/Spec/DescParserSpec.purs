@@ -22,7 +22,7 @@ import Test.Assert (assert)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
-import Test.Support (vliftEff, runMaybeEff, runEitherEff)
+import Test.Support (vliftEff)
 
 newtype TestCase = TestCase { input :: String
                             , output :: Either String (Array Desc.Desc) }
@@ -113,7 +113,7 @@ descParserSpec =
         ]
         runtest
   where
-    runtest (TestCase { input=input, output=output }) = do
+    runtest (TestCase { input, output }) = do
       it (input ++ " " ++
         (either (\msg -> "should fail with \"" ++ msg ++ "\"")
                 (\out -> "should succeed with:\n" ++

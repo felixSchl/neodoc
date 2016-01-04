@@ -26,6 +26,7 @@ import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
+import Test.Support.Usage
 
 data Expected a = F | P a
 
@@ -170,32 +171,6 @@ usageParserSpec =
         assertEqual 1 (length u1g0)
 
   where
-
-    -- short hand to create a command node
-    co :: String -> Usage.Argument
-    co = Usage.Command
-
-    -- short hand to create a short option node
-    so :: Char -> Array Char -> Maybe String -> Boolean -> Usage.Argument
-    so = Usage.OptionStack
-
-    -- short hand to create a long option node
-    lo :: String -> Maybe String -> Boolean -> Usage.Argument
-    lo = Usage.Option
-
-    -- short hand to create a positional node
-    po :: String -> Boolean -> Usage.Argument
-    po = Usage.Positional
-
-    -- short hand to create a required group node
-    gr :: Array (Array Usage.Argument) -> Boolean -> Usage.Argument
-    gr xs r = Usage.Group false ls r
-      where ls = toList <$> (toList xs)
-
-    -- short hand to create a optional group node
-    go :: Array (Array Usage.Argument) -> Boolean -> Usage.Argument
-    go xs r = Usage.Group true ls r
-      where ls = toList <$> (toList xs)
 
     kase i o = { i: i, o: o }
     pass i o = kase i (P o)
