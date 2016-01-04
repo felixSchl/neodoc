@@ -68,13 +68,15 @@ prettyPrintDesc :: Desc -> String
 prettyPrintDesc (OptionDesc opt) = "Option " ++ prettyPrintOption opt
 
 prettyPrintOption :: Option -> String
-prettyPrintOption (Option opt) = name opt.name
-                              ++ maybe "" arg opt.arg
+prettyPrintOption (Option opt)
+  = name opt.name ++ maybe "" (\a -> "=" ++ prettyPrintArgument a) opt.arg
   where name (Flag c)   = "-" ++ fromChar c
         name (Long n)   = "--" ++ n
         name (Full c n) = "-" ++ fromChar c ++ ", --" ++ n
-        arg  (Argument { name: n, default: d }) =
-          "=" ++ n ++ maybe "" (\v -> " [default:" ++ v ++  "]") d
+
+prettyPrintArgument :: Argument -> String
+prettyPrintArgument (Argument { name: n, default: d })
+  = n ++ maybe "" (\v -> " [default:" ++ v ++  "]") d
 
 argument :: String -> Maybe String -> Argument
 argument name default = Argument { name: name, default: default }
@@ -118,12 +120,19 @@ descParser =
         setDefault (Option o) d = return $ Option $
           o { arg = do
                 (Argument arg) <- o.arg
-                return $ Argument $ arg { default = d }
-            }
+                return $ Argument $ arg { default = d } }
 
         start :: L.TokenParser Option
         start = do
-          P.choice $ P.try <$> [ both, long, short ]
+          P.choice $ P.try <$> [
+            short <* do
+              P.notFollowedBy do
+                P.choice $ P.try <$> [ L.comma *> long, long ]
+          , long <* do
+              P.notFollowedBy do
+                P.choice $ P.try <$> [ L.comma *> short, short ]
+          , both
+          ]
 
         short :: L.TokenParser Option
         short = do
@@ -164,7 +173,8 @@ descParser =
                 combineArg (Just a) Nothing             = Right $ Just a
                 combineArg Nothing Nothing              = Right $ Nothing
                 combineArg (Just a) (Just b) | (a /= b) = Left  $
-                        "Arguments mismatch: " ++ show a ++ " and " ++ show b
+                        "Arguments mismatch: " ++ (show $ prettyPrintArgument a)
+                                    ++ " and " ++ (show $ prettyPrintArgument b)
 
     sopt :: L.TokenParser { flag :: Char, arg :: Maybe String }
     sopt = do

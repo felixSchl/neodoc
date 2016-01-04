@@ -86,9 +86,9 @@ descParserSpec =
                 , arg:  Just $ Desc.argument "BAZ" (Just "100") }
             , o { name: Desc.Full 'q' "qux"
                 , arg:  Just $ Desc.argument "QIZ" (Just "200") } ]
-        , fail -- XXX: Make this actually fail!
+        , fail
               "-f=BAZ, --foo=qux"
-              "Arguments mismatch: \"baz\" \"qux\""
+              "Arguments mismatch: \"BAZ\" and \"qux\""
         ]
         runtest
   where
