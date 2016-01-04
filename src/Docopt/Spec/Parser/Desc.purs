@@ -8,9 +8,8 @@ import Control.Apply ((*>), (<*))
 import Control.Monad.State (get)
 import Control.MonadPlus (guard)
 import Control.Monad.Trans (lift)
-import Data.List (
-  List(..), some, (:), toList, length
-, singleton, many, head, catMaybes)
+import Data.List (List(..), some, (:), toList, length
+                 , singleton, many, head, catMaybes, filter)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -34,11 +33,13 @@ data Desc = OptionDesc Option
 data Name        = Flag Char | Long String | Full Char String
 newtype Argument = Argument { name :: String, default :: Maybe String }
 newtype Option   = Option   { name :: Name, arg :: Maybe Argument }
+data Content     = Text | Default String
 
 derive instance genericDesc     :: Generic Desc
 derive instance genericArgument :: Generic Argument
 derive instance genericName     :: Generic Name
 derive instance genericOption   :: Generic Option
+derive instance genericContent  :: Generic Content
 
 instance showDesc :: Show Desc
   where show = gShow
@@ -50,6 +51,9 @@ instance showArgument :: Show Argument
   where show = gShow
 
 instance showName :: Show Name
+  where show = gShow
+
+instance showContent :: Show Content
   where show = gShow
 
 instance eqOption :: Eq Option
@@ -76,7 +80,7 @@ prettyPrintOption (Option opt)
 
 prettyPrintArgument :: Argument -> String
 prettyPrintArgument (Argument { name: n, default: d })
-  = n ++ maybe "" (\v -> " [default:" ++ v ++  "]") d
+  = n ++ maybe "" (\v -> " [default: " ++ v ++  "]") d
 
 argument :: String -> Maybe String -> Argument
 argument name default = Argument { name: name, default: default }
@@ -100,19 +104,31 @@ descParser =
 
     option :: L.TokenParser Desc
     option = do
-      opt <- start
+      xopt@(Option opt) <- start
 
-      -- Parse one token at a time towards the next option or the eof.
-      -- If a `[default: ...]` token is met, list it.
-      default <- head <<< catMaybes <$> do
+      description <- do
         flip P.manyTill (L.eof <|> (P.lookAhead $ P.try $ void start)) do
           P.choice $ P.try <$> [
-            Just <$> defaults
-          , L.anyToken *> pure Nothing
+            Default <$> defaults
+          , L.anyToken *> pure Text
           ]
 
+      let defaults = flip filter description \s -> case s of Default _ -> true
+                                                             _         -> false
+          default = maybe Nothing (\(Default v) -> Just v) $ head defaults
+
+      if (length defaults > 1)
+         then P.fail $ "Option " ++ (show $ prettyPrintOption xopt)
+                    ++ " has multiple defaults!"
+         else return unit
+
+      if (isJust default) && (not $ isJust opt.arg)
+         then P.fail $ "Option " ++ (show $ prettyPrintOption xopt)
+                    ++ " does not take arguments. Cannot specify defaults."
+         else return unit
+
       OptionDesc <$> do
-        either P.fail return $ setDefault opt default
+        either P.fail return $ setDefault xopt default
 
       where
 

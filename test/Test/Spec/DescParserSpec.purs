@@ -79,6 +79,7 @@ descParserSpec =
             -f=BAZ, --foo=BAZ this is
                               some more text
                               [default: 100]
+
             -q=QIZ, --qux=QIZ this is also more
               text [default: 200]
             """)
@@ -89,6 +90,26 @@ descParserSpec =
         , fail
               "-f=BAZ, --foo=qux"
               "Arguments mismatch: \"BAZ\" and \"qux\""
+        , pass (dedent
+            """
+            -f=BAZ, --foo=BAZ this is some more text [default: 100]
+                -q=QIZ, --qux=QIZ this option is over-indented and won't
+                                  be parsed.
+            """)
+            [ o { name: Desc.Full 'f' "foo"
+                , arg:  Just $ Desc.argument "BAZ" (Just "100") } ]
+        , fail (dedent
+            """
+            -q, --qux
+            -f, --foo this option takes no arg, `default`
+                      is invalid [default: 100]
+            """)
+            "Option \"-f, --foo\" does not take arguments. Cannot specify defaults."
+        , fail (dedent
+            """
+            -f=BAZ, --foo=BAZ [default: 100] [default: 100]
+            """)
+            "Option \"-f, --foo=BAZ\" has multiple defaults!"
         ]
         runtest
   where
