@@ -26,11 +26,11 @@ import Docopt.Spec.Parser.Scanner (scan)
 import Docopt.Spec.Parser.Lexer (lex)
 import Text.Wrap (dedent)
 
-newtype TestSuite = TestSuite { usages   :: Array U.Usage
-                              , cases :: Array TestCase
+newtype TestSuite = TestSuite { usages :: Array U.Usage
+                              , cases  :: Array TestCase
                               }
 newtype TestCase = TestCase { descs    :: Array D.Desc
-                            , expected :: Either Unit (Array Application) }
+                            , expected :: Either String (Array Application) }
 
 test :: Array U.Usage -> Array TestCase -> TestSuite
 test us cs = TestSuite { usages: us, cases: cs }
@@ -38,8 +38,8 @@ test us cs = TestSuite { usages: us, cases: cs }
 pass :: Array D.Desc -> Array Application -> TestCase
 pass ds as = TestCase { descs: ds, expected: Right as }
 
-fail :: Array D.Desc -> Unit -> TestCase
-fail ds _ = TestCase { descs: ds, expected: Left unit }
+fail :: Array D.Desc -> String -> TestCase
+fail ds msg = TestCase { descs: ds, expected: Left msg }
 
 usage :: Array (Array U.Argument) -> U.Usage
 usage = U.usage "foo"
@@ -61,9 +61,27 @@ solverSpec =
         \j (TestCase { descs, expected }) -> do
           it ("case " ++ show (j + 1) ++ "/" ++ (show $ A.length cases)) do
             vliftEff do
-              evaltest (solve (toList usages) (toList descs)) expected
+              evaltest
+                (solve (toList usages) (toList descs))
+                (toList <$> expected)
 
-    evaltest _ _ = return unit
+    evaltest (Right output) (Right expected)
+      = if output == (toList expected)
+            then return unit
+            else throwException $ error $
+              "Unexpected output:\n" ++ show output
+
+    evaltest (Right output) (Left _)
+      = throwException $ error $
+          "Missing exception! Got:\n" ++ show output
+
+    evaltest (Left err) (Left expected)
+      = if (show err) == expected
+            then return unit
+            else throwException $ error $
+              "Unexpected error:\n" ++ show err
+
+    evaltest (Left err) _ = throwException $ error $ show err
 
     traverseWithIndex_ :: forall a b m. (Applicative m) => (Int -> a -> m b)
                                                         -> (List a)
