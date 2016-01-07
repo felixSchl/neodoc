@@ -51,7 +51,7 @@ application xss = Application $ toList $ (\xs -> Branch $ toList xs) <$> xss
 
 solverSpec =
   describe "solver" do
-    for_ [
+    (flip traverseWithIndex_) (toList [
       test ([ usage [ [ U.co "foo" ] ] ])
         [ pass  ([])
                 ([ application [ [ D.co "foo" ] ] ])
@@ -66,18 +66,19 @@ solverSpec =
                     [ D.opt Nothing (Just "foo") Nothing true ]
                 ] ])
         ]
-    ] runtest
+    ]) runtest
 
   where
 
-    runtest (TestSuite { usages, cases }) = do
-      (flip traverseWithIndex_) (toList cases)
-        \j (TestCase { descs, expected }) -> do
-          it ("case " ++ show (j + 1) ++ "/" ++ (show $ A.length cases)) do
-            vliftEff do
-              evaltest
-                (solve (toList usages) (toList descs))
-                (toList <$> expected)
+    runtest n (TestSuite { usages, cases }) = do
+      describe ("Suite " ++ show (n + 1)) do
+        (flip traverseWithIndex_) (toList cases)
+          \j (TestCase { descs, expected }) -> do
+            it ("case " ++ show (j + 1) ++ "/" ++ (show $ A.length cases)) do
+              vliftEff do
+                evaltest
+                  (solve (toList usages) (toList descs))
+                  (toList <$> expected)
 
     evaltest (Right output) (Right expected)
       = if output == (toList expected)
