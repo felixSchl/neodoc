@@ -10,6 +10,7 @@ import Control.Plus (empty)
 import Data.Foldable (intercalate, for_)
 import Control.Monad.Eff.Exception (error, throwException)
 import qualified Data.Array as A
+import Data.Maybe (Maybe(..))
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
@@ -54,6 +55,16 @@ solverSpec =
       test ([ usage [ [ U.co "foo" ] ] ])
         [ pass  ([])
                 ([ application [ [ D.co "foo" ] ] ])
+        ]
+    , test ([ usage [ [ U.po "foo" true ] ] ])
+        [ pass  ([])
+                ([ application [ [ D.po "foo" true ] ] ])
+        ]
+    , test ([ usage [ [ U.lo "foo" Nothing true ] ] ])
+        [ pass  ([])
+                ([ application [
+                    [ D.opt Nothing (Just "foo") Nothing true ]
+                ] ])
         ]
     ] runtest
 

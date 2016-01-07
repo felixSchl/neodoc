@@ -31,21 +31,29 @@ findOptionDesc _ (U.Option n _ _)   = head $ filter matches ds
 findOptionDesc ds arg = head $ filter matches ds
   where matches _ = false
 
-solveArg :: U.Argument -> List D.Desc -> Either SolveError Argument
-solveArg (U.Command s) _       = return (Command s)
-solveArg (U.Positional s r) _  = return (Positional s r)
+solveArg :: U.Argument -> List D.Desc -> Either SolveError (List Argument)
+solveArg (U.Command s) _       = singleton <$> return (Command s)
+solveArg (U.Positional s r) _  = singleton <$> return (Positional s r)
 solveArg o@(U.Option s a r) ds = do
   let ref = findOptionDesc ds o
   Left SolveError
-solveArg (U.Group o bs r) ds  = flip (Group o) r <$> do
-  foldM go empty bs
-    where go :: List Branch -> U.Branch -> Either SolveError (List Branch)
-          go a b = do
-            br <- solveBranch b ds
-            return (br:a)
+solveArg (U.Group o bs r) ds  = singleton <$> do
+  flip (Group o) r <$> do
+    foldM go empty bs
+      where go :: List Branch -> U.Branch -> Either SolveError (List Branch)
+            go a b = do
+              br <- solveBranch b ds
+              return (br:a)
 
 solveBranch :: U.Branch -> List D.Desc -> Either SolveError Branch
-solveBranch b ds = Left SolveError
+solveBranch as ds = Branch <<< concat <$> (foldM step Nil as)
+  where
+    step :: List (List Argument)
+          -> U.Argument
+          -> Either SolveError (List (List Argument))
+    step ass a = do
+      xs <- solveArg a ds
+      return $ ass ++ (singleton xs)
 
 solveUsage :: U.Usage -> List D.Desc -> Either SolveError Application
 solveUsage (U.Usage _ bs) ds = Application <$> (foldM step Nil bs)
