@@ -36,6 +36,9 @@ solveArg (U.Command s) _       = singleton <$> return (Command s)
 solveArg (U.Positional s r) _  = singleton <$> return (Positional s r)
 solveArg o@(U.Option s a r) ds = do
   let ref = findOptionDesc ds o
+
+  -- XXX: IMPLEMENT THIS (!)
+
   Left SolveError
 solveArg (U.Group o bs r) ds  = singleton <$> do
   flip (Group o) r <$> do

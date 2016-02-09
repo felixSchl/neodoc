@@ -19,6 +19,7 @@ import Test.Assert.Simple
 import Test.Support (vliftEff, runEitherEff)
 import qualified Test.Support.Usage as U
 import qualified Test.Support.Docopt as D
+import qualified Test.Support.Desc as Desc
 
 import Docopt
 import Docopt.Spec.Solver (solve, SolveError(..))
@@ -61,7 +62,10 @@ solverSpec =
                 ([ application [ [ D.po "foo" true ] ] ])
         ]
     , test ([ usage [ [ U.lo "foo" Nothing true ] ] ])
-        [ pass  ([])
+        [ pass  ([ Desc.opt
+                    (Desc.fname 'f' "foo")
+                    (Just $ Desc.arg "bar" Nothing)
+                ])
                 ([ application [
                     [ D.opt Nothing (Just "foo") Nothing true ]
                 ] ])
