@@ -65,10 +65,6 @@ solveArg o@(U.Option n a r) ds = singleton <$> do
     convert _ = Nothing
 
 solveArg o@(U.OptionStack f fs a r) ds = do
-  -- TODO
-  -- Match f and then each f in fs up with a descrption, if any, returning
-  -- an Docopt.Option for each.
-
   let fs' = f:toList fs
 
   -- Ensure that only the last stacked option is to be considered in
