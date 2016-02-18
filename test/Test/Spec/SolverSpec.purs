@@ -62,12 +62,16 @@ solverSpec =
                 ([ application [ [ D.po "foo" true ] ] ])
         ]
     , test ([ usage [ [ U.lo "foo" Nothing true ] ] ])
-        [ pass  ([ Desc.opt
-                    (Desc.fname 'f' "foo")
-                    (Just $ Desc.arg "bar" Nothing)
+        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
+                            (Just $ Desc.arg "bar" (Just "qux"))
                 ])
                 ([ application [
-                    [ D.opt Nothing (Just "foo") Nothing true ]
+                    [ D.opt (Just 'f')
+                            (Just "foo")
+                            (Just $ OptionArgument "bar"
+                                                   (Just $ StringValue "qux"))
+                            true
+                    ]
                 ] ])
         ]
     ]) runtest
