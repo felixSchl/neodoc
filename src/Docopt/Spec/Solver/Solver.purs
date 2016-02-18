@@ -26,17 +26,6 @@ data SolveError = SolveError
 instance showSolveError :: Show SolveError where
   show _ = "SolveError"
 
-findOptionDesc :: List D.Desc -> U.Argument -> Maybe D.Desc
-findOptionDesc ds (U.Option n _ _) = head $ filter matches ds
-  where
-    matches (D.OptionDesc (D.Option { name=(D.Long n')   })) = n == n'
-    matches (D.OptionDesc (D.Option { name=(D.Full _ n') })) = n == n'
-    matches _ = false
-findOptionDesc ds (U.OptionStack n _ _ _) = head $ filter matches ds
-  where
-    matches _ = false
-findOptionDesc _ _ = Nothing
-
 solveArg :: U.Argument -> List D.Desc -> Either SolveError (List Argument)
 solveArg (U.Command s) _       = singleton <$> return (Command s)
 solveArg (U.Positional s r) _  = singleton <$> return (Positional s r)
