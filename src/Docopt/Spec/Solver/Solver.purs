@@ -8,9 +8,10 @@ module Docopt.Spec.Solver where
 import Prelude
 import Debug.Trace
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), isJust, maybe, maybe')
+import Data.Maybe.Unsafe (fromJust)
+import Data.Maybe (Maybe(..), isJust, maybe, maybe', isNothing)
 import Data.List (List(..), filter, head, foldM, concat, (:), singleton
-                , catMaybes, toList)
+                , catMaybes, toList, last, init, length)
 import Data.Traversable (traverse)
 import Data.Foldable (foldl)
 import Control.Plus (empty)
@@ -67,12 +68,25 @@ solveArg o@(U.OptionStack f fs a r) ds = do
   -- TODO
   -- Match f and then each f in fs up with a descrption, if any, returning
   -- an Docopt.Option for each.
-  traverse match (f:toList fs)
+
+  let fs' = f:toList fs
+
+  -- Ensure that only the last stacked option is to be considered in
+  -- "trailing" position and hence capable of expanding to take an argument.
+  if length fs' > 1
+    then do
+      xs <- traverse (match false) (fromJust $ init fs')
+      x  <- match true (fromJust $ last fs')
+      return $ xs ++ singleton x
+    else
+      traverse (match true) fs'
+
   where
-    match f = do
+    match :: Boolean -> Char -> Either SolveError Argument
+    match isTrailing f = do
       return $ maybe' (\_ -> Option (Just f) Nothing (toArg a) r)
                       id
-                      (head $ catMaybes $ convert f <$> ds)
+                      (head $ catMaybes $ convert f isTrailing <$> ds)
 
     toArg:: Maybe String -> Maybe OptionArgument
     toArg a = a >>= \an -> return $ OptionArgument an Nothing
@@ -89,14 +103,16 @@ solveArg o@(U.OptionStack f fs a r) ds = do
       -- `Desc.Argument` should be of type `Maybe Value`.
       = return $ OptionArgument a.name (StringValue <$> a.default)
 
-    convert :: Char -> D.Desc -> Maybe Argument
-    convert f (D.OptionDesc (D.Option { name=D.Flag f', arg=a' }))
-      | f == f'
+    convert :: Char -> Boolean -> D.Desc -> Maybe Argument
+    convert f isTrailing (D.OptionDesc (D.Option { name=D.Flag f', arg=a' }))
+      | (f == f')
+        && (isTrailing || isNothing a')
       = return $ Option (Just f) Nothing (resolveArg a a') r
-    convert f (D.OptionDesc (D.Option { name=D.Full f' n, arg=a' }))
-      | f == f'
+    convert f isTrailing (D.OptionDesc (D.Option { name=D.Full f' n, arg=a' }))
+      | (f == f')
+        && (isTrailing || isNothing a')
       = return $ Option (Just f) (Just n) (resolveArg a a') r
-    convert _ _ = Nothing
+    convert _ _ _ = Nothing
 
 solveArg (U.Group o bs r) ds  = singleton <$> do
   flip (Group o) r <$> do

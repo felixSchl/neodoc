@@ -74,19 +74,60 @@ solverSpec =
                     ]
                 ] ])
         ]
-    , test ([ usage [ [ U.so 'f' ['i', 'l', 'e'] Nothing true ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
-                            (Just $ Desc.arg "bar" (Just "qux"))
+    , test ([ usage [ [ U.so 'x' ['v', 'z', 'f'] Nothing true ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
+                            (Just $ Desc.arg "FILE" (Just "foo"))
+                ])
+                ([ application [
+                    [ D.opt (Just 'x') Nothing Nothing true
+                    , D.opt (Just 'v') Nothing Nothing true
+                    , D.opt (Just 'z') Nothing Nothing true
+                    , D.opt (Just 'f')
+                            (Just "file")
+                            (Just $ OptionArgument "FILE"
+                                                   (Just $ StringValue "foo"))
+                            true
+                    ]
+                ] ])
+        ]
+
+    , test ([ usage [ [ U.so 'f' [] Nothing true ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
+                            (Just $ Desc.arg "FILE" (Just "foo"))
                 ])
                 ([ application [
                     [ D.opt (Just 'f')
-                            (Just "foo")
-                            (Just $ OptionArgument "bar"
-                                                   (Just $ StringValue "qux"))
+                            (Just "file")
+                            (Just $ OptionArgument "FILE"
+                                                   (Just $ StringValue "foo"))
                             true
-                    , D.opt (Just 'i') Nothing Nothing true
-                    , D.opt (Just 'l') Nothing Nothing true
-                    , D.opt (Just 'e') Nothing Nothing true
+                    ]
+                ] ])
+        ]
+
+    , test ([ usage [ [ U.so 'f' ['x'] Nothing true ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
+                            (Just $ Desc.arg "FILE" (Just "foo"))
+                ])
+                ([ application [
+                    [ D.opt (Just 'f') Nothing Nothing true
+                    , D.opt (Just 'x') Nothing Nothing true
+                    ]
+                ] ])
+        ]
+
+      -- Note: `f` should not adopt `file` as it's full name since it's in an
+      -- option stack and not in trailing position (therefore cannot inherit the
+      -- description's argument, rendering it an unfit candidate)
+    , test ([ usage [ [ U.so 'f' ['v', 'z', 'x'] Nothing true ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
+                            (Just $ Desc.arg "FILE" (Just "foo"))
+                ])
+                ([ application [
+                    [ D.opt (Just 'f') Nothing Nothing true
+                    , D.opt (Just 'v') Nothing Nothing true
+                    , D.opt (Just 'z') Nothing Nothing true
+                    , D.opt (Just 'x') Nothing Nothing true
                     ]
                 ] ])
         ]
