@@ -38,11 +38,10 @@ solveArg o@(U.Option n a r) ds = singleton <$> do
                   (head $ catMaybes $ convert <$> ds)
 
   where
+    toArg:: Maybe String -> Maybe OptionArgument
     toArg a = a >>= \an -> return $ OptionArgument an Nothing
 
-    resolveArg :: Maybe String
-               -> Maybe D.Argument
-               -> Maybe OptionArgument
+    resolveArg :: Maybe String -> Maybe D.Argument -> Maybe OptionArgument
     resolveArg (Just an) Nothing = return $ OptionArgument an Nothing
     resolveArg Nothing (Just (D.Argument a))
       -- XXX: The conversion to `StringValue` should not be needed,
@@ -75,10 +74,10 @@ solveArg o@(U.OptionStack f fs a r) ds = do
                       id
                       (head $ catMaybes $ convert f <$> ds)
 
+    toArg:: Maybe String -> Maybe OptionArgument
     toArg a = a >>= \an -> return $ OptionArgument an Nothing
-    resolveArg :: Maybe String
-               -> Maybe D.Argument
-               -> Maybe OptionArgument
+
+    resolveArg :: Maybe String -> Maybe D.Argument -> Maybe OptionArgument
     resolveArg (Just an) Nothing = return $ OptionArgument an Nothing
     resolveArg Nothing (Just (D.Argument a))
       -- XXX: The conversion to `StringValue` should not be needed,
