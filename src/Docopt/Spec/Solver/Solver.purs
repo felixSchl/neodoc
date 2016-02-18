@@ -10,11 +10,12 @@ import Debug.Trace
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust, maybe, maybe')
 import Data.List (List(..), filter, head, foldM, concat, (:), singleton
-                , catMaybes)
+                , catMaybes, toList)
 import Data.Traversable (traverse)
 import Data.Foldable (foldl)
 import Control.Plus (empty)
 import Data.Monoid (mempty)
+import qualified Data.Array as A
 
 import Docopt (Argument(..), Application(..), Branch(..), OptionArgument(..)
               , Value(..))
@@ -49,8 +50,47 @@ solveArg o@(U.Option n a r) ds = singleton <$> do
 
   where
     toArg a = a >>= \an -> return $ OptionArgument an Nothing
-    resolveArg (Just an) Nothing
-      = return $ OptionArgument an Nothing
+
+    resolveArg :: Maybe String
+               -> Maybe D.Argument
+               -> Maybe OptionArgument
+    resolveArg (Just an) Nothing = return $ OptionArgument an Nothing
+    resolveArg Nothing (Just (D.Argument a))
+      -- XXX: The conversion to `StringValue` should not be needed,
+      -- `Desc.Argument` should be of type `Maybe Value`.
+      = return $ OptionArgument a.name (StringValue <$> a.default)
+    resolveArg (Just an) (Just (D.Argument a))
+      -- XXX: Do we need to guard that `an == a.name` here?
+      -- XXX: The conversion to `StringValue` should not be needed,
+      -- `Desc.Argument` should be of type `Maybe Value`.
+      = return $ OptionArgument a.name (StringValue <$> a.default)
+    resolveArg _ _ = Nothing
+
+    convert :: D.Desc -> Maybe Argument
+    convert (D.OptionDesc (D.Option { name=D.Long n', arg=a' }))
+      | n' == n
+      = return $ Option Nothing (Just n) (resolveArg a a') r
+    convert (D.OptionDesc (D.Option { name=D.Full f n', arg=a' }))
+      | n' == n
+      = return $ Option (Just f) (Just n) (resolveArg a a') r
+    convert _ = Nothing
+
+solveArg o@(U.OptionStack f fs a r) ds = do
+  -- TODO
+  -- Match f and then each f in fs up with a descrption, if any, returning
+  -- an Docopt.Option for each.
+  traverse match (f:toList fs)
+  where
+    match f = do
+      return $ maybe' (\_ -> Option (Just f) Nothing (toArg a) r)
+                      id
+                      (head $ catMaybes $ convert f <$> ds)
+
+    toArg a = a >>= \an -> return $ OptionArgument an Nothing
+    resolveArg :: Maybe String
+               -> Maybe D.Argument
+               -> Maybe OptionArgument
+    resolveArg (Just an) Nothing = return $ OptionArgument an Nothing
     resolveArg Nothing (Just (D.Argument a))
       -- XXX: The conversion to `StringValue` should not be needed,
       -- `Desc.Argument` should be of type `Maybe Value`.
@@ -61,19 +101,15 @@ solveArg o@(U.Option n a r) ds = singleton <$> do
       -- `Desc.Argument` should be of type `Maybe Value`.
       = return $ OptionArgument a.name (StringValue <$> a.default)
 
-    resolveArg _ _ = Nothing
-    convert (D.OptionDesc (D.Option { name=(D.Long n'), arg=a' }))
-      = return $ Option Nothing (Just n) (resolveArg a a') r
-    convert (D.OptionDesc (D.Option { name=(D.Full f n'), arg=a' }))
+    convert :: Char -> D.Desc -> Maybe Argument
+    convert f (D.OptionDesc (D.Option { name=D.Flag f', arg=a' }))
+      | f == f'
+      = return $ Option (Just f) Nothing (resolveArg a a') r
+    convert f (D.OptionDesc (D.Option { name=D.Full f' n, arg=a' }))
+      | f == f'
       = return $ Option (Just f) (Just n) (resolveArg a a') r
+    convert _ _ = Nothing
 
-    convert _ = Nothing
-
-solveArg o@(U.OptionStack f fs a r) ds = do
-  -- TODO
-  -- Match f and then each f in fs up with a descrption, if any, returning
-  -- an Docopt.Option for each.
-  Left SolveError
 solveArg (U.Group o bs r) ds  = singleton <$> do
   flip (Group o) r <$> do
     foldM go empty bs

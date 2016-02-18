@@ -74,6 +74,22 @@ solverSpec =
                     ]
                 ] ])
         ]
+    , test ([ usage [ [ U.so 'f' ['i', 'l', 'e'] Nothing true ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
+                            (Just $ Desc.arg "bar" (Just "qux"))
+                ])
+                ([ application [
+                    [ D.opt (Just 'f')
+                            (Just "foo")
+                            (Just $ OptionArgument "bar"
+                                                   (Just $ StringValue "qux"))
+                            true
+                    , D.opt (Just 'i') Nothing Nothing true
+                    , D.opt (Just 'l') Nothing Nothing true
+                    , D.opt (Just 'e') Nothing Nothing true
+                    ]
+                ] ])
+        ]
     ]) runtest
 
   where
