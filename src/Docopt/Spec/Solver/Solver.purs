@@ -2,6 +2,10 @@
 -- | Option sections, as well as some best effort guessing.
 -- |
 -- | ===
+-- |
+-- | Thoughts:
+-- |    * It appears there is never a reason to fail hard. It would be nice if
+-- |      we could produce warnings, however -> Write monad?
 
 module Docopt.Spec.Solver where
 
