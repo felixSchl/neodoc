@@ -20,6 +20,7 @@ import Data.Tuple
 import Data.Maybe hiding (maybe)
 import qualified Data.Array as A
 import qualified Data.String as Str
+import Control.Bind ((=<<))
 
 import Docopt.Spec.Parser.Base
 import Docopt.Spec.Parser.Common
@@ -31,9 +32,6 @@ type OptionArgument = String
 type IsOptional     = Boolean
 type IsRepeatable   = Boolean
 type Branch         = List Argument
-
-parse :: (List PositionedToken) -> Either P.ParseError (List Usage)
-parse = flip runTokenParser usageParser
 
 -- | Represent a single program usage.
 -- | A single usage is made up of a list of mutually exclusive groups,
@@ -80,6 +78,11 @@ instance eqArgument :: Eq Argument where
   eq (OptionStack c cs a r) (OptionStack c' cs' a' r') = (c == c') && (cs == cs') && (a == a') && (r == r')
   eq _                      _                          = false
 
+run :: String -> Either P.ParseError (List Usage)
+run x = parse =<< lex x
+
+parse :: (List PositionedToken) -> Either P.ParseError (List Usage)
+parse = flip runTokenParser usageParser
 
 -- | TokenParser to parse the usage section
 -- |
@@ -179,4 +182,4 @@ usageParser = do
       , pure false ]
 
     program :: TokenParser String
-    program = name <|> word
+    program = (name <|> word) P.<?> "Program Name"

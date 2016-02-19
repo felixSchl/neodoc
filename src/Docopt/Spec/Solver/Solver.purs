@@ -23,13 +23,9 @@ import Data.Monoid (mempty)
 import qualified Data.Array as A
 
 import Docopt (Argument(..), Application(..), Branch(..), OptionArgument(..)
-              , Value(..))
+              , Value(..), SolveError(..))
 import qualified Docopt.Spec.Parser.Desc  as D
 import qualified Docopt.Spec.Parser.Usage as U
-
-data SolveError = SolveError
-instance showSolveError :: Show SolveError where
-  show _ = "SolveError"
 
 solveArg :: U.Argument -> List D.Desc -> Either SolveError (List Argument)
 solveArg (U.Command s) _       = singleton <$> return (Command s)

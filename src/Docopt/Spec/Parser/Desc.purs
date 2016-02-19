@@ -25,6 +25,7 @@ import qualified Data.String as Str
 import Docopt.Spec.Parser.Base
 import Docopt.Spec.Parser.Common
 import Docopt.Spec.Parser.State
+import Docopt.Spec.Parser.Lexer (lex)
 import qualified Docopt.Spec.Parser.Lexer as L
 
 data Desc = OptionDesc Option
@@ -84,6 +85,9 @@ prettyPrintArgument (Argument { name: n, default: d })
 
 argument :: String -> Maybe String -> Argument
 argument name default = Argument { name: name, default: default }
+
+run :: String -> Either P.ParseError (List Desc)
+run x = lex x >>= parse
 
 parse :: (List L.PositionedToken) -> Either P.ParseError (List Desc)
 parse = flip L.runTokenParser descParser

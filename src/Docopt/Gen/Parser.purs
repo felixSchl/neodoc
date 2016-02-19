@@ -38,7 +38,7 @@ import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 
 import Docopt
-import Docopt.Gen
+import Docopt.Gen.Types
 import Docopt.Spec.Parser.Base (alphaNum, space, getInput, debug)
 
 --------------------------------------------------------------------------------
@@ -88,7 +88,6 @@ positional n = token go P.<?> "positional argument " ++ show n
 
 type HasConsumedArg = Boolean
 data OptParse = OptParse Value (Maybe Token) HasConsumedArg
-type ValueMapping = Tuple Argument Value
 
 longOption :: Name -> (Maybe OptionArgument) -> CliParser Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->

@@ -159,18 +159,17 @@ isBoolValue _             = false
 
 import qualified Text.Parsing.Parser as P
 
-data DocoptError
-  = ScanError   P.ParseError
-  | LexError    P.ParseError
-  | ParseError  P.ParseError
-  | GenError    String
-  | SolverError String
-  | RunError    P.ParseError
+data SolveError = SolveError
 
-instance showError :: Show DocoptError where
-  show (ScanError err)   = "ScanError "   ++ show err
-  show (LexError err)    = "LexError "    ++ show err
-  show (ParseError err)  = "ParseError "  ++ show err
-  show (GenError msg)    = "GenError "    ++ show msg
-  show (SolverError msg) = "SolverError " ++ show msg
-  show (RunError err)    = "RunError "    ++ show err
+instance showSolveError :: Show SolveError where
+  show SolveError = "SolveError"
+
+data DocoptError
+  = DocoptScanError   P.ParseError
+  | DocoptParseError  P.ParseError
+  | DocoptSolveError  SolveError
+
+instance showDocoptError :: Show DocoptError where
+  show (DocoptScanError err)  = "DocoptScanError "  ++ show err
+  show (DocoptParseError err) = "DocoptParseError " ++ show err
+  show (DocoptSolveError err) = "DocoptSolveError"  ++ show err

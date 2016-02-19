@@ -19,7 +19,7 @@ import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 import qualified Data.Array as A
-import Docopt.Gen
+import Docopt.Gen.Types
 import Docopt.Spec.Parser.Base
 
 -- | Parse a single token from the ARGV stream.

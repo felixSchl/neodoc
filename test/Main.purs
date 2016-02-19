@@ -9,10 +9,12 @@ import Test.Spec.UsageParserSpec (usageParserSpec)
 import Test.Spec.DescParserSpec (descParserSpec)
 import Test.Spec.GeneratorSpec (generatorSpec)
 import Test.Spec.SolverSpec (solverSpec)
+import Test.Spec.DocoptSpec (docoptSpec)
 
 main = run [consoleReporter] do
-  scannerSpec
-  usageParserSpec
-  descParserSpec
-  solverSpec
-  generatorSpec
+  -- scannerSpec
+  -- usageParserSpec
+  -- descParserSpec
+  -- solverSpec
+  -- generatorSpec
+  docoptSpec

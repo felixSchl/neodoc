@@ -16,13 +16,14 @@ import Test.Assert (assert)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
+
 import Test.Support (vliftEff, runEitherEff)
 import qualified Test.Support.Usage as U
 import qualified Test.Support.Docopt as D
 import qualified Test.Support.Desc as Desc
 
 import Docopt
-import Docopt.Spec.Solver (solve, SolveError(..))
+import Docopt.Spec.Solver (solve)
 import qualified Docopt.Spec.Parser.Usage as U
 import qualified Docopt.Spec.Parser.Desc as D
 import Docopt.Spec.Parser.Scanner (scan)

@@ -1,25 +1,24 @@
 module Docopt.Gen where
 
 import Prelude
-import Data.Maybe (Maybe(..), maybe)
-import Data.String (fromCharArray)
-import qualified Data.Array as A
+import Data.List (List(..))
+import Data.Either (Either(..))
+import Docopt.Gen.Types (ValueMapping(), Token())
+import qualified Text.Parsing.Parser as P
+import Docopt (Application(..))
+import Docopt.Gen.Lexer (lex)
+import Docopt.Gen.Parser (mkApplicationParser)
+import Data.Foldable (foldl)
+import Control.Alt ((<|>))
+import Control.Plus (empty)
 
--- | Represents each item in ARGV
-data Token
-  = LOpt String (Maybe String)
-  | SOpt Char (Array Char) (Maybe String)
-  | Lit  String
+run :: List Application
+    -> List String
+    -> Either P.ParseError (List ValueMapping)
+run as xs = do
+  toks <- lex xs
+  P.runParser toks parser
 
-prettyPrintToken :: Token -> String
-prettyPrintToken (Lit s) = show s
-prettyPrintToken (LOpt n a) = "--" ++ n ++ arg
-  where arg = maybe "" ("=" ++) a
-prettyPrintToken (SOpt n s a) = "-"  ++ (fromCharArray (A.cons n s)) ++ arg
-  where arg = maybe "" ("=" ++) a
-
-instance showToken :: Show Token where
-  show (LOpt s a)    = "LOpt " ++ show s ++ " " ++ show a
-  show (SOpt c cs a) = "SOpt " ++ show c ++ " " ++ show cs ++ " " ++ show a
-  show (Lit  s)      = "Lit "  ++ show s
-
+  where
+    parser :: P.Parser (List Token) (List ValueMapping)
+    parser = foldl (<|>) empty (mkApplicationParser <$> as)
