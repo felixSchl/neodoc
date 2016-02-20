@@ -2,7 +2,7 @@ module Test.Spec.SolverSpec (solverSpec) where
 
 import Prelude
 import Debug.Trace
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Control.Bind ((=<<))
 import Control.Apply ((*>))
 import Data.List (List(..), toList)
@@ -10,7 +10,8 @@ import Control.Plus (empty)
 import Data.Foldable (intercalate, for_)
 import Control.Monad.Eff.Exception (error, throwException)
 import qualified Data.Array as A
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
+import Data.String (fromChar)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
@@ -93,9 +94,11 @@ solverSpec =
         ]
 
     , test ([ usage [ [ U.so 'f' [] Nothing true ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
-                            (Just $ Desc.arg "FILE" (Just "foo"))
-                ])
+        [ pass  [ Desc.opt (Desc.fname 'f' "file")
+                           (Just $ Desc.arg "FILE" (Just "foo"))
+                , Desc.opt (Desc.fname 'f' "file")
+                           (Just $ Desc.arg "FILE" (Just "foo"))
+                ]
                 ([ application [
                     [ D.opt (Just 'f')
                             (Just "file")
@@ -137,14 +140,27 @@ solverSpec =
   where
 
     runtest n (TestSuite { usages, cases }) = do
-      describe ("Suite " ++ show (n + 1)) do
+      describe
+        ("\nUsage:\n" ++ intercalate "\n" (("  " ++) <$>
+          (U.prettyPrintUsage <$> usages))) do
         (flip traverseWithIndex_) (toList cases)
           \j (TestCase { descs, expected }) -> do
-            it ("case " ++ show (j + 1) ++ "/" ++ (show $ A.length cases)) do
-              vliftEff do
-                evaltest
-                  (solve (toList usages) (toList descs))
-                  (toList <$> expected)
+            describe
+              ("\nOptions:\n" ++ intercalate "\n" (("  " ++) <$>
+                (D.prettyPrintDesc <$> descs))) do
+              it (
+                either
+                  (\msg -> "Should fail with:\n" ++ msg)
+                  (\as  -> "Should resolve to:\n"
+                    ++ intercalate "\n" (("  " ++ ) <$>
+                      (prettyPrintApplication <$> as))
+                  )
+                  expected
+              ) do
+                vliftEff do
+                  evaltest
+                    (solve (toList usages) (toList descs))
+                    (toList <$> expected)
 
     evaltest (Right output) (Right expected)
       = if output == (toList expected)

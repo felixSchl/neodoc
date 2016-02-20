@@ -8,16 +8,17 @@ import Control.Monad.Trans (lift)
 import Control.Monad.State (get)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
+import Data.Foldable (intercalate)
 import Data.List (List(..), many, some, (:), toList, concat)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 import qualified Data.List as L
-import Data.String (length)
+import Data.String (length, fromChar)
 import Data.Either
 import Data.Tuple
-import Data.Maybe hiding (maybe)
+import Data.Maybe (Maybe(..), maybe)
 import qualified Data.Array as A
 import qualified Data.String as Str
 import Control.Bind ((=<<))
@@ -77,6 +78,33 @@ instance eqArgument :: Eq Argument where
   eq (Group b xs r)         (Group b' xs' r')          = (b == b') && (xs == xs') && (r == r')
   eq (OptionStack c cs a r) (OptionStack c' cs' a' r') = (c == c') && (cs == cs') && (a == a') && (r == r')
   eq _                      _                          = false
+
+prettyPrintUsage :: Usage -> String
+prettyPrintUsage (Usage name bs) =
+  name ++ " " ++ intercalate " | " (prettyPrintBranch <$> bs)
+    where
+      prettyPrintBranch :: Branch -> String
+      prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
+
+      prettyPrintArg :: Argument -> String
+      prettyPrintArg (Command n) = n
+      prettyPrintArg (Positional n r)
+        = n ++ if r then "..." else ""
+      prettyPrintArg (Option n a r)
+        = "--" ++ n
+          ++ (maybe "" ("="++) a)
+          ++ if r then "..." else ""
+      prettyPrintArg (OptionStack f fs a r)
+        = "-" ++ (fromChar f)
+          ++ (intercalate "" $ fromChar <$> toList fs)
+          ++ (maybe "" ("="++) a)
+          ++ if r then "..." else ""
+      prettyPrintUsage (Group b xs r)
+        = if b then "(" else "["
+          ++ intercalate " | " (prettyPrintBranch <$> bs)
+          ++ if b then ")" else "]"
+          ++ if r then "..." else ""
+
 
 run :: String -> Either P.ParseError (List Usage)
 run x = parse =<< lex x
