@@ -5,6 +5,7 @@ import Debug.Trace
 import Control.MonadPlus (guard)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
+import Text.Parsing.Parser.Combinators ((<?>))
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
@@ -34,28 +35,36 @@ docoptScanner = do
     P.anyChar
     ((void $ P.lookAhead sectionLabel) <|> P.eof)
 
-  label <- sectionLabel
-  guard ((toLower label) == "usage")
+  label <- sectionLabel <?> "section label"
+  guard $ (toLower label) == "usage"
 
   -- "Fix" the section by replacing the original section header with whitespace
   -- to maintain proper offsets.
   fixColOffset <- (P.char '\n' *> pure 0)
               <|> (pure $ Str.length label + 1) -- + 1 for the colon
-  usage <- fromCharArray <<< fromList <$> do
+
+  usage <- (fromCharArray <<< fromList <$> do
     P.manyTill
       P.anyChar
       ((void $ P.lookAhead sectionLabel) <|> P.eof)
+  ) <?> "usage section"
+
   let fixedUsage = (fromCharArray $ A.replicate fixColOffset ' ') ++ usage
 
-  options <- many do
-    label <- sectionLabel
-    guard $ endsWith ("options") (toLower label)
+  options <- (many do
+    label <- sectionLabel <?> "section label"
+    (guard $ endsWith "options" $ toLower label)
+      <?> "section label ending in \"options\". E.g.: \"Advanved Options:\""
     fromCharArray <<< fromList <$> do
       P.manyTill
         P.anyChar
         ((void $ P.lookAhead sectionLabel) <|> P.eof)
+  ) <?> "description sections"
 
-  pure { usage: dedent fixedUsage, options: options }
+  return {
+    usage:   dedent fixedUsage
+  , options: options
+  }
 
   where
     sectionLabel :: P.Parser String String

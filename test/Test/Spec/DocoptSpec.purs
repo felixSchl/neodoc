@@ -40,13 +40,10 @@ docoptSpec =
   describe "docopt" do
     it "..." do
       vliftEff do
-
-        traceShowA $ init (toList ['a'] :: List Char)
-
         runEitherEff do
           output <- runDocopt
             """
-            Usage: foo -o FILE FILE...
+            Usage: foo -h=<host[:port]> -o FILE FILE...
 
             Options:
             -o, --output=FILE The file to write to
