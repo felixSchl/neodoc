@@ -1,0 +1,33 @@
+{
+  "name": "docopt",
+  "version": "0.0.0",
+  "description": "Docopt",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "pulp test",
+    "bower-install": "bower install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/felixschl/docopt.js.git"
+  },
+  "keywords": [
+    "docopt",
+    "cli",
+    "parser"
+  ],
+  "author": "Felix Schlitter <felixschlitter@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/felixschl/docopt.js/issues"
+  },
+  "homepage": "https://github.com/felixschl/docopt.js#readme",
+  "devDependencies": {
+    "bower": "^1.7.7",
+    "pulp": "^8.0.0",
+    "purescript": "^0.8.0"
+  }
+}
