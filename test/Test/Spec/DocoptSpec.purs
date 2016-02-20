@@ -2,7 +2,7 @@ module Test.Spec.DocoptSpec (docoptSpec) where
 
 import Prelude
 import Debug.Trace
-import Data.List (toList, concat)
+import Data.List (List(..), toList, concat, last, init)
 import qualified Text.Parsing.Parser as P
 import Data.Traversable (traverse)
 import Data.Bifunctor (lmap)
@@ -40,6 +40,9 @@ docoptSpec =
   describe "docopt" do
     it "..." do
       vliftEff do
+
+        traceShowA $ init (toList ['a'] :: List Char)
+
         runEitherEff do
           docopt <- toScanErr $ scan $ dedent
             """

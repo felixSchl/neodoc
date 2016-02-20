@@ -17,6 +17,7 @@ import Data.Maybe (Maybe(..), isJust, maybe, maybe', isNothing)
 import Data.List (List(..), filter, head, foldM, concat, (:), singleton
                 , catMaybes, toList, last, init, length)
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.Foldable (foldl)
 import Control.Plus (empty)
 import Data.Monoid (mempty)
@@ -27,106 +28,141 @@ import Docopt (Argument(..), Application(..), Branch(..), OptionArgument(..)
 import qualified Docopt.Spec.Parser.Desc  as D
 import qualified Docopt.Spec.Parser.Usage as U
 
-solveArg :: U.Argument -> List D.Desc -> Either SolveError (List Argument)
-solveArg (U.Command s) _       = singleton <$> return (Command s)
-solveArg (U.Positional s r) _  = singleton <$> return (Positional s r)
-solveArg o@(U.Option n a r) ds = singleton <$> do
-  -- XXX: Is `head` the right thing to do here? What if there are more
-  -- matches? That would indicate ambigiutiy and needs to be treated, possibly
-  -- with an error?
-  return $ maybe' (\_ -> Option Nothing (Just n) (toArg a) r)
-                  id
-                  (head $ catMaybes $ convert <$> ds)
-
-  where
-    toArg:: Maybe String -> Maybe OptionArgument
-    toArg a = a >>= \an -> return $ OptionArgument an Nothing
-
-    resolveArg :: Maybe String -> Maybe D.Argument -> Maybe OptionArgument
-    resolveArg (Just an) Nothing = return $ OptionArgument an Nothing
-    resolveArg Nothing (Just (D.Argument a))
-      -- XXX: The conversion to `StringValue` should not be needed,
-      -- `Desc.Argument` should be of type `Maybe Value`.
-      = return $ OptionArgument a.name (StringValue <$> a.default)
-    resolveArg (Just an) (Just (D.Argument a))
-      -- XXX: Do we need to guard that `an == a.name` here?
-      -- XXX: The conversion to `StringValue` should not be needed,
-      -- `Desc.Argument` should be of type `Maybe Value`.
-      = return $ OptionArgument a.name (StringValue <$> a.default)
-    resolveArg _ _ = Nothing
-
-    convert :: D.Desc -> Maybe Argument
-    convert (D.OptionDesc (D.Option { name=D.Long n', arg=a' }))
-      | n' == n
-      = return $ Option Nothing (Just n) (resolveArg a a') r
-    convert (D.OptionDesc (D.Option { name=D.Full f n', arg=a' }))
-      | n' == n
-      = return $ Option (Just f) (Just n) (resolveArg a a') r
-    convert _ = Nothing
-
-solveArg o@(U.OptionStack f fs a r) ds = do
-  let fs' = f:toList fs
-
-  -- Ensure that only the last stacked option is to be considered in
-  -- "trailing" position and hence capable of expanding to take an argument.
-  if length fs' > 1
-    then do
-      xs <- traverse (match false) (fromJust $ init fs')
-      x  <- match true (fromJust $ last fs')
-      return $ xs ++ singleton x
-    else
-      traverse (match true) fs'
-
-  where
-    match :: Boolean -> Char -> Either SolveError Argument
-    match isTrailing f = do
-      return $ maybe' (\_ -> Option (Just f) Nothing (toArg a) r)
-                      id
-                      (head $ catMaybes $ convert f isTrailing <$> ds)
-
-    toArg:: Maybe String -> Maybe OptionArgument
-    toArg a = a >>= \an -> return $ OptionArgument an Nothing
-
-    resolveArg :: Maybe String -> Maybe D.Argument -> Maybe OptionArgument
-    resolveArg (Just an) Nothing = return $ OptionArgument an Nothing
-    resolveArg Nothing (Just (D.Argument a))
-      -- XXX: The conversion to `StringValue` should not be needed,
-      -- `Desc.Argument` should be of type `Maybe Value`.
-      = return $ OptionArgument a.name (StringValue <$> a.default)
-    resolveArg (Just an) (Just (D.Argument a))
-      -- XXX: Do we need to guard that `an == a.name` here?
-      -- XXX: The conversion to `StringValue` should not be needed,
-      -- `Desc.Argument` should be of type `Maybe Value`.
-      = return $ OptionArgument a.name (StringValue <$> a.default)
-
-    convert :: Char -> Boolean -> D.Desc -> Maybe Argument
-    convert f isTrailing (D.OptionDesc (D.Option { name=D.Flag f', arg=a' }))
-      | (f == f')
-        && (isTrailing || isNothing a')
-      = return $ Option (Just f) Nothing (resolveArg a a') r
-    convert f isTrailing (D.OptionDesc (D.Option { name=D.Full f' n, arg=a' }))
-      | (f == f')
-        && (isTrailing || isNothing a')
-      = return $ Option (Just f) (Just n) (resolveArg a a') r
-    convert _ _ _ = Nothing
-
-solveArg (U.Group o bs r) ds  = singleton <$> do
-  flip (Group o) r <$> do
-    foldM go empty bs
-      where go :: List Branch -> U.Branch -> Either SolveError (List Branch)
-            go a b = do
-              br <- solveBranch b ds
-              return (br:a)
+data Result = Consumed (List Argument) | Unconsumed (List Argument)
 
 solveBranch :: U.Branch -> List D.Desc -> Either SolveError Branch
-solveBranch as ds = Branch <<< concat <$> (foldM step Nil as)
-  where
-    step :: List (List Argument)
-          -> U.Argument
-          -> Either SolveError (List (List Argument))
-    step ass a = do
-      xs <- solveArg a ds
-      return $ ass ++ (singleton xs)
+solveBranch as ds = Branch <$> f as
+  where f :: U.Branch -> Either SolveError (List Argument)
+        f Nil = return Nil
+        f (Cons x Nil) = do
+          m <- solveArgs x Nothing
+          return $ case m of
+            Unconsumed zs -> zs
+            Consumed   zs -> zs
+        f (Cons x (Cons y xs)) = do
+          m <- solveArgs x (Just y)
+          case m of
+            Unconsumed zs -> (zs ++) <$> f (y:xs)
+            Consumed   zs -> (zs ++) <$> f xs
+
+        -- | Solve two adjacent arguments.
+        -- | Should the first argument be an option with an argument that
+        -- | matches an adjacent command or positional, consume the adjacent
+        -- | argument from the input (consume).
+        solveArgs :: U.Argument
+                  -> Maybe U.Argument
+                  -> Either SolveError Result
+
+        solveArgs (U.Command s) _
+          = Unconsumed <<< singleton <$> return (Command s)
+
+        solveArgs (U.Positional s r) _
+          = Unconsumed <<< singleton <$> return (Positional s r)
+
+        solveArgs (U.Group o bs r) _
+          = Unconsumed <<< singleton <$> do
+            flip (Group o) r <$> do
+              flip solveBranch ds `traverse` bs
+
+        solveArgs o@(U.Option n a r) y = do
+
+          -- XXX: Is `head` the right thing to do here? What if there are more
+          -- matches? That would indicate ambigiutiy and needs to be treated,
+          -- possibly with an error?
+          let opt = flip maybe' id
+                      (\_ -> Option Nothing (Just n) (toArg a) r)
+                      (head $ catMaybes $ convert <$> ds)
+
+          return $ (case y of
+            Just (U.Positional n _) ->
+              case opt of
+                (Option _ _ (Just (OptionArgument n' _)) _)
+                  | n == n' -> Consumed
+                _ -> Unconsumed
+            Just (U.Command n) ->
+              case opt of
+                (Option _ _ (Just (OptionArgument n' _)) _)
+                  | n == n' -> Consumed
+                _ -> Unconsumed
+            _                                  -> Unconsumed
+            ) $ singleton opt
+
+          where
+            convert :: D.Desc -> Maybe Argument
+            convert (D.OptionDesc (D.Option { name=D.Long n', arg=a' }))
+              | n' == n
+              = return $ Option Nothing (Just n) (resolveOptArg a a') r
+            convert (D.OptionDesc (D.Option { name=D.Full f n', arg=a' }))
+              | n' == n
+              = return $ Option (Just f) (Just n) (resolveOptArg a a') r
+            convert _ = Nothing
+
+        solveArgs o@(U.OptionStack f fs a r) y = do
+          -- Figure out trailing flag, in order to couple it with an adjacent
+          -- option where needed.
+          let fs' = toList fs
+              x   = case last fs' of
+                      Just f' -> Tuple (f:(fromJust $ init fs')) f'
+                      Nothing -> Tuple Nil f
+              fs'' = fst x
+              f''  = snd x
+
+          xs <- match false `traverse` fs''
+          x  <- match true f''
+
+          return $ (case y of
+            Just (U.Positional n _) ->
+              case x of
+                (Option _ _ (Just (OptionArgument n' _)) _)
+                  | n == n' -> Consumed
+                _ -> Unconsumed
+            Just (U.Command n) ->
+              case x of
+                (Option _ _ (Just (OptionArgument n' _)) _)
+                  | n == n' -> Consumed
+                _ -> Unconsumed
+            _ -> Unconsumed
+            ) $ xs ++ singleton x
+
+          where
+            match :: Boolean -> Char -> Either SolveError Argument
+            match isTrailing f = do
+              return $ flip maybe' id
+                        (\_ -> Option (Just f) Nothing (toArg a) r)
+                        (head $ catMaybes $ convert f isTrailing <$> ds)
+
+            convert :: Char -> Boolean -> D.Desc -> Maybe Argument
+            convert f isTrailing (D.OptionDesc (D.Option { name=D.Flag f', arg=a' }))
+              | (f == f')
+                && (isTrailing || isNothing a')
+              = return $ Option (Just f) Nothing (resolveOptArg a a') r
+            convert f isTrailing (D.OptionDesc (D.Option { name=D.Full f' n, arg=a' }))
+              | (f == f')
+                && (isTrailing || isNothing a')
+              = return $ Option (Just f) (Just n) (resolveOptArg a a') r
+            convert _ _ _ = Nothing
+
+        -- | Resolve an option's argument name against that given in the
+        -- | description, returning the most complete argument known.
+        resolveOptArg :: Maybe String
+                      -> Maybe D.Argument
+                      -> Maybe OptionArgument
+        resolveOptArg (Just n) Nothing = return $ OptionArgument n Nothing
+        resolveOptArg Nothing (Just (D.Argument a))
+          = do
+          -- XXX: The conversion to `StringValue` should not be needed,
+          -- `Desc.Argument` should be of type `Maybe Value`.
+          return $ OptionArgument a.name (StringValue <$> a.default)
+        resolveOptArg (Just an) (Just (D.Argument a))
+          = do
+          -- XXX: Do we need to guard that `an == a.name` here?
+          -- XXX: The conversion to `StringValue` should not be needed,
+          -- `Desc.Argument` should be of type `Maybe Value`.
+          return $ OptionArgument a.name (StringValue <$> a.default)
+        resolveOptArg _ _ = Nothing
+
+        toArg:: Maybe String -> Maybe OptionArgument
+        toArg a = a >>= \an -> return $ OptionArgument an Nothing
 
 solveUsage :: U.Usage -> List D.Desc -> Either SolveError Application
 solveUsage (U.Usage _ bs) ds = Application <$> (foldM step Nil bs)
