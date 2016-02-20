@@ -24,7 +24,7 @@ import Data.Monoid (mempty)
 import qualified Data.Array as A
 
 import Docopt (Argument(..), Application(..), Branch(..), OptionArgument(..)
-              , Value(..), SolveError(..))
+              , Value(..), SolveError(..), isRepeatable)
 import qualified Docopt.Spec.Parser.Desc  as D
 import qualified Docopt.Spec.Parser.Usage as U
 
@@ -73,19 +73,35 @@ solveBranch as ds = Branch <$> f as
                       (\_ -> Option Nothing (Just n) (toArg a) r)
                       (head $ catMaybes $ convert <$> ds)
 
-          return $ (case y of
-            Just (U.Positional n _) ->
-              case opt of
-                (Option _ _ (Just (OptionArgument n' _)) _)
-                  | n == n' -> Consumed
-                _ -> Unconsumed
-            Just (U.Command n) ->
-              case opt of
-                (Option _ _ (Just (OptionArgument n' _)) _)
-                  | n == n' -> Consumed
-                _ -> Unconsumed
-            _                                  -> Unconsumed
-            ) $ singleton opt
+          -- Look ahead if any of the following arguments should be consumed.
+          -- Return either `Nothing` to signify that nothing should be consumed
+          -- or a value signifieng that it should be consumed, and the
+          -- `isRepeated` should be inherited.
+          let out = if r
+                then Nothing
+                else
+                  case y of
+                    Just (U.Positional n r) ->
+                      case opt of
+                        (Option _ _ (Just (OptionArgument n' _)) _)
+                          | n == n' -> Just r
+                        _ -> Nothing
+                    Just (U.Command n) ->
+                      case opt of
+                        (Option _ _ (Just (OptionArgument n' _)) _)
+                          | n == n' -> Just false
+                        _ -> Nothing
+                    _ -> Nothing
+
+          return $ maybe'
+            (\_ -> Unconsumed $ singleton opt)
+            (\r -> case opt of
+              -- XXX: This is getting ugly. Should have used a record...
+              -- (Let this crash and burn at runtime by providing a
+              -- non-exhaustive list of patterns).
+              (Option f n a _) -> Consumed $ singleton $ Option f n a r
+            )
+            out
 
           where
             convert :: D.Desc -> Maybe Argument
@@ -110,19 +126,35 @@ solveBranch as ds = Branch <$> f as
           xs <- match false `traverse` fs''
           x  <- match true f''
 
-          return $ (case y of
-            Just (U.Positional n _) ->
-              case x of
-                (Option _ _ (Just (OptionArgument n' _)) _)
-                  | n == n' -> Consumed
-                _ -> Unconsumed
-            Just (U.Command n) ->
-              case x of
-                (Option _ _ (Just (OptionArgument n' _)) _)
-                  | n == n' -> Consumed
-                _ -> Unconsumed
-            _ -> Unconsumed
-            ) $ xs ++ singleton x
+          -- Look ahead if any of the following arguments should be consumed.
+          -- Return either `Nothing` to signify that nothing should be consumed
+          -- or a value signifieng that it should be consumed, and the
+          -- `isRepeated` should be inherited.
+          let out = if (isRepeatable x)
+                then Nothing
+                else
+                  case y of
+                    Just (U.Positional n r) ->
+                      case x of
+                        (Option _ _ (Just (OptionArgument n' _)) _)
+                          | n == n' -> Just r
+                        _ -> Nothing
+                    Just (U.Command n) ->
+                      case x of
+                        (Option _ _ (Just (OptionArgument n' _)) _)
+                          | n == n' -> Just false
+                        _ -> Nothing
+                    _ -> Nothing
+
+          return $ maybe'
+            (\_ -> Unconsumed $ xs ++ singleton x)
+            (\r -> case x of
+              -- XXX: This is getting ugly. Should have used a record...
+              -- (Let this crash and burn at runtime by providing a
+              -- non-exhaustive list of patterns).
+              (Option f n a _) -> Consumed $ xs ++ (singleton $ Option f n a r)
+            )
+            out
 
           where
             match :: Boolean -> Char -> Either SolveError Argument

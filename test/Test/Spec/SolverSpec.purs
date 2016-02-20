@@ -55,14 +55,17 @@ application xss = Application $ toList $ (\xs -> Branch $ toList xs) <$> xss
 solverSpec =
   describe "solver" do
     (flip traverseWithIndex_) (toList [
+
       test ([ usage [ [ U.co "foo" ] ] ])
         [ pass  ([])
                 ([ application [ [ D.co "foo" ] ] ])
         ]
+
     , test ([ usage [ [ U.po "foo" true ] ] ])
         [ pass  ([])
                 ([ application [ [ D.po "foo" true ] ] ])
         ]
+
     , test ([ usage [ [ U.lo "foo" Nothing true ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
                             (Just $ Desc.arg "bar" (Just "qux"))
@@ -76,6 +79,65 @@ solverSpec =
                     ]
                 ] ])
         ]
+
+    , test ([ usage [ [ U.lo "foo" Nothing true, U.co "BAR" ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
+                            (Just $ Desc.arg "BAR" (Just "qux"))
+                ])
+                ([ application [
+                    [ D.opt (Just 'f')
+                            (Just "foo")
+                            (Just $ OptionArgument "BAR"
+                                                   (Just $ StringValue "qux"))
+                            true
+                    , D.co "BAR"
+                    ]
+                ] ])
+        ]
+
+    , test ([ usage [ [ U.lo "foo" Nothing false, U.po "BAR" true ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
+                            (Just $ Desc.arg "BAR" (Just "qux"))
+                ])
+                ([ application [
+                    [ D.opt (Just 'f')
+                            (Just "foo")
+                            (Just $ OptionArgument "BAR"
+                                                   (Just $ StringValue "qux"))
+                            true
+                    ]
+                ] ])
+        ]
+
+    , test ([ usage [ [ U.lo "foo" Nothing false, U.po "BAR" false ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
+                            (Just $ Desc.arg "BAR" (Just "qux"))
+                ])
+                ([ application [
+                    [ D.opt (Just 'f')
+                            (Just "foo")
+                            (Just $ OptionArgument "BAR"
+                                                   (Just $ StringValue "qux"))
+                            false
+                    ]
+                ] ])
+        ]
+
+    , test ([ usage [ [ U.lo "foo" Nothing true, U.po "BAR" true ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
+                            (Just $ Desc.arg "BAR" (Just "qux"))
+                ])
+                ([ application [
+                    [ D.opt (Just 'f')
+                            (Just "foo")
+                            (Just $ OptionArgument "BAR"
+                                                   (Just $ StringValue "qux"))
+                            true
+                    , D.po "BAR" true
+                    ]
+                ] ])
+        ]
+
     , test ([ usage [ [ U.so 'x' ['v', 'z', 'f'] Nothing true ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "file")
                             (Just $ Desc.arg "FILE" (Just "foo"))
@@ -93,7 +155,7 @@ solverSpec =
                 ] ])
         ]
 
-    , test ([ usage [ [ U.so 'f' [] Nothing true ] ] ])
+    , test ([ usage [ [ U.so 'f' [] Nothing false, U.po "FILE" true ] ] ])
         [ pass  [ Desc.opt (Desc.fname 'f' "file")
                            (Just $ Desc.arg "FILE" (Just "foo"))
                 , Desc.opt (Desc.fname 'f' "file")
@@ -135,9 +197,30 @@ solverSpec =
                     ]
                 ] ])
         ]
+    , test ([ usage [ [ U.so 'x' ['v', 'z', 'f'] Nothing true ] ] ])
+        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
+                            (Just $ Desc.arg "FILE" (Just "foo"))
+                ])
+                ([ application [
+                    [ D.opt (Just 'x') Nothing Nothing true
+                    , D.opt (Just 'v') Nothing Nothing true
+                    , D.opt (Just 'z') Nothing Nothing true
+                    , D.opt (Just 'f')
+                            (Just "file")
+                            (Just $ OptionArgument "FILE"
+                                                   (Just $ StringValue "foo"))
+                            true
+                    ]
+                ] ])
+        ]
     ]) runtest
 
   where
+
+    prettyPrintOutput :: List Application -> String
+    prettyPrintOutput as =
+      intercalate "\n" (("  " ++ ) <$>
+        (prettyPrintApplication <$> as))
 
     runtest n (TestSuite { usages, cases }) = do
       describe
@@ -151,10 +234,7 @@ solverSpec =
               it (
                 either
                   (\msg -> "Should fail with:\n" ++ msg)
-                  (\as  -> "Should resolve to:\n"
-                    ++ intercalate "\n" (("  " ++ ) <$>
-                      (prettyPrintApplication <$> as))
-                  )
+                  (\as  -> "Should resolve to:\n" ++ prettyPrintOutput (toList as))
                   expected
               ) do
                 vliftEff do
@@ -166,11 +246,11 @@ solverSpec =
       = if output == (toList expected)
             then return unit
             else throwException $ error $
-              "Unexpected output:\n" ++ show output
+              "Unexpected output:\n" ++ prettyPrintOutput output
 
     evaltest (Right output) (Left _)
       = throwException $ error $
-          "Missing exception! Got:\n" ++ show output
+          "Missing exception! Got:\n" ++ prettyPrintOutput output
 
     evaltest (Left err) (Left expected)
       = if (show err) == expected
