@@ -43,10 +43,20 @@ docoptSpec =
         runEitherEff do
           output <- runDocopt
             """
-            Usage: foo -h=<host[:port]> -o FILE FILE...
+            Usage:
+              foo -h=<host[:port]> -o FILE FILE...
 
             Options:
-            -o, --output=FILE The file to write to
+              -o, --output=FILE
+                The file to write to
+
+              -h, --host=<host[:port]>
+                The host to connect to
+                [default: http://localhost:3000]
             """
-            [ "-o", "~/foo/bar", "x", "y" ]
+            [ "-o", "~/foo/bar"
+            , "-h", "http://localhost:5000"
+            , "x"
+            , "y"
+            ]
           traceShowA output

@@ -220,8 +220,6 @@ parseToken = P.choice
           Just n  -> return n
           Nothing -> P.fail "Could not parse integer"
 
-
-
   name :: P.Parser String String
   name = fromCharArray <$> do
     A.cons
@@ -239,12 +237,10 @@ parseToken = P.choice
   angleName = do
     P.char '<'
     name <- fromCharArray <$> do
-      A.cons
-        <$> identStart
-        <*> (A.many $ P.choice [
-              identLetter
-            , P.oneOf [ '-' ]
-            ])
+      A.many $ P.choice [
+        identLetter
+      , P.oneOf [ '-', '|', ':', '[', ']', '(', ')' ]
+      ]
     P.char '>'
     pure name
 
