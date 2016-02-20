@@ -197,19 +197,10 @@ solveBranch as ds = Branch <$> f as
         toArg a = a >>= \an -> return $ OptionArgument an Nothing
 
 solveUsage :: U.Usage -> List D.Desc -> Either SolveError Application
-solveUsage (U.Usage _ bs) ds = Application <$> (foldM step Nil bs)
-  where
-    step :: List Branch -> U.Branch -> Either SolveError (List Branch)
-    step bs b = do
-      x <- solveBranch b ds
-      return $ bs ++ (singleton x)
+solveUsage (U.Usage _ bs) ds = Application <$> do
+  traverse (flip solveBranch ds) bs
 
 solve :: (List U.Usage)
       -> (List D.Desc)
       -> Either SolveError (List Application)
-solve us ds = foldM step Nil us
-  where
-    step :: List Application -> U.Usage -> Either SolveError (List Application)
-    step as u = do
-      x <- solveUsage u ds
-      return $ as ++ (singleton x)
+solve us ds = traverse (flip solveUsage ds) us
