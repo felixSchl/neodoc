@@ -1,64 +1,50 @@
 # Docopt #
 
-> [WIP] Purescript implementation of docopt
+> [WIP] JS/Purescript implementation of docopt, available on npm.
+
+[![Build Status](https://travis-ci.org/felixSchl/docopt.svg?branch=development)](https://travis-ci.org/felixSchl/docopt)
 
 This is a fairly ambitious implementation of docopt _plus more_. The idea of
 docopt is great, but the language is still rather informal. It's a fine balance
 walk between keeping the docopt text fairly prose, but structured enough to
 extract meaningful information.
 
-For those unfamiliar with docopt, [refer to the original first][docopt-orig].
+_For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 
 ## Project goals ##
 
-* There should be **very good error reporting** for users and at least decent
+* Provide a declarative way to author command lines. Rather than deriving the
+  help text from some DSL, derive it from a human readable, prose-like EDSL,
+  located e.g. in the project's README. **This guarantees documentation and
+  implementation never diverge, because they simply can't.**
+* Provide **very good error reporting** for users of the CLI and at least decent
   error reporting for developers authoring the docopt text.
 * The manually crafted docopt text must be **readable, standardised, yet
   flexible and powerful** enough to handle a fair set of use-cases.
-* Should have a solid interface for use in **regular javascript**. Purescript
-  should merely be an implementation detail.
+* A solid interface for use in **regular javascript**. Purescript should merely
+  be an implementation detail.
 * **Solid test coverage**
 
 ## Project status ##
 
-The project is coming together slowly, but steadily. Three of major hurdles have
-been \*mostly\* overcome: Parsing of the specification, generating a parser
-from the specification and in part applying it to the user input. Much of the
-work has been placed into testing the components, which in turn has helped to
-achieve faster turn-arounds and more lasting / solid results.
+* [x] Scan the docopt text for usage sections and 0 or more description sections
+* [x] Lex and parse usage sections
+* [x] Lex and parse description sections
+* [x] Resolve ambiguities by combining the parsed usage and description sections
+* [x] Generate parser from the solved program specification
+* [x] Lex and parse user input on the CLI
+* [ ] Transform the parsed args into something more useful
+* [ ] Provide seamless interface to be called from JS
+* [ ] Provide typescript typings
 
-The areas that need to be worked on are, in order of importance:
 
-* Specification solving: A pure function, roughly of shape:
-  `Usage -> [ Option ] -> Either Error Specification`. This function needs
-  to run in the either monad in order to capture errors during solving, i.e.
-  a name clash or conflicting defaults, etc.
-* Transform the parsed input into a datastructure useful to the user:
-  `{ [key]: value }`, where options that have aliases, will be present
-  multiple times.
-* Low priority: Options should be able to specify default values straight in the
+Further, the wishlish looks somewhat like this:
+
+* Options should be able to specify default values straight in the
   Usage section, i.e.: `Usage: foo --bar=100`. This *will* have an impact on the
   solver implementation, however.
-* Low priority: Rewrite recursive functions to be in tail position, using
+* Rewrite recursive functions to be in tail position, using
   `purescript-tailrec` and consider trampolining using `purescript-free`.
-
-## Implementation ##
-
-The project can roughly be broken up into 4 distinct areas of work:
-
-1. Parsing the Specification
-    1. Breaking apart the text into sections:
-        * At least one usage section
-        * Zero or more option sections
-    1. Lex and parse the usage section
-    1. Lex and parse any option sections
-1. **Solve the parsed Specification into it's canonical, unambigious form**
-1. Generate a parser from the Specification
-1. Lex and parse the user input
-    1. Lex and parse the user input
-    1. **Transform into a usable form**
-
-<sub>Highlighted items are yet-to-be-done.</sub>
 
 ## Contributing ##
 
@@ -73,7 +59,29 @@ $ pulp test
 During development, `pulp --watch test` (or `pulp -w test`) is extremely useful
 to get immediate feedback.
 
+### Implementation ###
+
+> A quick overview of the implementation for potential contributors
+
+The project can roughly be broken up into 4 distinct areas of work:
+
+1. Scanning the docopt text:
+    1. Derive at least 1 usage section
+    1. Derive 0 or more description sections
+1. Parsing the Specification
+    1. Lex and parse the usage section
+    1. Lex and parse any description sections
+1. Solve the parsed Specification into it's canonical, unambigious form
+1. Generate a parser from the Specification
+1. Lex and parse the user input
+    1. Lex and parse the user input
+    1. **Transform into a usable form**
+
+<sub>\*Highlighted items are yet-to-be-done.</sub>
+
+
 ---
+
 
 ## Ideas for a future past the initial relase ##
 
