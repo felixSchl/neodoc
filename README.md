@@ -37,9 +37,10 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * [ ] Provide seamless interface to be called from JS
 * [ ] Provide typescript typings
 
+Further, the wishlist looks somewhat like this:
 
-Further, the wishlish looks somewhat like this:
-
+* Refactor the `Docopt.Spec.Parser.Usage.OptionStack` constructor to use
+  `NonEmpty` from `purescript-nonempty`
 * Options should be able to specify default values straight in the
   Usage section, i.e.: `Usage: foo --bar=100`. This *will* have an impact on the
   solver implementation, however.
