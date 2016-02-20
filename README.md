@@ -37,8 +37,18 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * [ ] Provide seamless interface to be called from JS
 * [ ] Provide typescript typings
 
+Known issues to work through:
+
+* [ ] Options that were not provided through argv but that have defaults, are
+      currently not present in the output
+* [ ] Options that have a default value and are provided through argv without an
+      argument should produce an error if the argument type is not a boolean
+      (toggle)
+
 Further, the wishlist looks somewhat like this:
 
+* Allow boolean negation. Let `--foo` be an option of type boolean, implicitly
+  allow it's negation `--no-foo`.
 * Refactor the `Docopt.Spec.Parser.Usage.OptionStack` constructor to use
   `NonEmpty` from `purescript-nonempty`
 * Options should be able to specify default values straight in the
