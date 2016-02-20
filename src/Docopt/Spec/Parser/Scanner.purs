@@ -73,6 +73,7 @@ docoptScanner = do
       name <- fromCharArray <$> do
         A.many $ P.noneOf [ '\n', '\r', ':' ]
       P.char ':'
+      P.char '\n'
       pure name
 
     endsWith :: String -> String -> Boolean
