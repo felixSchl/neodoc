@@ -39,6 +39,8 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 
 Known issues to work through:
 
+* [ ] `--` (end of args) not yet implemented
+* [ ] `-` (stdin) not yet implemented
 * [ ] Options that were not provided through argv but that have defaults, are
       currently not present in the output
 * [ ] Options that have a default value and are provided through argv without an
@@ -47,6 +49,11 @@ Known issues to work through:
 
 Further, the wishlist looks somewhat like this:
 
+* Make commands first class citizens, enabling easy subcommands, inheriting
+  options and all that.
+* Allow for `--foo[=<bar>]` syntax (git style).
+* Provide warnings. This would mean a largish refactor to use either a custom
+  monad, or the Writer monad, stacked on top of the Either monad.
 * Allow boolean negation. Let `--foo` be an option of type boolean, implicitly
   allow it's negation `--no-foo`.
 * Refactor the `Docopt.Spec.Parser.Usage.OptionStack` constructor to use
