@@ -44,21 +44,12 @@ docoptSpec =
         traceShowA $ init (toList ['a'] :: List Char)
 
         runEitherEff do
-          docopt <- toScanErr $ scan $ dedent
+          output <- runDocopt
             """
             Usage: foo -o FILE FILE...
 
             Options:
             -o, --output=FILE The file to write to
             """
-          us     <- toParseErr $ Usage.run docopt.usage
-          ds     <- toParseErr $ concat <$> Desc.run `traverse` docopt.options
-          solved <- toSolveErr $ Solver.solve us ds
-          output <- toParseErr $ Gen.run solved $
-            toList [
-              "-o", "~/foo/bar"
-            , "x"
-            , "y" -- XXX: This should not be needed once the solver works properly
-            ]
-
+            [ "-o", "~/foo/bar", "x", "y" ]
           traceShowA output

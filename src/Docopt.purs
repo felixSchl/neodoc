@@ -1,177 +1,44 @@
-module Docopt where
+module Docopt (
+  module Docopt.Types
+, module Docopt.Pretty
+, runDocopt
+) where
 
 import Prelude
-import Data.Either
-import Data.Maybe
-import Data.List
+import Data.Either (either, Either(..))
+import Data.Maybe (maybe, Maybe(..))
+import Data.List (toList, List(..), concat)
 import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
 import Data.String (fromChar)
 import Control.Apply ((*>))
-
---------------------------------------------------------------------------------
--- Types -----------------------------------------------------------------------
---------------------------------------------------------------------------------
-
-type Name          = String
-type IsRepeatable  = Boolean
-type IsOptional    = Boolean
-type TakesArgument = Boolean
-type Flag          = Char
-
-data Program     = Program (List Application)
-data Application = Application (List Branch)
-data Branch      = Branch (List Argument)
-data Argument
-  = Command     String
-  | Positional  String IsRepeatable
-  | Option      (Maybe Flag)
-                (Maybe Name)
-                (Maybe OptionArgument)
-                IsRepeatable
-  | Group       IsOptional (List Branch) IsRepeatable
-data OptionArgument = OptionArgument Name (Maybe Value)
-
-data Value
-  = StringValue String
-  | BoolValue   Boolean
-
---------------------------------------------------------------------------------
--- Pretty-printing -------------------------------------------------------------
---------------------------------------------------------------------------------
-
-prettyPrintArg :: Argument -> String
-prettyPrintArg (Command name)      = name
-prettyPrintArg (Positional name r) = name ++ (if r then "..." else "")
-prettyPrintArg (Option flag name arg r)
-  = short ++ long ++ arg' ++ rep ++ default
-  where
-    short   = maybe "" (\f -> "-" ++ (fromChar f)) flag
-    long    = maybe "" (const ", ") (flag *> name) ++ maybe "" ("--" ++) name
-    rep     = if r then "..." else ""
-    arg'    = flip (maybe "") arg \(OptionArgument n _) -> "="  ++ n
-    default = flip (maybe "") arg \(OptionArgument _ d) ->
-                flip (maybe "") d \d' ->
-                  " [default: " ++ (prettyPrintValue d') ++  "]"
-
-prettyPrintArg (Group o bs r) = open ++ inner ++ close ++ repetition
-  where
-    open       = if o then "[" else "("
-    close      = if o then "]" else ")"
-    inner      = intercalate " | " (prettyPrintBranch <$> bs)
-    repetition = if r then "..." else ""
-
-prettyPrintBranch :: Branch -> String
-prettyPrintBranch (Branch xs) = intercalate " " (prettyPrintArg <$> xs)
-
-prettyPrintApplication :: Application -> String
-prettyPrintApplication (Application xs)
-  = intercalate " | " (prettyPrintBranch <$> xs)
-
-prettyPrintValue :: Value -> String
-prettyPrintValue (StringValue s) = show s
-prettyPrintValue (BoolValue b)   = show b
-
---------------------------------------------------------------------------------
--- Instances -------------------------------------------------------------------
---------------------------------------------------------------------------------
-
-instance showApplication :: Show Application where
-  show (Application xs) = "Application " ++ show (show <$> xs)
-
-instance eqApplication :: Eq Application where
-  eq (Application xs) (Application ys) = xs == ys
-
-instance showBranch :: Show Branch where
-  show (Branch xs) = "Branch " ++ show (show <$> xs)
-
-instance eqBranch :: Eq Branch where
-  eq (Branch xs) (Branch xs') = (xs == xs')
-
-instance showArgument :: Show Argument where
-  show (Command n)
-    = intercalate " " [ "Command", show n ]
-  show (Positional n r)
-    = intercalate " " [ "Positional", show n, show r ]
-  show (Group o bs r) 
-    = intercalate " " [ "Group", show o, show bs, show r ]
-  show (Option f n a r)
-    = intercalate " " [ "Option", show f, show n, show a, show r ]
-
-instance eqArgument :: Eq Argument where
-  eq (Command n)      (Command n')         = (n == n')
-  eq (Positional n r) (Positional n' r')   = (n == n') && (r == r')
-  eq (Group o bs r)   (Group o' bs' r')    = (o == o') && (bs == bs') && (r == r')
-  eq (Option f n a r) (Option f' n' a' r') = (f == f') && (n == n') && (a == a') && (r == r')
-
-instance showOptionArgument :: Show OptionArgument where
-  show (OptionArgument n a) = (show n) ++ " " ++ (show a)
-
-instance eqOptionArgument :: Eq OptionArgument where
-  eq (OptionArgument n a) (OptionArgument n' a') = (n == n') && (a == a')
-
-instance showValue :: Show Value where
-  show (StringValue s) = "StringValue " ++ s
-  show (BoolValue b)   = "BoolValue "   ++ (show b)
-
-instance eqValue :: Eq Value where
-  eq (StringValue s) (StringValue s') = (s == s')
-  eq (BoolValue b)   (BoolValue b')   = (b == b')
-  eq _               _                = false
-
-instance semigroupApplication :: Semigroup Application where
-  append (Application xs) (Application ys) = Application (xs <> ys)
-
-instance monoidApplication :: Monoid Application where
-  mempty = Application Nil
-
---------------------------------------------------------------------------------
--- Utilities -------------------------------------------------------------------
---------------------------------------------------------------------------------
-
-isRepeatable :: Argument -> Boolean
-isRepeatable (Option _ _ _ r) = r
-isRepeatable (Positional _ r) = r
-isRepeatable _                = false
-
-hasDefault :: Argument -> Boolean
-hasDefault (Option _ _ (Just (OptionArgument _ (Just _))) _) = true
-hasDefault _                                                 = false
-
-takesArgument :: Argument -> Boolean
-takesArgument (Option _ _ (Just _) _) = true
-takesArgument _                       = false
-
-isFlag :: Argument -> Boolean
-isFlag (Option _ _ (Just (OptionArgument _ (Just (BoolValue _)))) _) = true
-isFlag _                                                             = false
-
-isSameValueType :: Value -> Value -> Boolean
-isSameValueType (StringValue _) (StringValue _) = true
-isSameValueType (BoolValue _)   (BoolValue _)   = true
-isSameValueType _               _               = false
-
-isBoolValue :: Value -> Boolean
-isBoolValue (BoolValue _) = true
-isBoolValue _             = false
-
---------------------------------------------------------------------------------
--- Errors (XXX: needs migration and improvement) -------------------------------
---------------------------------------------------------------------------------
-
+import Data.Bifunctor (lmap)
+import Data.Traversable (traverse)
+import Docopt.Types
+import Docopt.Pretty
+import qualified Docopt.Gen as Gen
+import qualified Docopt.Spec.Parser.Scanner as Scanner
+import qualified Docopt.Spec.Parser.Usage as Usage
+import qualified Docopt.Spec.Parser.Desc as Desc
+import qualified Docopt.Spec.Solver as Solver
 import qualified Text.Parsing.Parser as P
+import Text.Wrap (dedent)
 
-data SolveError = SolveError
+runDocopt :: String
+          -> Array String
+          -> Either DocoptError (List Gen.ValueMapping)
+runDocopt docopt argv = do
+  docopt <- toScanErr  $ Scanner.scan $ dedent docopt
+  us     <- toParseErr $ Usage.run docopt.usage
+  ds     <- toParseErr $ concat <$> Desc.run `traverse` docopt.options
+  solved <- toSolveErr $ Solver.solve us ds
+  toParseErr $ Gen.run solved (toList argv)
 
-instance showSolveError :: Show SolveError where
-  show SolveError = "SolveError"
+toScanErr :: forall a. Either P.ParseError a -> Either DocoptError a
+toScanErr  = lmap DocoptScanError
 
-data DocoptError
-  = DocoptScanError   P.ParseError
-  | DocoptParseError  P.ParseError
-  | DocoptSolveError  SolveError
+toParseErr :: forall a. Either P.ParseError a -> Either DocoptError a
+toParseErr = lmap DocoptParseError
 
-instance showDocoptError :: Show DocoptError where
-  show (DocoptScanError err)  = "DocoptScanError "  ++ show err
-  show (DocoptParseError err) = "DocoptParseError " ++ show err
-  show (DocoptSolveError err) = "DocoptSolveError"  ++ show err
+toSolveErr :: forall a. Either SolveError a -> Either DocoptError a
+toSolveErr = lmap DocoptSolveError

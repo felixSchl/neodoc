@@ -37,8 +37,10 @@ import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 
-import Docopt
+import Docopt.Types
+import Docopt.Pretty
 import Docopt.Gen.Types
+import Docopt.Gen.Pretty
 import Docopt.Spec.Parser.Base (alphaNum, space, getInput, debug)
 
 --------------------------------------------------------------------------------

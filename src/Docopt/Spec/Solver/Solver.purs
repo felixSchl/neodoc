@@ -23,8 +23,7 @@ import Control.Plus (empty)
 import Data.Monoid (mempty)
 import qualified Data.Array as A
 
-import Docopt (Argument(..), Application(..), Branch(..), OptionArgument(..)
-              , Value(..), SolveError(..), isRepeatable)
+import Docopt.Types
 import qualified Docopt.Spec.Parser.Desc  as D
 import qualified Docopt.Spec.Parser.Usage as U
 
