@@ -325,7 +325,7 @@ mkBranchParser (D.Branch xs) = do
         mkLoptParser Nothing _  = P.fail "no long name"
 
         mkSoptParser (Just f) a = shortOption f a
-        mkSoptParser Nothing _  = P.fail "not no flag"
+        mkSoptParser Nothing _  = P.fail "no flag"
 
     -- Generate a parser for a argument `Group`
     mkParser (D.Group optional bs repeated) = do
