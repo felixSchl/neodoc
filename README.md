@@ -50,6 +50,7 @@ Known issues to work through:
 
 Further, the wishlist looks somewhat like this:
 
+* Read arguments from environment using a prefix (see yargs)
 * Make commands first class citizens, enabling easy subcommands, inheriting
   options and all that.
 * Allow for `--foo[=<bar>]` syntax (git style).
