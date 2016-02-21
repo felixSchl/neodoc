@@ -61,6 +61,8 @@ Further, the wishlist looks somewhat like this:
   allow it's negation `--no-foo`.
 * Refactor the `Docopt.Spec.Parser.Usage.OptionStack` constructor to use
   `NonEmpty` from `purescript-nonempty`
+* Refactor `Docopt.Gen.Parser.mkBranchParser` to use manual recursive iteration,
+  rather than a fold, like in `Docopt.Spec.Solver`.
 * Options should be able to specify default values straight in the
   Usage section, i.e.: `Usage: foo --bar=100`. This *will* have an impact on the
   solver implementation, however.
