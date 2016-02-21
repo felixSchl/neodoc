@@ -1,5 +1,5 @@
-module Docopt.Gen
-( module Docopt.Gen.Types
+module Docopt.Gen(
+  module Docopt.Gen.Types
 , module Docopt.Gen.Pretty
 , run
 ) where
@@ -25,8 +25,5 @@ run :: List D.Application
     -> Either P.ParseError (Map D.Argument D.Value)
 run as xs = do
   toks <- lex xs
-  P.runParser toks parser
-
-  where
-    parser :: P.Parser (List Token) (Map D.Argument D.Value)
-    parser = foldl (<|>) empty (mkApplicationParser <$> as)
+  P.runParser toks $ do
+    foldl (<|>) empty (mkApplicationParser <$> as)
