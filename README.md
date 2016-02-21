@@ -40,7 +40,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 
 Known issues to work through:
 
-* [ ] `--` (end of args) not yet implemented
+* [x] ~~`--` (end of args) not yet implemented~~
 * [ ] `-` (stdin) not yet implemented
 * [ ] Options that were not provided through argv but that have defaults, are
       currently not present in the output
