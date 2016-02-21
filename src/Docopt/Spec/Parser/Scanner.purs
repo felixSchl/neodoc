@@ -46,20 +46,12 @@ docoptScanner = do
   usage <- (fromCharArray <<< fromList <$> do
     P.manyTill
       P.anyChar
-      ((void $ P.lookAhead sectionLabel) <|> P.eof)
+      ((void $ P.lookAhead optionSection) <|> P.eof)
   ) <?> "usage section"
 
   let fixedUsage = (fromCharArray $ A.replicate fixColOffset ' ') ++ usage
 
-  options <- (many do
-    label <- sectionLabel <?> "section label"
-    (guard $ endsWith "options" $ toLower label)
-      <?> "section label ending in \"options\". E.g.: \"Advanved Options:\""
-    fromCharArray <<< fromList <$> do
-      P.manyTill
-        P.anyChar
-        ((void $ P.lookAhead sectionLabel) <|> P.eof)
-  ) <?> "description sections"
+  options <- many optionSection
 
   return {
     usage:   dedent fixedUsage
@@ -67,14 +59,25 @@ docoptScanner = do
   }
 
   where
+    optionSection :: P.Parser String String
+    optionSection = go <?> "option section"
+      where
+        go = do
+          label <- sectionLabel <?> "section label"
+          (guard $ endsWith "options" $ toLower label)
+            <?> "section label ending in \"options\". E.g.: \"Advanved Options:\""
+          fromCharArray <<< fromList <$> do
+            P.manyTill
+              P.anyChar
+              ((void $ P.lookAhead optionSection) <|> P.eof)
+
     sectionLabel :: P.Parser String String
     sectionLabel = do
       many space
       name <- fromCharArray <$> do
         A.many $ P.noneOf [ '\n', '\r', ':' ]
       P.char ':'
-      P.char '\n'
-      pure name
+      return name
 
     endsWith :: String -> String -> Boolean
     endsWith sub s = Str.drop (Str.length s - Str.length sub) s == sub

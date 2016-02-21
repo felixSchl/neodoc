@@ -7,13 +7,13 @@ import Data.String (fromCharArray)
 import Data.Tuple (Tuple(..))
 import qualified Data.Array as A
 import qualified Text.Parsing.Parser as P
-import Docopt.Types (Argument(..), Value(..))
+import qualified Docopt.Types as Docopt
 
 -- | Represents each item in ARGV
 data Token
   = LOpt String (Maybe String)
   | SOpt Char (Array Char) (Maybe String)
-  | EOA (List String)
+  | EOA (List Docopt.Value)
   | Lit String
 
 instance showToken :: Show Token where
@@ -24,4 +24,6 @@ instance showToken :: Show Token where
 
 -- | Represents the mapping of a parsed argument to a user-provided value
 -- | E.g.: ("-f, --foo", "100")
-type ValueMapping = Tuple Argument Value
+-- |
+-- | XXX: Move this (!)
+type ValueMapping = Tuple Docopt.Argument Docopt.Value

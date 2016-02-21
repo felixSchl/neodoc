@@ -24,6 +24,7 @@ import Control.Plus (empty)
 import Control.Bind ((=<<))
 import Docopt.Gen.Types
 import Docopt.Spec.Parser.Base
+import qualified Docopt.Types as D
 
 -- | Parse a single token from the ARGV stream.
 -- | Because each item on the ARGV stream is a a string itself, apply a parser
@@ -33,8 +34,8 @@ parseToken = do
   P.choice $ P.try <$> [
     sopt <* P.eof
   , lopt <* P.eof
-  , lit  <* P.eof
   , eoa
+  , lit  <* P.eof
   ]
 
   where
@@ -63,7 +64,7 @@ parseToken = do
     lopt = do
       P.string "--"
       xs <- fromCharArray <$> do
-        A.many alphaNum
+        A.some alphaNum
       arg <- P.choice $ P.try <$> [
         Just <$> do
           many space *> P.char '=' <* many space
@@ -87,7 +88,9 @@ lex xs = step xs
     step (Cons x xs) = do
       tok <- P.runParser x parseToken
       case tok of
-        (EOA _) -> return $ singleton $ EOA xs
-        _       -> do
+        (EOA _) -> do
+          -- XXX: Each `x` in `xs` should be properly parsed into a `Value`
+          return $ singleton $ EOA (D.StringValue <$> xs)
+        _ -> do
           toks <- step xs
           return $ singleton tok ++ toks

@@ -44,7 +44,7 @@ docoptSpec =
           output <- runDocopt
             """
             Usage:
-              foo -h=<host[:port]> -o FILE FILE...
+              foo -h=<host[:port]> -o FILE FILE... -- ARGS
 
             Options:
               -o, --output=FILE
@@ -56,7 +56,7 @@ docoptSpec =
             """
             [ "-o", "~/foo/bar"
             , "-h", "http://localhost:5000"
-            , "x"
-            , "y"
+            , "x", "y"
+            , "--", "0"," 1", "3"
             ]
           traceShowA output

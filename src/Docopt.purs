@@ -5,6 +5,7 @@ module Docopt (
 ) where
 
 import Prelude
+import Debug.Trace
 import Data.Either (either, Either(..))
 import Data.Maybe (maybe, Maybe(..))
 import Data.List (toList, List(..), concat)

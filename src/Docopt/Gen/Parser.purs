@@ -37,7 +37,9 @@ import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 
-import Docopt.Types
+import qualified Docopt.Types as D
+import Docopt.Types (takesArgument, isFlag, isBoolValue, isRepeatable
+                    , hasDefault)
 import Docopt.Pretty
 import Docopt.Gen.Types
 import Docopt.Gen.Pretty
@@ -74,24 +76,30 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
 data Acc a
   = Free (CliParser a)
-  | Pending (CliParser a) (List Argument)
+  | Pending (CliParser a) (List D.Argument)
 
-command :: String -> CliParser Value
+eoa :: CliParser D.Value
+eoa = token go P.<?> "--"
+  where
+    go (EOA xs) = Just (D.ArrayValue (fromList xs))
+    go _        = Nothing
+
+command :: String -> CliParser D.Value
 command n = token go P.<?> "command " ++ show n
   where
-    go (Lit s) | s == n = Just (BoolValue true)
+    go (Lit s) | s == n = Just (D.BoolValue true)
     go _                = Nothing
 
-positional :: String -> CliParser Value
+positional :: String -> CliParser D.Value
 positional n = token go P.<?> "positional argument " ++ show n
   where
-    go (Lit v) = Just (StringValue v)
+    go (Lit v) = Just (D.StringValue v)
     go _       = Nothing
 
 type HasConsumedArg = Boolean
-data OptParse = OptParse Value (Maybe Token) HasConsumedArg
+data OptParse = OptParse D.Value (Maybe Token) HasConsumedArg
 
-longOption :: Name -> (Maybe OptionArgument) -> CliParser Value
+longOption :: D.Name -> (Maybe D.OptionArgument) -> CliParser D.Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
@@ -114,29 +122,29 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- The name is an exact match
     go (LOpt n' v) atok | takesArg && (n' == n)
       = case v of
-          Just val -> return $ OptParse (StringValue val) Nothing false
+          Just val -> return $ OptParse (D.StringValue val) Nothing false
           _  -> return case atok of
-            Just (Lit s) -> OptParse (StringValue s) Nothing true
+            Just (Lit s) -> OptParse (D.StringValue s) Nothing true
             _            ->
               -- return `true` as argument, let caller check
-              OptParse (BoolValue true) Nothing false
+              OptParse (D.BoolValue true) Nothing false
 
     -- case 2:
     -- The name is an exact match and takes no argument
     go (LOpt n' _) _ | (takesArg == false) && (n' == n)
-      = return $ OptParse (BoolValue true) Nothing false
+      = return $ OptParse (D.BoolValue true) Nothing false
 
     -- case 3:
     -- The name is a substring of the input and no explicit argument has been
     -- provdided.
     go (LOpt n' Nothing) atok | takesArg
       = case stripPrefix n n' of
-          Just s -> return $ OptParse (StringValue s) Nothing false
+          Just s -> return $ OptParse (D.StringValue s) Nothing false
           _      -> Left "Invalid substring"
 
     go _ _ = Left "Invalid token"
 
-shortOption :: Char -> (Maybe OptionArgument) -> CliParser Value
+shortOption :: Char -> (Maybe D.OptionArgument) -> CliParser D.Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
@@ -154,30 +162,30 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   where
 
     takesArg = isJust a
-    def      = maybe Nothing (\(OptionArgument _ v) -> v) a
+    def      = maybe Nothing (\(D.OptionArgument _ v) -> v) a
 
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
     -- argument may have been passed.
     go (SOpt f' xs v) atok | (f' == f) && takesArg && (A.length xs == 0)
       = case v of
-          Just val -> return $ OptParse (StringValue val) Nothing false
+          Just val -> return $ OptParse (D.StringValue val) Nothing false
           _  -> return case atok of
-            Just (Lit s) -> OptParse (StringValue s) Nothing true
-            _ -> OptParse (BoolValue true) Nothing false
+            Just (Lit s) -> OptParse (D.StringValue s) Nothing true
+            _ -> OptParse (D.BoolValue true) Nothing false
 
     -- case 2:
     -- The leading flag matches, there are stacked options, no explicit
     -- argument has been passed and the option takes an argument.
     go (SOpt f' xs Nothing) _ | (f' == f) && takesArg && (A.length xs > 0)
-      = return $ OptParse (StringValue $ fromCharArray xs) Nothing false
+      = return $ OptParse (D.StringValue $ fromCharArray xs) Nothing false
 
     -- case 3:
     -- The leading flag matches, there are stacked options, the option takes
     -- no argument and an explicit argument has not been provided.
     go (SOpt f' xs v) _ | (f' == f) && (takesArg == false) && (A.length xs > 0)
       = return $ OptParse
-                (BoolValue true)
+                (D.BoolValue true)
                 (Just $ SOpt (AU.head xs) (AU.tail xs) v)
                 false
 
@@ -186,7 +194,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- takes no argument - total consumption!
     go (SOpt f' xs _) _ | (f' == f) && (takesArg == false) && (A.length xs == 0)
       = return $ OptParse
-                (BoolValue true)
+                (D.BoolValue true)
                 Nothing
                 false
 
@@ -201,14 +209,14 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
             ++ (intercalate ", " $ prettyPrintToken <$> s)
 
 -- | Generate a parser for a single program application (Usage).
-mkApplicationParser :: Application -> CliParser (List ValueMapping)
-mkApplicationParser (Application xs) = do
+mkApplicationParser :: D.Application -> CliParser (List ValueMapping)
+mkApplicationParser (D.Application xs) = do
   P.choice $ P.try <<< mkBranchParser <$> xs
   <* eof
 
 -- | Generate a parser for a single usage branch
-mkBranchParser :: Branch -> CliParser (List ValueMapping)
-mkBranchParser (Branch xs) = do
+mkBranchParser :: D.Branch -> CliParser (List ValueMapping)
+mkBranchParser (D.Branch xs) = do
   either
     (\_   -> P.fail "Failed to generate parser")
     (\acc -> case acc of
@@ -222,14 +230,14 @@ mkBranchParser (Branch xs) = do
 
     -- Given a list of arguments, try parse them all in any order.
     -- The only requirement is that all input is consumed in the end.
-    mkExhaustiveParser :: List Argument -> CliParser (List ValueMapping)
+    mkExhaustiveParser :: List D.Argument -> CliParser (List ValueMapping)
     mkExhaustiveParser Nil = pure empty
     mkExhaustiveParser ps  = do
       draw ps (length ps)
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
         -- apply `draw` until the parser fails, with a modified `ps`.
-        draw :: List Argument -> Int -> CliParser (List ValueMapping)
+        draw :: List D.Argument -> Int -> CliParser (List ValueMapping)
         draw pss@(Cons p ps') n | n >= 0 = (do
           xs  <- mkParser p
 
@@ -265,7 +273,7 @@ mkBranchParser (Branch xs) = do
         draw _ _ = return Nil
 
     -- Options always transition to the `Pending state`
-    step (Free p) x@(Option _ _ _ _) = Right $ Pending p (singleton x)
+    step (Free p) x@(D.Option _ _ _ _) = Right $ Pending p (singleton x)
 
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
@@ -274,7 +282,7 @@ mkBranchParser (Branch xs) = do
       return $ a ++ as
 
     -- Options always keep accumulating
-    step (Pending p xs) x@(Option _ _ _ _) = Right $
+    step (Pending p xs) x@(D.Option _ _ _ _) = Right $
       Pending p (x:xs)
 
     -- Any non-options always leaves the pending state
@@ -286,20 +294,25 @@ mkBranchParser (Branch xs) = do
         return (a ++ as ++ ass)
 
     -- Parser generator for a single `Argument`
-    mkParser :: Argument -> CliParser (List ValueMapping)
+    mkParser :: D.Argument -> CliParser (List ValueMapping)
 
     -- Generate a parser for a `Command` argument
-    mkParser x@(Command n) = do
+    mkParser x@(D.Command n) = do
       singleton <<< Tuple x <$> do
         command n
 
+    -- Generate a parser for a `EOA` argument
+    mkParser x@(D.EOA) = do
+      singleton <<< Tuple x <$> do
+        eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
+
     -- Generate a parser for a `Positional` argument
-    mkParser x@(Positional n r) = do
+    mkParser x@(D.Positional n r) = do
       if r then (some go) else (singleton <$> go)
       where go = Tuple x <$> (positional n)
 
     -- Generate a parser for a `Option` argument
-    mkParser x@(Option f n a r) = do
+    mkParser x@(D.Option f n a r) = do
       if r then (some go) else (singleton <$> go)
       where
         go = do
@@ -315,7 +328,7 @@ mkBranchParser (Branch xs) = do
         mkSoptParser Nothing _  = P.fail "not no flag"
 
     -- Generate a parser for a argument `Group`
-    mkParser (Group optional bs repeated) = do
+    mkParser (D.Group optional bs repeated) = do
       concat <$>
         let mod    = if optional then P.option Nil else \p -> p
             parser = if repeated then some go else singleton <$> go

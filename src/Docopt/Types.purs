@@ -26,11 +26,14 @@ data Argument
                 (Maybe OptionArgument)
                 IsRepeatable
   | Group       IsOptional (List Branch) IsRepeatable
+  | EOA
+
 data OptionArgument = OptionArgument Name (Maybe Value)
 
 data Value
   = StringValue String
   | BoolValue   Boolean
+  | ArrayValue  (Array Value)
 
 --------------------------------------------------------------------------------
 -- Instances -------------------------------------------------------------------
@@ -49,6 +52,7 @@ instance eqBranch :: Eq Branch where
   eq (Branch xs) (Branch xs') = (xs == xs')
 
 instance showArgument :: Show Argument where
+  show (EOA) = "--"
   show (Command n)
     = intercalate " " [ "Command", show n ]
   show (Positional n r)
@@ -59,6 +63,7 @@ instance showArgument :: Show Argument where
     = intercalate " " [ "Option", show f, show n, show a, show r ]
 
 instance eqArgument :: Eq Argument where
+  eq (EOA)            (EOA)                = true
   eq (Command n)      (Command n')         = (n == n')
   eq (Positional n r) (Positional n' r')   = (n == n') && (r == r')
   eq (Group o bs r)   (Group o' bs' r')    = (o == o') && (bs == bs') && (r == r')
@@ -73,8 +78,10 @@ instance eqOptionArgument :: Eq OptionArgument where
 instance showValue :: Show Value where
   show (StringValue s) = "StringValue " ++ s
   show (BoolValue b)   = "BoolValue "   ++ (show b)
+  show (ArrayValue xs) = "ArrayValue "  ++ show (show <$> xs)
 
 instance eqValue :: Eq Value where
+  eq (ArrayValue xs) (ArrayValue xs') = (xs == xs')
   eq (StringValue s) (StringValue s') = (s == s')
   eq (BoolValue b)   (BoolValue b')   = (b == b')
   eq _               _                = false

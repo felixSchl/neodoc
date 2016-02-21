@@ -11,6 +11,7 @@ import Control.Apply ((*>))
 import Docopt.Types
 
 prettyPrintArg :: Argument -> String
+prettyPrintArg (EOA)               = "--"
 prettyPrintArg (Command name)      = name
 prettyPrintArg (Positional name r) = name ++ (if r then "..." else "")
 prettyPrintArg (Option flag name arg r)
@@ -41,4 +42,4 @@ prettyPrintApplication (Application xs)
 prettyPrintValue :: Value -> String
 prettyPrintValue (StringValue s) = show s
 prettyPrintValue (BoolValue b)   = show b
-
+prettyPrintValue (ArrayValue xs) = show xs

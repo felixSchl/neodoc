@@ -1,6 +1,7 @@
 module Test.Spec.ScannerSpec (scannerSpec) where
 
 import Prelude
+import Debug.Trace
 import Control.Monad.Aff
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
@@ -58,17 +59,6 @@ scannerSpec = do
           dedent
             """
             Options: bar
-            """
-      vliftEff do
-        assert $ isLeft result
-
-    it "should fail multiple usage sections" do
-      let result = Scanner.scan $
-          dedent
-            """
-            Usage: bar
-            Options: foo
-            Usage: qux
             """
       vliftEff do
         assert $ isLeft result

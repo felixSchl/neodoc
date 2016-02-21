@@ -52,6 +52,9 @@ solveBranch as ds = Branch <$> f as
                   -> Maybe U.Argument
                   -> Either SolveError Result
 
+        solveArgs (U.EOA) _
+          = Unconsumed <<< singleton <$> return (EOA)
+
         solveArgs (U.Command s) _
           = Unconsumed <<< singleton <$> return (Command s)
 

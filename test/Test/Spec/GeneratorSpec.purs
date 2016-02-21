@@ -38,6 +38,10 @@ co = Command
 pos :: String -> Boolean -> Argument
 pos = Positional
 
+-- short hand to create a end-of-arguments marker
+eoa :: Argument
+eoa = EOA
+
 -- short hand to create an Option argument
 opt :: Flag
       -> Name
@@ -103,7 +107,7 @@ generatorSpec = describe "The generator" do
       opt_b_baz___r    = opt 'b' "baz"   (oa "BAZ" $ StringValue "ax") false
       opt_o_out        = opt 'o' "out"   Nothing false
       opt_i_input      = opt 'i' "input" Nothing false
-      pos_arg_r        = pos "arg" true
+      pos_arg_r        = pos "qux" true
       cmd_baz          = co "baz"
 
   let testCases = [
@@ -116,10 +120,27 @@ generatorSpec = describe "The generator" do
             , Tuple pos_arg_r (StringValue "c")
             ]
         , fail [ "--foo", "baz" ]
-            "Expected positional argument \"arg\""
+            "Expected positional argument \"qux\""
         , fail
             [ "a", "--foo", "-f=10" ]
             "Trailing input: --foo, -f=10"
+        ]
+
+    , test [ pos_arg_r, eoa ]
+        [ pass
+            [ "a", "b", "c", "--" ]
+            [ Tuple pos_arg_r (StringValue "a")
+            , Tuple pos_arg_r (StringValue "b")
+            , Tuple pos_arg_r (StringValue "c")
+            , Tuple eoa       (ArrayValue [])
+            ]
+        , pass
+            [ "a", "b", "c", "--", "--", "--" ]
+            [ Tuple pos_arg_r (StringValue "a")
+            , Tuple pos_arg_r (StringValue "b")
+            , Tuple pos_arg_r (StringValue "c")
+            , Tuple eoa       (ArrayValue [ StringValue "--", StringValue "--" ])
+            ]
         ]
 
     , test
@@ -206,7 +227,7 @@ generatorSpec = describe "The generator" do
 
       prettyPrintExpected :: Output -> String
       prettyPrintExpected expected = ("\n\t" ++) $ intercalate "\n\t" $
-                      flip map expected \(Tuple arg val) ->
+                      expected <#> \(Tuple arg val) ->
                         prettyPrintArg arg ++ ": " ++ prettyPrintValue val
 
       validate :: forall eff. Array Argument

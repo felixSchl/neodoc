@@ -36,6 +36,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * [ ] Transform the parsed args into something more useful
 * [ ] Provide seamless interface to be called from JS
 * [ ] Provide typescript typings
+* [ ] Fix all warnings
 
 Known issues to work through:
 
