@@ -1,6 +1,7 @@
 module Test.Spec.UsageParserSpec (usageParserSpec) where
 
 import Prelude
+import Debug.Trace
 import Control.Monad.Aff (liftEff')
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
@@ -132,6 +133,16 @@ usageParserSpec =
         , fail "[...]"
         ]
 
+    -- Test positionals in various formats.
+    -- Each entry is run for both singular and repeated version.
+    describe "end-of-args" do
+      runTests
+        [ pass "--" $ [[[ eoa ]]]
+        , pass "-- FOO..." $ [[[ eoa ]]]
+        , pass "-- FOO... BAR" $ [[[ eoa ]]]
+        , pass "foo -- FOO... BAR" $ [[[ co "foo", eoa ]]]
+        ]
+
     -- | Test the scanner and lexer in combination with the parser.
     -- | This validates that the program source can successfully extracted
     -- | from the - possibly - unstructured usage description text.
@@ -172,9 +183,38 @@ usageParserSpec =
 
   where
 
+    kase :: forall a. String -> Expected a -> { i :: String, o :: Expected a }
     kase i o = { i: i, o: o }
+
+    pass :: forall a. String -> a -> { i :: String, o :: Expected a }
     pass i o = kase i (P o)
+
+    fail :: forall a. String -> { i :: String, o :: Expected a }
     fail i = kase i F
+
+    runTests xs =
+      for_ xs \{ i: i, o: o } -> do
+        let input = "foo " ++ i
+        case o of
+          P expected -> do
+            it (input ++ " -> " ++ show expected)  do
+              vliftEff do
+                usages <- runEitherEff do
+                  Lexer.lex input >>= Usage.parse
+                flip assertEqual
+                  usages
+                  (Usage.Usage "foo" <$> do
+                    -- deeply convert array to list
+                    -- (array is used for readability above)
+                    (((toList <$>) <$>) toList <$> toList <$> toList expected))
+          _ -> do
+            it (input ++ " should fail") do
+            vliftEff do
+              assertThrows (const true) do
+                runEitherEff do
+                  toks  <- Lexer.lex input
+                  usage <- Usage.parse toks
+                  debug usage
 
     runSingleArgumentTests xs =
       for_ xs \{ i: i, o: o } -> do

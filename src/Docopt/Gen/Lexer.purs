@@ -9,6 +9,7 @@ module Docopt.Gen.Lexer (lex) where
 
 import Prelude
 import Debug.Trace
+import Data.List (List(..))
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
@@ -19,6 +20,8 @@ import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 import qualified Data.Array as A
+import Control.Plus (empty)
+import Control.Bind ((=<<))
 import Docopt.Gen.Types
 import Docopt.Spec.Parser.Base
 
@@ -27,12 +30,19 @@ import Docopt.Spec.Parser.Base
 -- | to each item and derive a token.
 parseToken :: P.Parser String Token
 parseToken = do
-  -- each token must be bounded by a EOF.
-  P.choice $ (P.try <<< (<* P.eof)) <$> [ sopt
-                                        , lopt
-                                        , lit
-                                        ]
+  P.choice $ P.try <$> [
+    sopt <* P.eof
+  , lopt <* P.eof
+  , lit  <* P.eof
+  , eoa
+  ]
+
   where
+    eoa :: P.Parser String Token
+    eoa = do
+      P.string "--"
+      return $ EOA empty
+
     -- | Parse a short option
     sopt :: P.Parser String Token
     sopt = do
@@ -71,9 +81,13 @@ parseToken = do
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
 -- | item individually.
 lex :: (List String) -> Either P.ParseError (List Token)
-lex = foldM step Nil
+lex xs = step xs
   where
-    step :: List Token -> String -> Either P.ParseError (List Token)
-    step a b = do
-      x <- flip P.runParser parseToken b
-      return $ a ++ (singleton x)
+    step Nil = return Nil
+    step (Cons x xs) = do
+      tok <- P.runParser x parseToken
+      case tok of
+        (EOA _) -> return $ singleton $ EOA xs
+        _       -> do
+          toks <- step xs
+          return $ singleton tok ++ toks

@@ -9,13 +9,15 @@ import Control.Monad.State (get)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Data.Foldable (intercalate)
-import Data.List (List(..), many, some, (:), toList, concat)
+import Data.List (List(..), many, some, (:), toList, concat, singleton
+                  , modifyAt, length)
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 import qualified Data.List as L
-import Data.String (length, fromChar)
+import Data.String (fromChar)
+import qualified Data.String as Str
 import Data.Either
 import Data.Tuple
 import Data.Maybe (Maybe(..), maybe)
@@ -60,18 +62,24 @@ data Argument
   | Group       IsOptional
                 (List Branch)
                 IsRepeatable
+  | EOA
 
 instance showUsage :: Show Usage where
   show (Usage n xs) = "Usage " ++ show n ++ " " ++ show xs
 
 instance showArgument :: Show Argument where
+  show (EOA)                 = "--"
   show (Command n)           = "Command " ++ n
   show (Positional n b)      = "Positional " ++ n ++ " " ++ show b
   show (Option n a b)        = "Option " ++ show n ++ " " ++ show a ++ " " ++ show b
   show (OptionStack n s a b) = "OptionStack " ++ show n ++ " " ++ show s ++ " " ++ show a ++ " " ++ show b
   show (Group n b o)         = "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
 
+instance eqUsage :: Eq Usage where
+  eq (Usage n xs) (Usage n' xs') = (n == n') && (xs == xs')
+
 instance eqArgument :: Eq Argument where
+  eq (EOA)                  (EOA)                      = true
   eq (Command s)            (Command s')               = (s == s')
   eq (Positional s r)       (Positional s' r')         = (s == s') && (r == r')
   eq (Option s a r)         (Option s' a' r')          = (s == s') && (a == a') && (r == r')
@@ -99,12 +107,12 @@ prettyPrintUsage (Usage name bs) =
           ++ (intercalate "" $ fromChar <$> toList fs)
           ++ (maybe "" ("="++) a)
           ++ if r then "..." else ""
-      prettyPrintUsage (Group b xs r)
+      prettyPrintArg (Group b xs r)
         = if b then "(" else "["
           ++ intercalate " | " (prettyPrintBranch <$> bs)
           ++ if b then ")" else "]"
           ++ if r then "..." else ""
-
+      prettyPrintArg (EOA) = "--"
 
 run :: String -> Either P.ParseError (List Usage)
 run x = parse =<< lex x
@@ -134,7 +142,7 @@ usageParser = do
   -- Calculate and mark the original program indentation.
   name <- program
   col' <- getCol
-  let startCol = col' - (length name) - 1
+  let startCol = col' - (Str.length name) - 1
   markIndent' startCol $ do
     Cons
     <$> (usageLine name)
@@ -144,9 +152,23 @@ usageParser = do
 
     usageLine :: String -> TokenParser Usage
     usageLine name = Usage name <$> do
-      x <- (some $ moreIndented *> elem) `P.sepBy1` vbar
-      eof <|> (P.lookAhead $ lessIndented)
-      pure x
+      xs  <- (many $ moreIndented *> elem) `P.sepBy1` vbar
+      eoa <- P.choice [
+        P.try $ do
+          moreIndented *> doubleDash
+          return $ Just EOA
+      , do
+          eof <|> (P.lookAhead $ lessIndented)
+          return Nothing
+      ]
+
+      -- Push the EOA onto the last branch (the most right branch)
+      return $ maybe xs id do
+        e <- eoa
+        modifyAt
+          (length xs - 1)
+          (\as -> as ++ (singleton e))
+          xs
 
     elem :: TokenParser Argument
     elem = defer \_ -> do

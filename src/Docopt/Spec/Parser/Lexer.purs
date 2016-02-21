@@ -55,6 +55,7 @@ data Token
   | StringLiteral String
   | NumberLiteral NumberLiteral
   | Garbage Char
+  | DoubleDash
 
 prettyPrintToken :: Token -> String
 prettyPrintToken LParen            = show '('
@@ -68,7 +69,8 @@ prettyPrintToken VBar              = show '|'
 prettyPrintToken Colon             = show ':'
 prettyPrintToken Comma             = show ','
 prettyPrintToken Equal             = show '='
-prettyPrintToken TripleDot         = show "..."
+prettyPrintToken TripleDot         = "..."
+prettyPrintToken DoubleDash        = "--"
 prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
 prettyPrintToken (Default   s)     = "Default "   ++ s
 prettyPrintToken (Name      n)     = "Name "      ++ show n
@@ -110,6 +112,7 @@ instance eqToken :: Eq Token where
   eq Comma             Comma              = true
   eq Dash              Dash               = true
   eq Equal             Equal              = true
+  eq DoubleDash        DoubleDash         = true
   eq TripleDot         TripleDot          = true
   eq (LOpt n a)        (LOpt n' a')       = (n == n') && (a == a')
   eq (SOpt n s a)      (SOpt n' s' a')    = (n == n') && (s' == s') && (a == a')
@@ -153,6 +156,7 @@ parseToken = P.choice
   , P.try $ AngleName <$> angleName
   , P.try $ P.char   '<'   *> pure LAngle
   , P.try $ P.char   '>'   *> pure RAngle
+  , P.try $ P.string "--"  *> pure DoubleDash
   , P.try $ P.char   '-'   *> pure Dash
   , P.try $ P.char   '='   *> pure Equal
   , P.try $ P.string "..." *> pure TripleDot
@@ -237,7 +241,7 @@ parseToken = P.choice
   angleName = do
     P.char '<'
     name <- fromCharArray <$> do
-      A.many $ P.choice [
+      A.some $ P.choice [
         identLetter
       , P.oneOf [ '-', '|', ':', '[', ']', '(', ')' ]
       ]
@@ -398,6 +402,9 @@ rangle = match RAngle
 
 dash :: TokenParser Unit
 dash = match Dash
+
+doubleDash :: TokenParser Unit
+doubleDash = match DoubleDash
 
 vbar :: TokenParser Unit
 vbar = match VBar

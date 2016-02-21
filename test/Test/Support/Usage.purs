@@ -41,3 +41,7 @@ gr xs r = Usage.Group false ls r
 go :: Array (Array Usage.Argument) -> Boolean -> Usage.Argument
 go xs r = Usage.Group true ls r
   where ls = toList <$> (toList xs)
+
+-- short hand to create an end-of-argument marker
+eoa :: Usage.Argument
+eoa = Usage.EOA
