@@ -31,6 +31,8 @@ import qualified Data.Array.Unsafe as AU
 import Data.Array (uncons)
 import Data.Tuple (Tuple(..))
 import Data.Monoid (mempty)
+import Data.Map (Map(..))
+import qualified Data.Map as Map
 
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
@@ -209,10 +211,55 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
             ++ (intercalate ", " $ prettyPrintToken <$> s)
 
 -- | Generate a parser for a single program application (Usage).
-mkApplicationParser :: D.Application -> CliParser (List ValueMapping)
+mkApplicationParser :: D.Application -> CliParser (Map D.Argument D.Value)
 mkApplicationParser (D.Application xs) = do
-  P.choice $ P.try <<< mkBranchParser <$> xs
+  P.choice $ xs <#> \x -> P.try do
+    vs <- mkBranchParser x
+    return $ mergeValMap (toDefValMap x) vs
   <* eof
+  where
+    toKeys :: D.Argument -> Array String
+    toKeys (D.Command n)      = [n]
+    toKeys (D.Positional n _) = [n]
+    toKeys (D.Group _ _ _)    = []
+    toKeys (D.EOA)            = ["--"]
+    toKeys (D.Option f n _ _) = []
+                              ++ maybe [] (A.singleton <<< show) f
+                              ++ maybe [] A.singleton n
+
+    mergeValMap :: Map D.Argument D.Value
+                -> List ValueMapping
+                -> Map D.Argument D.Value
+    mergeValMap = foldl step
+      where
+        step :: Map D.Argument D.Value
+             -> ValueMapping
+             -> Map D.Argument D.Value
+        step m (Tuple k v) = Map.unionWith resolve m (Map.singleton k v)
+
+        resolve :: D.Value -> D.Value -> D.Value
+        resolve (D.ArrayValue xs) (D.ArrayValue xs') = D.ArrayValue (xs ++ xs')
+        resolve (D.ArrayValue xs) v = D.ArrayValue (xs ++ [v])
+        resolve _ v = v
+
+    toDefValMap :: D.Branch -> Map D.Argument D.Value
+    toDefValMap (D.Branch b) = foldl step Map.empty b
+      where
+        step :: Map D.Argument D.Value -> D.Argument -> Map D.Argument D.Value
+        step m x = maybe m
+                           (`Map.union` m)
+                           (Map.singleton x <$> toDefVal x)
+
+        toDefVal :: D.Argument -> Maybe D.Value
+        toDefVal (D.Option _ _ (Just (D.OptionArgument _ (Just v))) r) =
+          return $ if (D.isArrayValue v || not r)
+                      then v
+                      else D.ArrayValue [v]
+        toDefVal (D.Positional _ r) = if r
+                                       then return $ D.ArrayValue []
+                                       else Nothing
+        toDefVal (D.EOA) = Just $ D.ArrayValue []
+        toDefVal _ = Nothing
 
 -- | Generate a parser for a single usage branch
 mkBranchParser :: D.Branch -> CliParser (List ValueMapping)
@@ -239,7 +286,7 @@ mkBranchParser (D.Branch xs) = do
         -- apply `draw` until the parser fails, with a modified `ps`.
         draw :: List D.Argument -> Int -> CliParser (List ValueMapping)
         draw pss@(Cons p ps') n | n >= 0 = (do
-          xs  <- mkParser p
+          xs <- mkParser p
 
           -- verify the arguments for parsed set of options
           -- when an option takes anything but a bool value, i.e. it is not

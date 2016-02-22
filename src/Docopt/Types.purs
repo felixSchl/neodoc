@@ -62,12 +62,16 @@ instance showArgument :: Show Argument where
   show (Option f n a r)
     = intercalate " " [ "Option", show f, show n, show a, show r ]
 
+instance ordArgument :: Ord Argument where
+  compare _ _ = EQ
+
 instance eqArgument :: Eq Argument where
   eq (EOA)            (EOA)                = true
   eq (Command n)      (Command n')         = (n == n')
   eq (Positional n r) (Positional n' r')   = (n == n') && (r == r')
   eq (Group o bs r)   (Group o' bs' r')    = (o == o') && (bs == bs') && (r == r')
   eq (Option f n a r) (Option f' n' a' r') = (f == f') && (n == n') && (a == a') && (r == r')
+  eq _                _                    = false
 
 instance showOptionArgument :: Show OptionArgument where
   show (OptionArgument n a) = (show n) ++ " " ++ (show a)
@@ -81,9 +85,9 @@ instance showValue :: Show Value where
   show (ArrayValue xs) = "ArrayValue "  ++ show (show <$> xs)
 
 instance eqValue :: Eq Value where
-  eq (ArrayValue xs) (ArrayValue xs') = (xs == xs')
   eq (StringValue s) (StringValue s') = (s == s')
   eq (BoolValue b)   (BoolValue b')   = (b == b')
+  eq (ArrayValue xs) (ArrayValue xs') = (xs == xs')
   eq _               _                = false
 
 instance semigroupApplication :: Semigroup Application where
@@ -137,8 +141,13 @@ isFlag _                                                             = false
 isSameValueType :: Value -> Value -> Boolean
 isSameValueType (StringValue _) (StringValue _) = true
 isSameValueType (BoolValue _)   (BoolValue _)   = true
+isSameValueType (ArrayValue _)  (ArrayValue _)  = true
 isSameValueType _               _               = false
 
 isBoolValue :: Value -> Boolean
 isBoolValue (BoolValue _) = true
 isBoolValue _             = false
+
+isArrayValue :: Value -> Boolean
+isArrayValue (ArrayValue _) = true
+isArrayValue _              = false

@@ -12,6 +12,8 @@ import Data.List (toList, List(..), concat)
 import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
 import Data.String (fromChar)
+import Data.Map (Map(..))
+import qualified Data.Map as Map
 import Control.Apply ((*>))
 import Data.Bifunctor (lmap)
 import Data.Traversable (traverse)
@@ -27,7 +29,7 @@ import Text.Wrap (dedent)
 
 runDocopt :: String
           -> Array String
-          -> Either DocoptError (List Gen.ValueMapping)
+          -> Either DocoptError (Map Argument Value)
 runDocopt docopt argv = do
   docopt <- toScanErr  $ Scanner.scan $ dedent docopt
   us     <- toParseErr $ Usage.run docopt.usage

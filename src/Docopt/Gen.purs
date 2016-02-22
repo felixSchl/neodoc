@@ -7,6 +7,8 @@ module Docopt.Gen
 import Prelude
 import Data.List (List(..))
 import Data.Either (Either(..))
+import Data.Map (Map(..))
+import qualified Data.Map as Map
 import Docopt.Gen.Types (ValueMapping(), Token())
 import qualified Text.Parsing.Parser as P
 import Docopt.Gen.Lexer (lex)
@@ -20,11 +22,11 @@ import qualified Docopt.Types as D
 
 run :: List D.Application
     -> List String
-    -> Either P.ParseError (List ValueMapping)
+    -> Either P.ParseError (Map D.Argument D.Value)
 run as xs = do
   toks <- lex xs
   P.runParser toks parser
 
   where
-    parser :: P.Parser (List Token) (List ValueMapping)
+    parser :: P.Parser (List Token) (Map D.Argument D.Value)
     parser = foldl (<|>) empty (mkApplicationParser <$> as)

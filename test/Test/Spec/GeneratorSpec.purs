@@ -9,6 +9,8 @@ import Control.Monad.State (State(), evalState)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), either)
 import Data.List (List(..), toList, length, fromList, singleton)
+import Data.Map (Map(..))
+import qualified Data.Map as Map
 import qualified Data.Array as A
 import Data.Foldable (for_, intercalate)
 import Control.Monad.Eff.Exception (error, throwException, catchException
@@ -85,15 +87,15 @@ oa_ :: String -> Maybe OptionArgument
 oa_ n = Just $ OptionArgument n Nothing
 
 type Input    = Array String
-type Output   = Array (Tuple Argument Value)
+type Output   = Map Argument Value
 data Test = Test (Array Argument) (Array Case)
 data Case = Case Input (Either String Output)
 
 test :: Array Argument -> Array Case -> Test
 test = Test
 
-pass :: Input -> Output -> Case
-pass i o = Case i (Right o)
+pass :: Input -> (Array (Tuple Argument Value)) -> Case
+pass i o = Case i (Right $ Map.fromList $ toList o)
 
 fail :: Input -> String -> Case
 fail i e = Case i (Left e)
@@ -115,9 +117,11 @@ generatorSpec = describe "The generator" do
       test [ pos_arg_r ]
         [ pass
             [ "a", "b", "c" ]
-            [ Tuple pos_arg_r (StringValue "a")
-            , Tuple pos_arg_r (StringValue "b")
-            , Tuple pos_arg_r (StringValue "c")
+            [ Tuple pos_arg_r (ArrayValue [
+                                StringValue "a"
+                              , StringValue "b"
+                              , StringValue "c"
+                              ])
             ]
         , fail [ "--foo", "baz" ]
             "Expected positional argument \"qux\""
@@ -129,17 +133,24 @@ generatorSpec = describe "The generator" do
     , test [ pos_arg_r, eoa ]
         [ pass
             [ "a", "b", "c", "--" ]
-            [ Tuple pos_arg_r (StringValue "a")
-            , Tuple pos_arg_r (StringValue "b")
-            , Tuple pos_arg_r (StringValue "c")
-            , Tuple eoa       (ArrayValue [])
+            [ Tuple pos_arg_r (ArrayValue [
+                                StringValue "a"
+                              , StringValue "b"
+                              , StringValue "c"
+                              ])
+            , Tuple eoa (ArrayValue [])
             ]
         , pass
             [ "a", "b", "c", "--", "--", "--" ]
-            [ Tuple pos_arg_r (StringValue "a")
-            , Tuple pos_arg_r (StringValue "b")
-            , Tuple pos_arg_r (StringValue "c")
-            , Tuple eoa       (ArrayValue [ StringValue "--", StringValue "--" ])
+            [ Tuple pos_arg_r (ArrayValue [
+                                StringValue "a"
+                              , StringValue "b"
+                              , StringValue "c"
+                              ])
+            , Tuple eoa (ArrayValue [
+                          StringValue "--"
+                        , StringValue "--"
+                        ])
             ]
         ]
 
@@ -217,7 +228,7 @@ generatorSpec = describe "The generator" do
       for_ kases \(Case input expected) ->
             let msg = either
                   (\e -> "Should fail with \"" ++ e ++ "\"")
-                  (\e -> prettyPrintExpected e)
+                  (\e -> prettyPrintOutput e)
                   expected
             in it (intercalate " " input ++ " -> " ++ msg) do
                   vliftEff do
@@ -225,9 +236,9 @@ generatorSpec = describe "The generator" do
 
     where
 
-      prettyPrintExpected :: Output -> String
-      prettyPrintExpected expected = ("\n\t" ++) $ intercalate "\n\t" $
-                      expected <#> \(Tuple arg val) ->
+      prettyPrintOutput :: Output -> String
+      prettyPrintOutput expected = ("\n\t" ++) $ intercalate "\n\t" $
+                      (Map.toList expected) <#> \(Tuple arg val) ->
                         prettyPrintArg arg ++ ": " ++ prettyPrintValue val
 
       validate :: forall eff. Array Argument
@@ -251,11 +262,12 @@ generatorSpec = describe "The generator" do
               (const $ throwException $ error $ show e)
               expected
           Right r -> do
-            let r'' = fromList r
             either
               (throwException <<< error <<< show)
-              (\r' -> if (r'' /= r')
-                then throwException $ error $
-                  "Unexpected output:\n" ++ prettyPrintExpected r''
-                else return unit)
+              (\r' ->
+                if (r /= r')
+                  then throwException $ error $
+                    "Unexpected output:\n"
+                      ++ prettyPrintOutput r
+                  else return unit)
               expected

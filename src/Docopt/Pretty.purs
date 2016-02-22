@@ -40,6 +40,6 @@ prettyPrintApplication (Application xs)
   = intercalate " | " (prettyPrintBranch <$> xs)
 
 prettyPrintValue :: Value -> String
-prettyPrintValue (StringValue s) = show s
+prettyPrintValue (StringValue s) = s
 prettyPrintValue (BoolValue b)   = show b
-prettyPrintValue (ArrayValue xs) = show xs
+prettyPrintValue (ArrayValue xs) = show $ prettyPrintValue <$> xs
