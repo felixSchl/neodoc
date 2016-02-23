@@ -45,12 +45,34 @@ eoa :: Argument
 eoa = EOA
 
 -- short hand to create an Option argument
-opt :: Flag
+opt' :: Flag
       -> Name
       -> (Maybe OptionArgument)
       -> IsRepeatable
       -> Argument
-opt f name = Option (Just f) (Just name)
+opt' f n = Option (Just f) (Just n)
+
+opt_ :: Flag
+      -> Name
+      -> Argument
+opt_ f n = opt' f n Nothing false
+
+optR_ :: Flag
+      -> Name
+      -> Argument
+optR_ f n = opt' f n Nothing true
+
+opt :: Flag
+    -> Name
+    -> OptionArgument
+    -> Argument
+opt f n a = opt' f n (Just a) false
+
+optR :: Flag
+     -> Name
+     -> OptionArgument
+     -> Argument
+optR f n a = opt' f n (Just a) true
 
 sopt :: Flag
       -> (Maybe OptionArgument)
@@ -65,26 +87,26 @@ lopt :: Name
 lopt name = Option Nothing (Just name)
 
 -- short hand to create a group
-gr :: Boolean -> (Array (Array Argument)) -> IsRepeatable -> Argument
-gr b xs = Group b (toList $ br <$> xs)
+gr :: Boolean -> IsRepeatable -> (Array (Array Argument)) -> Argument
+gr b r xs = Group b (toList $ br <$> xs) r
 
 -- short hand to create a optional group
-gro :: (Array (Array Argument)) -> IsRepeatable -> Argument
+gro :: IsRepeatable -> (Array (Array Argument)) -> Argument
 gro = gr true
 
 -- short hand to create a required group
-grr :: (Array (Array Argument)) -> IsRepeatable -> Argument
+grr :: IsRepeatable -> (Array (Array Argument)) -> Argument
 grr = gr false
 
 -- short hand to create a whole branch
 br :: (Array Argument) -> Branch
 br xs = Branch (toList xs)
 
-oa :: String -> Value -> Maybe OptionArgument
-oa n v = Just $ OptionArgument n (Just v)
+oa :: String -> Value -> OptionArgument
+oa n v = OptionArgument n (Just v)
 
-oa_ :: String -> Maybe OptionArgument
-oa_ n = Just $ OptionArgument n Nothing
+oa_ :: String -> OptionArgument
+oa_ n = OptionArgument n Nothing
 
 type Input    = Array String
 type Output   = Map Argument Value
@@ -100,17 +122,19 @@ pass i o = Case i (Right $ Map.fromList $ toList o)
 fail :: Input -> String -> Case
 fail i e = Case i (Left e)
 
+(//) = Tuple
+
 generatorSpec = describe "The generator" do
 
   -- Some options that will be used for these tests
-  let cmd_foo          = co "foo"
-      opt_f_foo_FOZ__r = opt 'f' "foo"   (oa_ "FOZ") true
-      opt_q_qux___r    = opt 'q' "qux"   Nothing true
-      opt_b_baz        = opt 'b' "baz"   (oa "BAZ" $ StringValue "ax") false
-      opt_o_out        = opt 'o' "out"   Nothing false
-      opt_i_input      = opt 'i' "input" Nothing false
-      pos_arg_r        = pos "qux" true
-      cmd_baz          = co "baz"
+  let cmd_foo          = co    "foo"
+      opt_f_foo_FOZ__r = optR  'f' "foo" (oa_ "FOZ")
+      opt_q_qux___r    = optR_ 'q' "qux"
+      opt_b_baz        = opt   'b' "baz"   (oa "BAZ" $ StringValue "ax")
+      opt_o_out        = opt_  'o' "out"
+      opt_i_input      = opt_  'i' "input"
+      pos_arg_r        = pos    "qux" true
+      cmd_baz          = co     "baz"
 
   let testCases = [
 
@@ -124,7 +148,7 @@ generatorSpec = describe "The generator" do
                               ])
             ]
         , fail [ "--foo", "baz" ]
-            "Expected positional argument \"qux\""
+            "Expected positional argument \"qux...\""
         , fail
             [ "a", "--foo", "-f=10" ]
             "Trailing input: --foo, -f=10"
@@ -152,6 +176,85 @@ generatorSpec = describe "The generator" do
                         , StringValue "--"
                         ])
             ]
+        ]
+
+    , test
+        [ grr false [] ]
+        [ pass [] [] ]
+
+    , test
+        [ gro false [] ]
+        [ pass [] [] ]
+
+    , test
+        [ grr false [[
+            opt 'i' "input" (oa_ "FILE")
+          ]]
+        ]
+        [ fail [] "Missing required options: (-i, --input=FILE)"
+        , pass
+            [ "-i", "bar" ]
+            [ opt 'i' "input" (oa_ "FILE") // (StringValue "bar") ]
+        ]
+
+    , test
+        [ grr false [[
+            opt 'i' "input" (oa_ "FILE")
+          ]]
+        , opt 'o' "output" (oa_ "FILE")
+        ]
+        [ fail [] "Missing required options: -o, --output=FILE, (-i, --input=FILE)"
+        , fail [ "-i", "bar" ] "Missing required options: -o, --output=FILE"
+        , pass [ "-i", "bar", "-o", "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE") // (StringValue "bar")
+            , opt 'o' "output" (oa_ "FILE") // (StringValue "bar") ]
+          -- group should be interchangable if it's only of options:
+        , pass [ "-o", "bar", "-i", "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE") // (StringValue "bar")
+            , opt 'o' "output" (oa_ "FILE") // (StringValue "bar") ]
+        ]
+
+    , test
+        [ grr false [[
+            grr false [[
+              opt 'i' "input" (oa_ "FILE")
+            ]]
+          , opt 'r' "redirect" (oa_ "FILE")
+          ]]
+        , opt 'o' "output" (oa_ "FILE")
+        ]
+        [ fail []
+            "Missing required options: -o, --output=FILE, ((-i, --input=FILE) -r, --redirect=FILE)"
+        , fail [ "-i", "bar", "-r", "bar" ]
+            "Missing required options: -o, --output=FILE"
+        , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE")   // (StringValue "bar")
+            , opt 'r' "redirect" (oa_ "FILE") // (StringValue "bar")
+            , opt 'o' "output" (oa_ "FILE")   // (StringValue "bar") ]
+          -- group should be interchangable if it's only of options:
+        , pass [ "-o", "bar", "-r", "bar", "-i", "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE")   // (StringValue "bar")
+            , opt 'r' "redirect" (oa_ "FILE") // (StringValue "bar")
+            , opt 'o' "output" (oa_ "FILE")   // (StringValue "bar") ]
+        ]
+
+    , test
+        [ grr false [[
+            opt 'i' "input" (oa_ "FILE")
+          , pos "env" false
+          ]]
+        , opt 'o' "output" (oa_ "FILE")
+        ]
+        [ fail [] "Missing required options: -i, --input=FILE"
+          -- XXX: Would be cool to show the reason the group did not parse!
+        , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
+        , pass [ "-i", "bar", "x", "-o", "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE") // (StringValue "bar")
+            , pos "env" false               // (StringValue "x")
+            , opt 'o' "output" (oa_ "FILE") // (StringValue "bar") ]
+          -- group should NOT be interchangable if it contains non-options:
+        , fail [ "-o", "bar", "x", "-i", "bar" ]
+            "Missing required options: -i, --input=FILE"
         ]
 
     , test
@@ -235,15 +338,15 @@ generatorSpec = describe "The generator" do
         , fail
             [ "foo", "-o", "-i", "-bax" ]
             -- TODO: Create a more sophisticated way to test this
-            "Expected command \"baz\""
+            "Expected command: \"baz\""
         ]
 
     , test
-        [ gro [[ cmd_foo ]] false ]
+        [ gro false [[ cmd_foo ]] ]
         [ fail [ "goo" ] "Trailing input: \"goo\"" ]
     , test
-        [ grr [[ cmd_foo ]] false ]
-        [ fail [ "goo" ] "Expected command \"foo\"" ]
+        [ grr false [[ cmd_foo ]] ]
+        [ fail [ "goo" ] "Expected command: \"foo\"" ]
   ]
 
   for_ testCases \(Test branch kases) -> do

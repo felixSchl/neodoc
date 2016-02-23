@@ -146,6 +146,10 @@ isFlag :: Argument -> Boolean
 isFlag (Option _ _ (Just (OptionArgument _ (Just (BoolValue _)))) _) = true
 isFlag _                                                             = false
 
+isOption :: Argument -> Boolean
+isOption (Option _ _ _ _) = true
+isOption _                = false
+
 isSameValueType :: Value -> Value -> Boolean
 isSameValueType (StringValue _) (StringValue _) = true
 isSameValueType (BoolValue _)   (BoolValue _)   = true

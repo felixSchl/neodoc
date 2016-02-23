@@ -22,7 +22,7 @@ import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
                  , head, many, tail, fromList, filter, reverse, concat)
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
-import Data.Foldable (foldl, intercalate, for_)
+import Data.Foldable (foldl, intercalate, for_, all)
 import Data.String (fromCharArray, stripPrefix)
 import qualified Data.List as L
 import qualified Data.List.Unsafe as LU
@@ -109,7 +109,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         Left e -> P.parseFailed toks pos e
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
-          , input:    (maybe Nil singleton newtok) ++
+          , input:    (maybe empty singleton newtok) ++
                       (if hasConsumedArg then (LU.tail xs) else xs)
           , result:   Right v
           , position: pos -- ignore pos (for now)
@@ -154,7 +154,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         Left e -> P.parseFailed toks pos e
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
-          , input:    (maybe Nil singleton newtok) ++
+          , input:    (maybe empty singleton newtok) ++
                       (if hasConsumedArg then (LU.tail xs) else xs)
           , result:   Right v
           , position: pos -- ignore pos
@@ -335,11 +335,14 @@ mkBranchParser (D.Branch xs) = do
             then P.fail $
               "Missing required options: "
                 ++ intercalate ", " (prettyPrintArg <$> rest)
-            else return Nil
-        draw _ _ = return Nil
+            else return empty
+        draw _ _ = return empty
 
     -- Options always transition to the `Pending state`
-    step (Free p) x@(D.Option _ _ _ _) = Right $ Pending p (singleton x)
+    step (Free p) x@(D.Option _ _ _ _)
+      = Right $ Pending p (singleton x)
+    step (Free p) x@(D.Group _ bs _) | isFree x
+      = Right $ Pending p (singleton x)
 
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
@@ -363,23 +366,27 @@ mkBranchParser (D.Branch xs) = do
     mkParser :: D.Argument -> CliParser (List ValueMapping)
 
     -- Generate a parser for a `Command` argument
-    mkParser x@(D.Command n) = do
+    mkParser x@(D.Command n) = (do
       singleton <<< Tuple x <$> do
         command n
+      ) P.<?> "command: " ++ (show $ prettyPrintArg x)
 
     -- Generate a parser for a `EOA` argument
-    mkParser x@(D.EOA) = do
+    mkParser x@(D.EOA) = (do
       singleton <<< Tuple x <$> do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
+      ) P.<?> "end of arguments: \"--\""
 
     -- Generate a parser for a `Positional` argument
-    mkParser x@(D.Positional n r) = do
+    mkParser x@(D.Positional n r) = (do
       if r then (some go) else (singleton <$> go)
+      ) P.<?> "positional argument: " ++ (show $ prettyPrintArg x)
       where go = Tuple x <$> (positional n)
 
     -- Generate a parser for a `Option` argument
-    mkParser x@(D.Option f n a r) = do
+    mkParser x@(D.Option f n a r) = (do
       if r then (some go) else (singleton <$> go)
+      ) P.<?> "option: " ++ (show $ prettyPrintArg x)
       where
         go = do
           P.choice $ P.try <$> [
@@ -394,9 +401,16 @@ mkBranchParser (D.Branch xs) = do
         mkSoptParser Nothing _  = P.fail "no flag"
 
     -- Generate a parser for a argument `Group`
-    mkParser (D.Group optional bs repeated) = do
+    mkParser x@(D.Group optional bs repeated) = do
       concat <$>
-        let mod    = if optional then P.option Nil else \p -> p
-            parser = if repeated then some go else singleton <$> go
+        let mod    = if optional then P.option empty else \p -> p
+            parser = if repeated then many go else singleton <$> go
          in mod parser
-      where go = P.choice $ P.try <<< mkBranchParser <$> bs
+      where go = if length bs > 0
+                    then P.choice $ P.try <<< mkBranchParser <$> bs
+                    else return empty
+
+    isFree :: D.Argument -> Boolean
+    isFree (D.Option _ _ _ _) = true
+    isFree (D.Group _ bs _)   = all (\(D.Branch b) -> all isFree b) bs
+    isFree _                  = false
