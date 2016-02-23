@@ -148,7 +148,7 @@ generatorSpec = describe "The generator" do
                               ])
             ]
         , fail [ "--foo", "baz" ]
-            "Expected positional argument \"qux...\""
+            "Expected positional argument: \"qux...\""
         , fail
             [ "a", "--foo", "-f=10" ]
             "Trailing input: --foo, -f=10"
