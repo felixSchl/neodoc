@@ -106,7 +106,7 @@ generatorSpec = describe "The generator" do
   let cmd_foo          = co "foo"
       opt_f_foo_FOZ__r = opt 'f' "foo"   (oa_ "FOZ") true
       opt_q_qux___r    = opt 'q' "qux"   Nothing true
-      opt_b_baz___r    = opt 'b' "baz"   (oa "BAZ" $ StringValue "ax") false
+      opt_b_baz        = opt 'b' "baz"   (oa "BAZ" $ StringValue "ax") false
       opt_o_out        = opt 'o' "out"   Nothing false
       opt_i_input      = opt 'i' "input" Nothing false
       pos_arg_r        = pos "qux" true
@@ -158,52 +158,74 @@ generatorSpec = describe "The generator" do
         [ cmd_foo
         , opt_o_out
         , opt_q_qux___r
-        , opt_b_baz___r
+        , opt_b_baz
         , opt_i_input
         , opt_f_foo_FOZ__r
         , cmd_baz
         ]
 
         [ pass
+            [ "foo" , "--out", "--input", "--qux", "--foo=ox", "baz" ]
+            [ Tuple cmd_foo          (BoolValue true)
+            , Tuple opt_o_out        (BoolValue true)
+            , Tuple opt_i_input      (BoolValue true)
+            , Tuple opt_q_qux___r    (ArrayValue [ BoolValue true ])
+            , Tuple opt_f_foo_FOZ__r (ArrayValue [ StringValue "ox" ])
+            , Tuple cmd_baz          (BoolValue true)
+            -- should have added default value that was not provided above:
+            , Tuple opt_b_baz        (StringValue "ax")
+            ]
+
+        , pass
             [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
-            , Tuple opt_q_qux___r    (BoolValue true)
-            , Tuple opt_q_qux___r    (BoolValue true)
-            , Tuple opt_q_qux___r    (BoolValue true)
-            , Tuple opt_f_foo_FOZ__r (StringValue "ox")
-            , Tuple opt_b_baz___r    (StringValue "ax")
+            , Tuple opt_q_qux___r    (ArrayValue [
+                                        BoolValue true
+                                      , BoolValue true
+                                      , BoolValue true
+                                     ])
+            , Tuple opt_f_foo_FOZ__r (ArrayValue [StringValue "ox"])
+            , Tuple opt_b_baz        (StringValue "ax")
             , Tuple opt_i_input      (BoolValue true)
             , Tuple cmd_baz          (BoolValue true)
             ]
+
         , pass
             [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
-            , Tuple opt_q_qux___r    (BoolValue true)
+            , Tuple opt_q_qux___r    (ArrayValue [
+                                        BoolValue true
+                                      , BoolValue true
+                                     ])
             , Tuple opt_o_out        (BoolValue true)
-            , Tuple opt_q_qux___r    (BoolValue true)
             , Tuple opt_i_input      (BoolValue true)
-            , Tuple opt_b_baz___r    (StringValue "ax")
-            , Tuple opt_f_foo_FOZ__r (StringValue "ox")
+            , Tuple opt_b_baz        (StringValue "ax")
+            , Tuple opt_f_foo_FOZ__r (ArrayValue [StringValue "ox"])
             , Tuple cmd_baz          (BoolValue true)
             ]
+
         , pass
             [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
-            , Tuple opt_b_baz___r    (StringValue "ax")
+            , Tuple opt_b_baz        (StringValue "ax")
             , Tuple opt_o_out        (BoolValue true)
-            , Tuple opt_f_foo_FOZ__r (StringValue "ox")
+            , Tuple opt_f_foo_FOZ__r (ArrayValue [StringValue "ox"])
             , Tuple opt_i_input      (BoolValue true)
             , Tuple cmd_baz          (BoolValue true)
             ]
+
         , pass
             [ "foo", "-o", "-i", "-bax", "baz" ]
             [ Tuple cmd_foo          (BoolValue true)
             , Tuple opt_o_out        (BoolValue true)
             , Tuple opt_i_input      (BoolValue true)
-            , Tuple opt_b_baz___r    (StringValue "ax")
+            , Tuple opt_b_baz        (StringValue "ax")
             , Tuple cmd_baz          (BoolValue true)
+            -- should have added default value that was not provided above:
+            , Tuple opt_b_baz        (StringValue "ax")
             ]
+
         , fail
             [ "foo" ]
             -- TODO: Create a more sophisticated way to test this
@@ -215,6 +237,7 @@ generatorSpec = describe "The generator" do
             -- TODO: Create a more sophisticated way to test this
             "Expected command \"baz\""
         ]
+
     , test
         [ gro [[ cmd_foo ]] false ]
         [ fail [ "goo" ] "Trailing input: \"goo\"" ]

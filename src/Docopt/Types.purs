@@ -3,6 +3,7 @@ module Docopt.Types where
 import Prelude
 import Data.Either
 import Data.Maybe
+import Debug.Trace
 import Data.List
 import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
@@ -70,7 +71,12 @@ instance eqArgument :: Eq Argument where
   eq (Command n)      (Command n')         = (n == n')
   eq (Positional n r) (Positional n' r')   = (n == n') && (r == r')
   eq (Group o bs r)   (Group o' bs' r')    = (o == o') && (bs == bs') && (r == r')
-  eq (Option f n a r) (Option f' n' a' r') = (f == f') && (n == n') && (a == a') && (r == r')
+  eq (Option f  n  (Just (OptionArgument a  _)) r)
+     (Option f' n' (Just (OptionArgument a' _)) r')
+      = (f == f') && (n == n') && (a == a') && (r == r')
+  eq (Option f  n  Nothing r)
+     (Option f' n' Nothing r')
+      = (f == f') && (n == n') && (r == r')
   eq _                _                    = false
 
 instance showOptionArgument :: Show OptionArgument where

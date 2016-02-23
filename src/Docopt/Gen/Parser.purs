@@ -215,7 +215,7 @@ mkApplicationParser :: D.Application -> CliParser (Map D.Argument D.Value)
 mkApplicationParser (D.Application xs) = do
   P.choice $ xs <#> \x -> P.try do
     vs <- mkBranchParser x
-    return $ mergeValMap (toDefValMap x) vs
+    return $ mergeDefVals x $ toValMap vs
   <* eof
   where
     toKeys :: D.Argument -> Array String
@@ -227,37 +227,56 @@ mkApplicationParser (D.Application xs) = do
                               ++ maybe [] (A.singleton <<< show) f
                               ++ maybe [] A.singleton n
 
-    mergeValMap :: Map D.Argument D.Value
-                -> List ValueMapping
-                -> Map D.Argument D.Value
-    mergeValMap = foldl step
+    toValMap :: List (Tuple D.Argument D.Value) -> Map D.Argument D.Value
+    toValMap vs = foldl step Map.empty (prepare <$> vs)
       where
         step :: Map D.Argument D.Value
              -> ValueMapping
              -> Map D.Argument D.Value
-        step m (Tuple k v) = Map.unionWith resolve m (Map.singleton k v)
+        step m (Tuple k v) = Map.unionWith (resolve k) (Map.singleton k v) m
+
+        prepare :: (Tuple D.Argument D.Value) -> ValueMapping
+        prepare (Tuple k v) | D.isRepeatable k
+          = Tuple k (D.ArrayValue $
+              (case v of
+                D.ArrayValue xs -> xs
+                _               -> [v]
+              ))
+        prepare k = k
+
+        resolve :: D.Argument -> D.Value -> D.Value -> D.Value
+        resolve _ (D.ArrayValue xs) (D.ArrayValue xs') = D.ArrayValue (xs' ++ xs)
+        resolve a (D.ArrayValue xs) v = D.ArrayValue (v A.: xs)
+        resolve a v v' | D.isRepeatable a
+          = D.ArrayValue $
+              (case v' of
+                D.ArrayValue xs -> xs
+                _               -> [v']
+              ) ++ [v]
+        resolve _ v v' = v
+
+    mergeDefVals :: D.Branch -> Map D.Argument D.Value -> Map D.Argument D.Value
+    mergeDefVals (D.Branch b) m = foldl step m b
+      where
+        step :: Map D.Argument D.Value
+            -> D.Argument
+            -> Map D.Argument D.Value
+        step m d = maybe m (`Map.unionWith resolve` m)
+                           (Map.singleton d <$> toDefVal d)
 
         resolve :: D.Value -> D.Value -> D.Value
-        resolve (D.ArrayValue xs) (D.ArrayValue xs') = D.ArrayValue (xs ++ xs')
-        resolve (D.ArrayValue xs) v = D.ArrayValue (xs ++ [v])
         resolve _ v = v
 
-    toDefValMap :: D.Branch -> Map D.Argument D.Value
-    toDefValMap (D.Branch b) = foldl step Map.empty b
-      where
-        step :: Map D.Argument D.Value -> D.Argument -> Map D.Argument D.Value
-        step m x = maybe m
-                           (`Map.union` m)
-                           (Map.singleton x <$> toDefVal x)
-
         toDefVal :: D.Argument -> Maybe D.Value
-        toDefVal (D.Option _ _ (Just (D.OptionArgument _ (Just v))) r) =
-          return $ if (D.isArrayValue v || not r)
-                      then v
-                      else D.ArrayValue [v]
-        toDefVal (D.Positional _ r) = if r
-                                       then return $ D.ArrayValue []
-                                       else Nothing
+        toDefVal (D.Option _ _ (Just (D.OptionArgument _ (Just v))) r)
+          = return $
+              if (D.isArrayValue v || not r)
+                then v
+                else D.ArrayValue [v]
+        toDefVal (D.Positional _ r)
+          = if r
+              then return $ D.ArrayValue []
+              else Nothing
         toDefVal (D.EOA) = Just $ D.ArrayValue []
         toDefVal _ = Nothing
 
