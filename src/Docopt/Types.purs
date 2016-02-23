@@ -1,10 +1,11 @@
 module Docopt.Types where
 
 import Prelude
-import Data.Either
-import Data.Maybe
 import Debug.Trace
-import Data.List
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
+import Data.List (List(..))
+import Data.Function (on)
 import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
 import Data.String (fromChar)
@@ -64,7 +65,8 @@ instance showArgument :: Show Argument where
     = intercalate " " [ "Option", show f, show n, show a, show r ]
 
 instance ordArgument :: Ord Argument where
-  compare _ _ = EQ
+  -- XXX: Implement a more efficient `compare` function
+  compare = compare `on` show
 
 instance eqArgument :: Eq Argument where
   eq (EOA)            (EOA)                = true
