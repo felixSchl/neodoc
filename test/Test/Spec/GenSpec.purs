@@ -5,11 +5,10 @@ module Test.Spec.GenSpec (
 where
 
 import Prelude
-import Data.Tuple (Tuple(..))
 import Debug.Trace
+import Data.Tuple (Tuple(..))
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Exception (EXCEPTION())
-import Control.Monad.State (State(), evalState)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), either)
 import Data.List (List(..), toList, length, fromList, singleton)
@@ -17,19 +16,12 @@ import Data.Map (Map(..))
 import qualified Data.Map as Map
 import qualified Data.Array as A
 import Data.Foldable (for_, intercalate)
-import Control.Monad.Eff.Exception (error, throwException, catchException
-                                   , message)
+import Control.Monad.Eff.Exception (error, throwException)
 import qualified Text.Parsing.Parser as P
 
 import Docopt
-import Docopt.Spec.Parser.Usage (Usage(..))
-import qualified Docopt.Spec.Parser.Usage as Usage
-import qualified Docopt.Spec.Parser.Lexer as Lexer
-import qualified Docopt.Spec.Parser.Scanner as Scanner
 import Docopt.Gen (genParser, runParser)
 import Docopt.Gen.Trans (expand)
-import Docopt.Gen.Lexer (lex)
-import Docopt.Spec.Parser.Base (debug)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())
