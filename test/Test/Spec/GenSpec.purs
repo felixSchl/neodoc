@@ -27,6 +27,7 @@ import qualified Docopt.Spec.Parser.Usage as Usage
 import qualified Docopt.Spec.Parser.Lexer as Lexer
 import qualified Docopt.Spec.Parser.Scanner as Scanner
 import Docopt.Gen (genParser, runParser)
+import Docopt.Gen.Trans (expand)
 import Docopt.Gen.Lexer (lex)
 import Docopt.Spec.Parser.Base (debug)
 
@@ -37,8 +38,8 @@ import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
 import Test.Support.Docopt
 
-type Input    = Array String
-type Output   = Map Argument Value
+type Input = Array String
+type Output = Map Argument Value
 data Test = Test (Array Argument) (Array Case)
 data Case = Case Input (Either String Output)
 
@@ -307,9 +308,11 @@ genSpec = \_ -> describe "The generator" do
 genTransSpec = \_ ->
   describe "The output transformer" do
     it "..." do
-      -- let m = Map.fromList $ toList [
-      --   
-      -- ]
-      -- traceShowA m
+      let m = Map.fromList $ toList [
+        opt  'i' "input" (oa "BAR" $ str "Foo") #= str "qux"
+      , optR 'i' "input" (oa_ "BAR")            #= str "xuq"
+      ]
+      traceShowA m
+      traceShowA (expand m)
       pure unit
 

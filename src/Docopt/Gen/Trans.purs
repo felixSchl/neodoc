@@ -1,4 +1,4 @@
-module Docopt.Gen.Trans (reduce)
+module Docopt.Gen.Trans (reduce, expand)
 where
 
 import Prelude
@@ -13,18 +13,13 @@ import qualified Docopt.Types as D
 import Data.List (List(..))
 import Docopt.Gen.Types (ValueMapping())
 
+-- TODO: Implement this
+expand :: Map D.Argument D.Value -> Map String D.Value
+expand m = Map.empty
+
 reduce :: Tuple D.Branch (List ValueMapping) -> Map D.Argument D.Value
 reduce (Tuple b vs) = mergeDefVals b $ toValMap vs
   where
-    toKeys :: D.Argument -> Array String
-    toKeys (D.Command n)      = [n]
-    toKeys (D.Positional n _) = [n]
-    toKeys (D.Group _ _ _)    = []
-    toKeys (D.EOA)            = ["--"]
-    toKeys (D.Option f n _ _) = []
-                              ++ maybe [] (A.singleton <<< show) f
-                              ++ maybe [] A.singleton n
-
     toValMap :: List (Tuple D.Argument D.Value) -> Map D.Argument D.Value
     toValMap vs = foldl step Map.empty (prepare <$> vs)
       where
