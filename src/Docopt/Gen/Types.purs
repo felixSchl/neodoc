@@ -21,3 +21,7 @@ instance showToken :: Show Token where
   show (SOpt c cs a) = "SOpt " ++ show c ++ " " ++ show cs ++ " " ++ show a
   show (Lit  s)      = "Lit "  ++ show s
   show (EOA  xs)     = "EOA "  ++ show xs
+
+type CliParser a = P.Parser (List Token) a
+
+type ValueMapping = Tuple D.Argument D.Value

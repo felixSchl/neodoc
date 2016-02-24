@@ -22,7 +22,7 @@ import Docopt.Spec.Parser.Usage (Usage(..))
 import qualified Docopt.Spec.Parser.Usage as Usage
 import qualified Docopt.Spec.Parser.Lexer as Lexer
 import qualified Docopt.Spec.Parser.Scanner as Scanner
-import Docopt.Gen.Parser (mkApplicationParser)
+import Docopt.Gen (genParser, runParser)
 import Docopt.Gen.Lexer (lex)
 import Docopt.Spec.Parser.Base (debug)
 
@@ -373,10 +373,9 @@ generatorSpec = describe "The generator" do
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate args argv expected = do
         let result = do
-              toks <- lex (toList argv)
-              P.runParser
-                (toks)
-                (mkApplicationParser $ Application $ singleton $ br args)
+              runParser
+                (toList argv)
+                (genParser $ singleton $ Application $ singleton $ br args)
         case result of
           Left (e@(P.ParseError { message: msg })) ->
             either

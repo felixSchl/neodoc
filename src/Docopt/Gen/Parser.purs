@@ -5,11 +5,8 @@
 -- |
 -- | ===
 
-module Docopt.Gen.Parser (
-  mkApplicationParser
-, runCliParser
-, CliParser ()
-) where
+module Docopt.Gen.Parser (genParser)
+where
 
 import Prelude
 import Control.Plus (empty)
@@ -50,14 +47,6 @@ import Docopt.Spec.Parser.Base (alphaNum, space, getInput, debug)
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
 --------------------------------------------------------------------------------
-
-type CliParser a = P.Parser (List Token) a
-
-runCliParser :: forall a.
-                (List Token)
-              -> CliParser a
-              -> Either P.ParseError a
-runCliParser = P.runParser
 
 -- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> CliParser a
@@ -211,74 +200,11 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
             ++ (intercalate ", " $ prettyPrintToken <$> s)
 
 -- | Generate a parser for a single program application (Usage).
-mkApplicationParser :: D.Application -> CliParser (Map D.Argument D.Value)
-mkApplicationParser (D.Application xs) = do
-  P.choice $ xs <#> \x -> P.try do
-    vs <- mkBranchParser x
-    return $ mergeDefVals x $ toValMap vs
+genParser :: D.Application
+          -> CliParser (Tuple D.Branch (List ValueMapping))
+genParser (D.Application xs) = do
+  P.choice $ xs <#> \x -> Tuple x <$> mkBranchParser x
   <* eof
-  where
-    toKeys :: D.Argument -> Array String
-    toKeys (D.Command n)      = [n]
-    toKeys (D.Positional n _) = [n]
-    toKeys (D.Group _ _ _)    = []
-    toKeys (D.EOA)            = ["--"]
-    toKeys (D.Option f n _ _) = []
-                              ++ maybe [] (A.singleton <<< show) f
-                              ++ maybe [] A.singleton n
-
-    toValMap :: List (Tuple D.Argument D.Value) -> Map D.Argument D.Value
-    toValMap vs = foldl step Map.empty (prepare <$> vs)
-      where
-        step :: Map D.Argument D.Value
-             -> Tuple D.Argument D.Value
-             -> Map D.Argument D.Value
-        step m (Tuple k v) = Map.unionWith (resolve k) (Map.singleton k v) m
-
-        prepare :: Tuple D.Argument D.Value -> Tuple D.Argument D.Value
-        prepare (Tuple k v) | D.isRepeatable k
-          = Tuple k (D.ArrayValue $
-              (case v of
-                D.ArrayValue xs -> xs
-                _               -> [v]
-              ))
-        prepare k = k
-
-        resolve :: D.Argument -> D.Value -> D.Value -> D.Value
-        resolve _ (D.ArrayValue xs) (D.ArrayValue xs') = D.ArrayValue (xs' ++ xs)
-        resolve a (D.ArrayValue xs) v = D.ArrayValue (v A.: xs)
-        resolve a v v' | D.isRepeatable a
-          = D.ArrayValue $
-              (case v' of
-                D.ArrayValue xs -> xs
-                _               -> [v']
-              ) ++ [v]
-        resolve _ v v' = v
-
-    mergeDefVals :: D.Branch -> Map D.Argument D.Value -> Map D.Argument D.Value
-    mergeDefVals (D.Branch b) m = foldl step m b
-      where
-        step :: Map D.Argument D.Value
-            -> D.Argument
-            -> Map D.Argument D.Value
-        step m d = maybe m (`Map.unionWith resolve` m)
-                           (Map.singleton d <$> toDefVal d)
-
-        resolve :: D.Value -> D.Value -> D.Value
-        resolve _ v = v
-
-        toDefVal :: D.Argument -> Maybe D.Value
-        toDefVal (D.Option _ _ (Just (D.OptionArgument _ (Just v))) r)
-          = return $
-              if (D.isArrayValue v || not r)
-                then v
-                else D.ArrayValue [v]
-        toDefVal (D.Positional _ r)
-          = if r
-              then return $ D.ArrayValue []
-              else Nothing
-        toDefVal (D.EOA) = Just $ D.ArrayValue []
-        toDefVal _ = Nothing
 
 -- | Generate a parser for a single usage branch
 mkBranchParser :: D.Branch -> CliParser (List (Tuple D.Argument D.Value))
