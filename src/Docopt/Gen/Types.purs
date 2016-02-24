@@ -21,9 +21,3 @@ instance showToken :: Show Token where
   show (SOpt c cs a) = "SOpt " ++ show c ++ " " ++ show cs ++ " " ++ show a
   show (Lit  s)      = "Lit "  ++ show s
   show (EOA  xs)     = "EOA "  ++ show xs
-
--- | Represents the mapping of a parsed argument to a user-provided value
--- | E.g.: ("-f, --foo", "100")
--- |
--- | XXX: Move this (!)
-type ValueMapping = Tuple D.Argument D.Value

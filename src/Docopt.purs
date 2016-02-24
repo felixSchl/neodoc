@@ -35,7 +35,9 @@ runDocopt docopt argv = do
   us     <- toParseErr $ Usage.run docopt.usage
   ds     <- toParseErr $ concat <$> Desc.run `traverse` docopt.options
   solved <- toSolveErr $ Solver.solve us ds
-  toParseErr $ Gen.run solved (toList argv)
+  vals   <- toParseErr $ Gen.run solved (toList argv)
+  return vals
+
 
 toScanErr :: forall a. Either P.ParseError a -> Either DocoptError a
 toScanErr  = lmap DocoptScanError

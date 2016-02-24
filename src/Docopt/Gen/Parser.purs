@@ -231,11 +231,11 @@ mkApplicationParser (D.Application xs) = do
     toValMap vs = foldl step Map.empty (prepare <$> vs)
       where
         step :: Map D.Argument D.Value
-             -> ValueMapping
+             -> Tuple D.Argument D.Value
              -> Map D.Argument D.Value
         step m (Tuple k v) = Map.unionWith (resolve k) (Map.singleton k v) m
 
-        prepare :: (Tuple D.Argument D.Value) -> ValueMapping
+        prepare :: Tuple D.Argument D.Value -> Tuple D.Argument D.Value
         prepare (Tuple k v) | D.isRepeatable k
           = Tuple k (D.ArrayValue $
               (case v of
@@ -281,7 +281,7 @@ mkApplicationParser (D.Application xs) = do
         toDefVal _ = Nothing
 
 -- | Generate a parser for a single usage branch
-mkBranchParser :: D.Branch -> CliParser (List ValueMapping)
+mkBranchParser :: D.Branch -> CliParser (List (Tuple D.Argument D.Value))
 mkBranchParser (D.Branch xs) = do
   either
     (\_   -> P.fail "Failed to generate parser")
@@ -296,14 +296,17 @@ mkBranchParser (D.Branch xs) = do
 
     -- Given a list of arguments, try parse them all in any order.
     -- The only requirement is that all input is consumed in the end.
-    mkExhaustiveParser :: List D.Argument -> CliParser (List ValueMapping)
+    mkExhaustiveParser :: List D.Argument
+                       -> CliParser (List (Tuple D.Argument D.Value))
     mkExhaustiveParser Nil = pure empty
     mkExhaustiveParser ps  = do
       draw ps (length ps)
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
         -- apply `draw` until the parser fails, with a modified `ps`.
-        draw :: List D.Argument -> Int -> CliParser (List ValueMapping)
+        draw :: List D.Argument
+             -> Int
+             -> CliParser (List (Tuple D.Argument D.Value))
         draw pss@(Cons p ps') n | n >= 0 = (do
           xs <- mkParser p
 
@@ -363,7 +366,7 @@ mkBranchParser (D.Branch xs) = do
         return (a ++ as ++ ass)
 
     -- Parser generator for a single `Argument`
-    mkParser :: D.Argument -> CliParser (List ValueMapping)
+    mkParser :: D.Argument -> CliParser (List (Tuple D.Argument D.Value))
 
     -- Generate a parser for a `Command` argument
     mkParser x@(D.Command n) = (do

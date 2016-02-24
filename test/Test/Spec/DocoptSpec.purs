@@ -59,4 +59,4 @@ docoptSpec =
             , "x", "y"
             , "--", "0"," 1", "3"
             ]
-          traceShowA output
+          return unit
