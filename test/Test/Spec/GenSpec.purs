@@ -1,8 +1,4 @@
-module Test.Spec.GenSpec (
-  genSpec
-, genTransSpec
-)
-where
+module Test.Spec.GenSpec (genSpec) where
 
 import Prelude
 import Debug.Trace
@@ -21,7 +17,7 @@ import qualified Text.Parsing.Parser as P
 
 import Docopt
 import Docopt.Gen (genParser, runParser)
-import Docopt.Gen.Trans (expand)
+import qualified Docopt.Gen.Trans as Trans
 
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())
@@ -30,22 +26,20 @@ import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
 import Test.Support.Docopt
 
-type Input = Array String
-type Output = Map Argument Value
 data Test = Test (Array Argument) (Array Case)
-data Case = Case Input (Either String Output)
+data Case = Case (Array String) (Either String (Map Argument Value))
 
 test :: Array Argument -> Array Case -> Test
 test = Test
 
-pass :: Input -> (Array (Tuple Argument Value)) -> Case
+pass :: Array String -> (Array (Tuple Argument Value)) -> Case
 pass i o = Case i (Right $ Map.fromList $ toList o)
 
-fail :: Input -> String -> Case
+fail :: Array String -> String -> Case
 fail i e = Case i (Left e)
 
-(#=) = Tuple
-infixr 0 #=
+(:>) = Tuple
+infixr 0 :>
 
 genSpec = \_ -> describe "The generator" do
 
@@ -64,7 +58,7 @@ genSpec = \_ -> describe "The generator" do
       test [ pos_arg_r ]
         [ pass
             [ "a", "b", "c" ]
-            [ pos_arg_r #= array [ str "a" , str "b" , str "c" ] ]
+            [ pos_arg_r :> array [ str "a" , str "b" , str "c" ] ]
         , fail [ "--foo", "baz" ]
             "Expected positional argument: \"qux...\""
         , fail
@@ -75,13 +69,13 @@ genSpec = \_ -> describe "The generator" do
     , test [ pos_arg_r, eoa ]
         [ pass
             [ "a", "b", "c", "--" ]
-            [ pos_arg_r #= array [ str "a" , str "b" , str "c" ]
-            , eoa       #= array []
+            [ pos_arg_r :> array [ str "a" , str "b" , str "c" ]
+            , eoa       :> array []
             ]
         , pass
             [ "a", "b", "c", "--", "--", "--" ]
-            [ pos_arg_r #= array [ str "a" , str "b" , str "c" ]
-            , eoa       #= array [ str "--" , str "--" ]
+            [ pos_arg_r :> array [ str "a" , str "b" , str "c" ]
+            , eoa       :> array [ str "--" , str "--" ]
             ]
         ]
 
@@ -101,7 +95,7 @@ genSpec = \_ -> describe "The generator" do
         [ fail [] "Missing required options: (-i, --input=FILE)"
         , pass
             [ "-i", "bar" ]
-            [ opt 'i' "input" (oa_ "FILE") #= (str "bar") ]
+            [ opt 'i' "input" (oa_ "FILE") :> (str "bar") ]
         ]
 
     , test
@@ -113,12 +107,12 @@ genSpec = \_ -> describe "The generator" do
         [ fail [] "Missing required options: -o, --output=FILE, (-i, --input=FILE)"
         , fail [ "-i", "bar" ] "Missing required options: -o, --output=FILE"
         , pass [ "-i", "bar", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") #= str "bar"
-            , opt 'o' "output" (oa_ "FILE") #= str "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE") :> str "bar"
+            , opt 'o' "output" (oa_ "FILE") :> str "bar" ]
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-i", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") #= str "bar"
-            , opt 'o' "output" (oa_ "FILE") #= str "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE") :> str "bar"
+            , opt 'o' "output" (oa_ "FILE") :> str "bar" ]
         ]
 
     , test
@@ -135,14 +129,14 @@ genSpec = \_ -> describe "The generator" do
         , fail [ "-i", "bar", "-r", "bar" ]
             "Missing required options: -o, --output=FILE"
         , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE")   #= str "bar"
-            , opt 'r' "redirect" (oa_ "FILE") #= str "bar"
-            , opt 'o' "output" (oa_ "FILE")   #= str "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE")   :> str "bar"
+            , opt 'r' "redirect" (oa_ "FILE") :> str "bar"
+            , opt 'o' "output" (oa_ "FILE")   :> str "bar" ]
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-r", "bar", "-i", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE")   #= str "bar"
-            , opt 'r' "redirect" (oa_ "FILE") #= str "bar"
-            , opt 'o' "output" (oa_ "FILE")   #= str "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE")   :> str "bar"
+            , opt 'r' "redirect" (oa_ "FILE") :> str "bar"
+            , opt 'o' "output" (oa_ "FILE")   :> str "bar" ]
         ]
 
     , test
@@ -156,9 +150,9 @@ genSpec = \_ -> describe "The generator" do
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
         , pass [ "-i", "bar", "x", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") #= str "bar"
-            , po  "env" false               #= str "x"
-            , opt 'o' "output" (oa_ "FILE") #= str "bar" ]
+            [ opt 'i' "input"  (oa_ "FILE") :> str "bar"
+            , po  "env" false               :> str "x"
+            , opt 'o' "output" (oa_ "FILE") :> str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail [ "-o", "bar", "x", "-i", "bar" ]
             "Missing required options: -i, --input=FILE"
@@ -176,57 +170,57 @@ genSpec = \_ -> describe "The generator" do
 
         [ pass
             [ "foo" , "--out", "--input", "--qux", "--foo=ox", "baz" ]
-            [ cmd_foo          #= bool true
-            , opt_o_out        #= bool true
-            , opt_i_input      #= bool true
-            , opt_q_qux___r    #= array [ bool true ]
-            , opt_f_foo_FOZ__r #= array [ str "ox" ]
-            , cmd_baz          #= bool true
+            [ cmd_foo          :> bool true
+            , opt_o_out        :> bool true
+            , opt_i_input      :> bool true
+            , opt_q_qux___r    :> array [ bool true ]
+            , opt_f_foo_FOZ__r :> array [ str "ox" ]
+            , cmd_baz          :> bool true
             -- should have added default value that was not provided above:
-            , opt_b_baz        #= str "ax"
+            , opt_b_baz        :> str "ax"
             ]
 
         , pass
             [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
-            [ cmd_foo          #= bool true
-            , opt_o_out        #= bool true
-            , opt_q_qux___r    #= array [ bool true , bool true , bool true ]
-            , opt_f_foo_FOZ__r #= array [str "ox"]
-            , opt_b_baz        #= str "ax"
-            , opt_i_input      #= bool true
-            , cmd_baz          #= bool true
+            [ cmd_foo          :> bool true
+            , opt_o_out        :> bool true
+            , opt_q_qux___r    :> array [ bool true , bool true , bool true ]
+            , opt_f_foo_FOZ__r :> array [str "ox"]
+            , opt_b_baz        :> str "ax"
+            , opt_i_input      :> bool true
+            , cmd_baz          :> bool true
             ]
 
         , pass
             [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
-            [ cmd_foo          #= bool true
-            , opt_q_qux___r    #= array [ bool true , bool true ]
-            , opt_o_out        #= bool true
-            , opt_i_input      #= bool true
-            , opt_b_baz        #= str "ax"
-            , opt_f_foo_FOZ__r #= array [ str "ox" ]
-            , cmd_baz          #= bool true
+            [ cmd_foo          :> bool true
+            , opt_q_qux___r    :> array [ bool true , bool true ]
+            , opt_o_out        :> bool true
+            , opt_i_input      :> bool true
+            , opt_b_baz        :> str "ax"
+            , opt_f_foo_FOZ__r :> array [ str "ox" ]
+            , cmd_baz          :> bool true
             ]
 
         , pass
             [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
-            [ cmd_foo          #= bool true
-            , opt_b_baz        #= str "ax"
-            , opt_o_out        #= bool true
-            , opt_f_foo_FOZ__r #= array [ str "ox" ]
-            , opt_i_input      #= bool true
-            , cmd_baz          #= bool true
+            [ cmd_foo          :> bool true
+            , opt_b_baz        :> str "ax"
+            , opt_o_out        :> bool true
+            , opt_f_foo_FOZ__r :> array [ str "ox" ]
+            , opt_i_input      :> bool true
+            , cmd_baz          :> bool true
             ]
 
         , pass
             [ "foo", "-o", "-i", "-bax", "baz" ]
-            [ cmd_foo     #= bool true
-            , opt_o_out   #= bool true
-            , opt_i_input #= bool true
-            , opt_b_baz   #= str "ax"
-            , cmd_baz     #= bool true
+            [ cmd_foo     :> bool true
+            , opt_o_out   :> bool true
+            , opt_i_input :> bool true
+            , opt_b_baz   :> str "ax"
+            , cmd_baz     :> bool true
             -- should have added default value that was not provided above:
-            , opt_b_baz   #= str "ax"
+            , opt_b_baz   :> str "ax"
             ]
 
         , fail
@@ -254,7 +248,7 @@ genSpec = \_ -> describe "The generator" do
       for_ kases \(Case input expected) ->
             let msg = either
                   (\e -> "Should fail with \"" ++ e ++ "\"")
-                  (\e -> prettyPrintOutput e)
+                  prettyPrintOut
                   expected
             in it (intercalate " " input ++ " -> " ++ msg) do
                   vliftEff do
@@ -262,14 +256,17 @@ genSpec = \_ -> describe "The generator" do
 
     where
 
-      prettyPrintOutput :: Output -> String
-      prettyPrintOutput expected = ("\n\t" ++) $ intercalate "\n\t" $
-                      (Map.toList expected) <#> \(Tuple arg val) ->
-                        prettyPrintArg arg ++ ": " ++ prettyPrintValue val
+      prettyPrintOut :: Map Argument Value -> String
+      prettyPrintOut m = "\n\t" ++ (prettyPrintMap m prettyPrintArg)
+
+      prettyPrintMap :: forall a. Map a Value -> (a -> String) -> String
+      prettyPrintMap m p = intercalate "\n\t" $
+        Map.toList m <#> \(Tuple arg val) ->
+          p arg ++ " => " ++ prettyPrintValue val
 
       validate :: forall eff. Array Argument
-                            -> Input
-                            -> Either String Output
+                            -> Array String
+                            -> Either String (Map Argument Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate args argv expected = do
         let result = do
@@ -293,18 +290,6 @@ genSpec = \_ -> describe "The generator" do
                 if (r /= r')
                   then throwException $ error $
                     "Unexpected output:\n"
-                      ++ prettyPrintOutput r
+                      ++ prettyPrintOut r
                   else return unit)
               expected
-
-genTransSpec = \_ ->
-  describe "The output transformer" do
-    it "..." do
-      let m = Map.fromList $ toList [
-        opt  'i' "input" (oa "BAR" $ str "Foo") #= str "qux"
-      , optR 'i' "input" (oa_ "BAR")            #= str "xuq"
-      ]
-      traceShowA m
-      traceShowA (expand m)
-      pure unit
-
