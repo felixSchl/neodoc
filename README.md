@@ -109,60 +109,36 @@ The project can roughly be broken up into 4 distinct areas of work:
 ## Ideas for a future past the initial relase ##
 
 * Write syntax plugin for vim
-* **Formalise the options** text layout in order to add more helpful information
-  about options, consider:
-  ```sh
-  Usage: program --foo
+* First class commands description sections (and `[options...]`)
+    * Consider the following:
+        ```sh
+        Usage:
+            git branch [options...] [branch-options...]
+            #            ^                ^
+            #            |                |
+            #            |                `- Denotes common options
+            #            |
+            #            `- denotes options specific to `branch` command
 
-  Options:
-    -f, --foo  this is foo and does something great
-                [default: 100]
-                [implies: --qux, --baz=10]
-                [choices: 0|10|100]
-  ```
-* **Make commands first-class citizens**. Many utilities break their
-  functionality across sub-commands. Consider git _(shortened for clarity)_:
-  ```sh
-  $ git --help
-  usage: git [--version] [--help] <command> [<args>]
+        Common Options: # <-- Identify as match for `options` by substring
+          -h, --help  Show this help and exit
 
-  $ git branch --help
-  SYNOPSIS
-     git branch [--color[=<when>] | --no-color] [-r | -a]
-             [--list] [-v [--abbrev=<length> | --no-abbrev]]
-             [--column[=<options>] | --no-column]
-             [(--merged | --no-merged | --contains) [<commit>]] [<pattern>...]
-     git branch [--set-upstream | --track | --no-track] [-l] [-f] <branchname> [<start-point>]
-  ```
+        Branch Options: # <-- Identify as match for `branch-options` by substring
+          -D <name>  Delete the branch identified by <name>
+        ```
+    * Or the following (multiple usage):
+        ```sh
+        Usage:
+            git branch
 
-  In this example `<command>` was `branch`.
-  This means that `git --version --help branch` &mdash; albeit non-sensical
-  &mdash; is a valid way to use git.
+        Git-branch usage: # <-- Identify as match for `branch` by substring
+            git branch [options...] [-D]
 
-  This could perhaps be documented as such:
+        Git-branch options: # <-- Identify as match for `branch` by substring
+            -D <name>  Delete the branch identified by <name>
+        ```
+        This approach is slightly more verbose, but might be easier for
+        normalization for large projects across different files?
 
-  ```sh
-  usage: git [--version] [--help] [-C <path>] [-c name=value]
-          [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
-          [-p|--paginate|--no-pager] [--no-replace-objects] [--bare]
-          [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
-          <command> [<args>]
-
-  The most commonly used git commands are:
-    add        Add file contents to the index
-    bisect     Find by binary search the change that introduced a bug
-    branch     List, create, or delete branches
-    [...]
-    rm         Remove files from the working tree and from the index
-    show       Show various types of objects
-
-  'git help -a' and 'git help -g' lists available subcommands and some
-  concept guides. See 'git help <command>' or 'git help <concept>'
-  to read about a specific subcommand or concept.
-  ```
-
-  This has the following implications:
-    * How to detect a commands section? Something in the title?
-    * Is `<command>` special?
 
 [docopt-orig]: http://docopt.org
