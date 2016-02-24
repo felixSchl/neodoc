@@ -126,7 +126,8 @@ pass i o = Case i (Right $ Map.fromList $ toList o)
 fail :: Input -> String -> Case
 fail i e = Case i (Left e)
 
-(//) = Tuple
+(#=) = Tuple
+infixr 0 #=
 
 genSpec = \_ -> describe "The generator" do
 
@@ -145,11 +146,11 @@ genSpec = \_ -> describe "The generator" do
       test [ pos_arg_r ]
         [ pass
             [ "a", "b", "c" ]
-            [ Tuple pos_arg_r (ArrayValue [
-                                StringValue "a"
-                              , StringValue "b"
-                              , StringValue "c"
-                              ])
+            [ pos_arg_r #= ArrayValue [
+                            StringValue "a"
+                          , StringValue "b"
+                          , StringValue "c"
+                          ]
             ]
         , fail [ "--foo", "baz" ]
             "Expected positional argument: \"qux...\""
@@ -161,24 +162,24 @@ genSpec = \_ -> describe "The generator" do
     , test [ pos_arg_r, eoa ]
         [ pass
             [ "a", "b", "c", "--" ]
-            [ Tuple pos_arg_r (ArrayValue [
-                                StringValue "a"
-                              , StringValue "b"
-                              , StringValue "c"
-                              ])
-            , Tuple eoa (ArrayValue [])
+            [ pos_arg_r #= ArrayValue [
+                              StringValue "a"
+                            , StringValue "b"
+                            , StringValue "c"
+                            ]
+            , eoa #= ArrayValue []
             ]
         , pass
             [ "a", "b", "c", "--", "--", "--" ]
-            [ Tuple pos_arg_r (ArrayValue [
-                                StringValue "a"
-                              , StringValue "b"
-                              , StringValue "c"
-                              ])
-            , Tuple eoa (ArrayValue [
-                          StringValue "--"
-                        , StringValue "--"
-                        ])
+            [ pos_arg_r #= ArrayValue [
+                              StringValue "a"
+                            , StringValue "b"
+                            , StringValue "c"
+                            ]
+            , eoa #= ArrayValue [
+                        StringValue "--"
+                      , StringValue "--"
+                      ]
             ]
         ]
 
@@ -198,7 +199,7 @@ genSpec = \_ -> describe "The generator" do
         [ fail [] "Missing required options: (-i, --input=FILE)"
         , pass
             [ "-i", "bar" ]
-            [ opt 'i' "input" (oa_ "FILE") // (StringValue "bar") ]
+            [ opt 'i' "input" (oa_ "FILE") #= (StringValue "bar") ]
         ]
 
     , test
@@ -210,12 +211,12 @@ genSpec = \_ -> describe "The generator" do
         [ fail [] "Missing required options: -o, --output=FILE, (-i, --input=FILE)"
         , fail [ "-i", "bar" ] "Missing required options: -o, --output=FILE"
         , pass [ "-i", "bar", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") // (StringValue "bar")
-            , opt 'o' "output" (oa_ "FILE") // (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE") #= (StringValue "bar")
+            , opt 'o' "output" (oa_ "FILE") #= (StringValue "bar") ]
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-i", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") // (StringValue "bar")
-            , opt 'o' "output" (oa_ "FILE") // (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE") #= (StringValue "bar")
+            , opt 'o' "output" (oa_ "FILE") #= (StringValue "bar") ]
         ]
 
     , test
@@ -232,14 +233,14 @@ genSpec = \_ -> describe "The generator" do
         , fail [ "-i", "bar", "-r", "bar" ]
             "Missing required options: -o, --output=FILE"
         , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE")   // (StringValue "bar")
-            , opt 'r' "redirect" (oa_ "FILE") // (StringValue "bar")
-            , opt 'o' "output" (oa_ "FILE")   // (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE")   #= (StringValue "bar")
+            , opt 'r' "redirect" (oa_ "FILE") #= (StringValue "bar")
+            , opt 'o' "output" (oa_ "FILE")   #= (StringValue "bar") ]
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-r", "bar", "-i", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE")   // (StringValue "bar")
-            , opt 'r' "redirect" (oa_ "FILE") // (StringValue "bar")
-            , opt 'o' "output" (oa_ "FILE")   // (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE")   #= (StringValue "bar")
+            , opt 'r' "redirect" (oa_ "FILE") #= (StringValue "bar")
+            , opt 'o' "output" (oa_ "FILE")   #= (StringValue "bar") ]
         ]
 
     , test
@@ -253,9 +254,9 @@ genSpec = \_ -> describe "The generator" do
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
         , pass [ "-i", "bar", "x", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") // (StringValue "bar")
-            , pos "env" false               // (StringValue "x")
-            , opt 'o' "output" (oa_ "FILE") // (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE") #= (StringValue "bar")
+            , pos "env" false               #= (StringValue "x")
+            , opt 'o' "output" (oa_ "FILE") #= (StringValue "bar") ]
           -- group should NOT be interchangable if it contains non-options:
         , fail [ "-o", "bar", "x", "-i", "bar" ]
             "Missing required options: -i, --input=FILE"
@@ -273,64 +274,64 @@ genSpec = \_ -> describe "The generator" do
 
         [ pass
             [ "foo" , "--out", "--input", "--qux", "--foo=ox", "baz" ]
-            [ Tuple cmd_foo          (BoolValue true)
-            , Tuple opt_o_out        (BoolValue true)
-            , Tuple opt_i_input      (BoolValue true)
-            , Tuple opt_q_qux___r    (ArrayValue [ BoolValue true ])
-            , Tuple opt_f_foo_FOZ__r (ArrayValue [ StringValue "ox" ])
-            , Tuple cmd_baz          (BoolValue true)
+            [ cmd_foo          #= BoolValue true
+            , opt_o_out        #= BoolValue true
+            , opt_i_input      #= BoolValue true
+            , opt_q_qux___r    #= ArrayValue [ BoolValue true ]
+            , opt_f_foo_FOZ__r #= ArrayValue [ StringValue "ox" ]
+            , cmd_baz          #= BoolValue true
             -- should have added default value that was not provided above:
-            , Tuple opt_b_baz        (StringValue "ax")
+            , opt_b_baz        #= StringValue "ax"
             ]
 
         , pass
             [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
-            [ Tuple cmd_foo          (BoolValue true)
-            , Tuple opt_o_out        (BoolValue true)
-            , Tuple opt_q_qux___r    (ArrayValue [
-                                        BoolValue true
-                                      , BoolValue true
-                                      , BoolValue true
-                                     ])
-            , Tuple opt_f_foo_FOZ__r (ArrayValue [StringValue "ox"])
-            , Tuple opt_b_baz        (StringValue "ax")
-            , Tuple opt_i_input      (BoolValue true)
-            , Tuple cmd_baz          (BoolValue true)
+            [ cmd_foo       #= BoolValue true
+            , opt_o_out     #= BoolValue true
+            , opt_q_qux___r #= ArrayValue [
+                                  BoolValue true
+                                , BoolValue true
+                                , BoolValue true
+                                ]
+            , opt_f_foo_FOZ__r #= ArrayValue [StringValue "ox"]
+            , opt_b_baz        #= StringValue "ax"
+            , opt_i_input      #= BoolValue true
+            , cmd_baz          #= BoolValue true
             ]
 
         , pass
             [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
-            [ Tuple cmd_foo          (BoolValue true)
-            , Tuple opt_q_qux___r    (ArrayValue [
+            [ cmd_foo          #= BoolValue true
+            , opt_q_qux___r    #= ArrayValue [
                                         BoolValue true
                                       , BoolValue true
-                                     ])
-            , Tuple opt_o_out        (BoolValue true)
-            , Tuple opt_i_input      (BoolValue true)
-            , Tuple opt_b_baz        (StringValue "ax")
-            , Tuple opt_f_foo_FOZ__r (ArrayValue [StringValue "ox"])
-            , Tuple cmd_baz          (BoolValue true)
+                                     ]
+            , opt_o_out        #= BoolValue true
+            , opt_i_input      #= BoolValue true
+            , opt_b_baz        #= StringValue "ax"
+            , opt_f_foo_FOZ__r #= ArrayValue [StringValue "ox"]
+            , cmd_baz          #= BoolValue true
             ]
 
         , pass
             [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
-            [ Tuple cmd_foo          (BoolValue true)
-            , Tuple opt_b_baz        (StringValue "ax")
-            , Tuple opt_o_out        (BoolValue true)
-            , Tuple opt_f_foo_FOZ__r (ArrayValue [StringValue "ox"])
-            , Tuple opt_i_input      (BoolValue true)
-            , Tuple cmd_baz          (BoolValue true)
+            [ cmd_foo          #= BoolValue true
+            , opt_b_baz        #= StringValue "ax"
+            , opt_o_out        #= BoolValue true
+            , opt_f_foo_FOZ__r #= ArrayValue [StringValue "ox"]
+            , opt_i_input      #= BoolValue true
+            , cmd_baz          #= BoolValue true
             ]
 
         , pass
             [ "foo", "-o", "-i", "-bax", "baz" ]
-            [ Tuple cmd_foo          (BoolValue true)
-            , Tuple opt_o_out        (BoolValue true)
-            , Tuple opt_i_input      (BoolValue true)
-            , Tuple opt_b_baz        (StringValue "ax")
-            , Tuple cmd_baz          (BoolValue true)
+            [ cmd_foo     #= BoolValue true
+            , opt_o_out   #= BoolValue true
+            , opt_i_input #= BoolValue true
+            , opt_b_baz   #= StringValue "ax"
+            , cmd_baz     #= BoolValue true
             -- should have added default value that was not provided above:
-            , Tuple opt_b_baz        (StringValue "ax")
+            , opt_b_baz  #= StringValue "ax"
             ]
 
         , fail
