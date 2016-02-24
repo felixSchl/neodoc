@@ -35,82 +35,7 @@ import Test.Spec (describe, it, Spec())
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
-
--- short hand to create a Command
-co :: String -> Argument
-co = Command
-
--- short hand to create a Positional argument
-pos :: String -> Boolean -> Argument
-pos = Positional
-
--- short hand to create a end-of-arguments marker
-eoa :: Argument
-eoa = EOA
-
--- short hand to create an Option argument
-opt' :: Flag
-      -> Name
-      -> (Maybe OptionArgument)
-      -> IsRepeatable
-      -> Argument
-opt' f n = Option (Just f) (Just n)
-
-opt_ :: Flag
-      -> Name
-      -> Argument
-opt_ f n = opt' f n Nothing false
-
-optR_ :: Flag
-      -> Name
-      -> Argument
-optR_ f n = opt' f n Nothing true
-
-opt :: Flag
-    -> Name
-    -> OptionArgument
-    -> Argument
-opt f n a = opt' f n (Just a) false
-
-optR :: Flag
-     -> Name
-     -> OptionArgument
-     -> Argument
-optR f n a = opt' f n (Just a) true
-
-sopt :: Flag
-      -> (Maybe OptionArgument)
-      -> IsRepeatable
-      -> Argument
-sopt f = Option (Just f) Nothing
-
-lopt :: Name
-      -> (Maybe OptionArgument)
-      -> IsRepeatable
-      -> Argument
-lopt name = Option Nothing (Just name)
-
--- short hand to create a group
-gr :: Boolean -> IsRepeatable -> (Array (Array Argument)) -> Argument
-gr b r xs = Group b (toList $ br <$> xs) r
-
--- short hand to create a optional group
-gro :: IsRepeatable -> (Array (Array Argument)) -> Argument
-gro = gr true
-
--- short hand to create a required group
-grr :: IsRepeatable -> (Array (Array Argument)) -> Argument
-grr = gr false
-
--- short hand to create a whole branch
-br :: (Array Argument) -> Branch
-br xs = Branch (toList xs)
-
-oa :: String -> Value -> OptionArgument
-oa n v = OptionArgument n (Just v)
-
-oa_ :: String -> OptionArgument
-oa_ n = OptionArgument n Nothing
+import Test.Support.Docopt
 
 type Input    = Array String
 type Output   = Map Argument Value
@@ -138,7 +63,7 @@ genSpec = \_ -> describe "The generator" do
       opt_b_baz        = opt   'b' "baz"   (oa "BAZ" $ StringValue "ax")
       opt_o_out        = opt_  'o' "out"
       opt_i_input      = opt_  'i' "input"
-      pos_arg_r        = pos    "qux" true
+      pos_arg_r        = po     "qux" true
       cmd_baz          = co     "baz"
 
   let testCases = [
@@ -246,7 +171,7 @@ genSpec = \_ -> describe "The generator" do
     , test
         [ grr false [[
             opt 'i' "input" (oa_ "FILE")
-          , pos "env" false
+          , po  "env" false
           ]]
         , opt 'o' "output" (oa_ "FILE")
         ]
@@ -255,7 +180,7 @@ genSpec = \_ -> describe "The generator" do
         , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
         , pass [ "-i", "bar", "x", "-o", "bar" ]
             [ opt 'i' "input"  (oa_ "FILE") #= (StringValue "bar")
-            , pos "env" false               #= (StringValue "x")
+            , po  "env" false               #= (StringValue "x")
             , opt 'o' "output" (oa_ "FILE") #= (StringValue "bar") ]
           -- group should NOT be interchangable if it contains non-options:
         , fail [ "-o", "bar", "x", "-i", "bar" ]
@@ -405,5 +330,9 @@ genSpec = \_ -> describe "The generator" do
 genTransSpec = \_ ->
   describe "The output transformer" do
     it "..." do
+      -- let m = Map.fromList $ toList [
+      --   
+      -- ]
+      -- traceShowA m
       pure unit
 

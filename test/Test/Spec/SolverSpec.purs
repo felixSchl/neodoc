@@ -71,12 +71,7 @@ solverSpec = \_ ->
                             (Just $ Desc.arg "bar" (Just "qux"))
                 ])
                 ([ application [
-                    [ D.opt (Just 'f')
-                            (Just "foo")
-                            (Just $ OptionArgument "bar"
-                                                   (Just $ StringValue "qux"))
-                            true
-                    ]
+                    [ D.optR 'f' "foo" (D.oa "bar" (StringValue "qux")) ]
                 ] ])
         ]
 
@@ -85,11 +80,7 @@ solverSpec = \_ ->
                             (Just $ Desc.arg "BAR" (Just "qux"))
                 ])
                 ([ application [
-                    [ D.opt (Just 'f')
-                            (Just "foo")
-                            (Just $ OptionArgument "BAR"
-                                                   (Just $ StringValue "qux"))
-                            true
+                    [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
                     , D.co "BAR"
                     ]
                 ] ])
@@ -100,12 +91,7 @@ solverSpec = \_ ->
                             (Just $ Desc.arg "BAR" (Just "qux"))
                 ])
                 ([ application [
-                    [ D.opt (Just 'f')
-                            (Just "foo")
-                            (Just $ OptionArgument "BAR"
-                                                   (Just $ StringValue "qux"))
-                            true
-                    ]
+                    [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
                 ] ])
         ]
 
@@ -114,12 +100,7 @@ solverSpec = \_ ->
                             (Just $ Desc.arg "BAR" (Just "qux"))
                 ])
                 ([ application [
-                    [ D.opt (Just 'f')
-                            (Just "foo")
-                            (Just $ OptionArgument "BAR"
-                                                   (Just $ StringValue "qux"))
-                            false
-                    ]
+                    [ D.opt 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
                 ] ])
         ]
 
@@ -128,11 +109,7 @@ solverSpec = \_ ->
                             (Just $ Desc.arg "BAR" (Just "qux"))
                 ])
                 ([ application [
-                    [ D.opt (Just 'f')
-                            (Just "foo")
-                            (Just $ OptionArgument "BAR"
-                                                   (Just $ StringValue "qux"))
-                            true
+                    [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
                     , D.po "BAR" true
                     ]
                 ] ])
@@ -143,14 +120,10 @@ solverSpec = \_ ->
                             (Just $ Desc.arg "FILE" (Just "foo"))
                 ])
                 ([ application [
-                    [ D.opt (Just 'x') Nothing Nothing true
-                    , D.opt (Just 'v') Nothing Nothing true
-                    , D.opt (Just 'z') Nothing Nothing true
-                    , D.opt (Just 'f')
-                            (Just "file")
-                            (Just $ OptionArgument "FILE"
-                                                   (Just $ StringValue "foo"))
-                            true
+                    [ D.soptR_ 'x'
+                    , D.soptR_ 'v'
+                    , D.soptR_ 'z'
+                    , D.optR 'f' "file" (D.oa "FILE" (StringValue "foo"))
                     ]
                 ] ])
         ]
@@ -162,12 +135,7 @@ solverSpec = \_ ->
                            (Just $ Desc.arg "FILE" (Just "foo"))
                 ]
                 ([ application [
-                    [ D.opt (Just 'f')
-                            (Just "file")
-                            (Just $ OptionArgument "FILE"
-                                                   (Just $ StringValue "foo"))
-                            true
-                    ]
+                    [ D.optR 'f' "file" (D.oa "FILE" (StringValue "foo")) ]
                 ] ])
         ]
 
@@ -176,8 +144,8 @@ solverSpec = \_ ->
                             (Just $ Desc.arg "FILE" (Just "foo"))
                 ])
                 ([ application [
-                    [ D.opt (Just 'f') Nothing Nothing true
-                    , D.opt (Just 'x') Nothing Nothing true
+                    [ D.soptR_ 'f'
+                    , D.soptR_ 'x'
                     ]
                 ] ])
         ]
@@ -190,10 +158,10 @@ solverSpec = \_ ->
                             (Just $ Desc.arg "FILE" (Just "foo"))
                 ])
                 ([ application [
-                    [ D.opt (Just 'f') Nothing Nothing true
-                    , D.opt (Just 'v') Nothing Nothing true
-                    , D.opt (Just 'z') Nothing Nothing true
-                    , D.opt (Just 'x') Nothing Nothing true
+                    [ D.soptR_ 'f'
+                    , D.soptR_ 'v'
+                    , D.soptR_ 'z'
+                    , D.soptR_ 'x'
                     ]
                 ] ])
         ]
@@ -202,14 +170,10 @@ solverSpec = \_ ->
                             (Just $ Desc.arg "FILE" (Just "foo"))
                 ])
                 ([ application [
-                    [ D.opt (Just 'x') Nothing Nothing true
-                    , D.opt (Just 'v') Nothing Nothing true
-                    , D.opt (Just 'z') Nothing Nothing true
-                    , D.opt (Just 'f')
-                            (Just "file")
-                            (Just $ OptionArgument "FILE"
-                                                   (Just $ StringValue "foo"))
-                            true
+                    [ D.soptR_ 'x'
+                    , D.soptR_ 'v'
+                    , D.soptR_ 'z'
+                    , D.optR 'f' "file" (D.oa "FILE" (StringValue "foo"))
                     ]
                 ] ])
         ]
