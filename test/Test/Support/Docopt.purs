@@ -119,3 +119,7 @@ oa n v = OptionArgument n (Just v)
 oa_ :: String -> OptionArgument
 oa_ n = OptionArgument n Nothing
 
+-- short hand for values
+array = ArrayValue
+str   = StringValue
+bool  = BoolValue

@@ -60,7 +60,7 @@ genSpec = \_ -> describe "The generator" do
   let cmd_foo          = co    "foo"
       opt_f_foo_FOZ__r = optR  'f' "foo" (oa_ "FOZ")
       opt_q_qux___r    = optR_ 'q' "qux"
-      opt_b_baz        = opt   'b' "baz"   (oa "BAZ" $ StringValue "ax")
+      opt_b_baz        = opt   'b' "baz"   (oa "BAZ" $ str "ax")
       opt_o_out        = opt_  'o' "out"
       opt_i_input      = opt_  'i' "input"
       pos_arg_r        = po     "qux" true
@@ -71,12 +71,7 @@ genSpec = \_ -> describe "The generator" do
       test [ pos_arg_r ]
         [ pass
             [ "a", "b", "c" ]
-            [ pos_arg_r #= ArrayValue [
-                            StringValue "a"
-                          , StringValue "b"
-                          , StringValue "c"
-                          ]
-            ]
+            [ pos_arg_r #= array [ str "a" , str "b" , str "c" ] ]
         , fail [ "--foo", "baz" ]
             "Expected positional argument: \"qux...\""
         , fail
@@ -87,24 +82,13 @@ genSpec = \_ -> describe "The generator" do
     , test [ pos_arg_r, eoa ]
         [ pass
             [ "a", "b", "c", "--" ]
-            [ pos_arg_r #= ArrayValue [
-                              StringValue "a"
-                            , StringValue "b"
-                            , StringValue "c"
-                            ]
-            , eoa #= ArrayValue []
+            [ pos_arg_r #= array [ str "a" , str "b" , str "c" ]
+            , eoa       #= array []
             ]
         , pass
             [ "a", "b", "c", "--", "--", "--" ]
-            [ pos_arg_r #= ArrayValue [
-                              StringValue "a"
-                            , StringValue "b"
-                            , StringValue "c"
-                            ]
-            , eoa #= ArrayValue [
-                        StringValue "--"
-                      , StringValue "--"
-                      ]
+            [ pos_arg_r #= array [ str "a" , str "b" , str "c" ]
+            , eoa       #= array [ str "--" , str "--" ]
             ]
         ]
 
@@ -124,7 +108,7 @@ genSpec = \_ -> describe "The generator" do
         [ fail [] "Missing required options: (-i, --input=FILE)"
         , pass
             [ "-i", "bar" ]
-            [ opt 'i' "input" (oa_ "FILE") #= (StringValue "bar") ]
+            [ opt 'i' "input" (oa_ "FILE") #= (str "bar") ]
         ]
 
     , test
@@ -136,12 +120,12 @@ genSpec = \_ -> describe "The generator" do
         [ fail [] "Missing required options: -o, --output=FILE, (-i, --input=FILE)"
         , fail [ "-i", "bar" ] "Missing required options: -o, --output=FILE"
         , pass [ "-i", "bar", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") #= (StringValue "bar")
-            , opt 'o' "output" (oa_ "FILE") #= (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE") #= str "bar"
+            , opt 'o' "output" (oa_ "FILE") #= str "bar" ]
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-i", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") #= (StringValue "bar")
-            , opt 'o' "output" (oa_ "FILE") #= (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE") #= str "bar"
+            , opt 'o' "output" (oa_ "FILE") #= str "bar" ]
         ]
 
     , test
@@ -158,14 +142,14 @@ genSpec = \_ -> describe "The generator" do
         , fail [ "-i", "bar", "-r", "bar" ]
             "Missing required options: -o, --output=FILE"
         , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE")   #= (StringValue "bar")
-            , opt 'r' "redirect" (oa_ "FILE") #= (StringValue "bar")
-            , opt 'o' "output" (oa_ "FILE")   #= (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE")   #= str "bar"
+            , opt 'r' "redirect" (oa_ "FILE") #= str "bar"
+            , opt 'o' "output" (oa_ "FILE")   #= str "bar" ]
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-r", "bar", "-i", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE")   #= (StringValue "bar")
-            , opt 'r' "redirect" (oa_ "FILE") #= (StringValue "bar")
-            , opt 'o' "output" (oa_ "FILE")   #= (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE")   #= str "bar"
+            , opt 'r' "redirect" (oa_ "FILE") #= str "bar"
+            , opt 'o' "output" (oa_ "FILE")   #= str "bar" ]
         ]
 
     , test
@@ -179,9 +163,9 @@ genSpec = \_ -> describe "The generator" do
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
         , pass [ "-i", "bar", "x", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") #= (StringValue "bar")
-            , po  "env" false               #= (StringValue "x")
-            , opt 'o' "output" (oa_ "FILE") #= (StringValue "bar") ]
+            [ opt 'i' "input"  (oa_ "FILE") #= str "bar"
+            , po  "env" false               #= str "x"
+            , opt 'o' "output" (oa_ "FILE") #= str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail [ "-o", "bar", "x", "-i", "bar" ]
             "Missing required options: -i, --input=FILE"
@@ -199,64 +183,57 @@ genSpec = \_ -> describe "The generator" do
 
         [ pass
             [ "foo" , "--out", "--input", "--qux", "--foo=ox", "baz" ]
-            [ cmd_foo          #= BoolValue true
-            , opt_o_out        #= BoolValue true
-            , opt_i_input      #= BoolValue true
-            , opt_q_qux___r    #= ArrayValue [ BoolValue true ]
-            , opt_f_foo_FOZ__r #= ArrayValue [ StringValue "ox" ]
-            , cmd_baz          #= BoolValue true
+            [ cmd_foo          #= bool true
+            , opt_o_out        #= bool true
+            , opt_i_input      #= bool true
+            , opt_q_qux___r    #= array [ bool true ]
+            , opt_f_foo_FOZ__r #= array [ str "ox" ]
+            , cmd_baz          #= bool true
             -- should have added default value that was not provided above:
-            , opt_b_baz        #= StringValue "ax"
+            , opt_b_baz        #= str "ax"
             ]
 
         , pass
             [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
-            [ cmd_foo       #= BoolValue true
-            , opt_o_out     #= BoolValue true
-            , opt_q_qux___r #= ArrayValue [
-                                  BoolValue true
-                                , BoolValue true
-                                , BoolValue true
-                                ]
-            , opt_f_foo_FOZ__r #= ArrayValue [StringValue "ox"]
-            , opt_b_baz        #= StringValue "ax"
-            , opt_i_input      #= BoolValue true
-            , cmd_baz          #= BoolValue true
+            [ cmd_foo          #= bool true
+            , opt_o_out        #= bool true
+            , opt_q_qux___r    #= array [ bool true , bool true , bool true ]
+            , opt_f_foo_FOZ__r #= array [str "ox"]
+            , opt_b_baz        #= str "ax"
+            , opt_i_input      #= bool true
+            , cmd_baz          #= bool true
             ]
 
         , pass
             [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
-            [ cmd_foo          #= BoolValue true
-            , opt_q_qux___r    #= ArrayValue [
-                                        BoolValue true
-                                      , BoolValue true
-                                     ]
-            , opt_o_out        #= BoolValue true
-            , opt_i_input      #= BoolValue true
-            , opt_b_baz        #= StringValue "ax"
-            , opt_f_foo_FOZ__r #= ArrayValue [StringValue "ox"]
-            , cmd_baz          #= BoolValue true
+            [ cmd_foo          #= bool true
+            , opt_q_qux___r    #= array [ bool true , bool true ]
+            , opt_o_out        #= bool true
+            , opt_i_input      #= bool true
+            , opt_b_baz        #= str "ax"
+            , opt_f_foo_FOZ__r #= array [ str "ox" ]
+            , cmd_baz          #= bool true
             ]
 
         , pass
             [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
-            [ cmd_foo          #= BoolValue true
-            , opt_b_baz        #= StringValue "ax"
-            , opt_o_out        #= BoolValue true
-            , opt_f_foo_FOZ__r #= ArrayValue [StringValue "ox"]
-            , opt_i_input      #= BoolValue true
-            , cmd_baz          #= BoolValue true
+            [ cmd_foo          #= bool true
+            , opt_b_baz        #= str "ax"
+            , opt_o_out        #= bool true
+            , opt_f_foo_FOZ__r #= array [ str "ox" ]
+            , opt_i_input      #= bool true
+            , cmd_baz          #= bool true
             ]
 
         , pass
             [ "foo", "-o", "-i", "-bax", "baz" ]
-            [ cmd_foo     #= BoolValue true
-            , opt_o_out   #= BoolValue true
-            , opt_i_input #= BoolValue true
-            , opt_b_baz   #= StringValue "ax"
-            , cmd_baz     #= BoolValue true
+            [ cmd_foo     #= bool true
+            , opt_o_out   #= bool true
+            , opt_i_input #= bool true
+            , opt_b_baz   #= str "ax"
+            , cmd_baz     #= bool true
             -- should have added default value that was not provided above:
-            , opt_b_baz  #= StringValue "ax"
+            , opt_b_baz   #= str "ax"
             ]
 
         , fail
