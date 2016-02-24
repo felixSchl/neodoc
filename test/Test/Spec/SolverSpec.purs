@@ -52,7 +52,7 @@ usage = U.usage "foo"
 application :: Array (Array Argument) -> Application
 application xss = Application $ toList $ (\xs -> Branch $ toList xs) <$> xss
 
-solverSpec =
+solverSpec = \_ ->
   describe "solver" do
     (flip traverseWithIndex_) (toList [
 

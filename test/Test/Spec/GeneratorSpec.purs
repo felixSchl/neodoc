@@ -27,7 +27,7 @@ import Docopt.Gen.Lexer (lex)
 import Docopt.Spec.Parser.Base (debug)
 
 import Test.Assert (assert)
-import Test.Spec (describe, it)
+import Test.Spec (describe, it, Spec())
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
@@ -124,7 +124,7 @@ fail i e = Case i (Left e)
 
 (//) = Tuple
 
-generatorSpec = describe "The generator" do
+generatorSpec = \_ -> describe "The generator" do
 
   -- Some options that will be used for these tests
   let cmd_foo          = co    "foo"

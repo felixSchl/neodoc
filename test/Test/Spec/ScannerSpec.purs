@@ -21,7 +21,7 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff)
 
-scannerSpec = do
+scannerSpec = \_ ->
   describe "scanner" do
     it "should scan sections" do
       let docopt = fromRight $ Scanner.scan $

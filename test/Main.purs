@@ -12,9 +12,9 @@ import Test.Spec.SolverSpec (solverSpec)
 import Test.Spec.DocoptSpec (docoptSpec)
 
 main = run [consoleReporter] do
-  scannerSpec
-  usageParserSpec
-  descParserSpec
-  solverSpec
-  generatorSpec
-  docoptSpec
+  scannerSpec     unit
+  usageParserSpec unit
+  descParserSpec  unit
+  solverSpec      unit
+  generatorSpec   unit
+  docoptSpec      unit

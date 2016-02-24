@@ -36,7 +36,7 @@ toParseErr = lmap DocoptParseError
 toSolveErr :: forall a. Either SolveError a -> Either DocoptError a
 toSolveErr = lmap DocoptSolveError
 
-docoptSpec =
+docoptSpec = \_ ->
   describe "docopt" do
     it "..." do
       vliftEff do

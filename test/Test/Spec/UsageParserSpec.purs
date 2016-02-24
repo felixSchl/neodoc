@@ -31,7 +31,7 @@ import Test.Support.Usage
 
 data Expected a = F | P a
 
-usageParserSpec =
+usageParserSpec = \_ ->
   describe "usage parser" do
 
     -- Test commands.
