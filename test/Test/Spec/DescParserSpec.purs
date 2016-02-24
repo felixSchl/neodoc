@@ -36,7 +36,7 @@ fail input msg = TestCase { input: input, output: Left msg }
 o = Desc.OptionDesc <<< Desc.Option
 
 descParserSpec = \_ ->
-  describe "description parser" do
+  describe "The description parser" do
     for_ [
           pass (dedent
             """

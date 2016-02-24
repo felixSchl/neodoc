@@ -22,7 +22,7 @@ import Test.Assert.Simple
 import Test.Support (vliftEff)
 
 scannerSpec = \_ ->
-  describe "scanner" do
+  describe "The scanner" do
     it "should scan sections" do
       let docopt = fromRight $ Scanner.scan $
           dedent

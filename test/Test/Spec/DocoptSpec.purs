@@ -37,7 +37,7 @@ toSolveErr :: forall a. Either SolveError a -> Either DocoptError a
 toSolveErr = lmap DocoptSolveError
 
 docoptSpec = \_ ->
-  describe "docopt" do
+  describe "Docopt" do
     it "..." do
       vliftEff do
         runEitherEff do

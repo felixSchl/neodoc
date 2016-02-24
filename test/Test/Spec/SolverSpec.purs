@@ -53,7 +53,7 @@ application :: Array (Array Argument) -> Application
 application xss = Application $ toList $ (\xs -> Branch $ toList xs) <$> xss
 
 solverSpec = \_ ->
-  describe "solver" do
+  describe "The solver" do
     (flip traverseWithIndex_) (toList [
 
       test ([ usage [ [ U.co "foo" ] ] ])

@@ -32,7 +32,7 @@ import Test.Support.Usage
 data Expected a = F | P a
 
 usageParserSpec = \_ ->
-  describe "usage parser" do
+  describe "The usage parser" do
 
     -- Test commands.
     -- Commands are the least considered type of token.
