@@ -1,4 +1,4 @@
-module Docopt.Gen.Reduce (reduce)
+module Docopt.Gen.Trans (reduce)
 where
 
 import Prelude

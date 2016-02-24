@@ -1,4 +1,8 @@
-module Test.Spec.GeneratorSpec (generatorSpec) where
+module Test.Spec.GeneratorSpec (
+  genSpec
+, genTransSpec
+)
+where
 
 import Prelude
 import Data.Tuple (Tuple(..))
@@ -124,7 +128,12 @@ fail i e = Case i (Left e)
 
 (//) = Tuple
 
-generatorSpec = \_ -> describe "The generator" do
+genTransSpec = \_ ->
+  describe "The output transformer" do
+    it "..." do
+      pure unit
+
+genSpec = \_ -> describe "The generator" do
 
   -- Some options that will be used for these tests
   let cmd_foo          = co    "foo"

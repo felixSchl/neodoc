@@ -21,7 +21,7 @@ import Docopt.Gen.Lexer (lex)
 import Docopt.Gen.Types (Token(), ValueMapping())
 import qualified Docopt.Types as D
 import qualified Docopt.Gen.Parser as Gen
-import qualified Docopt.Gen.Reduce as Gen
+import qualified Docopt.Gen.Trans as Gen
 
 genParser :: List D.Application
           -> CliParser (Tuple D.Branch (List ValueMapping))
