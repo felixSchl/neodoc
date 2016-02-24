@@ -7,7 +7,7 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.ScannerSpec (scannerSpec)
 import Test.Spec.UsageParserSpec (usageParserSpec)
 import Test.Spec.DescParserSpec (descParserSpec)
-import Test.Spec.GeneratorSpec (genSpec, genTransSpec)
+import Test.Spec.GenSpec (genSpec, genTransSpec)
 import Test.Spec.SolverSpec (solverSpec)
 import Test.Spec.DocoptSpec (docoptSpec)
 

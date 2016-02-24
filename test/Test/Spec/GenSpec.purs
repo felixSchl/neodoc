@@ -1,4 +1,4 @@
-module Test.Spec.GeneratorSpec (
+module Test.Spec.GenSpec (
   genSpec
 , genTransSpec
 )
@@ -127,11 +127,6 @@ fail :: Input -> String -> Case
 fail i e = Case i (Left e)
 
 (//) = Tuple
-
-genTransSpec = \_ ->
-  describe "The output transformer" do
-    it "..." do
-      pure unit
 
 genSpec = \_ -> describe "The generator" do
 
@@ -405,3 +400,9 @@ genSpec = \_ -> describe "The generator" do
                       ++ prettyPrintOutput r
                   else return unit)
               expected
+
+genTransSpec = \_ ->
+  describe "The output transformer" do
+    it "..." do
+      pure unit
+
