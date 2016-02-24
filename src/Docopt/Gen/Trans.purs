@@ -1,4 +1,4 @@
-module Docopt.Gen.Trans (reduce, expand)
+module Docopt.Gen.Trans (reduce, transform)
 where
 
 import Prelude
@@ -13,10 +13,15 @@ import qualified Docopt.Types as D
 import Data.List (List(..))
 import Docopt.Gen.Types (ValueMapping())
 
--- TODO: Implement this
-expand :: Map D.Argument D.Value -> Map String D.Value
-expand m = Map.empty
+-- Transform the map of (Argument, Value) mappings to a map of (String, Value),
+-- where the String is the name of the option and it's aliases.
+-- This means that Arguments that resolve to the same name/alias must be
+-- somehow resolved.
+transform :: Map D.Argument D.Value -> Map String D.Value
+transform m = Map.empty
 
+-- Reduce the list of (Argument, Value) mappings down to a Set.
+-- This means that duplicate Arguments must be somehow resolved.
 reduce :: Tuple D.Branch (List ValueMapping) -> Map D.Argument D.Value
 reduce (Tuple b vs) = mergeDefVals b $ toValMap vs
   where

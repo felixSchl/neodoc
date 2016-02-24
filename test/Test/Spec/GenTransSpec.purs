@@ -54,7 +54,7 @@ genTransSpec = \_ ->
 
       let inp = Map.fromList $ toList test.i
           exp = Map.fromList $ toList test.o
-          out = Trans.expand inp
+          out = Trans.transform inp
 
       describe (prettyPrintIn inp) do
         it (prettyPrintOut exp) do
