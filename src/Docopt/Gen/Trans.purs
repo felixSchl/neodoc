@@ -7,10 +7,12 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Foldable (foldl)
 import qualified Data.Array as A
 import Data.Map (Map())
+import Data.String (fromChar)
 import qualified Data.Map as Map
 import Data.Tuple (Tuple(..))
 import qualified Docopt.Types as D
-import Data.List (List(..))
+import Data.List (List(..), toList, concat)
+import qualified Data.List as L
 import Docopt.Gen.Types (ValueMapping())
 
 -- Transform the map of (Argument, Value) mappings to a map of (String, Value),
@@ -18,7 +20,24 @@ import Docopt.Gen.Types (ValueMapping())
 -- This means that Arguments that resolve to the same name/alias must be
 -- somehow resolved.
 transform :: Map D.Argument D.Value -> Map String D.Value
-transform m = Map.empty
+transform m = foldl (Map.unionWith resolve)
+                    Map.empty
+                    (L.concat $ Map.toList m <#> \(Tuple k v) ->
+                      toList $ toKeys k <#> \k' -> Map.singleton k' v)
+  where
+
+    toKeys :: D.Argument -> Array String
+    toKeys (D.Command n)      = [n]
+    toKeys (D.Positional n _) = [n]
+    toKeys (D.Group _ _ _)    = []
+    toKeys (D.EOA)            = ["--"]
+    toKeys (D.Option f n _ _) = []
+                              ++ maybe [] (A.singleton <<< fromChar) f
+                              ++ maybe [] A.singleton n
+
+    -- XXX: How to resolve this?
+    resolve :: D.Value -> D.Value -> D.Value
+    resolve v v' = v'
 
 -- Reduce the list of (Argument, Value) mappings down to a Set.
 -- This means that duplicate Arguments must be somehow resolved.
