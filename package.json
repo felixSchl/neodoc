@@ -7,6 +7,7 @@
     "test": "test"
   },
   "scripts": {
+    "build": "pulp build",
     "test": "pulp test",
     "watch": "pulp -w test",
     "deps": "bower install"

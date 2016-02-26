@@ -3,5 +3,6 @@ node_js:
   - 4
 script:
   - npm run deps
+  - travis_wait npm build
   - npm test
 sudo: false
