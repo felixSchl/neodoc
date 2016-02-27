@@ -16,8 +16,9 @@ import Data.Foldable (foldMap, traverse_, for_)
 import Data.Array ((..))
 
 import Language.Docopt
-import qualified Language.Docopt.Parser.Usage as Usage
-import qualified Language.Docopt.Parser.Lexer as Lexer
+import qualified Test.Support.Usage             as U
+import qualified Language.Docopt.Parser.Usage   as U
+import qualified Language.Docopt.Parser.Lexer   as Lexer
 import qualified Language.Docopt.Parser.Scanner as Scanner
 import Language.Docopt.Parser.Base (debug)
 import Text.Wrap (dedent)
@@ -27,9 +28,14 @@ import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
-import Test.Support.Usage
 
 data Expected a = F | P a
+
+sopt_ f fs r = (if r then U.soptR_ else U.sopt_) f fs
+sopt  f fs a r = (if r then U.soptR else U.sopt) f fs a
+lopt_ f r = (if r then U.loptR_ else U.lopt_) f
+lopt  f a r = (if r then U.loptR else U.lopt) f a
+po    n r = (if r then U.poR else U.po) n
 
 usageParserSpec = \_ ->
   describe "The usage parser" do
@@ -43,11 +49,11 @@ usageParserSpec = \_ ->
       vliftEff do
         usage <- runEitherEff do
           toks <- Lexer.lex "foo bar"
-          Usage.parse toks
+          U.parse toks
         assertEqual 1 (length usage)
-        (Usage.Usage _ u) <- runMaybeEff $ usage !! 0
+        (U.Usage _ u) <- runMaybeEff $ usage !! 0
         g <- runMaybeEff $ u !! 0
-        flip assertEqual g (Cons (Usage.Command "bar") Nil)
+        flip assertEqual g (Cons (U.Command "bar") Nil)
 
     -- Test positionals in various formats.
     -- Each entry is run for both singular and repeated version.
@@ -64,15 +70,15 @@ usageParserSpec = \_ ->
     -- Each entry is run for both singular and repeated version.
     describe "long options" do
       runSingleArgumentTests
-        [ pass "--bar"         $ lo "bar" Nothing
-        , pass "--bar = foo"   $ lo "bar" (Just "foo")
-        , pass "--bar=<foo>"   $ lo "bar" (Just "foo")
-        , pass "--bar=FOO"     $ lo "bar" (Just "FOO")
-        , pass "--bar = FOO"   $ lo "bar" (Just "FOO")
-        , pass "--bar=fOo"     $ lo "bar" (Just "fOo")
-        , pass "--bar = fOo"   $ lo "bar" (Just "fOo")
-        , pass "--bar = <foo>" $ lo "bar" (Just "foo")
-        , pass "--barFOO"      $ lo "barFOO" Nothing
+        [ pass "--bar"         $ lopt_ "bar"
+        , pass "--bar = foo"   $ lopt  "bar" "foo"
+        , pass "--bar=<foo>"   $ lopt  "bar" "foo"
+        , pass "--bar=FOO"     $ lopt  "bar" "FOO"
+        , pass "--bar = FOO"   $ lopt  "bar" "FOO"
+        , pass "--bar=fOo"     $ lopt  "bar" "fOo"
+        , pass "--bar = fOo"   $ lopt  "bar" "fOo"
+        , pass "--bar = <foo>" $ lopt  "bar" "foo"
+        , pass "--barFOO"      $ lopt_ "barFOO"
         , fail "- - bar"
         , fail "--bar="
         , fail "--bar=<>"
@@ -84,23 +90,23 @@ usageParserSpec = \_ ->
     -- Each entry is run for both singular and repeated version.
     describe "stacked options" do
       runSingleArgumentTests
-        [ pass "-b"          $ so 'b' [] Nothing
-        , pass "-bFOO"       $ so 'b' ['F', 'O', 'O'] Nothing
-        , pass "-bFoo"       $ so 'b' ['F', 'o', 'o'] Nothing
-        , pass "-b<foo>"     $ so 'b' [] (Just "foo")
-        , pass "-b<foo>"     $ so 'b' [] (Just "foo")
-        , pass "-b=foo"      $ so 'b' [] (Just "foo")
-        , pass "-b=FOO"      $ so 'b' [] (Just "FOO")
-        , pass "-b=<foo>"    $ so 'b' [] (Just "foo")
-        , pass "-bar"        $ so 'b' ['a', 'r'] Nothing
-        , pass "-barFOO"     $ so 'b' ['a', 'r', 'F', 'O', 'O'] Nothing
-        , pass "-bar<foo>"   $ so 'b' ['a', 'r'] (Just "foo")
-        , pass "-barFoo"     $ so 'b' ['a', 'r', 'F', 'o', 'o'] Nothing
-        , pass "-bar=foo"    $ so 'b' ['a', 'r'] (Just "foo")
-        , pass "-bar=FOO"    $ so 'b' ['a', 'r'] (Just "FOO")
-        , pass "-bar=<foo>"  $ so 'b' ['a', 'r'] (Just "foo")
-        , pass "-bAR"        $ so 'b' ['A', 'R'] Nothing
-        , pass "-bARfoo"     $ so 'b' ['A', 'R', 'f', 'o', 'o'] Nothing
+        [ pass "-b"          $ sopt_ 'b' []
+        , pass "-bFOO"       $ sopt_ 'b' ['F', 'O', 'O']
+        , pass "-bFoo"       $ sopt_ 'b' ['F', 'o', 'o']
+        , pass "-b<foo>"     $ sopt  'b' [] "foo"
+        , pass "-b<foo>"     $ sopt  'b' [] "foo"
+        , pass "-b=foo"      $ sopt  'b' [] "foo"
+        , pass "-b=FOO"      $ sopt  'b' [] "FOO"
+        , pass "-b=<foo>"    $ sopt  'b' [] "foo"
+        , pass "-bar"        $ sopt_ 'b' ['a', 'r']
+        , pass "-barFOO"     $ sopt_ 'b' ['a', 'r', 'F', 'O', 'O']
+        , pass "-bar<foo>"   $ sopt  'b' ['a', 'r'] "foo"
+        , pass "-barFoo"     $ sopt_ 'b' ['a', 'r', 'F', 'o', 'o']
+        , pass "-bar=foo"    $ sopt  'b' ['a', 'r'] "foo"
+        , pass "-bar=FOO"    $ sopt  'b' ['a', 'r'] "FOO"
+        , pass "-bar=<foo>"  $ sopt  'b' ['a', 'r'] "foo"
+        , pass "-bAR"        $ sopt_ 'b' ['A', 'R']
+        , pass "-bARfoo"     $ sopt_ 'b' ['A', 'R', 'f', 'o', 'o']
         ]
 
     -- Test required groups in various formats.
@@ -108,11 +114,11 @@ usageParserSpec = \_ ->
     describe "required groups" do
       runSingleArgumentTests
         [ fail "()"
-        , pass "(foo)"          $ gr [[ co "foo" ]]
-        , pass "(foo|bar)"      $ gr [[ co "foo" ], [co "bar"]]
-        , pass "(foo bar|bar)"  $ gr [[ co "foo", co "bar"], [co "bar"]]
-        , pass "((foo)|bar)"    $ gr [[ gr [[ co "foo" ]] false ], [co "bar"]]
-        , pass "((foo)...|bar)" $ gr [[ gr [[ co "foo" ]] true ], [co "bar"]]
+        , pass "(foo)"          $ U.gr [[ U.co "foo" ]]
+        , pass "(foo|bar)"      $ U.gr [[ U.co "foo" ], [ U.co "bar" ]]
+        , pass "(foo bar|bar)"  $ U.gr [[ U.co "foo", U.co "bar"], [ U.co "bar" ]]
+        , pass "((foo)|bar)"    $ U.gr [[ U.gr [[ U.co "foo" ]] false ], [ U.co "bar" ]]
+        , pass "((foo)...|bar)" $ U.gr [[ U.gr [[ U.co "foo" ]] true ], [ U.co "bar" ]]
         , fail "(()|bar)"
         , fail "(bar|())"
         , fail "(...)"
@@ -123,11 +129,11 @@ usageParserSpec = \_ ->
     describe "optional groups" do
       runSingleArgumentTests
         [ fail "[]"
-        , pass "[foo]"          $ go [[ co "foo" ]]
-        , pass "[foo|bar]"      $ go [[ co "foo" ], [co "bar"]]
-        , pass "[foo bar|bar]"  $ go [[ co "foo", co "bar"], [co "bar"]]
-        , pass "[[foo]|bar]"    $ go [[ go [[ co "foo" ]] false ], [co "bar"]]
-        , pass "[[foo]...|bar]" $ go [[ go [[ co "foo" ]] true ], [co "bar"]]
+        , pass "[foo]"          $ U.go [[ U.co "foo" ]]
+        , pass "[foo|bar]"      $ U.go [[ U.co "foo" ], [U.co "bar"]]
+        , pass "[foo bar|bar]"  $ U.go [[ U.co "foo", U.co "bar"], [U.co "bar"]]
+        , pass "[[foo]|bar]"    $ U.go [[ U.go [[ U.co "foo" ]] false ], [U.co "bar"]]
+        , pass "[[foo]...|bar]" $ U.go [[ U.go [[ U.co "foo" ]] true ], [U.co "bar"]]
         , fail "[[]|bar]"
         , fail "[bar|[]]"
         , fail "[...]"
@@ -137,10 +143,10 @@ usageParserSpec = \_ ->
     -- Each entry is run for both singular and repeated version.
     describe "end-of-args" do
       runTests
-        [ pass "--" $ [[[ eoa ]]]
-        , pass "-- FOO..." $ [[[ eoa ]]]
-        , pass "-- FOO... BAR" $ [[[ eoa ]]]
-        , pass "foo -- FOO... BAR" $ [[[ co "foo", eoa ]]]
+        [ pass "--" $ [[[ U.eoa ]]]
+        , pass "-- FOO..." $ [[[ U.eoa ]]]
+        , pass "-- FOO... BAR" $ [[[ U.eoa ]]]
+        , pass "foo -- FOO... BAR" $ [[[ U.co "foo", U.eoa ]]]
         ]
 
     -- | Test the scanner and lexer in combination with the parser.
@@ -159,11 +165,11 @@ usageParserSpec = \_ ->
               NOT PART OF SECTION
               """
           toks <- Lexer.lex docopt.usage
-          Usage.parse toks
+          U.parse toks
         assertEqual 2 (length usage)
 
         -- Validate the first usage
-        (Usage.Usage _ u0) <- runMaybeEff $ usage !! 0
+        (U.Usage _ u0) <- runMaybeEff $ usage !! 0
         assertEqual 2 (length u0)
 
         -- Validate the left half of the mutex group
@@ -175,7 +181,7 @@ usageParserSpec = \_ ->
         assertEqual 2 (length u0g1)
 
         -- Validate the second usage
-        (Usage.Usage _ u1) <- runMaybeEff $ usage !! 1
+        (U.Usage _ u1) <- runMaybeEff $ usage !! 1
         assertEqual 1 (length u1)
 
         u1g0 <- runMaybeEff $ u1 !! 0
@@ -200,10 +206,10 @@ usageParserSpec = \_ ->
             it (input ++ " -> " ++ show expected)  do
               vliftEff do
                 usages <- runEitherEff do
-                  Lexer.lex input >>= Usage.parse
+                  Lexer.lex input >>= U.parse
                 flip assertEqual
                   usages
-                  (Usage.Usage "foo" <$> do
+                  (U.Usage "foo" <$> do
                     -- deeply convert array to list
                     -- (array is used for readability above)
                     (((toList <$>) <$>) toList <$> toList <$> toList expected))
@@ -213,7 +219,7 @@ usageParserSpec = \_ ->
               assertThrows (const true) do
                 runEitherEff do
                   toks  <- Lexer.lex input
-                  usage <- Usage.parse toks
+                  usage <- U.parse toks
                   debug usage
 
     runSingleArgumentTests xs =
@@ -230,11 +236,11 @@ usageParserSpec = \_ ->
                 it (input ++ " -> " ++ show expected)  do
                   vliftEff do
                     usage <- runEitherEff do
-                      Lexer.lex input >>= Usage.parse
+                      Lexer.lex input >>= U.parse
 
                     -- There should only be one top-level mutex group
                     assertEqual 1 (length usage)
-                    (Usage.Usage _ u) <- runMaybeEff $ usage !! 0
+                    (U.Usage _ u) <- runMaybeEff $ usage !! 0
                     g <- runMaybeEff $ u !! 0
 
                     -- Assert output matches expected
@@ -245,5 +251,5 @@ usageParserSpec = \_ ->
                   assertThrows (const true) do
                     runEitherEff do
                       toks  <- Lexer.lex input
-                      usage <- Usage.parse toks
+                      usage <- U.parse toks
                       debug usage

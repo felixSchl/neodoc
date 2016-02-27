@@ -50,7 +50,7 @@ genSpec = \_ -> describe "The generator" do
       opt_b_baz        = opt   'b' "baz"   (oa "BAZ" $ str "ax")
       opt_o_out        = opt_  'o' "out"
       opt_i_input      = opt_  'i' "input"
-      pos_arg_r        = po     "qux" true
+      pos_arg_r        = poR    "qux"
       cmd_baz          = co     "baz"
 
   let testCases = [
@@ -142,7 +142,7 @@ genSpec = \_ -> describe "The generator" do
     , test
         [ grr false [[
             opt 'i' "input" (oa_ "FILE")
-          , po  "env" false
+          , po  "env"
           ]]
         , opt 'o' "output" (oa_ "FILE")
         ]
@@ -151,7 +151,7 @@ genSpec = \_ -> describe "The generator" do
         , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
         , pass [ "-i", "bar", "x", "-o", "bar" ]
             [ opt 'i' "input"  (oa_ "FILE") :> str "bar"
-            , po  "env" false               :> str "x"
+            , po  "env"                     :> str "x"
             , opt 'o' "output" (oa_ "FILE") :> str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail [ "-o", "bar", "x", "-i", "bar" ]

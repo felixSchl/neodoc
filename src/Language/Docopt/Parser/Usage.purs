@@ -30,7 +30,6 @@ import Language.Docopt.Parser.Common
 import Language.Docopt.Parser.Lexer
 import Language.Docopt.Parser.State
 
-type OptionAlias    = String
 type OptionArgument = String
 type IsOptional     = Boolean
 type IsRepeatable   = Boolean

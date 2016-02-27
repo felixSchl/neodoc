@@ -10,8 +10,11 @@ co :: String -> Argument
 co = Command
 
 -- short hand to create a Positional argument
-po :: String -> Boolean -> Argument
-po = Positional
+po :: String -> Argument
+po n = Positional n false
+
+poR :: String -> Argument
+poR n = Positional n true
 
 -- short hand to create a end-of-arguments marker
 eoa :: Argument

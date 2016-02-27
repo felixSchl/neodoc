@@ -46,80 +46,77 @@ pass ds as = TestCase { descs: ds, expected: Right as }
 fail :: Array D.Desc -> String -> TestCase
 fail ds msg = TestCase { descs: ds, expected: Left msg }
 
-usage :: Array (Array U.Argument) -> U.Usage
-usage = U.usage "foo"
-
-application :: Array (Array Argument) -> Usage
-application xss = Usage $ toList $ (\xs -> Branch $ toList xs) <$> xss
+out :: Array (Array Argument) -> Usage
+out xss = Usage $ toList $ (\xs -> Branch $ toList xs) <$> xss
 
 solverSpec = \_ ->
   describe "The solver" do
     (flip traverseWithIndex_) (toList [
 
-      test ([ usage [ [ U.co "foo" ] ] ])
+      test ([ U.usage "foo" [ [ U.co "foo" ] ] ])
         [ pass  ([])
-                ([ application [ [ D.co "foo" ] ] ])
+                ([ out [ [ D.co "foo" ] ] ])
         ]
 
-    , test ([ usage [ [ U.po "foo" true ] ] ])
+    , test ([ U.usage "foo" [ [ U.poR "foo" ] ] ])
         [ pass  ([])
-                ([ application [ [ D.po "foo" true ] ] ])
+                ([ out [ [ D.poR "foo" ] ] ])
         ]
 
-    , test ([ usage [ [ U.lo "foo" Nothing true ] ] ])
+    , test ([ U.usage "foo" [ [ U.loptR_ "foo" ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
                             (Just $ Desc.arg "bar" (Just "qux"))
                 ])
-                ([ application [
+                ([ out [
                     [ D.optR 'f' "foo" (D.oa "bar" (StringValue "qux")) ]
                 ] ])
         ]
 
-    , test ([ usage [ [ U.lo "foo" Nothing true, U.co "BAR" ] ] ])
+    , test ([ U.usage "foo" [ [ U.loptR_ "foo", U.co "BAR" ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
                             (Just $ Desc.arg "BAR" (Just "qux"))
                 ])
-                ([ application [
+                ([ out [
                     [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
                     , D.co "BAR"
                     ]
                 ] ])
         ]
 
-    , test ([ usage [ [ U.lo "foo" Nothing false, U.po "BAR" true ] ] ])
+    , test ([ U.usage "foo" [ [ U.lopt_ "foo", U.poR "BAR" ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
                             (Just $ Desc.arg "BAR" (Just "qux"))
                 ])
-                ([ application [
+                ([ out [
                     [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
                 ] ])
         ]
 
-    , test ([ usage [ [ U.lo "foo" Nothing false, U.po "BAR" false ] ] ])
+    , test ([ U.usage "foo" [ [ U.lopt_ "foo", U.po "BAR" ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
                             (Just $ Desc.arg "BAR" (Just "qux"))
                 ])
-                ([ application [
+                ([ out [
                     [ D.opt 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
                 ] ])
         ]
 
-    , test ([ usage [ [ U.lo "foo" Nothing true, U.po "BAR" true ] ] ])
+    , test ([ U.usage "foo" [ [ U.loptR_ "foo", U.poR "BAR" ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
                             (Just $ Desc.arg "BAR" (Just "qux"))
                 ])
-                ([ application [
+                ([ out [
                     [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
-                    , D.po "BAR" true
+                    , D.poR "BAR"
                     ]
                 ] ])
         ]
 
-    , test ([ usage [ [ U.so 'x' ['v', 'z', 'f'] Nothing true ] ] ])
+    , test ([ U.usage "foo" [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "file")
                             (Just $ Desc.arg "FILE" (Just "foo"))
                 ])
-                ([ application [
+                ([ out [
                     [ D.soptR_ 'x'
                     , D.soptR_ 'v'
                     , D.soptR_ 'z'
@@ -128,22 +125,22 @@ solverSpec = \_ ->
                 ] ])
         ]
 
-    , test ([ usage [ [ U.so 'f' [] Nothing false, U.po "FILE" true ] ] ])
+    , test ([ U.usage "foo" [ [ U.sopt_ 'f' [], U.poR "FILE" ] ] ])
         [ pass  [ Desc.opt (Desc.fname 'f' "file")
                            (Just $ Desc.arg "FILE" (Just "foo"))
                 , Desc.opt (Desc.fname 'f' "file")
                            (Just $ Desc.arg "FILE" (Just "foo"))
                 ]
-                ([ application [
+                ([ out [
                     [ D.optR 'f' "file" (D.oa "FILE" (StringValue "foo")) ]
                 ] ])
         ]
 
-    , test ([ usage [ [ U.so 'f' ['x'] Nothing true ] ] ])
+    , test ([ U.usage "foo" [ [ U.soptR_ 'f' ['x'] ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "file")
                             (Just $ Desc.arg "FILE" (Just "foo"))
                 ])
-                ([ application [
+                ([ out [
                     [ D.soptR_ 'f'
                     , D.soptR_ 'x'
                     ]
@@ -153,11 +150,11 @@ solverSpec = \_ ->
       -- Note: `f` should not adopt `file` as it's full name since it's in an
       -- option stack and not in trailing position (therefore cannot inherit the
       -- description's argument, rendering it an unfit candidate)
-    , test ([ usage [ [ U.so 'f' ['v', 'z', 'x'] Nothing true ] ] ])
+    , test ([ U.usage "foo" [ [ U.soptR_ 'f' ['v', 'z', 'x'] ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "file")
                             (Just $ Desc.arg "FILE" (Just "foo"))
                 ])
-                ([ application [
+                ([ out [
                     [ D.soptR_ 'f'
                     , D.soptR_ 'v'
                     , D.soptR_ 'z'
@@ -165,11 +162,11 @@ solverSpec = \_ ->
                     ]
                 ] ])
         ]
-    , test ([ usage [ [ U.so 'x' ['v', 'z', 'f'] Nothing true ] ] ])
+    , test ([ U.usage "foo" [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
         [ pass  ([ Desc.opt (Desc.fname 'f' "file")
                             (Just $ Desc.arg "FILE" (Just "foo"))
                 ])
-                ([ application [
+                ([ out [
                     [ D.soptR_ 'x'
                     , D.soptR_ 'v'
                     , D.soptR_ 'z'
