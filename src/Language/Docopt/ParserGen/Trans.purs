@@ -1,5 +1,7 @@
-module Language.Docopt.ParserGen.Trans (reduce, transform)
-where
+module Language.Docopt.ParserGen.Trans (
+    reduce
+  , transform
+  ) where
 
 import Prelude
 import Debug.Trace
