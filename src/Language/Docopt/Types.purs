@@ -10,6 +10,7 @@ import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
 import Data.String (fromChar)
 import Control.Apply ((*>))
+import Data.Generic
 import qualified Data.String as Str
 
 type Name = String
@@ -112,15 +113,34 @@ instance monoidUsage :: Monoid Usage where
 
 import qualified Text.Parsing.Parser as P
 
-data SolveError = SolveError
+data DescriptionError
+  = ArgumentMismatchError {
+      option :: {
+        flag :: Maybe Flag
+      , name :: Maybe Name
+      , arg  :: Maybe String
+      }
+    , description :: {
+        arg :: Maybe String
+      }
+    }
 
-instance showSolveError :: Show SolveError where
-  show SolveError = "SolveError"
+data SolveError
+  = DescriptionError DescriptionError
 
 data DocoptError
   = DocoptScanError   P.ParseError
   | DocoptParseError  P.ParseError
   | DocoptSolveError  SolveError
+
+derive instance genericSolveError       :: Generic SolveError
+derive instance genericDescriptionError :: Generic DescriptionError
+
+instance showSolveError :: Show SolveError where
+  show = gShow
+
+instance showDescriptionError :: Show DescriptionError where
+  show = gShow
 
 instance showDocoptError :: Show DocoptError where
   show (DocoptScanError err)  = "DocoptScanError "  ++ show err

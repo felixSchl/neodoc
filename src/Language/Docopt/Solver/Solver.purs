@@ -19,8 +19,11 @@ import Data.List (List(..), filter, head, foldM, concat, (:), singleton
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Foldable (foldl)
+import Control.MonadPlus (guard)
 import Control.Plus (empty)
+import Control.Alt ((<|>))
 import Data.Monoid (mempty)
+import Control.Monad.Error.Class (throwError)
 import qualified Data.Array as A
 import qualified Data.String as Str
 
@@ -77,11 +80,27 @@ solveBranch as ds = Branch <$> f as
                       (\_ -> Option Nothing (Just n) (toArg a) r)
                       (head $ catMaybes $ convert <$> ds)
 
+          case opt of
+            -- XXX: Non-exhaustive on purpose. How to improve?
+            (Option f n a' _) ->
+              if (argMatches a a')
+                then return unit
+                else throwError $ DescriptionError $ ArgumentMismatchError {
+                        option: {
+                          flag: f
+                        , name: n
+                        , arg:  a
+                        }
+                      , description: {
+                          arg: a' <#> \(OptionArgument an _) -> an
+                        }
+                      }
+
           -- Look ahead if any of the following arguments should be consumed.
           -- Return either `Nothing` to signify that nothing should be consumed
           -- or a value signifieng that it should be consumed, and the
           -- `isRepeated` should be inherited.
-          let out = if r
+          let adjArg = if r
                 then Nothing
                 else
                   case y of
@@ -97,37 +116,28 @@ solveBranch as ds = Branch <$> f as
                         _ -> Nothing
                     _ -> Nothing
 
+          -- Apply adjacent argument
           return $ maybe'
             (\_ -> Unconsumed $ singleton opt)
             (\r -> case opt of
-              -- XXX: This is getting ugly. Should have used a record...
-              -- (Let this crash and burn at runtime by providing a
-              -- non-exhaustive list of patterns).
-              (Option f n a _) -> Consumed $ singleton $ Option f n a r
+              -- XXX: non-exhaustive, because doesn't need to be...
+              (Option f n a _) -> do
+                Consumed $ singleton $ Option f n a r
             )
-            out
+            adjArg
 
           where
             convert :: Desc -> Maybe Argument
             convert (Desc.OptionDesc (Desc.Option { name=Desc.Long n', arg=a' }))
               | Str.toUpper n' == Str.toUpper n
-              && argMatches a'
               = return $ Option Nothing (Just n) (resolveOptArg a a') r
             convert (Desc.OptionDesc (Desc.Option { name=Desc.Full f n', arg=a' }))
               | Str.toUpper n' == Str.toUpper n
-              && argMatches a'
               = return $ Option (Just f) (Just n) (resolveOptArg a a') r
             convert _ = Nothing
 
-            argMatches :: Maybe Desc.Argument -> Boolean
-            argMatches a' = (isNothing a && isNothing a')
-                         || (maybe false id do
-                              a' >>= \(Desc.Argument a'') -> do
-                                an <- a
-                                return (Str.toUpper an == Str.toUpper a''.name)
-                            )
-
         solveArgs o@(U.OptionStack f fs a r) y = do
+
           -- Figure out trailing flag, in order to couple it with an adjacent
           -- option where needed.
           let fs' = toList fs
@@ -140,11 +150,27 @@ solveBranch as ds = Branch <$> f as
           xs <- match false `traverse` fs''
           x  <- match true f''
 
+          case x of
+            -- XXX: Non-exhaustive on purpose. How to improve?
+            (Option f n a' _) ->
+              if (argMatches a a')
+                then return unit
+                else throwError $ DescriptionError $ ArgumentMismatchError {
+                        option: {
+                          flag: f
+                        , name: n
+                        , arg:  a
+                        }
+                      , description: {
+                          arg: a' <#> \(OptionArgument an _) -> an
+                        }
+                      }
+
           -- Look ahead if any of the following arguments should be consumed.
           -- Return either `Nothing` to signify that nothing should be consumed
           -- or a value signifieng that it should be consumed, and the
           -- `isRepeated` should be inherited.
-          let out = if (isRepeatable x)
+          let adjArg = if (isRepeatable x)
                 then Nothing
                 else
                   case y of
@@ -160,15 +186,15 @@ solveBranch as ds = Branch <$> f as
                         _ -> Nothing
                     _ -> Nothing
 
+          -- Apply adjacent argument
           return $ maybe'
             (\_ -> Unconsumed $ xs ++ singleton x)
             (\r -> case x of
-              -- XXX: This is getting ugly. Should have used a record...
-              -- (Let this crash and burn at runtime by providing a
-              -- non-exhaustive list of patterns).
-              (Option f n a _) -> Consumed $ xs ++ (singleton $ Option f n a r)
+              -- XXX: Non-exhaustive on purpose. How to improve?
+              (Option f n a' _) -> do
+                Consumed $ xs ++ (singleton $ Option f n a' r)
             )
-            out
+            adjArg
 
           where
             match :: Boolean -> Char -> Either SolveError Argument
@@ -209,6 +235,17 @@ solveBranch as ds = Branch <$> f as
 
         toArg:: Maybe String -> Maybe OptionArgument
         toArg a = a >>= \an -> return $ OptionArgument an Nothing
+
+        argMatches :: Maybe String
+                   -> Maybe OptionArgument
+                   -> Boolean
+        argMatches a a'
+          =  (isNothing a && isNothing a')
+          || (maybe false id do
+              a' >>= \(OptionArgument an' _) -> do
+                an <- a
+                return (Str.toUpper an == Str.toUpper an')
+            )
 
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
 solveUsage (U.Usage _ bs) ds = Usage <$> do
