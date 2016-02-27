@@ -17,9 +17,9 @@ type IsOptional = Boolean
 type TakesArgument = Boolean
 type Flag = Char
 
-data Program = Program (List Application)
-data Application = Application (List Branch)
-data Branch = Branch (List Argument)
+type Program = List Usage
+newtype Usage = Usage (List Branch)
+newtype Branch = Branch (List Argument)
 data Argument
   = Command     String
   | Positional  String IsRepeatable
@@ -41,11 +41,11 @@ data Value
 -- Instances -------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
-instance showApplication :: Show Application where
-  show (Application xs) = "Application " ++ show (show <$> xs)
+instance showUsage :: Show Usage where
+  show (Usage xs) = "Usage " ++ show (show <$> xs)
 
-instance eqApplication :: Eq Application where
-  eq (Application xs) (Application ys) = xs == ys
+instance eqUsage :: Eq Usage where
+  eq (Usage xs) (Usage ys) = xs == ys
 
 instance showBranch :: Show Branch where
   show (Branch xs) = "Branch " ++ show (show <$> xs)
@@ -98,11 +98,11 @@ instance eqValue :: Eq Value where
   eq (ArrayValue xs) (ArrayValue xs') = (xs == xs')
   eq _               _                = false
 
-instance semigroupApplication :: Semigroup Application where
-  append (Application xs) (Application ys) = Application (xs <> ys)
+instance semigroupUsage :: Semigroup Usage where
+  append (Usage xs) (Usage ys) = Usage (xs <> ys)
 
-instance monoidApplication :: Monoid Application where
-  mempty = Application Nil
+instance monoidUsage :: Monoid Usage where
+  mempty = Usage Nil
 
 --------------------------------------------------------------------------------
 -- Errors (XXX: needs migration and improvement) -------------------------------

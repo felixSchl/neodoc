@@ -1,9 +1,7 @@
 module Language.Docopt.Pretty where
 
 import Prelude
-import Data.Either
-import Data.Maybe
-import Data.List
+import Data.Maybe (maybe)
 import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
 import Data.String (fromChar)
@@ -35,8 +33,8 @@ prettyPrintArg (Group o bs r) = open ++ inner ++ close ++ repetition
 prettyPrintBranch :: Branch -> String
 prettyPrintBranch (Branch xs) = intercalate " " (prettyPrintArg <$> xs)
 
-prettyPrintApplication :: Application -> String
-prettyPrintApplication (Application xs)
+prettyPrintUsage :: Usage -> String
+prettyPrintUsage (Usage xs)
   = intercalate " | " (prettyPrintBranch <$> xs)
 
 prettyPrintValue :: Value -> String

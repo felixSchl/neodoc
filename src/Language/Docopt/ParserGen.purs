@@ -23,7 +23,7 @@ import qualified Language.Docopt.ParserGen.Parser as G
 import qualified Language.Docopt.ParserGen.Trans  as G
 import qualified Language.Docopt.ParserGen.Lexer  as G
 
-genParser :: List D.Application
+genParser :: D.Program
           -> G.Parser (Tuple D.Branch (List G.ValueMapping))
 genParser as = foldl (<|>) empty (G.genParser <$> as)
 

@@ -272,7 +272,7 @@ genSpec = \_ -> describe "The generator" do
         let result = do
               runParser
                 (toList argv)
-                (genParser $ singleton $ Application $ singleton $ br args)
+                (genParser $ singleton $ Usage $ singleton $ br args)
         case result of
           Left (e@(P.ParseError { message: msg })) ->
             either

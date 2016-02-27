@@ -198,11 +198,11 @@ solveBranch as ds = Branch <$> f as
         toArg:: Maybe String -> Maybe OptionArgument
         toArg a = a >>= \an -> return $ OptionArgument an Nothing
 
-solveUsage :: U.Usage -> List D.Desc -> Either SolveError Application
-solveUsage (U.Usage _ bs) ds = Application <$> do
+solveUsage :: U.Usage -> List D.Desc -> Either SolveError Usage
+solveUsage (U.Usage _ bs) ds = Usage <$> do
   traverse (flip solveBranch ds) bs
 
 solve :: (List U.Usage)
       -> (List D.Desc)
-      -> Either SolveError (List Application)
+      -> Either SolveError (List Usage)
 solve us ds = traverse (flip solveUsage ds) us

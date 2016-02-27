@@ -203,10 +203,10 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
               "Trailing input: "
             ++ (intercalate ", " $ prettyPrintToken <$> s)
 
--- | Generate a parser for a single program application (Usage).
-genParser :: D.Application
+-- | Generate a parser for a single program usage.
+genParser :: D.Usage
           -> Parser (Tuple D.Branch (List ValueMapping))
-genParser (D.Application xs) = do
+genParser (D.Usage xs) = do
   P.choice $ xs <#> \x -> Tuple x <$> mkBranchParser x
   <* eof
 
