@@ -7,6 +7,7 @@ import qualified Text.Parsing.Parser as P
 import Data.Traversable (traverse)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
+import Text.Wrap (dedent)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
@@ -18,23 +19,7 @@ import qualified Test.Support.Usage as U
 import qualified Test.Support.Docopt as D
 import qualified Test.Support.Desc as Desc
 
-import Language.Docopt
-import Language.Docopt.Parser.Scanner (scan)
-import qualified Language.Docopt.Parser.Usage as Usage
-import qualified Language.Docopt.Parser.Desc  as Desc
-import qualified Language.Docopt.Solver       as Solver
-import qualified Language.Docopt.ParserGen         as Gen
-
-import Text.Wrap (dedent)
-
-toScanErr :: forall a. Either P.ParseError a -> Either DocoptError a
-toScanErr  = lmap DocoptScanError
-
-toParseErr :: forall a. Either P.ParseError a -> Either DocoptError a
-toParseErr = lmap DocoptParseError
-
-toSolveErr :: forall a. Either SolveError a -> Either DocoptError a
-toSolveErr = lmap DocoptSolveError
+import Language.Docopt (runDocopt)
 
 docoptSpec = \_ ->
   describe "Docopt" do

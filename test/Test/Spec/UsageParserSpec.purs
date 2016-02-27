@@ -19,7 +19,7 @@ import Language.Docopt
 import qualified Test.Support.Usage             as U
 import qualified Language.Docopt.Parser.Usage   as U
 import qualified Language.Docopt.Parser.Lexer   as Lexer
-import qualified Language.Docopt.Parser.Scanner as Scanner
+import qualified Language.Docopt.Scanner        as Scanner
 import Language.Docopt.Parser.Base (debug)
 import Text.Wrap (dedent)
 

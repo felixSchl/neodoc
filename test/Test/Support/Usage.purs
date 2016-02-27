@@ -8,7 +8,7 @@ import Data.List (List(..), length, (!!), take, toList)
 import Language.Docopt
 import qualified Language.Docopt.Parser.Usage as Usage
 import qualified Language.Docopt.Parser.Lexer as Lexer
-import qualified Language.Docopt.Parser.Scanner as Scanner
+import qualified Language.Docopt.Scanner      as Scanner
 import Language.Docopt.Parser.Base (debug)
 import Text.Wrap (dedent)
 

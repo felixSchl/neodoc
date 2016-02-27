@@ -1,4 +1,8 @@
-module Language.Docopt.Parser.Scanner where
+module Language.Docopt.Scanner (
+    scan
+  , Docopt(..)
+  , Section()
+  ) where
 
 import Prelude
 import Debug.Trace

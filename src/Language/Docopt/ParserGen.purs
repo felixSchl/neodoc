@@ -25,7 +25,7 @@ import qualified Language.Docopt.ParserGen.Lexer  as G
 
 genParser :: D.Program
           -> G.Parser (Tuple D.Branch (List G.ValueMapping))
-genParser as = foldl (<|>) empty (G.genParser <$> as)
+genParser us = foldl (<|>) empty (G.genUsageParser <$> us)
 
 runParser :: List String
           -> G.Parser (Tuple D.Branch (List G.ValueMapping))

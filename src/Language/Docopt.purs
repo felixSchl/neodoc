@@ -16,30 +16,27 @@ import qualified Data.Map as Map
 import Control.Apply ((*>))
 import Data.Bifunctor (lmap)
 import Data.Traversable (traverse)
+import qualified Text.Parsing.Parser as P
+import Text.Wrap (dedent)
 
 import qualified Language.Docopt.Types     as D
 import qualified Language.Docopt.Pretty    as D
-import qualified Language.Docopt.ParserGen as Gen
+import qualified Language.Docopt.ParserGen as G
 
-import qualified Language.Docopt.Parser.Scanner as Scanner
+import qualified Language.Docopt.Scanner      as Scanner
+import qualified Language.Docopt.Solver       as Solver
 import qualified Language.Docopt.Parser.Usage as Usage
-import qualified Language.Docopt.Parser.Desc as Desc
-import qualified Language.Docopt.Solver as Solver
+import qualified Language.Docopt.Parser.Desc  as Desc
 
-import qualified Text.Parsing.Parser as P
-
-import Text.Wrap (dedent)
-
-runDocopt :: String
-          -> Array String
+runDocopt :: String -- ^ The docopt text
+-> Array String     -- ^ The user input
           -> Either D.DocoptError (Map D.Argument D.Value)
 runDocopt docopt argv = do
   docopt <- toScanErr  $ Scanner.scan $ dedent docopt
   us     <- toParseErr $ Usage.run docopt.usage
   ds     <- toParseErr $ concat <$> Desc.run `traverse` docopt.options
   solved <- toSolveErr $ Solver.solve us ds
-  toParseErr $ Gen.runParser (toList argv)
-                             (Gen.genParser solved)
+  toParseErr $ G.runParser (toList argv) (G.genParser solved)
 
 toScanErr :: forall a. Either P.ParseError a -> Either D.DocoptError a
 toScanErr  = lmap D.DocoptScanError

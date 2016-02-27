@@ -27,7 +27,7 @@ import Language.Docopt
 import Language.Docopt.Solver (solve)
 import qualified Language.Docopt.Parser.Usage as U
 import qualified Language.Docopt.Parser.Desc as D
-import Language.Docopt.Parser.Scanner (scan)
+import Language.Docopt.Scanner (scan)
 import Language.Docopt.Parser.Lexer (lex)
 import Text.Wrap (dedent)
 

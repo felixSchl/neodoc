@@ -6,7 +6,7 @@
 -- | ===
 
 module Language.Docopt.ParserGen.Parser (
-    genParser
+    genUsageParser
   , Parser()
   ) where
 
@@ -204,32 +204,31 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
             ++ (intercalate ", " $ prettyPrintToken <$> s)
 
 -- | Generate a parser for a single program usage.
-genParser :: D.Usage
-          -> Parser (Tuple D.Branch (List ValueMapping))
-genParser (D.Usage xs) = do
-  P.choice $ xs <#> \x -> Tuple x <$> mkBranchParser x
+genUsageParser :: D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
+genUsageParser (D.Usage xs) = do
+  P.choice $ xs <#> \x -> Tuple x <$> genBranchParser x
   <* eof
 
 -- | Generate a parser for a single usage branch
-mkBranchParser :: D.Branch -> Parser (List (Tuple D.Argument D.Value))
-mkBranchParser (D.Branch xs) = do
+genBranchParser :: D.Branch -> Parser (List (Tuple D.Argument D.Value))
+genBranchParser (D.Branch xs) = do
   either
     (\_   -> P.fail "Failed to generate parser")
     (\acc -> case acc of
       Free p       -> p
       Pending p xs -> do
         a  <- p
-        as <- mkExhaustiveParser xs
+        as <- genExhaustiveParser xs
         return (a ++ as))
     (foldM step (Free $ pure empty) xs)
   where
 
     -- Given a list of arguments, try parse them all in any order.
     -- The only requirement is that all input is consumed in the end.
-    mkExhaustiveParser :: List D.Argument
+    genExhaustiveParser :: List D.Argument
                        -> Parser (List (Tuple D.Argument D.Value))
-    mkExhaustiveParser Nil = pure empty
-    mkExhaustiveParser ps  = do
+    genExhaustiveParser Nil = pure empty
+    genExhaustiveParser ps  = do
       draw ps (length ps)
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
@@ -238,7 +237,7 @@ mkBranchParser (D.Branch xs) = do
              -> Int
              -> Parser (List (Tuple D.Argument D.Value))
         draw pss@(Cons p ps') n | n >= 0 = (do
-          xs <- mkParser p
+          xs <- genParser p
 
           -- verify the arguments for parsed set of options
           -- when an option takes anything but a bool value, i.e. it is not
@@ -280,7 +279,7 @@ mkBranchParser (D.Branch xs) = do
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
       a  <- p
-      as <- mkParser x
+      as <- genParser x
       return $ a ++ as
 
     -- Options always keep accumulating
@@ -291,33 +290,33 @@ mkBranchParser (D.Branch xs) = do
     step (Pending p xs) y = Right $
       Free do
         a   <- p
-        as  <- mkExhaustiveParser xs
-        ass <- mkParser y
+        as  <- genExhaustiveParser xs
+        ass <- genParser y
         return (a ++ as ++ ass)
 
     -- Parser generator for a single `Argument`
-    mkParser :: D.Argument -> Parser (List (Tuple D.Argument D.Value))
+    genParser :: D.Argument -> Parser (List (Tuple D.Argument D.Value))
 
     -- Generate a parser for a `Command` argument
-    mkParser x@(D.Command n) = (do
+    genParser x@(D.Command n) = (do
       singleton <<< Tuple x <$> do
         command n
       ) P.<?> "command: " ++ (show $ prettyPrintArg x)
 
     -- Generate a parser for a `EOA` argument
-    mkParser x@(D.EOA) = (do
+    genParser x@(D.EOA) = (do
       singleton <<< Tuple x <$> do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
       ) P.<?> "end of arguments: \"--\""
 
     -- Generate a parser for a `Positional` argument
-    mkParser x@(D.Positional n r) = (do
+    genParser x@(D.Positional n r) = (do
       if r then (some go) else (singleton <$> go)
       ) P.<?> "positional argument: " ++ (show $ prettyPrintArg x)
       where go = Tuple x <$> (positional n)
 
     -- Generate a parser for a `Option` argument
-    mkParser x@(D.Option f n a r) = (do
+    genParser x@(D.Option f n a r) = (do
       if r then (some go) else (singleton <$> go)
       ) P.<?> "option: " ++ (show $ prettyPrintArg x)
       where
@@ -334,13 +333,13 @@ mkBranchParser (D.Branch xs) = do
         mkSoptParser Nothing _  = P.fail "no flag"
 
     -- Generate a parser for a argument `Group`
-    mkParser x@(D.Group optional bs repeated) = do
+    genParser x@(D.Group optional bs repeated) = do
       concat <$>
         let mod    = if optional then P.option empty else \p -> p
             parser = if repeated then many go else singleton <$> go
          in mod parser
       where go = if length bs > 0
-                    then P.choice $ P.try <<< mkBranchParser <$> bs
+                    then P.choice $ P.try <<< genBranchParser <$> bs
                     else return empty
 
     isFree :: D.Argument -> Boolean
