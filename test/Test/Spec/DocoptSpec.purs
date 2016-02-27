@@ -32,7 +32,7 @@ docoptSpec = \_ ->
               foo push -h=<host[:port]> -o <file> FILE... -- ARGS
 
             Options:
-              -o, --output=FILE
+              -o, --output=ILE
                 The file to write to
 
               -h, --host=<host[:port]>

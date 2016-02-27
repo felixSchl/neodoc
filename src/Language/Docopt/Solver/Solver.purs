@@ -25,12 +25,13 @@ import qualified Data.Array as A
 import qualified Data.String as Str
 
 import Language.Docopt.Types
-import qualified Language.Docopt.Parser.Desc  as D
+import Language.Docopt.Parser.Desc (Desc(..))
+import qualified Language.Docopt.Parser.Desc  as Desc
 import qualified Language.Docopt.Parser.Usage as U
 
 data Result = Consumed (List Argument) | Unconsumed (List Argument)
 
-solveBranch :: U.Branch -> List D.Desc -> Either SolveError Branch
+solveBranch :: U.Branch -> List Desc -> Either SolveError Branch
 solveBranch as ds = Branch <$> f as
   where f :: U.Branch -> Either SolveError (List Argument)
         f Nil = return Nil
@@ -107,14 +108,24 @@ solveBranch as ds = Branch <$> f as
             out
 
           where
-            convert :: D.Desc -> Maybe Argument
-            convert (D.OptionDesc (D.Option { name=D.Long n', arg=a' }))
+            convert :: Desc -> Maybe Argument
+            convert (Desc.OptionDesc (Desc.Option { name=Desc.Long n', arg=a' }))
               | Str.toUpper n' == Str.toUpper n
+              && argMatches a'
               = return $ Option Nothing (Just n) (resolveOptArg a a') r
-            convert (D.OptionDesc (D.Option { name=D.Full f n', arg=a' }))
+            convert (Desc.OptionDesc (Desc.Option { name=Desc.Full f n', arg=a' }))
               | Str.toUpper n' == Str.toUpper n
+              && argMatches a'
               = return $ Option (Just f) (Just n) (resolveOptArg a a') r
             convert _ = Nothing
+
+            argMatches :: Maybe Desc.Argument -> Boolean
+            argMatches a' = (isNothing a && isNothing a')
+                         || (maybe false id do
+                              a' >>= \(Desc.Argument a'') -> do
+                                an <- a
+                                return (Str.toUpper an == Str.toUpper a''.name)
+                            )
 
         solveArgs o@(U.OptionStack f fs a r) y = do
           -- Figure out trailing flag, in order to couple it with an adjacent
@@ -166,12 +177,12 @@ solveBranch as ds = Branch <$> f as
                         (\_ -> Option (Just f) Nothing (toArg a) r)
                         (head $ catMaybes $ convert f isTrailing <$> ds)
 
-            convert :: Char -> Boolean -> D.Desc -> Maybe Argument
-            convert f isTrailing (D.OptionDesc (D.Option { name=D.Flag f', arg=a' }))
+            convert :: Char -> Boolean -> Desc -> Maybe Argument
+            convert f isTrailing (Desc.OptionDesc (Desc.Option { name=Desc.Flag f', arg=a' }))
               | (f == f')
                 && (isTrailing || isNothing a')
               = return $ Option (Just f) Nothing (resolveOptArg a a') r
-            convert f isTrailing (D.OptionDesc (D.Option { name=D.Full f' n, arg=a' }))
+            convert f isTrailing (Desc.OptionDesc (Desc.Option { name=Desc.Full f' n, arg=a' }))
               | (f == f')
                 && (isTrailing || isNothing a')
               = return $ Option (Just f) (Just n) (resolveOptArg a a') r
@@ -180,15 +191,15 @@ solveBranch as ds = Branch <$> f as
         -- | Resolve an option's argument name against that given in the
         -- | description, returning the most complete argument known.
         resolveOptArg :: Maybe String
-                      -> Maybe D.Argument
+                      -> Maybe Desc.Argument
                       -> Maybe OptionArgument
         resolveOptArg (Just n) Nothing = return $ OptionArgument n Nothing
-        resolveOptArg Nothing (Just (D.Argument a))
+        resolveOptArg Nothing (Just (Desc.Argument a))
           = do
           -- XXX: The conversion to `StringValue` should not be needed,
           -- `Desc.Argument` should be of type `Maybe Value`.
           return $ OptionArgument a.name (StringValue <$> a.default)
-        resolveOptArg (Just an) (Just (D.Argument a))
+        resolveOptArg (Just an) (Just (Desc.Argument a))
           = do
           -- XXX: Do we need to guard that `an == a.name` here?
           -- XXX: The conversion to `StringValue` should not be needed,
@@ -199,11 +210,11 @@ solveBranch as ds = Branch <$> f as
         toArg:: Maybe String -> Maybe OptionArgument
         toArg a = a >>= \an -> return $ OptionArgument an Nothing
 
-solveUsage :: U.Usage -> List D.Desc -> Either SolveError Usage
+solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
 solveUsage (U.Usage _ bs) ds = Usage <$> do
   traverse (flip solveBranch ds) bs
 
 solve :: (List U.Usage)
-      -> (List D.Desc)
+      -> (List Desc)
       -> Either SolveError (List Usage)
 solve us ds = traverse (flip solveUsage ds) us

@@ -31,10 +31,10 @@ import qualified Language.Docopt.Parser.Lexer as L
 data Desc = OptionDesc Option
           | CommandDesc
 
-data Name        = Flag Char | Long String | Full Char String
+data Name = Flag Char | Long String | Full Char String
 newtype Argument = Argument { name :: String, default :: Maybe String }
-newtype Option   = Option   { name :: Name, arg :: Maybe Argument }
-data Content     = Text | Default String
+newtype Option = Option   { name :: Name, arg :: Maybe Argument }
+data Content = Text | Default String
 
 derive instance genericDesc     :: Generic Desc
 derive instance genericArgument :: Generic Argument
