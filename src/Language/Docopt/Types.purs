@@ -10,6 +10,7 @@ import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
 import Data.String (fromChar)
 import Control.Apply ((*>))
+import qualified Data.String as Str
 
 type Name = String
 type IsRepeatable = Boolean
@@ -69,17 +70,18 @@ instance ordArgument :: Ord Argument where
   compare = compare `on` show
 
 instance eqArgument :: Eq Argument where
-  eq (EOA)            (EOA)                = true
-  eq (Command n)      (Command n')         = (n == n')
-  eq (Positional n r) (Positional n' r')   = (n == n') && (r == r')
-  eq (Group o bs r)   (Group o' bs' r')    = (o == o') && (bs == bs') && (r == r')
+  eq (EOA) (EOA) = true
+  eq (Command n) (Command n') = (n == n')
+  eq (Positional n r) (Positional n' r')
+    = (Str.toUpper n == Str.toUpper n') && (r == r')
+  eq (Group o bs r) (Group o' bs' r') = (o == o') && (bs == bs') && (r == r')
   eq (Option f  n  (Just (OptionArgument a  _)) r)
      (Option f' n' (Just (OptionArgument a' _)) r')
       = (f == f') && (n == n') && (a == a') && (r == r')
   eq (Option f  n  Nothing r)
      (Option f' n' Nothing r')
       = (f == f') && (n == n') && (r == r')
-  eq _                _                    = false
+  eq _ _ = false
 
 instance showOptionArgument :: Show OptionArgument where
   show (OptionArgument n a) = (show n) ++ " " ++ (show a)

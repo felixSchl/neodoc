@@ -14,12 +14,12 @@ import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 
-import Test.Support (vliftEff, runEitherEff)
-import qualified Test.Support.Usage as U
+import Test.Support (vliftEff, runEitherEff, prettyPrintMap)
+import qualified Test.Support.Usage  as U
 import qualified Test.Support.Docopt as D
-import qualified Test.Support.Desc as Desc
+import qualified Test.Support.Desc   as Desc
 
-import Language.Docopt (runDocopt)
+import Language.Docopt (runDocopt, prettyPrintValue)
 
 docoptSpec = \_ ->
   describe "Docopt" do
@@ -29,7 +29,7 @@ docoptSpec = \_ ->
           output <- runDocopt
             """
             Usage:
-              foo -h=<host[:port]> -o FILE FILE... -- ARGS
+              foo push -h=<host[:port]> -o <file> FILE... -- ARGS
 
             Options:
               -o, --output=FILE
@@ -39,9 +39,11 @@ docoptSpec = \_ ->
                 The host to connect to
                 [default: http://localhost:3000]
             """
-            [ "-o", "~/foo/bar"
+            [ "push"
+            , "-o", "~/foo/bar"
             , "-h", "http://localhost:5000"
             , "x", "y"
-            , "--", "0"," 1", "3"
+            , "--", "0", "1", "3"
             ]
+          traceA (prettyPrintMap output show prettyPrintValue)
           return unit

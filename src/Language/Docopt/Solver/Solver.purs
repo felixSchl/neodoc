@@ -22,6 +22,7 @@ import Data.Foldable (foldl)
 import Control.Plus (empty)
 import Data.Monoid (mempty)
 import qualified Data.Array as A
+import qualified Data.String as Str
 
 import Language.Docopt.Types
 import qualified Language.Docopt.Parser.Desc  as D
@@ -108,10 +109,10 @@ solveBranch as ds = Branch <$> f as
           where
             convert :: D.Desc -> Maybe Argument
             convert (D.OptionDesc (D.Option { name=D.Long n', arg=a' }))
-              | n' == n
+              | Str.toUpper n' == Str.toUpper n
               = return $ Option Nothing (Just n) (resolveOptArg a a') r
             convert (D.OptionDesc (D.Option { name=D.Full f n', arg=a' }))
-              | n' == n
+              | Str.toUpper n' == Str.toUpper n
               = return $ Option (Just f) (Just n) (resolveOptArg a a') r
             convert _ = Nothing
 
@@ -139,12 +140,12 @@ solveBranch as ds = Branch <$> f as
                     Just (U.Positional n r) ->
                       case x of
                         (Option _ _ (Just (OptionArgument n' _)) _)
-                          | n == n' -> Just r
+                          | Str.toUpper n == Str.toUpper n' -> Just r
                         _ -> Nothing
                     Just (U.Command n) ->
                       case x of
                         (Option _ _ (Just (OptionArgument n' _)) _)
-                          | n == n' -> Just false
+                          | Str.toUpper n == Str.toUpper n' -> Just false
                         _ -> Nothing
                     _ -> Nothing
 

@@ -17,13 +17,13 @@ import qualified Text.Parsing.Parser as P
 
 import Language.Docopt
 import Language.Docopt.ParserGen (genParser, runParser)
-import qualified Language.Docopt.ParserGen.Trans as Trans
+import qualified Language.Docopt.ParserGen.Trans as T
 
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
-import Test.Support (vliftEff, runMaybeEff, runEitherEff)
+import Test.Support (vliftEff, runMaybeEff, runEitherEff, prettyPrintMap)
 import Test.Support.Docopt
 
 (:>) = Tuple
@@ -55,7 +55,7 @@ genTransSpec = \_ ->
 
       let inp = Map.fromList $ toList test.i
           exp = Map.fromList $ toList test.o
-          out = Trans.transform inp
+          out = T.byName inp
 
       describe (prettyPrintIn inp) do
         it (prettyPrintOut exp) do
@@ -67,19 +67,11 @@ genTransSpec = \_ ->
                         ++ prettyPrintOut out
 
   where
+    pretty :: forall k. Map k Value -> (k -> String) -> String
+    pretty m = flip (prettyPrintMap m) prettyPrintValue
+
     prettyPrintIn :: Map Argument Value -> String
-    prettyPrintIn m = "\n\t" ++ (prettyPrintMap m prettyPrintArg)
+    prettyPrintIn m = "\n\t" ++ (pretty m prettyPrintArg)
 
     prettyPrintOut :: Map String Value -> String
-    prettyPrintOut m = "\n\t" ++ (prettyPrintMap m show)
-
-    prettyPrintMap :: forall a. Map a Value -> (a -> String) -> String
-    prettyPrintMap m p =
-      let xs = Map.toList m
-       in if length xs == 0
-              then "{}"
-              else "{ "
-                ++ (intercalate "\n\t, " $
-                      xs <#> \(Tuple arg val) ->
-                        p arg ++ " => " ++ prettyPrintValue val)
-                ++ "\n\t}"
+    prettyPrintOut m = "\n\t" ++ (pretty m show)

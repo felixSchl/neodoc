@@ -1,6 +1,6 @@
 module Language.Docopt.ParserGen.Trans (
     reduce
-  , transform
+  , byName
   ) where
 
 import Prelude
@@ -11,6 +11,7 @@ import qualified Data.Array as A
 import Data.Map (Map())
 import Data.String (fromChar)
 import qualified Data.Map as Map
+import qualified Data.String as Str
 import Data.Tuple (Tuple(..))
 import qualified Language.Docopt.Types as D
 import Data.List (List(..), toList, concat)
@@ -21,21 +22,25 @@ import Language.Docopt.ParserGen.Types (ValueMapping())
 -- where the String is the name of the option and it's aliases.
 -- This means that Arguments that resolve to the same name/alias must be
 -- somehow resolved.
-transform :: Map D.Argument D.Value -> Map String D.Value
-transform m = foldl (Map.unionWith resolve)
-                    Map.empty
-                    (L.concat $ Map.toList m <#> \(Tuple k v) ->
-                      toList $ toKeys k <#> \k' -> Map.singleton k' v)
+byName :: Map D.Argument D.Value -> Map String D.Value
+byName m
+  = foldl (Map.unionWith resolve)
+          Map.empty
+          (L.concat $ Map.toList m <#> \(Tuple k v) ->
+            toList $ toKeys k <#> \k' -> Map.singleton k' v)
   where
 
     toKeys :: D.Argument -> Array String
     toKeys (D.Command n)      = [n]
     toKeys (D.Positional n _) = [n]
+    -- [ "<" ++ Str.toLower n ++ ">"
+    --                             , Str.toUpper n
+    --                             ]
     toKeys (D.Group _ _ _)    = []
     toKeys (D.EOA)            = ["--"]
     toKeys (D.Option f n _ _) = []
-                              ++ maybe [] (A.singleton <<< fromChar) f
-                              ++ maybe [] A.singleton n
+                              ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) f
+                              ++ maybe [] (\s -> [ "--" ++ s ]) n
 
     -- XXX: How to resolve this?
     resolve :: D.Value -> D.Value -> D.Value
