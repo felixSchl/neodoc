@@ -15,16 +15,15 @@ import Data.Foldable (for_, intercalate)
 import Control.Monad.Eff.Exception (error, throwException)
 import qualified Text.Parsing.Parser as P
 
-import Language.Docopt
-import Language.Docopt.ParserGen (genParser, runParser)
-import qualified Language.Docopt.ParserGen.Trans as Trans
-
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
-import Test.Support.Docopt
+
+import Language.Docopt
+import Language.Docopt.ParserGen (genParser, runParser)
+import qualified Test.Support.Docopt as D
 
 data Test = Test (Array Argument) (Array Case)
 data Case = Case (Array String) (Either String (Map Argument Value))
@@ -44,21 +43,21 @@ infixr 0 :>
 genSpec = \_ -> describe "The generator" do
 
   -- Some options that will be used for these tests
-  let cmd_foo          = co    "foo"
-      opt_f_foo_FOZ__r = optR  'f' "foo" (oa_ "FOZ")
-      opt_q_qux___r    = optR_ 'q' "qux"
-      opt_b_baz        = opt   'b' "baz"   (oa "BAZ" $ str "ax")
-      opt_o_out        = opt_  'o' "out"
-      opt_i_input      = opt_  'i' "input"
-      pos_arg_r        = poR    "qux"
-      cmd_baz          = co     "baz"
+  let cmd_foo          = D.co    "foo"
+      opt_f_foo_FOZ__r = D.optR  'f' "foo" (D.oa_ "FOZ")
+      opt_q_qux___r    = D.optR_ 'q' "qux"
+      opt_b_baz        = D.opt   'b' "baz" (D.oa "BAZ" $ D.str "ax")
+      opt_o_out        = D.opt_  'o' "out"
+      opt_i_input      = D.opt_  'i' "input"
+      pos_arg_r        = D.poR    "qux"
+      cmd_baz          = D.co     "baz"
 
   let testCases = [
 
       test [ pos_arg_r ]
         [ pass
             [ "a", "b", "c" ]
-            [ pos_arg_r :> array [ str "a" , str "b" , str "c" ] ]
+            [ pos_arg_r :> D.array [ D.str "a" , D.str "b" , D.str "c" ] ]
         , fail [ "--foo", "baz" ]
             "Expected positional argument: \"qux...\""
         , fail
@@ -66,93 +65,93 @@ genSpec = \_ -> describe "The generator" do
             "Trailing input: --foo, -f=10"
         ]
 
-    , test [ pos_arg_r, eoa ]
+    , test [ pos_arg_r, D.eoa ]
         [ pass
             [ "a", "b", "c", "--" ]
-            [ pos_arg_r :> array [ str "a" , str "b" , str "c" ]
-            , eoa       :> array []
+            [ pos_arg_r :> D.array [ D.str "a" , D.str "b" , D.str "c" ]
+            , D.eoa     :> D.array []
             ]
         , pass
             [ "a", "b", "c", "--", "--", "--" ]
-            [ pos_arg_r :> array [ str "a" , str "b" , str "c" ]
-            , eoa       :> array [ str "--" , str "--" ]
+            [ pos_arg_r :> D.array [ D.str "a" , D.str "b" , D.str "c" ]
+            , D.eoa     :> D.array [ D.str "--" , D.str "--" ]
             ]
         ]
 
     , test
-        [ grr false [] ]
+        [ D.grr false [] ]
         [ pass [] [] ]
 
     , test
-        [ gro false [] ]
+        [ D.gro false [] ]
         [ pass [] [] ]
 
     , test
-        [ grr false [[
-            opt 'i' "input" (oa_ "FILE")
+        [ D.grr false [[
+            D.opt 'i' "input" (D.oa_ "FILE")
           ]]
         ]
         [ fail [] "Missing required options: (-i, --input=FILE)"
         , pass
             [ "-i", "bar" ]
-            [ opt 'i' "input" (oa_ "FILE") :> (str "bar") ]
+            [ D.opt 'i' "input" (D.oa_ "FILE") :> (D.str "bar") ]
         ]
 
     , test
-        [ grr false [[
-            opt 'i' "input" (oa_ "FILE")
+        [ D.grr false [[
+            D.opt 'i' "input" (D.oa_ "FILE")
           ]]
-        , opt 'o' "output" (oa_ "FILE")
+        , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail [] "Missing required options: -o, --output=FILE, (-i, --input=FILE)"
         , fail [ "-i", "bar" ] "Missing required options: -o, --output=FILE"
         , pass [ "-i", "bar", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") :> str "bar"
-            , opt 'o' "output" (oa_ "FILE") :> str "bar" ]
+            [ D.opt 'i' "input"  (D.oa_ "FILE") :> D.str "bar"
+            , D.opt 'o' "output" (D.oa_ "FILE") :> D.str "bar" ]
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-i", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") :> str "bar"
-            , opt 'o' "output" (oa_ "FILE") :> str "bar" ]
+            [ D.opt 'i' "input"  (D.oa_ "FILE") :> D.str "bar"
+            , D.opt 'o' "output" (D.oa_ "FILE") :> D.str "bar" ]
         ]
 
     , test
-        [ grr false [[
-            grr false [[
-              opt 'i' "input" (oa_ "FILE")
+        [ D.grr false [[
+            D.grr false [[
+              D.opt 'i' "input" (D.oa_ "FILE")
             ]]
-          , opt 'r' "redirect" (oa_ "FILE")
+          , D.opt 'r' "redirect" (D.oa_ "FILE")
           ]]
-        , opt 'o' "output" (oa_ "FILE")
+        , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
             "Missing required options: -o, --output=FILE, ((-i, --input=FILE) -r, --redirect=FILE)"
         , fail [ "-i", "bar", "-r", "bar" ]
             "Missing required options: -o, --output=FILE"
         , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE")   :> str "bar"
-            , opt 'r' "redirect" (oa_ "FILE") :> str "bar"
-            , opt 'o' "output" (oa_ "FILE")   :> str "bar" ]
+            [ D.opt 'i' "input"  (D.oa_ "FILE")   :> D.str "bar"
+            , D.opt 'r' "redirect" (D.oa_ "FILE") :> D.str "bar"
+            , D.opt 'o' "output" (D.oa_ "FILE")   :> D.str "bar" ]
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-r", "bar", "-i", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE")   :> str "bar"
-            , opt 'r' "redirect" (oa_ "FILE") :> str "bar"
-            , opt 'o' "output" (oa_ "FILE")   :> str "bar" ]
+            [ D.opt 'i' "input"  (D.oa_ "FILE")   :> D.str "bar"
+            , D.opt 'r' "redirect" (D.oa_ "FILE") :> D.str "bar"
+            , D.opt 'o' "output" (D.oa_ "FILE")   :> D.str "bar" ]
         ]
 
     , test
-        [ grr false [[
-            opt 'i' "input" (oa_ "FILE")
-          , po  "env"
+        [ D.grr false [[
+            D.opt 'i' "input" (D.oa_ "FILE")
+          , D.po  "env"
           ]]
-        , opt 'o' "output" (oa_ "FILE")
+        , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail [] "Missing required options: -i, --input=FILE"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
         , pass [ "-i", "bar", "x", "-o", "bar" ]
-            [ opt 'i' "input"  (oa_ "FILE") :> str "bar"
-            , po  "env"                     :> str "x"
-            , opt 'o' "output" (oa_ "FILE") :> str "bar" ]
+            [ D.opt 'i' "input"  (D.oa_ "FILE") :> D.str "bar"
+            , D.po  "env"                       :> D.str "x"
+            , D.opt 'o' "output" (D.oa_ "FILE") :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail [ "-o", "bar", "x", "-i", "bar" ]
             "Missing required options: -i, --input=FILE"
@@ -170,57 +169,57 @@ genSpec = \_ -> describe "The generator" do
 
         [ pass
             [ "foo" , "--out", "--input", "--qux", "--foo=ox", "baz" ]
-            [ cmd_foo          :> bool true
-            , opt_o_out        :> bool true
-            , opt_i_input      :> bool true
-            , opt_q_qux___r    :> array [ bool true ]
-            , opt_f_foo_FOZ__r :> array [ str "ox" ]
-            , cmd_baz          :> bool true
+            [ cmd_foo          :> D.bool true
+            , opt_o_out        :> D.bool true
+            , opt_i_input      :> D.bool true
+            , opt_q_qux___r    :> D.array [ D.bool true ]
+            , opt_f_foo_FOZ__r :> D.array [ D.str "ox" ]
+            , cmd_baz          :> D.bool true
             -- should have added default value that was not provided above:
-            , opt_b_baz        :> str "ax"
+            , opt_b_baz        :> D.str "ax"
             ]
 
         , pass
             [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
-            [ cmd_foo          :> bool true
-            , opt_o_out        :> bool true
-            , opt_q_qux___r    :> array [ bool true , bool true , bool true ]
-            , opt_f_foo_FOZ__r :> array [str "ox"]
-            , opt_b_baz        :> str "ax"
-            , opt_i_input      :> bool true
-            , cmd_baz          :> bool true
+            [ cmd_foo          :> D.bool true
+            , opt_o_out        :> D.bool true
+            , opt_q_qux___r    :> D.array [ D.bool true , D.bool true , D.bool true ]
+            , opt_f_foo_FOZ__r :> D.array [D.str "ox"]
+            , opt_b_baz        :> D.str "ax"
+            , opt_i_input      :> D.bool true
+            , cmd_baz          :> D.bool true
             ]
 
         , pass
             [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
-            [ cmd_foo          :> bool true
-            , opt_q_qux___r    :> array [ bool true , bool true ]
-            , opt_o_out        :> bool true
-            , opt_i_input      :> bool true
-            , opt_b_baz        :> str "ax"
-            , opt_f_foo_FOZ__r :> array [ str "ox" ]
-            , cmd_baz          :> bool true
+            [ cmd_foo          :> D.bool true
+            , opt_q_qux___r    :> D.array [ D.bool true , D.bool true ]
+            , opt_o_out        :> D.bool true
+            , opt_i_input      :> D.bool true
+            , opt_b_baz        :> D.str "ax"
+            , opt_f_foo_FOZ__r :> D.array [ D.str "ox" ]
+            , cmd_baz          :> D.bool true
             ]
 
         , pass
             [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
-            [ cmd_foo          :> bool true
-            , opt_b_baz        :> str "ax"
-            , opt_o_out        :> bool true
-            , opt_f_foo_FOZ__r :> array [ str "ox" ]
-            , opt_i_input      :> bool true
-            , cmd_baz          :> bool true
+            [ cmd_foo          :> D.bool true
+            , opt_b_baz        :> D.str "ax"
+            , opt_o_out        :> D.bool true
+            , opt_f_foo_FOZ__r :> D.array [ D.str "ox" ]
+            , opt_i_input      :> D.bool true
+            , cmd_baz          :> D.bool true
             ]
 
         , pass
             [ "foo", "-o", "-i", "-bax", "baz" ]
-            [ cmd_foo     :> bool true
-            , opt_o_out   :> bool true
-            , opt_i_input :> bool true
-            , opt_b_baz   :> str "ax"
-            , cmd_baz     :> bool true
+            [ cmd_foo     :> D.bool true
+            , opt_o_out   :> D.bool true
+            , opt_i_input :> D.bool true
+            , opt_b_baz   :> D.str "ax"
+            , cmd_baz     :> D.bool true
             -- should have added default value that was not provided above:
-            , opt_b_baz   :> str "ax"
+            , opt_b_baz   :> D.str "ax"
             ]
 
         , fail
@@ -236,15 +235,15 @@ genSpec = \_ -> describe "The generator" do
         ]
 
     , test
-        [ gro false [[ cmd_foo ]] ]
+        [ D.gro false [[ cmd_foo ]] ]
         [ fail [ "goo" ] "Trailing input: \"goo\"" ]
     , test
-        [ grr false [[ cmd_foo ]] ]
+        [ D.grr false [[ cmd_foo ]] ]
         [ fail [ "goo" ] "Expected command: \"foo\"" ]
   ]
 
   for_ testCases \(Test branch kases) -> do
-    describe (prettyPrintBranch $ br branch) do
+    describe (prettyPrintBranch $ D.br branch) do
       for_ kases \(Case input expected) ->
             let msg = either
                   (\e -> "Should fail with \"" ++ e ++ "\"")
@@ -272,7 +271,7 @@ genSpec = \_ -> describe "The generator" do
         let result = do
               runParser
                 (toList argv)
-                (genParser $ singleton $ Usage $ singleton $ br args)
+                (genParser $ singleton $ Usage $ singleton $ D.br args)
         case result of
           Left (e@(P.ParseError { message: msg })) ->
             either
