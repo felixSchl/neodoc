@@ -18,12 +18,12 @@ import qualified Test.Support.Usage as U
 import qualified Test.Support.Docopt as D
 import qualified Test.Support.Desc as Desc
 
-import Docopt
-import Docopt.Parser.Scanner (scan)
-import qualified Docopt.Parser.Usage as Usage
-import qualified Docopt.Parser.Desc  as Desc
-import qualified Docopt.Solver       as Solver
-import qualified Docopt.ParserGen         as Gen
+import Language.Docopt
+import Language.Docopt.Parser.Scanner (scan)
+import qualified Language.Docopt.Parser.Usage as Usage
+import qualified Language.Docopt.Parser.Desc  as Desc
+import qualified Language.Docopt.Solver       as Solver
+import qualified Language.Docopt.ParserGen         as Gen
 
 import Text.Wrap (dedent)
 

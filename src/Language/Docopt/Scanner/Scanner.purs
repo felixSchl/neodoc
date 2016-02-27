@@ -1,4 +1,4 @@
-module Docopt.Parser.Scanner where
+module Language.Docopt.Parser.Scanner where
 
 import Prelude
 import Debug.Trace
@@ -17,9 +17,9 @@ import Data.String (toLower, toCharArray, fromCharArray)
 import qualified Data.String as Str
 import Data.Maybe
 import Data.Either
-import Docopt.Parser.Base
-import qualified Docopt.Parser.Lexer as Lexer
-import qualified Docopt.Parser.Usage as Usage
+import Language.Docopt.Parser.Base
+import qualified Language.Docopt.Parser.Lexer as Lexer
+import qualified Language.Docopt.Parser.Usage as Usage
 import Text.Wrap (dedent)
 
 type Docopt = { usage :: Section, options :: List Section }

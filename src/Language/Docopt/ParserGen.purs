@@ -1,6 +1,6 @@
-module Docopt.ParserGen (
-    module Docopt.ParserGen.Types
-  , module Docopt.ParserGen.Pretty
+module Language.Docopt.ParserGen (
+    module Language.Docopt.ParserGen.Types
+  , module Language.Docopt.ParserGen.Pretty
   , genParser
   , runParser
   ) where
@@ -16,12 +16,12 @@ import Data.Foldable (foldl)
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 
-import qualified Docopt.Types as D
-import qualified Docopt.ParserGen.Types  as G
-import qualified Docopt.ParserGen.Pretty as G
-import qualified Docopt.ParserGen.Parser as G
-import qualified Docopt.ParserGen.Trans  as G
-import qualified Docopt.ParserGen.Lexer  as G
+import qualified Language.Docopt.Types as D
+import qualified Language.Docopt.ParserGen.Types  as G
+import qualified Language.Docopt.ParserGen.Pretty as G
+import qualified Language.Docopt.ParserGen.Parser as G
+import qualified Language.Docopt.ParserGen.Trans  as G
+import qualified Language.Docopt.ParserGen.Lexer  as G
 
 genParser :: List D.Application
           -> G.Parser (Tuple D.Branch (List G.ValueMapping))

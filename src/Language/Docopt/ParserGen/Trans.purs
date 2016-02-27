@@ -1,4 +1,4 @@
-module Docopt.ParserGen.Trans (reduce, transform)
+module Language.Docopt.ParserGen.Trans (reduce, transform)
 where
 
 import Prelude
@@ -10,10 +10,10 @@ import Data.Map (Map())
 import Data.String (fromChar)
 import qualified Data.Map as Map
 import Data.Tuple (Tuple(..))
-import qualified Docopt.Types as D
+import qualified Language.Docopt.Types as D
 import Data.List (List(..), toList, concat)
 import qualified Data.List as L
-import Docopt.ParserGen.Types (ValueMapping())
+import Language.Docopt.ParserGen.Types (ValueMapping())
 
 -- Transform the map of (Argument, Value) mappings to a map of (String, Value),
 -- where the String is the name of the option and it's aliases.

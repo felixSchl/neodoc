@@ -12,10 +12,10 @@ import Data.Foldable (intercalate, for_)
 import Control.Monad.Eff.Exception (error, throwException)
 import qualified Text.Parsing.Parser as P
 
-import Docopt
-import qualified Docopt.Parser.Desc as Desc
-import qualified Docopt.Parser.Lexer as Lexer
-import Docopt.Parser.Base (debug)
+import Language.Docopt
+import qualified Language.Docopt.Parser.Desc as Desc
+import qualified Language.Docopt.Parser.Lexer as Lexer
+import Language.Docopt.Parser.Base (debug)
 import Text.Wrap (dedent)
 
 import Test.Assert (assert)

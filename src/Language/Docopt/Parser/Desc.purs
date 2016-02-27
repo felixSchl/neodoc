@@ -1,4 +1,4 @@
-module Docopt.Parser.Desc where
+module Language.Docopt.Parser.Desc where
 
 import Prelude
 import Debug.Trace
@@ -22,11 +22,11 @@ import Data.String (toLower, fromChar)
 import qualified Data.Array as A
 import qualified Data.String as Str
 
-import Docopt.Parser.Base
-import Docopt.Parser.Common
-import Docopt.Parser.State
-import Docopt.Parser.Lexer (lex)
-import qualified Docopt.Parser.Lexer as L
+import Language.Docopt.Parser.Base
+import Language.Docopt.Parser.Common
+import Language.Docopt.Parser.State
+import Language.Docopt.Parser.Lexer (lex)
+import qualified Language.Docopt.Parser.Lexer as L
 
 data Desc = OptionDesc Option
           | CommandDesc

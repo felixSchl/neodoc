@@ -1,4 +1,4 @@
-module Docopt.ParserGen.Types where
+module Language.Docopt.ParserGen.Types where
 
 import Prelude
 import Data.Maybe (Maybe(..), maybe)
@@ -7,7 +7,7 @@ import Data.String (fromCharArray)
 import Data.Tuple (Tuple(..))
 import qualified Data.Array as A
 import qualified Text.Parsing.Parser as P
-import qualified Docopt.Types as D
+import qualified Language.Docopt.Types as D
 
 -- | Represents each item in ARGV
 data Token

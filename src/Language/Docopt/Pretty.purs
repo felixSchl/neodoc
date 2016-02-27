@@ -1,4 +1,4 @@
-module Docopt.Pretty where
+module Language.Docopt.Pretty where
 
 import Prelude
 import Data.Either
@@ -8,7 +8,7 @@ import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
 import Data.String (fromChar)
 import Control.Apply ((*>))
-import Docopt.Types
+import Language.Docopt.Types
 
 prettyPrintArg :: Argument -> String
 prettyPrintArg (EOA)               = "--"

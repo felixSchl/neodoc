@@ -1,11 +1,11 @@
-module Docopt.ParserGen.Pretty where
+module Language.Docopt.ParserGen.Pretty where
 
 import Prelude
 import Data.Maybe (maybe)
 import Data.Foldable (intercalate)
 import Data.String (fromCharArray)
-import Docopt.ParserGen.Types
-import qualified Docopt.Pretty as D
+import Language.Docopt.ParserGen.Types
+import qualified Language.Docopt.Pretty as D
 import qualified Data.Array as A
 
 prettyPrintToken :: Token -> String

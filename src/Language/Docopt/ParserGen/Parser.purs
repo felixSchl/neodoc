@@ -5,7 +5,7 @@
 -- |
 -- | ===
 
-module Docopt.ParserGen.Parser (
+module Language.Docopt.ParserGen.Parser (
     genParser
   , Parser()
   ) where
@@ -38,13 +38,13 @@ import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 
-import qualified Docopt.Types as D
-import Docopt.Types (takesArgument, isFlag, isBoolValue, isRepeatable
+import qualified Language.Docopt.Types as D
+import Language.Docopt.Types (takesArgument, isFlag, isBoolValue, isRepeatable
                     , hasDefault)
-import Docopt.Pretty
-import Docopt.ParserGen.Types
-import Docopt.ParserGen.Pretty
-import Docopt.Parser.Base (alphaNum, space, getInput, debug)
+import Language.Docopt.Pretty
+import Language.Docopt.ParserGen.Types
+import Language.Docopt.ParserGen.Pretty
+import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
 type Parser a = P.Parser (List Token) a
 

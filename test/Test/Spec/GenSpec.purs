@@ -15,9 +15,9 @@ import Data.Foldable (for_, intercalate)
 import Control.Monad.Eff.Exception (error, throwException)
 import qualified Text.Parsing.Parser as P
 
-import Docopt
-import Docopt.ParserGen (genParser, runParser)
-import qualified Docopt.ParserGen.Trans as Trans
+import Language.Docopt
+import Language.Docopt.ParserGen (genParser, runParser)
+import qualified Language.Docopt.ParserGen.Trans as Trans
 
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())

@@ -23,12 +23,12 @@ import qualified Test.Support.Usage as U
 import qualified Test.Support.Docopt as D
 import qualified Test.Support.Desc as Desc
 
-import Docopt
-import Docopt.Solver (solve)
-import qualified Docopt.Parser.Usage as U
-import qualified Docopt.Parser.Desc as D
-import Docopt.Parser.Scanner (scan)
-import Docopt.Parser.Lexer (lex)
+import Language.Docopt
+import Language.Docopt.Solver (solve)
+import qualified Language.Docopt.Parser.Usage as U
+import qualified Language.Docopt.Parser.Desc as D
+import Language.Docopt.Parser.Scanner (scan)
+import Language.Docopt.Parser.Lexer (lex)
 import Text.Wrap (dedent)
 
 newtype TestSuite = TestSuite { usages :: Array U.Usage

@@ -15,11 +15,11 @@ import Data.Maybe (Maybe(..))
 import Data.Foldable (foldMap, traverse_, for_)
 import Data.Array ((..))
 
-import Docopt
-import qualified Docopt.Parser.Usage as Usage
-import qualified Docopt.Parser.Lexer as Lexer
-import qualified Docopt.Parser.Scanner as Scanner
-import Docopt.Parser.Base (debug)
+import Language.Docopt
+import qualified Language.Docopt.Parser.Usage as Usage
+import qualified Language.Docopt.Parser.Lexer as Lexer
+import qualified Language.Docopt.Parser.Scanner as Scanner
+import Language.Docopt.Parser.Base (debug)
 import Text.Wrap (dedent)
 
 import Test.Assert (assert)

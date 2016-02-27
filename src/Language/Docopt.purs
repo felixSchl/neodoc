@@ -1,4 +1,4 @@
-module Docopt (
+module Language.Docopt (
   module D
 , runDocopt
 ) where
@@ -17,14 +17,14 @@ import Control.Apply ((*>))
 import Data.Bifunctor (lmap)
 import Data.Traversable (traverse)
 
-import qualified Docopt.Types     as D
-import qualified Docopt.Pretty    as D
-import qualified Docopt.ParserGen as Gen
+import qualified Language.Docopt.Types     as D
+import qualified Language.Docopt.Pretty    as D
+import qualified Language.Docopt.ParserGen as Gen
 
-import qualified Docopt.Parser.Scanner as Scanner
-import qualified Docopt.Parser.Usage as Usage
-import qualified Docopt.Parser.Desc as Desc
-import qualified Docopt.Solver as Solver
+import qualified Language.Docopt.Parser.Scanner as Scanner
+import qualified Language.Docopt.Parser.Usage as Usage
+import qualified Language.Docopt.Parser.Desc as Desc
+import qualified Language.Docopt.Solver as Solver
 
 import qualified Text.Parsing.Parser as P
 

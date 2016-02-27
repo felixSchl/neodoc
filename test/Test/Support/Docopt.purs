@@ -2,7 +2,7 @@ module Test.Support.Docopt where
 
 import Prelude
 import Data.Maybe (Maybe(..))
-import Docopt
+import Language.Docopt
 import Data.List (List(..), toList, length, fromList, singleton)
 
 -- short hand to create a Command

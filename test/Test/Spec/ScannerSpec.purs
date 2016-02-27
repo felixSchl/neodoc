@@ -11,8 +11,8 @@ import Data.Either.Unsafe (fromLeft, fromRight)
 import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..))
 
-import Docopt
-import qualified Docopt.Parser.Scanner as Scanner
+import Language.Docopt
+import qualified Language.Docopt.Parser.Scanner as Scanner
 import Text.Wrap (dedent)
 
 import Test.Assert (assert)

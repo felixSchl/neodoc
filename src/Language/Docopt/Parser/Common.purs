@@ -2,7 +2,7 @@
 -- | This module defines commonly used TokenParser-combinators
 -- |
 
-module Docopt.Parser.Common where
+module Language.Docopt.Parser.Common where
 
 import Prelude
 import Debug.Trace
@@ -11,9 +11,9 @@ import Control.MonadPlus (guard)
 import Control.Monad.State
 import Data.List (List(..))
 import Data.Either (Either(..))
-import Docopt.Parser.Lexer
-import Docopt.Parser.State
-import Docopt.Parser.Base
+import Language.Docopt.Parser.Lexer
+import Language.Docopt.Parser.State
+import Language.Docopt.Parser.Base
 import qualified Text.Parsing.Parser as P
 import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Token as P
