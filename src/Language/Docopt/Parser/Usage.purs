@@ -1,4 +1,4 @@
-module Docopt.Spec.Parser.Usage where
+module Docopt.Parser.Usage where
 
 import Prelude
 import Debug.Trace
@@ -25,10 +25,10 @@ import qualified Data.Array as A
 import qualified Data.String as Str
 import Control.Bind ((=<<))
 
-import Docopt.Spec.Parser.Base
-import Docopt.Spec.Parser.Common
-import Docopt.Spec.Parser.Lexer
-import Docopt.Spec.Parser.State
+import Docopt.Parser.Base
+import Docopt.Parser.Common
+import Docopt.Parser.Lexer
+import Docopt.Parser.State
 
 type OptionAlias    = String
 type OptionArgument = String

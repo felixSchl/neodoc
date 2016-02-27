@@ -5,7 +5,7 @@
 -- |
 -- | ===
 
-module Docopt.Gen.Lexer (lex) where
+module Docopt.ParserGen.Lexer (lex) where
 
 import Prelude
 import Debug.Trace
@@ -22,8 +22,8 @@ import qualified Text.Parsing.Parser.String as P
 import qualified Data.Array as A
 import Control.Plus (empty)
 import Control.Bind ((=<<))
-import Docopt.Gen.Types
-import Docopt.Spec.Parser.Base
+import Docopt.ParserGen.Types
+import Docopt.Parser.Base
 import qualified Docopt.Types as D
 
 -- | Parse a single token from the ARGV stream.

@@ -1,4 +1,4 @@
-module Docopt.Gen.Trans (reduce, transform)
+module Docopt.ParserGen.Trans (reduce, transform)
 where
 
 import Prelude
@@ -13,7 +13,7 @@ import Data.Tuple (Tuple(..))
 import qualified Docopt.Types as D
 import Data.List (List(..), toList, concat)
 import qualified Data.List as L
-import Docopt.Gen.Types (ValueMapping())
+import Docopt.ParserGen.Types (ValueMapping())
 
 -- Transform the map of (Argument, Value) mappings to a map of (String, Value),
 -- where the String is the name of the option and it's aliases.

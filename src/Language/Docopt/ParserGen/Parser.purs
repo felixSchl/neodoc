@@ -5,8 +5,10 @@
 -- |
 -- | ===
 
-module Docopt.Gen.Parser (genParser)
-where
+module Docopt.ParserGen.Parser (
+    genParser
+  , Parser()
+  ) where
 
 import Prelude
 import Control.Plus (empty)
@@ -40,16 +42,18 @@ import qualified Docopt.Types as D
 import Docopt.Types (takesArgument, isFlag, isBoolValue, isRepeatable
                     , hasDefault)
 import Docopt.Pretty
-import Docopt.Gen.Types
-import Docopt.Gen.Pretty
-import Docopt.Spec.Parser.Base (alphaNum, space, getInput, debug)
+import Docopt.ParserGen.Types
+import Docopt.ParserGen.Pretty
+import Docopt.Parser.Base (alphaNum, space, getInput, debug)
+
+type Parser a = P.Parser (List Token) a
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
 --------------------------------------------------------------------------------
 
 -- | Test the token at the head of the stream
-token :: forall a. (Token -> Maybe a) -> CliParser a
+token :: forall a. (Token -> Maybe a) -> Parser a
 token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
@@ -66,22 +70,22 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
 data Acc a
-  = Free (CliParser a)
-  | Pending (CliParser a) (List D.Argument)
+  = Free (Parser a)
+  | Pending (Parser a) (List D.Argument)
 
-eoa :: CliParser D.Value
+eoa :: Parser D.Value
 eoa = token go P.<?> "--"
   where
     go (EOA xs) = Just (D.ArrayValue (fromList xs))
     go _        = Nothing
 
-command :: String -> CliParser D.Value
+command :: String -> Parser D.Value
 command n = token go P.<?> "command " ++ show n
   where
     go (Lit s) | s == n = Just (D.BoolValue true)
     go _                = Nothing
 
-positional :: String -> CliParser D.Value
+positional :: String -> Parser D.Value
 positional n = token go P.<?> "positional argument " ++ show n
   where
     go (Lit v) = Just (D.StringValue v)
@@ -90,7 +94,7 @@ positional n = token go P.<?> "positional argument " ++ show n
 type HasConsumedArg = Boolean
 data OptParse = OptParse D.Value (Maybe Token) HasConsumedArg
 
-longOption :: D.Name -> (Maybe D.OptionArgument) -> CliParser D.Value
+longOption :: D.Name -> (Maybe D.OptionArgument) -> Parser D.Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
@@ -135,7 +139,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     go _ _ = Left "Invalid token"
 
-shortOption :: Char -> (Maybe D.OptionArgument) -> CliParser D.Value
+shortOption :: Char -> (Maybe D.OptionArgument) -> Parser D.Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
@@ -191,7 +195,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     go a b = Left $ "Invalid token " ++ show a ++ " (input: " ++ show b ++ ")"
 
-eof :: CliParser Unit
+eof :: Parser Unit
 eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
   return $ case s of
     Nil -> { consumed: false, input: s, result: Right unit, position: pos }
@@ -201,13 +205,13 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 
 -- | Generate a parser for a single program application (Usage).
 genParser :: D.Application
-          -> CliParser (Tuple D.Branch (List ValueMapping))
+          -> Parser (Tuple D.Branch (List ValueMapping))
 genParser (D.Application xs) = do
   P.choice $ xs <#> \x -> Tuple x <$> mkBranchParser x
   <* eof
 
 -- | Generate a parser for a single usage branch
-mkBranchParser :: D.Branch -> CliParser (List (Tuple D.Argument D.Value))
+mkBranchParser :: D.Branch -> Parser (List (Tuple D.Argument D.Value))
 mkBranchParser (D.Branch xs) = do
   either
     (\_   -> P.fail "Failed to generate parser")
@@ -223,7 +227,7 @@ mkBranchParser (D.Branch xs) = do
     -- Given a list of arguments, try parse them all in any order.
     -- The only requirement is that all input is consumed in the end.
     mkExhaustiveParser :: List D.Argument
-                       -> CliParser (List (Tuple D.Argument D.Value))
+                       -> Parser (List (Tuple D.Argument D.Value))
     mkExhaustiveParser Nil = pure empty
     mkExhaustiveParser ps  = do
       draw ps (length ps)
@@ -232,7 +236,7 @@ mkBranchParser (D.Branch xs) = do
         -- apply `draw` until the parser fails, with a modified `ps`.
         draw :: List D.Argument
              -> Int
-             -> CliParser (List (Tuple D.Argument D.Value))
+             -> Parser (List (Tuple D.Argument D.Value))
         draw pss@(Cons p ps') n | n >= 0 = (do
           xs <- mkParser p
 
@@ -292,7 +296,7 @@ mkBranchParser (D.Branch xs) = do
         return (a ++ as ++ ass)
 
     -- Parser generator for a single `Argument`
-    mkParser :: D.Argument -> CliParser (List (Tuple D.Argument D.Value))
+    mkParser :: D.Argument -> Parser (List (Tuple D.Argument D.Value))
 
     -- Generate a parser for a `Command` argument
     mkParser x@(D.Command n) = (do

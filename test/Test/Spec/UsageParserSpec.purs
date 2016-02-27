@@ -16,10 +16,10 @@ import Data.Foldable (foldMap, traverse_, for_)
 import Data.Array ((..))
 
 import Docopt
-import qualified Docopt.Spec.Parser.Usage as Usage
-import qualified Docopt.Spec.Parser.Lexer as Lexer
-import qualified Docopt.Spec.Parser.Scanner as Scanner
-import Docopt.Spec.Parser.Base (debug)
+import qualified Docopt.Parser.Usage as Usage
+import qualified Docopt.Parser.Lexer as Lexer
+import qualified Docopt.Parser.Scanner as Scanner
+import Docopt.Parser.Base (debug)
 import Text.Wrap (dedent)
 
 import Test.Assert (assert)

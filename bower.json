@@ -22,7 +22,8 @@
     "purescript-simple-assert": "~0.3.0",
     "purescript-transformers": "~0.8.1",
     "purescript-integers": "~0.2.1",
-    "purescript-globals": "~0.2.1"
+    "purescript-globals": "~0.2.1",
+    "purescript-maps": "~0.5.4"
   },
   "resolutions": {
     "purescript-transformers": "^0.7.1",

@@ -19,11 +19,11 @@ import qualified Test.Support.Docopt as D
 import qualified Test.Support.Desc as Desc
 
 import Docopt
-import Docopt.Spec.Parser.Scanner (scan)
-import qualified Docopt.Spec.Parser.Usage as Usage
-import qualified Docopt.Spec.Parser.Desc  as Desc
-import qualified Docopt.Spec.Solver       as Solver
-import qualified Docopt.Gen               as Gen
+import Docopt.Parser.Scanner (scan)
+import qualified Docopt.Parser.Usage as Usage
+import qualified Docopt.Parser.Desc  as Desc
+import qualified Docopt.Solver       as Solver
+import qualified Docopt.ParserGen         as Gen
 
 import Text.Wrap (dedent)
 

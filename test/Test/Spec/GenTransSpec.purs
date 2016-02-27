@@ -16,8 +16,8 @@ import Control.Monad.Eff.Exception (error, throwException)
 import qualified Text.Parsing.Parser as P
 
 import Docopt
-import Docopt.Gen (genParser, runParser)
-import qualified Docopt.Gen.Trans as Trans
+import Docopt.ParserGen (genParser, runParser)
+import qualified Docopt.ParserGen.Trans as Trans
 
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())

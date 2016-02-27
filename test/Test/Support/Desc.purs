@@ -3,7 +3,7 @@ module Test.Support.Desc where
 import Prelude
 import Data.Maybe (Maybe(..))
 
-import qualified Docopt.Spec.Parser.Desc as Desc
+import qualified Docopt.Parser.Desc as Desc
 
 arg :: String -> Maybe String -> Desc.Argument
 arg = Desc.argument

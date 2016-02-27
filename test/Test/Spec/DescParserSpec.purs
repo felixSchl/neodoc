@@ -13,9 +13,9 @@ import Control.Monad.Eff.Exception (error, throwException)
 import qualified Text.Parsing.Parser as P
 
 import Docopt
-import qualified Docopt.Spec.Parser.Desc as Desc
-import qualified Docopt.Spec.Parser.Lexer as Lexer
-import Docopt.Spec.Parser.Base (debug)
+import qualified Docopt.Parser.Desc as Desc
+import qualified Docopt.Parser.Lexer as Lexer
+import Docopt.Parser.Base (debug)
 import Text.Wrap (dedent)
 
 import Test.Assert (assert)

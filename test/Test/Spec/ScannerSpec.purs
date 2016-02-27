@@ -12,7 +12,7 @@ import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..))
 
 import Docopt
-import qualified Docopt.Spec.Parser.Scanner as Scanner
+import qualified Docopt.Parser.Scanner as Scanner
 import Text.Wrap (dedent)
 
 import Test.Assert (assert)

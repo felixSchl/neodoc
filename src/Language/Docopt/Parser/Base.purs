@@ -2,7 +2,7 @@
 -- | This module defines commonly used Parser-combinators
 -- |
 
-module Docopt.Spec.Parser.Base where
+module Docopt.Parser.Base where
 
 import Prelude
 import Control.Alt ((<|>))

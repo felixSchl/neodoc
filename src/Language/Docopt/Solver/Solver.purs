@@ -7,7 +7,7 @@
 -- |    * It appears there is never a reason to fail hard. It would be nice if
 -- |      we could produce warnings, however -> Write monad?
 
-module Docopt.Spec.Solver where
+module Docopt.Solver where
 
 import Prelude
 import Debug.Trace
@@ -24,8 +24,8 @@ import Data.Monoid (mempty)
 import qualified Data.Array as A
 
 import Docopt.Types
-import qualified Docopt.Spec.Parser.Desc  as D
-import qualified Docopt.Spec.Parser.Usage as U
+import qualified Docopt.Parser.Desc  as D
+import qualified Docopt.Parser.Usage as U
 
 data Result = Consumed (List Argument) | Unconsumed (List Argument)
 
