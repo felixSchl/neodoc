@@ -62,11 +62,7 @@ prettyPrintUsage (Usage name bs) =
       prettyPrintArg (Positional n r)
         = n ++ if r then "..." else ""
       prettyPrintArg (Option o) = O.prettyPrintLOpt o
-      prettyPrintArg (OptionStack f fs a r)
-        = "-" ++ (fromChar f)
-          ++ (intercalate "" $ fromChar <$> toList fs)
-          ++ (maybe "" ("="++) a)
-          ++ if r then "..." else ""
+      prettyPrintArg (OptionStack o) = O.prettyPrintSOpt o
       prettyPrintArg (Group b xs r)
         = if b then "(" else "["
           ++ intercalate " | " (prettyPrintBranch <$> bs)
@@ -145,9 +141,9 @@ usageParser = do
       O.lopt' name arg <$> repetition
 
     shortOption :: L.TokenParser Argument
-    shortOption = do
+    shortOption = OptionStack <$> do
       { flag: flag, stack: stack, arg: arg } <- L.sopt
-      OptionStack flag stack arg <$> repetition
+      O.sopt' flag stack arg <$> repetition
 
     option :: L.TokenParser Argument
     option = longOption <|> shortOption

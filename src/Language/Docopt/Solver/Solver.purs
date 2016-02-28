@@ -93,7 +93,7 @@ solveBranch as ds = Branch <$> f as
                 else throwError $ DescriptionError $ ArgumentMismatchError {
                         option: {
                           flag: f
-                        , name: pure o.name
+                        , name: n
                         , arg:  o.arg
                         }
                       , description: {
@@ -147,14 +147,14 @@ solveBranch as ds = Branch <$> f as
                                 (o.repeatable)
             convert _ = Nothing
 
-        solveArgs o@(U.OptionStack f fs a r) y = do
+        solveArgs (U.OptionStack (UO.SOpt o)) y = do
 
           -- Figure out trailing flag, in order to couple it with an adjacent
           -- option where needed.
-          let fs' = toList fs
+          let fs' = toList o.stack
               x   = case last fs' of
-                      Just f' -> Tuple (f:(fromJust $ init fs')) f'
-                      Nothing -> Tuple Nil f
+                      Just f' -> Tuple (o.flag:(fromJust $ init fs')) f'
+                      Nothing -> Tuple Nil o.flag
               fs'' = fst x
               f''  = snd x
 
@@ -164,13 +164,13 @@ solveBranch as ds = Branch <$> f as
           case x of
             -- XXX: Non-exhaustive on purpose. How to improve?
             (Option f n a' _) ->
-              if (argMatches a a')
+              if (argMatches o.arg a')
                 then return unit
                 else throwError $ DescriptionError $ ArgumentMismatchError {
                         option: {
                           flag: f
                         , name: n
-                        , arg:  a
+                        , arg:  o.arg
                         }
                       , description: {
                           arg: a' <#> \(OptionArgument an _) -> an
@@ -211,18 +211,27 @@ solveBranch as ds = Branch <$> f as
             match :: Boolean -> Char -> Either SolveError Argument
             match isTrailing f = do
               return $ flip maybe' id
-                        (\_ -> Option (Just f) Nothing (toArg a) r)
+                        (\_ -> Option (Just f)
+                                      Nothing
+                                      (toArg o.arg)
+                                      o.repeatable)
                         (head $ catMaybes $ convert f isTrailing <$> ds)
 
             convert :: Char -> Boolean -> Desc -> Maybe Argument
             convert f isTrailing (Desc.OptionDesc (Desc.Option { name=Desc.Flag f', arg=a' }))
               | (f == f')
                 && (isTrailing || isNothing a')
-              = return $ Option (Just f) Nothing (resolveOptArg a a') r
+              = return $ Option (Just f)
+                                Nothing
+                                (resolveOptArg o.arg a')
+                                o.repeatable
             convert f isTrailing (Desc.OptionDesc (Desc.Option { name=Desc.Full f' n, arg=a' }))
               | (f == f')
                 && (isTrailing || isNothing a')
-              = return $ Option (Just f) (Just n) (resolveOptArg a a') r
+              = return $ Option (Just f)
+                                (Just n)
+                                (resolveOptArg o.arg a')
+                                o.repeatable
             convert _ _ _ = Nothing
 
         -- | Resolve an option's argument name against that given in the
