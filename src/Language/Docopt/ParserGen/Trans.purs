@@ -40,9 +40,10 @@ byName m
                                 ]
     toKeys (D.Group _ _ _)    = []
     toKeys (D.EOA)            = ["--"]
-    toKeys (D.Option f n _ _) = []
-                              ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) f
-                              ++ maybe [] (\s -> [ "--" ++ s ]) n
+    toKeys (D.Option (O.Option o))
+                              = []
+                              ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) o.flag
+                              ++ maybe [] (\s -> [ "--" ++ s ]) o.name
 
     -- XXX: How to resolve this?
     resolve :: D.Value -> D.Value -> D.Value
@@ -107,9 +108,11 @@ reduce (Tuple b vs) = mergeDefVals b $ toValMap vs
         resolve _ v = v
 
         toDefVal :: D.Argument -> Maybe D.Value
-        toDefVal (D.Option _ _ (Just (O.Argument _ (Just v))) r)
+        toDefVal (D.Option (O.Option o@{
+                  arg: Just (O.Argument _ (Just v))
+                }))
           = return $
-              if (D.isArrayValue v || not r)
+              if (D.isArrayValue v || not o.repeatable)
                 then v
                 else D.ArrayValue [v]
         toDefVal (D.Positional _ r)

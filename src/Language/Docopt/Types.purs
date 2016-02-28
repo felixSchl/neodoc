@@ -15,6 +15,7 @@ import qualified Data.String as Str
 
 import Language.Docopt.Value
 import Language.Docopt.Argument
+import qualified Language.Docopt.Option as O
 
 --------------------------------------------------------------------------------
 -- Errors (XXX: needs migration and improvement) -------------------------------
@@ -25,8 +26,8 @@ import qualified Text.Parsing.Parser as P
 data DescriptionError
   = ArgumentMismatchError {
       option :: {
-        flag :: Maybe Flag
-      , name :: Maybe Name
+        flag :: Maybe O.Flag
+      , name :: Maybe O.Name
       , arg  :: Maybe String
       }
     , description :: {

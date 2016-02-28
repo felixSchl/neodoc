@@ -26,7 +26,8 @@ import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.ParserGen (genParser, runParser)
-import qualified Test.Support.Docopt as D
+import qualified Language.Docopt.Argument as D
+import qualified Test.Support.Docopt      as D
 
 data Test = Test (Array Argument) (Array Case)
 data Case = Case (Array String) (Either String (Map Argument Value))

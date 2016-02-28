@@ -83,25 +83,24 @@ solveBranch as ds = Branch <$> f as
           -- matches? That would indicate ambigiutiy and needs to be treated,
           -- possibly with an error?
           let opt = flip maybe' id
-                      (\_ -> Option Nothing
-                                    (Just o.name)
-                                    (toArg o.arg)
-                                    (o.repeatable))
+                      (\_ -> lopt' o.name
+                                   (toArg o.arg)
+                                   (o.repeatable))
                       (head $ catMaybes $ convert <$> ds)
 
           case opt of
             -- XXX: Non-exhaustive on purpose. How to improve?
-            (Option f n a' _) ->
-              if (argMatches o.arg a')
+            (Option (O.Option o')) ->
+              if (argMatches o.arg o'.arg)
                 then return unit
                 else throwError $ DescriptionError $ ArgumentMismatchError {
                         option: {
-                          flag: f
-                        , name: n
+                          flag: o'.flag
+                        , name: o'.name
                         , arg:  o.arg
                         }
                       , description: {
-                          arg: a' <#> \(O.Argument an _) -> an
+                          arg: o'.arg <#> \(O.Argument an _) -> an
                         }
                       }
 
@@ -115,12 +114,12 @@ solveBranch as ds = Branch <$> f as
                   case y of
                     Just (U.Positional n r) ->
                       case opt of
-                        (Option _ _ (Just (O.Argument n' _)) _)
+                        (Option (O.Option { arg: Just (O.Argument n' _) }))
                           | n == n' -> Just r
                         _ -> Nothing
                     Just (U.Command n) ->
                       case opt of
-                        (Option _ _ (Just (O.Argument n' _)) _)
+                        (Option (O.Option { arg: Just (O.Argument n' _) }))
                           | n == n' -> Just false
                         _ -> Nothing
                     _ -> Nothing
@@ -130,8 +129,8 @@ solveBranch as ds = Branch <$> f as
             (\_ -> Unconsumed $ singleton opt)
             (\r -> case opt of
               -- XXX: non-exhaustive, because doesn't need to be...
-              (Option f n a _) -> do
-                Consumed $ singleton $ Option f n a r
+              (Option (O.Option o)) -> do
+                Consumed $ singleton $ Option (O.Option o { repeatable = r })
             )
             adjArg
 
@@ -139,16 +138,15 @@ solveBranch as ds = Branch <$> f as
             convert :: Desc -> Maybe Argument
             convert (Desc.OptionDesc (Desc.Option { name=Desc.Long n', arg=a' }))
               | Str.toUpper n' == Str.toUpper o.name
-              = return $ Option Nothing
-                                (Just o.name)
-                                (resolveOptArg o.arg a')
-                                (o.repeatable)
+              = return $ lopt' o.name
+                               (resolveOptArg o.arg a')
+                               (o.repeatable)
             convert (Desc.OptionDesc (Desc.Option { name=Desc.Full f n', arg=a' }))
               | Str.toUpper n' == Str.toUpper o.name
-              = return $ Option (Just f)
-                                (Just o.name)
-                                (resolveOptArg o.arg a')
-                                (o.repeatable)
+              = return $ opt' (Just f)
+                              (Just o.name)
+                              (resolveOptArg o.arg a')
+                              (o.repeatable)
             convert _ = Nothing
 
         solveArgs (U.OptionStack (UO.SOpt o)) y = do
@@ -167,17 +165,17 @@ solveBranch as ds = Branch <$> f as
 
           case x of
             -- XXX: Non-exhaustive on purpose. How to improve?
-            (Option f n a' _) ->
-              if (argMatches o.arg a')
+            (Option (O.Option o')) ->
+              if (argMatches o.arg o'.arg)
                 then return unit
                 else throwError $ DescriptionError $ ArgumentMismatchError {
                         option: {
-                          flag: f
-                        , name: n
+                          flag: o'.flag
+                        , name: o'.name
                         , arg:  o.arg
                         }
                       , description: {
-                          arg: a' <#> \(O.Argument an _) -> an
+                          arg: o'.arg <#> \(O.Argument an _) -> an
                         }
                       }
 
@@ -191,12 +189,12 @@ solveBranch as ds = Branch <$> f as
                   case y of
                     Just (U.Positional n r) ->
                       case x of
-                        (Option _ _ (Just (O.Argument n' _)) _)
+                        (Option (O.Option { arg: Just (O.Argument n' _) } ))
                           | Str.toUpper n == Str.toUpper n' -> Just r
                         _ -> Nothing
                     Just (U.Command n) ->
                       case x of
-                        (Option _ _ (Just (O.Argument n' _)) _)
+                        (Option (O.Option { arg: Just (O.Argument n' _) } ))
                           | Str.toUpper n == Str.toUpper n' -> Just false
                         _ -> Nothing
                     _ -> Nothing
@@ -206,8 +204,10 @@ solveBranch as ds = Branch <$> f as
             (\_ -> Unconsumed $ xs ++ singleton x)
             (\r -> case x of
               -- XXX: Non-exhaustive on purpose. How to improve?
-              (Option f n a' _) -> do
-                Consumed $ xs ++ (singleton $ Option f n a' r)
+              (Option (O.Option o')) -> do
+                Consumed $ xs ++ (singleton $ Option $ O.Option o' {
+                                                        repeatable = r
+                                                       })
             )
             adjArg
 
@@ -215,27 +215,25 @@ solveBranch as ds = Branch <$> f as
             match :: Boolean -> Char -> Either SolveError Argument
             match isTrailing f = do
               return $ flip maybe' id
-                        (\_ -> Option (Just f)
-                                      Nothing
-                                      (toArg o.arg)
-                                      o.repeatable)
+                        (\_ -> sopt' f
+                                     (toArg o.arg)
+                                     o.repeatable)
                         (head $ catMaybes $ convert f isTrailing <$> ds)
 
             convert :: Char -> Boolean -> Desc -> Maybe Argument
             convert f isTrailing (Desc.OptionDesc (Desc.Option { name=Desc.Flag f', arg=a' }))
               | (f == f')
                 && (isTrailing || isNothing a')
-              = return $ Option (Just f)
-                                Nothing
-                                (resolveOptArg o.arg a')
-                                o.repeatable
+              = return $ sopt' f
+                               (resolveOptArg o.arg a')
+                               o.repeatable
             convert f isTrailing (Desc.OptionDesc (Desc.Option { name=Desc.Full f' n, arg=a' }))
               | (f == f')
                 && (isTrailing || isNothing a')
-              = return $ Option (Just f)
-                                (Just n)
-                                (resolveOptArg o.arg a')
-                                o.repeatable
+              = return $ opt' (Just f)
+                              (Just n)
+                              (resolveOptArg o.arg a')
+                              o.repeatable
             convert _ _ _ = Nothing
 
         -- | Resolve an option's argument name against that given in the

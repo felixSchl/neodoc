@@ -7,11 +7,14 @@ module Language.Docopt.Value (
   ) where
 
 import Prelude
+import Data.Generic
 
 data Value
   = StringValue String
   | BoolValue   Boolean
   | ArrayValue  (Array Value)
+
+derive instance genericValue :: Generic Value
 
 instance showValue :: Show Value where
   show (StringValue s) = "StringValue " ++ s

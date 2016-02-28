@@ -96,7 +96,7 @@ positional n = token go P.<?> "positional argument " ++ show n
 type HasConsumedArg = Boolean
 data OptParse = OptParse D.Value (Maybe Token) HasConsumedArg
 
-longOption :: D.Name -> (Maybe O.Argument) -> Parser D.Value
+longOption :: O.Name -> (Maybe O.Argument) -> Parser D.Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
@@ -274,8 +274,7 @@ genBranchParser (D.Branch xs) = do
         draw _ _ = return empty
 
     -- Options always transition to the `Pending state`
-    step (Free p) x@(D.Option _ _ _ _)
-      = Right $ Pending p (singleton x)
+    step (Free p) x@(D.Option _) = Right $ Pending p (singleton x)
     step (Free p) x@(D.Group _ bs _) | isFree x
       = Right $ Pending p (singleton x)
 
@@ -286,8 +285,7 @@ genBranchParser (D.Branch xs) = do
       return $ a ++ as
 
     -- Options always keep accumulating
-    step (Pending p xs) x@(D.Option _ _ _ _) = Right $
-      Pending p (x:xs)
+    step (Pending p xs) x@(D.Option _) = Right $ Pending p (x:xs)
 
     -- Any non-options always leaves the pending state
     step (Pending p xs) y = Right $
@@ -319,14 +317,14 @@ genBranchParser (D.Branch xs) = do
       where go = Tuple x <$> (positional n)
 
     -- Generate a parser for a `Option` argument
-    genParser x@(D.Option f n a r) = (do
-      if r then (some go) else (singleton <$> go)
+    genParser x@(D.Option (O.Option o)) = (do
+      if o.repeatable then (some go) else (singleton <$> go)
       ) P.<?> "option: " ++ (show $ D.prettyPrintArg x)
       where
         go = do
           P.choice $ P.try <$> [
-            Tuple x <$> (mkLoptParser n a)
-          , Tuple x <$> (mkSoptParser f a)
+            Tuple x <$> (mkLoptParser o.name o.arg)
+          , Tuple x <$> (mkSoptParser o.flag o.arg)
           ]
 
         mkLoptParser (Just n) a = longOption n a
@@ -346,6 +344,6 @@ genBranchParser (D.Branch xs) = do
                     else return empty
 
     isFree :: D.Argument -> Boolean
-    isFree (D.Option _ _ _ _) = true
-    isFree (D.Group _ bs _)   = all (\(D.Branch b) -> all isFree b) bs
-    isFree _                  = false
+    isFree (D.Option _)     = true
+    isFree (D.Group _ bs _) = all (\(D.Branch b) -> all isFree b) bs
+    isFree _                = false

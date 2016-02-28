@@ -29,6 +29,8 @@ import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.Solver (solve)
 import Language.Docopt.Parser.Desc (Desc())
+import qualified Language.Docopt.Argument as D
+import qualified Test.Support.Docopt      as D
 import qualified Language.Docopt.Parser.Usage.Argument as U
 import qualified Language.Docopt.Parser.Usage          as U
 import qualified Language.Docopt.Parser.Desc           as Desc
