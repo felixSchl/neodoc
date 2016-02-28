@@ -2,8 +2,10 @@ module Test.Support.Docopt where
 
 import Prelude
 import Data.Maybe (Maybe(..))
-import Language.Docopt
 import Data.List (List(..), toList, length, fromList, singleton)
+import Language.Docopt.Value
+import Language.Docopt.Argument
+import qualified Language.Docopt.Option as O
 
 -- short hand to create a Command
 co :: String -> Argument
@@ -23,7 +25,7 @@ eoa = EOA
 -- short hand to create an Option argument
 opt' :: Flag
       -> Name
-      -> (Maybe OptionArgument)
+      -> (Maybe O.Argument)
       -> IsRepeatable
       -> Argument
 opt' f n = Option (Just f) (Just n)
@@ -40,19 +42,19 @@ optR_ f n = opt' f n Nothing true
 
 opt :: Flag
     -> Name
-    -> OptionArgument
+    -> O.Argument
     -> Argument
 opt f n a = opt' f n (Just a) false
 
 optR :: Flag
      -> Name
-     -> OptionArgument
+     -> O.Argument
      -> Argument
 optR f n a = opt' f n (Just a) true
 
 -- short hand to create an Short-Option argument
 sopt' :: Flag
-      -> (Maybe OptionArgument)
+      -> (Maybe O.Argument)
       -> IsRepeatable
       -> Argument
 sopt' f = Option (Just f) Nothing
@@ -66,18 +68,18 @@ soptR_ :: Flag
 soptR_ f = sopt' f Nothing true
 
 sopt :: Flag
-    -> OptionArgument
+    -> O.Argument
     -> Argument
 sopt f a = sopt' f (Just a) false
 
 soptR :: Flag
-     -> OptionArgument
+     -> O.Argument
      -> Argument
 soptR f a = sopt' f (Just a) true
 
 -- short hand to create an Long-Option argument
 lopt' :: Name
-      -> (Maybe OptionArgument)
+      -> (Maybe O.Argument)
       -> IsRepeatable
       -> Argument
 lopt' n = Option Nothing (Just n)
@@ -91,12 +93,12 @@ loptR_ :: Name
 loptR_ n = lopt' n Nothing true
 
 lopt :: Name
-    -> OptionArgument
+    -> O.Argument
     -> Argument
 lopt n a = lopt' n (Just a) false
 
 loptR :: Name
-     -> OptionArgument
+     -> O.Argument
      -> Argument
 loptR n a = lopt' n (Just a) true
 
@@ -116,11 +118,11 @@ grr = gr false
 br :: (Array Argument) -> Branch
 br xs = Branch (toList xs)
 
-oa :: String -> Value -> OptionArgument
-oa n v = OptionArgument n (Just v)
+oa :: String -> Value -> O.Argument
+oa n v = O.Argument n (Just v)
 
-oa_ :: String -> OptionArgument
-oa_ n = OptionArgument n Nothing
+oa_ :: String -> O.Argument
+oa_ n = O.Argument n Nothing
 
 -- short hand for values
 array = ArrayValue

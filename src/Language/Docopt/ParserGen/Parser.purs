@@ -33,14 +33,17 @@ import Data.Monoid (mempty)
 import Data.Map (Map(..))
 import qualified Data.Map as Map
 
-import qualified Text.Parsing.Parser as P
+import qualified Text.Parsing.Parser             as P
 import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Pos as P
-import qualified Text.Parsing.Parser.String as P
+import qualified Text.Parsing.Parser.Pos         as P
+import qualified Text.Parsing.Parser.String      as P
 
-import qualified Language.Docopt.Types as D
-import Language.Docopt.Types (takesArgument, isFlag, isBoolValue, isRepeatable
-                    , hasDefault)
+import qualified Language.Docopt.Types    as D
+import qualified Language.Docopt.Value    as D
+import qualified Language.Docopt.Argument as D
+import qualified Language.Docopt.Usage    as D
+import qualified Language.Docopt.Option   as O
+
 import Language.Docopt.Pretty
 import Language.Docopt.ParserGen.Types
 import Language.Docopt.ParserGen.Pretty
@@ -94,7 +97,7 @@ positional n = token go P.<?> "positional argument " ++ show n
 type HasConsumedArg = Boolean
 data OptParse = OptParse D.Value (Maybe Token) HasConsumedArg
 
-longOption :: D.Name -> (Maybe D.OptionArgument) -> Parser D.Value
+longOption :: D.Name -> (Maybe O.Argument) -> Parser D.Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
@@ -138,7 +141,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     go _ _ = Left "Invalid token"
 
-shortOption :: Char -> (Maybe D.OptionArgument) -> Parser D.Value
+shortOption :: Char -> (Maybe O.Argument) -> Parser D.Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons tok xs ->
@@ -156,7 +159,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   where
 
     takesArg = isJust a
-    def      = maybe Nothing (\(D.OptionArgument _ v) -> v) a
+    def      = maybe Nothing (\(O.Argument _ v) -> v) a
 
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
@@ -243,29 +246,29 @@ genBranchParser (D.Branch xs) = do
           -- a switch, an explicit argument *must* be provided.
           let ys = map (\(Tuple a _) -> a) $
                     filter
-                      (\(Tuple a v) -> (takesArgument a)
-                                    && (not $ isFlag a)
-                                    && (isBoolValue v))
+                      (\(Tuple a v) -> (D.takesArgument a)
+                                    && (not $ D.isFlag a)
+                                    && (D.isBoolValue v))
                       xs
           if (length ys > 0)
             then P.fail $ "Missing required arguments for "
-                        ++ intercalate ", " (prettyPrintArg <$> ys)
+                        ++ intercalate ", " (D.prettyPrintArg <$> ys)
             else return unit
 
-          xss <- if isRepeatable p
+          xss <- if D.isRepeatable p
                       then draw pss (length pss)
                       else draw (ps') (length ps')
           return $ xs ++ xss
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
         draw ps' n | (length ps' > 0) && (n < 0) = do
           let rest = filter
-                      (\p -> (not $ isRepeatable p)
-                          && (not $ hasDefault p))
+                      (\p -> (not $ D.isRepeatable p)
+                          && (not $ D.hasDefault p))
                       (reverse ps')
           if (length rest > 0)
             then P.fail $
               "Missing required options: "
-                ++ intercalate ", " (prettyPrintArg <$> rest)
+                ++ intercalate ", " (D.prettyPrintArg <$> rest)
             else return empty
         draw _ _ = return empty
 
@@ -300,7 +303,7 @@ genBranchParser (D.Branch xs) = do
     genParser x@(D.Command n) = (do
       singleton <<< Tuple x <$> do
         command n
-      ) P.<?> "command: " ++ (show $ prettyPrintArg x)
+      ) P.<?> "command: " ++ (show $ D.prettyPrintArg x)
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) = (do
@@ -311,13 +314,13 @@ genBranchParser (D.Branch xs) = do
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional n r) = (do
       if r then (some go) else (singleton <$> go)
-      ) P.<?> "positional argument: " ++ (show $ prettyPrintArg x)
+      ) P.<?> "positional argument: " ++ (show $ D.prettyPrintArg x)
       where go = Tuple x <$> (positional n)
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option f n a r) = (do
       if r then (some go) else (singleton <$> go)
-      ) P.<?> "option: " ++ (show $ prettyPrintArg x)
+      ) P.<?> "option: " ++ (show $ D.prettyPrintArg x)
       where
         go = do
           P.choice $ P.try <$> [

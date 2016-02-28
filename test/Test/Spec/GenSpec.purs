@@ -21,7 +21,10 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
 
-import Language.Docopt
+import Language.Docopt.Types
+import Language.Docopt.Argument
+import Language.Docopt.Value
+import Language.Docopt.Usage
 import Language.Docopt.ParserGen (genParser, runParser)
 import qualified Test.Support.Docopt as D
 

@@ -16,7 +16,10 @@ import Data.Foldable (foldl)
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 
-import qualified Language.Docopt.Types as D
+import qualified Language.Docopt.Value    as D
+import qualified Language.Docopt.Types    as D
+import qualified Language.Docopt.Argument as D
+import qualified Language.Docopt.Usage    as D
 import qualified Language.Docopt.ParserGen.Types  as G
 import qualified Language.Docopt.ParserGen.Pretty as G
 import qualified Language.Docopt.ParserGen.Parser as G

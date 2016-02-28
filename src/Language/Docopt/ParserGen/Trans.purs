@@ -13,7 +13,10 @@ import Data.String (fromChar)
 import qualified Data.Map as Map
 import qualified Data.String as Str
 import Data.Tuple (Tuple(..))
-import qualified Language.Docopt.Types as D
+import qualified Language.Docopt.Types    as D
+import qualified Language.Docopt.Value    as D
+import qualified Language.Docopt.Argument as D
+import qualified Language.Docopt.Option   as O
 import Data.List (List(..), toList, concat)
 import qualified Data.List as L
 import Language.Docopt.ParserGen.Types (ValueMapping())
@@ -104,7 +107,7 @@ reduce (Tuple b vs) = mergeDefVals b $ toValMap vs
         resolve _ v = v
 
         toDefVal :: D.Argument -> Maybe D.Value
-        toDefVal (D.Option _ _ (Just (D.OptionArgument _ (Just v))) r)
+        toDefVal (D.Option _ _ (Just (O.Argument _ (Just v))) r)
           = return $
               if (D.isArrayValue v || not r)
                 then v

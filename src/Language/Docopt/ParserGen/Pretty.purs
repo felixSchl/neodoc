@@ -4,9 +4,13 @@ import Prelude
 import Data.Maybe (maybe)
 import Data.Foldable (intercalate)
 import Data.String (fromCharArray)
-import Language.Docopt.ParserGen.Types
-import qualified Language.Docopt.Pretty as D
 import qualified Data.Array as A
+
+import Language.Docopt.ParserGen.Types
+
+import qualified Language.Docopt.Types    as D
+import qualified Language.Docopt.Value    as D
+import qualified Language.Docopt.Argument as D
 
 prettyPrintToken :: Token -> String
 prettyPrintToken (EOA xs) = "-- " ++ intercalate " " (D.prettyPrintValue <$> xs)

@@ -23,7 +23,10 @@ import qualified Test.Support.Usage as U
 import qualified Test.Support.Docopt as D
 import qualified Test.Support.Desc as Desc
 
-import Language.Docopt
+import Language.Docopt.Types
+import Language.Docopt.Argument
+import Language.Docopt.Value
+import Language.Docopt.Usage
 import Language.Docopt.Solver (solve)
 import Language.Docopt.Parser.Desc (Desc())
 import qualified Language.Docopt.Parser.Usage.Argument as U

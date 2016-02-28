@@ -28,7 +28,11 @@ import qualified Data.Array as A
 import qualified Data.String as Str
 
 import Language.Docopt.Types
+import Language.Docopt.Argument
+import Language.Docopt.Usage
 import Language.Docopt.Parser.Desc (Desc(..))
+import Language.Docopt.Value (Value(..))
+import qualified Language.Docopt.Option                as O
 import qualified Language.Docopt.Parser.Desc           as Desc
 import qualified Language.Docopt.Parser.Usage          as U
 import qualified Language.Docopt.Parser.Usage.Argument as U
@@ -97,7 +101,7 @@ solveBranch as ds = Branch <$> f as
                         , arg:  o.arg
                         }
                       , description: {
-                          arg: a' <#> \(OptionArgument an _) -> an
+                          arg: a' <#> \(O.Argument an _) -> an
                         }
                       }
 
@@ -111,12 +115,12 @@ solveBranch as ds = Branch <$> f as
                   case y of
                     Just (U.Positional n r) ->
                       case opt of
-                        (Option _ _ (Just (OptionArgument n' _)) _)
+                        (Option _ _ (Just (O.Argument n' _)) _)
                           | n == n' -> Just r
                         _ -> Nothing
                     Just (U.Command n) ->
                       case opt of
-                        (Option _ _ (Just (OptionArgument n' _)) _)
+                        (Option _ _ (Just (O.Argument n' _)) _)
                           | n == n' -> Just false
                         _ -> Nothing
                     _ -> Nothing
@@ -173,7 +177,7 @@ solveBranch as ds = Branch <$> f as
                         , arg:  o.arg
                         }
                       , description: {
-                          arg: a' <#> \(OptionArgument an _) -> an
+                          arg: a' <#> \(O.Argument an _) -> an
                         }
                       }
 
@@ -187,12 +191,12 @@ solveBranch as ds = Branch <$> f as
                   case y of
                     Just (U.Positional n r) ->
                       case x of
-                        (Option _ _ (Just (OptionArgument n' _)) _)
+                        (Option _ _ (Just (O.Argument n' _)) _)
                           | Str.toUpper n == Str.toUpper n' -> Just r
                         _ -> Nothing
                     Just (U.Command n) ->
                       case x of
-                        (Option _ _ (Just (OptionArgument n' _)) _)
+                        (Option _ _ (Just (O.Argument n' _)) _)
                           | Str.toUpper n == Str.toUpper n' -> Just false
                         _ -> Nothing
                     _ -> Nothing
@@ -238,32 +242,32 @@ solveBranch as ds = Branch <$> f as
         -- | description, returning the most complete argument known.
         resolveOptArg :: Maybe String
                       -> Maybe Desc.Argument
-                      -> Maybe OptionArgument
-        resolveOptArg (Just n) Nothing = return $ OptionArgument n Nothing
+                      -> Maybe O.Argument
+        resolveOptArg (Just n) Nothing = return $ O.Argument n Nothing
         resolveOptArg Nothing (Just (Desc.Argument a))
           = do
           -- XXX: The conversion to `StringValue` should not be needed,
           -- `Desc.Argument` should be of type `Maybe Value`.
-          return $ OptionArgument a.name (StringValue <$> a.default)
+          return $ O.Argument a.name (StringValue <$> a.default)
         resolveOptArg (Just an) (Just (Desc.Argument a))
           = do
           -- XXX: Do we need to guard that `an == a.name` here?
           -- XXX: The conversion to `StringValue` should not be needed,
           -- `Desc.Argument` should be of type `Maybe Value`.
-          return $ OptionArgument a.name (StringValue <$> a.default)
+          return $ O.Argument a.name (StringValue <$> a.default)
         resolveOptArg _ _ = Nothing
 
-        toArg:: Maybe String -> Maybe OptionArgument
-        toArg a = a >>= \an -> return $ OptionArgument an Nothing
+        toArg:: Maybe String -> Maybe O.Argument
+        toArg a = a >>= \an -> return $ O.Argument an Nothing
 
         argMatches :: Maybe String
-                   -> Maybe OptionArgument
+                   -> Maybe O.Argument
                    -> Boolean
         argMatches a a'
           =  (isNothing a)
           || (isNothing a && isNothing a')
           || (maybe false id do
-              a' >>= \(OptionArgument an' _) -> do
+              a' >>= \(O.Argument an' _) -> do
                 an <- a
                 return (Str.toUpper an == Str.toUpper an')
             )
