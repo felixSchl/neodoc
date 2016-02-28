@@ -8,7 +8,7 @@ import Data.Tuple (Tuple(..))
 import qualified Data.Array as A
 import qualified Text.Parsing.Parser as P
 
-import qualified Language.Docopt.Types    as D
+import qualified Language.Docopt.Errors   as D
 import qualified Language.Docopt.Value    as D
 import qualified Language.Docopt.Argument as D
 

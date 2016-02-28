@@ -30,7 +30,7 @@ import qualified Data.Array.Unsafe as AU
 import Data.Array (uncons)
 import Data.Tuple (Tuple(..))
 import Data.Monoid (mempty)
-import Data.Map (Map(..))
+import Data.Map (Map())
 import qualified Data.Map as Map
 
 import qualified Text.Parsing.Parser             as P
@@ -38,13 +38,12 @@ import qualified Text.Parsing.Parser.Combinators as P
 import qualified Text.Parsing.Parser.Pos         as P
 import qualified Text.Parsing.Parser.String      as P
 
-import qualified Language.Docopt.Types    as D
+import qualified Language.Docopt.Errors   as D
 import qualified Language.Docopt.Value    as D
 import qualified Language.Docopt.Argument as D
 import qualified Language.Docopt.Usage    as D
 import qualified Language.Docopt.Option   as O
 
-import Language.Docopt.Pretty
 import Language.Docopt.ParserGen.Types
 import Language.Docopt.ParserGen.Pretty
 import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)

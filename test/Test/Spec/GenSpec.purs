@@ -21,7 +21,7 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
 
-import Language.Docopt.Types
+import Language.Docopt.Errors
 import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage

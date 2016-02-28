@@ -15,7 +15,7 @@ import Data.Foldable (for_, intercalate)
 import Control.Monad.Eff.Exception (error, throwException)
 import qualified Text.Parsing.Parser as P
 
-import Language.Docopt.Types
+import Language.Docopt.Errors
 import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.ParserGen (genParser, runParser)

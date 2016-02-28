@@ -27,7 +27,7 @@ import Control.Monad.Error.Class (throwError)
 import qualified Data.Array as A
 import qualified Data.String as Str
 
-import Language.Docopt.Types
+import Language.Docopt.Errors
 import Language.Docopt.Argument
 import Language.Docopt.Usage
 import Language.Docopt.Parser.Desc (Desc(..))

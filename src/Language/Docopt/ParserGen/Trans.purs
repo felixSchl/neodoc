@@ -13,7 +13,7 @@ import Data.String (fromChar)
 import qualified Data.Map as Map
 import qualified Data.String as Str
 import Data.Tuple (Tuple(..))
-import qualified Language.Docopt.Types    as D
+import qualified Language.Docopt.Errors   as D
 import qualified Language.Docopt.Value    as D
 import qualified Language.Docopt.Argument as D
 import qualified Language.Docopt.Option   as O

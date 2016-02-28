@@ -8,7 +8,7 @@ import qualified Data.Array as A
 
 import Language.Docopt.ParserGen.Types
 
-import qualified Language.Docopt.Types    as D
+import qualified Language.Docopt.Errors   as D
 import qualified Language.Docopt.Value    as D
 import qualified Language.Docopt.Argument as D
 

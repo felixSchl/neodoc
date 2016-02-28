@@ -1,4 +1,4 @@
-module Language.Docopt.Types where
+module Language.Docopt.Errors where
 
 import Prelude
 import Debug.Trace

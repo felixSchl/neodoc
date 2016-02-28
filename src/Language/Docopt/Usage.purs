@@ -28,5 +28,3 @@ instance monoidUsage :: Monoid Usage where
 prettyPrintUsage :: Usage -> String
 prettyPrintUsage (Usage xs)
   = intercalate " | " (prettyPrintBranch <$> xs)
-
-

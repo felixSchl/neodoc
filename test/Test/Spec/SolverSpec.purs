@@ -23,7 +23,7 @@ import qualified Test.Support.Usage as U
 import qualified Test.Support.Docopt as D
 import qualified Test.Support.Desc as Desc
 
-import Language.Docopt.Types
+import Language.Docopt.Errors
 import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage

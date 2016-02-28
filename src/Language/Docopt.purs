@@ -19,9 +19,8 @@ import Data.Traversable (traverse)
 import qualified Text.Parsing.Parser as P
 import Text.Wrap (dedent)
 
-import qualified Language.Docopt.Types           as D
+import qualified Language.Docopt.Errors          as D
 import qualified Language.Docopt.Value           as D
-import qualified Language.Docopt.Pretty          as D
 import qualified Language.Docopt.ParserGen       as G
 import qualified Language.Docopt.ParserGen.Trans as T
 
