@@ -136,12 +136,18 @@ solveBranch as ds = Branch <$> f as
 
           where
             convert :: Desc -> Maybe Argument
-            convert (Desc.OptionDesc (Desc.Option { name=Desc.Long n', arg=a' }))
+            convert (Desc.OptionDesc (Desc.Option {
+                      name=Desc.Long n'
+                    , arg=a'
+                    }))
               | Str.toUpper n' == Str.toUpper o.name
               = return $ lopt' o.name
                                (resolveOptArg o.arg a')
                                (o.repeatable)
-            convert (Desc.OptionDesc (Desc.Option { name=Desc.Full f n', arg=a' }))
+            convert (Desc.OptionDesc (Desc.Option {
+                      name=Desc.Full f n'
+                    , arg=a'
+                    }))
               | Str.toUpper n' == Str.toUpper o.name
               = return $ opt' (Just f)
                               (Just o.name)
@@ -221,13 +227,19 @@ solveBranch as ds = Branch <$> f as
                         (head $ catMaybes $ convert f isTrailing <$> ds)
 
             convert :: Char -> Boolean -> Desc -> Maybe Argument
-            convert f isTrailing (Desc.OptionDesc (Desc.Option { name=Desc.Flag f', arg=a' }))
+            convert f isTrailing (Desc.OptionDesc (Desc.Option {
+                                  name=Desc.Flag f'
+                                , arg=a'
+                                }))
               | (f == f')
                 && (isTrailing || isNothing a')
               = return $ sopt' f
                                (resolveOptArg o.arg a')
                                o.repeatable
-            convert f isTrailing (Desc.OptionDesc (Desc.Option { name=Desc.Full f' n, arg=a' }))
+            convert f isTrailing (Desc.OptionDesc (Desc.Option {
+                                  name=Desc.Full f' n
+                                , arg=a'
+                                }))
               | (f == f')
                 && (isTrailing || isNothing a')
               = return $ opt' (Just f)
