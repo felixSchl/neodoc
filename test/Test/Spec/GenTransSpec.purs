@@ -46,8 +46,8 @@ genTransSpec = \_ ->
           [ opt  'i' "input" (oa "BAR" $ str "Foo") :> str "qux"
           , optR 'i' "input" (oa_ "BAR")            :> str "xuq" ]
             `shouldBecome`
-              [ "i"     :> str "xuq"
-              , "input" :> str "xuq"
+              [ "-i"     :> str "xuq"
+              , "--input" :> str "xuq"
               ]
         ]
 
