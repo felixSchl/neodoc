@@ -19,7 +19,7 @@ import qualified Language.Docopt.Argument as D
 import qualified Language.Docopt.Option   as O
 import Data.List (List(..), toList, concat)
 import qualified Data.List as L
-import Language.Docopt.ParserGen.Types (ValueMapping())
+import Language.Docopt.ParserGen.ValueMapping
 
 -- Transform the map of (Argument, Value) mappings to a map of (String, Value),
 -- where the String is the name of the option and it's aliases.

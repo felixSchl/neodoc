@@ -1,6 +1,5 @@
 module Language.Docopt.ParserGen (
-    module Language.Docopt.ParserGen.Types
-  , module Language.Docopt.ParserGen.Pretty
+    module Language.Docopt.ParserGen.Token
   , genParser
   , runParser
   ) where
@@ -20,11 +19,11 @@ import qualified Language.Docopt.Value    as D
 import qualified Language.Docopt.Errors   as D
 import qualified Language.Docopt.Argument as D
 import qualified Language.Docopt.Usage    as D
-import qualified Language.Docopt.ParserGen.Types  as G
-import qualified Language.Docopt.ParserGen.Pretty as G
-import qualified Language.Docopt.ParserGen.Parser as G
-import qualified Language.Docopt.ParserGen.Trans  as G
-import qualified Language.Docopt.ParserGen.Lexer  as G
+import qualified Language.Docopt.ParserGen.Token        as G
+import qualified Language.Docopt.ParserGen.Parser       as G
+import qualified Language.Docopt.ParserGen.Trans        as G
+import qualified Language.Docopt.ParserGen.Lexer        as G
+import qualified Language.Docopt.ParserGen.ValueMapping as G
 
 genParser :: D.Program
           -> G.Parser (Tuple D.Branch (List G.ValueMapping))

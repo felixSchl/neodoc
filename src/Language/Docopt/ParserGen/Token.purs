@@ -1,10 +1,15 @@
-module Language.Docopt.ParserGen.Types where
+module Language.Docopt.ParserGen.Token (
+    Token (..)
+  , prettyPrintToken
+  ) where
 
 import Prelude
 import Data.Maybe (Maybe(..), maybe)
+import Data.Foldable (intercalate)
+import qualified Data.Array as A
 import Data.List (List(..))
 import Data.String (fromCharArray)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple())
 import qualified Data.Array as A
 import qualified Text.Parsing.Parser as P
 
@@ -25,4 +30,10 @@ instance showToken :: Show Token where
   show (Lit  s)      = "Lit "  ++ show s
   show (EOA  xs)     = "EOA "  ++ show xs
 
-type ValueMapping = Tuple D.Argument D.Value
+prettyPrintToken :: Token -> String
+prettyPrintToken (EOA xs) = "-- " ++ intercalate " " (D.prettyPrintValue <$> xs)
+prettyPrintToken (Lit s) = show s
+prettyPrintToken (LOpt n a) = "--" ++ n ++ arg
+  where arg = maybe "" ("=" ++) a
+prettyPrintToken (SOpt n s a) = "-"  ++ (fromCharArray (A.cons n s)) ++ arg
+  where arg = maybe "" ("=" ++) a

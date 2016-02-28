@@ -44,8 +44,8 @@ import qualified Language.Docopt.Argument as D
 import qualified Language.Docopt.Usage    as D
 import qualified Language.Docopt.Option   as O
 
-import Language.Docopt.ParserGen.Types
-import Language.Docopt.ParserGen.Pretty
+import Language.Docopt.ParserGen.Token
+import Language.Docopt.ParserGen.ValueMapping
 import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
 type Parser a = P.Parser (List Token) a
