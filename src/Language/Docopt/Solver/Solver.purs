@@ -31,6 +31,7 @@ import Language.Docopt.Types
 import Language.Docopt.Parser.Desc (Desc(..))
 import qualified Language.Docopt.Parser.Desc  as Desc
 import qualified Language.Docopt.Parser.Usage as U
+import qualified Language.Docopt.Parser.Usage.Argument as U
 
 data Result = Consumed (List Argument) | Unconsumed (List Argument)
 
@@ -240,7 +241,8 @@ solveBranch as ds = Branch <$> f as
                    -> Maybe OptionArgument
                    -> Boolean
         argMatches a a'
-          =  (isNothing a && isNothing a')
+          =  (isNothing a)
+          || (isNothing a && isNothing a')
           || (maybe false id do
               a' >>= \(OptionArgument an' _) -> do
                 an <- a

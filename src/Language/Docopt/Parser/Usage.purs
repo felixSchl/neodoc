@@ -28,11 +28,7 @@ import Language.Docopt.Parser.Base
 import Language.Docopt.Parser.Common
 import Language.Docopt.Parser.Lexer
 import Language.Docopt.Parser.State
-
-type OptionArgument = String
-type IsOptional     = Boolean
-type IsRepeatable   = Boolean
-type Branch         = List Argument
+import Language.Docopt.Parser.Usage.Argument
 
 -- | Represent a single program usage.
 -- | A single usage is made up of a list of mutually exclusive groups,
@@ -46,44 +42,12 @@ type Branch         = List Argument
 -- |    \ /       |      |
 -- | [   0    ,   1   ,  2 ]
 data Usage = Usage String (List Branch)
-data Argument
-  = Command     String
-  | Positional  String
-                IsRepeatable
-  | Option      String
-                (Maybe OptionArgument)
-                IsRepeatable
-  | OptionStack Char
-                (Array Char)
-                (Maybe OptionArgument)
-                IsRepeatable
-  | Group       IsOptional
-                (List Branch)
-                IsRepeatable
-  | EOA
 
 instance showUsage :: Show Usage where
   show (Usage n xs) = "Usage " ++ show n ++ " " ++ show xs
 
-instance showArgument :: Show Argument where
-  show (EOA)                 = "--"
-  show (Command n)           = "Command " ++ n
-  show (Positional n b)      = "Positional " ++ n ++ " " ++ show b
-  show (Option n a b)        = "Option " ++ show n ++ " " ++ show a ++ " " ++ show b
-  show (OptionStack n s a b) = "OptionStack " ++ show n ++ " " ++ show s ++ " " ++ show a ++ " " ++ show b
-  show (Group n b o)         = "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
-
 instance eqUsage :: Eq Usage where
   eq (Usage n xs) (Usage n' xs') = (n == n') && (xs == xs')
-
-instance eqArgument :: Eq Argument where
-  eq (EOA)                  (EOA)                      = true
-  eq (Command s)            (Command s')               = (s == s')
-  eq (Positional s r)       (Positional s' r')         = (s == s') && (r == r')
-  eq (Option s a r)         (Option s' a' r')          = (s == s') && (a == a') && (r == r')
-  eq (Group b xs r)         (Group b' xs' r')          = (b == b') && (xs == xs') && (r == r')
-  eq (OptionStack c cs a r) (OptionStack c' cs' a' r') = (c == c') && (cs == cs') && (a == a') && (r == r')
-  eq _                      _                          = false
 
 prettyPrintUsage :: Usage -> String
 prettyPrintUsage (Usage name bs) =

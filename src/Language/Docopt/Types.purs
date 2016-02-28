@@ -78,7 +78,7 @@ instance eqArgument :: Eq Argument where
   eq (Group o bs r) (Group o' bs' r') = (o == o') && (bs == bs') && (r == r')
   eq (Option f  n  (Just (OptionArgument a  _)) r)
      (Option f' n' (Just (OptionArgument a' _)) r')
-      = (f == f') && (n == n') && (a == a') && (r == r')
+      = (f == f') && (n == n') && (Str.toUpper a == Str.toUpper a') && (r == r')
   eq (Option f  n  Nothing r)
      (Option f' n' Nothing r')
       = (f == f') && (n == n') && (r == r')
@@ -88,7 +88,8 @@ instance showOptionArgument :: Show OptionArgument where
   show (OptionArgument n a) = (show n) ++ " " ++ (show a)
 
 instance eqOptionArgument :: Eq OptionArgument where
-  eq (OptionArgument n a) (OptionArgument n' a') = (n == n') && (a == a')
+  eq (OptionArgument n a) (OptionArgument n' a')
+    = (Str.toUpper n == Str.toUpper n') && (a == a')
 
 instance showValue :: Show Value where
   show (StringValue s) = "StringValue " ++ s

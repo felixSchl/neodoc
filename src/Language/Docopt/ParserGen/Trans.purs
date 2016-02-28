@@ -32,10 +32,9 @@ byName m
 
     toKeys :: D.Argument -> Array String
     toKeys (D.Command n)      = [n]
-    toKeys (D.Positional n _) = [n]
-    -- [ "<" ++ Str.toLower n ++ ">"
-    --                             , Str.toUpper n
-    --                             ]
+    toKeys (D.Positional n _) = [ "<" ++ Str.toLower n ++ ">"
+                                , Str.toUpper n
+                                ]
     toKeys (D.Group _ _ _)    = []
     toKeys (D.EOA)            = ["--"]
     toKeys (D.Option f n _ _) = []
@@ -47,7 +46,20 @@ byName m
     resolve v v' = v'
 
 -- Reduce the list of (Argument, Value) mappings down to a Set.
--- This means that duplicate Arguments must be somehow resolved.
+-- This means that duplicate Arguments must somehow be resolved.
+--
+-- XXX: `toValMap` needs to be extended to merge 'similar' keys.
+-- Consider, for example, two options that are talking about the same
+-- flag and name combination, then how to solve the following issues:
+--
+--  * Two options differ in:
+--      * Their argument name           -> ?
+--      * Their argument default value  -> ?
+--      * Their ability to repeat       -> repeat if any option does
+--      * Their names:
+--          * (f, foo) vs. (b, foo)
+--          * (f, foo) vs. (f, baz)
+--
 reduce :: Tuple D.Branch (List ValueMapping) -> Map D.Argument D.Value
 reduce (Tuple b vs) = mergeDefVals b $ toValMap vs
   where
@@ -70,7 +82,7 @@ reduce (Tuple b vs) = mergeDefVals b $ toValMap vs
 
         resolve :: D.Argument -> D.Value -> D.Value -> D.Value
         resolve _ (D.ArrayValue xs) (D.ArrayValue xs') = D.ArrayValue (xs' ++ xs)
-        resolve a (D.ArrayValue xs) v = D.ArrayValue (v A.: xs)
+        resolve _ (D.ArrayValue xs) v = D.ArrayValue (v A.: xs)
         resolve a v v' | D.isRepeatable a
           = D.ArrayValue $
               (case v' of

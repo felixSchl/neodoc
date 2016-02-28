@@ -117,12 +117,11 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- The name is an exact match
     go (LOpt n' v) atok | takesArg && (n' == n)
       = case v of
-          Just val -> return $ OptParse (D.StringValue val) Nothing false
+          Just s ->
+            return $ OptParse (D.StringValue s) Nothing false
           _  -> return case atok of
-            Just (Lit s) -> OptParse (D.StringValue s) Nothing true
-            _            ->
-              -- return `true` as argument, let caller check
-              OptParse (D.BoolValue true) Nothing false
+            Just (Lit s) -> OptParse (D.StringValue s)  Nothing true
+            _            -> OptParse (D.BoolValue true) Nothing false
 
     -- case 2:
     -- The name is an exact match and takes no argument
