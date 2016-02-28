@@ -70,12 +70,6 @@ prettyPrintUsage (Usage name bs) =
           ++ if r then "..." else ""
       prettyPrintArg (EOA) = "--"
 
-run :: String -> Either P.ParseError (List Usage)
-run x = parse =<< L.lex x
-
-parse :: (List L.PositionedToken) -> Either P.ParseError (List Usage)
-parse = flip L.runTokenParser usageParser
-
 -- | L.TokenParser to parse the usage section
 -- |
 -- | This parser is tricky because it has to solve the following problems:
@@ -187,3 +181,9 @@ usageParser = do
 
     program :: L.TokenParser String
     program = (L.name <|> L.word) P.<?> "Program Name"
+
+parse :: (List L.PositionedToken) -> Either P.ParseError (List Usage)
+parse = flip L.runTokenParser usageParser
+
+run :: String -> Either P.ParseError (List Usage)
+run x = parse =<< L.lex x
