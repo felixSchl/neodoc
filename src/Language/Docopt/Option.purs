@@ -42,11 +42,10 @@ derive instance genericOption :: Generic Option
 derive instance genericArgument :: Generic Argument
 
 instance showArgument :: Show Argument where
-  show (Argument n a) = (show n) ++ " " ++ (show a)
+  show = gShow
 
 instance eqArgument :: Eq Argument where
-  eq (Argument n a) (Argument n' a')
-    = (Str.toUpper n == Str.toUpper n') && (a == a')
+  eq = gEq
 
 instance showOption :: Show Option where
   show = gShow

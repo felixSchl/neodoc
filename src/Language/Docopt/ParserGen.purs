@@ -9,7 +9,7 @@ import Data.List (List(..))
 import Data.Either (Either(..))
 import Data.Map (Map())
 import qualified Data.Map as Map
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import qualified Text.Parsing.Parser as P
 import Data.Foldable (foldl)
 import Control.Alt ((<|>))
@@ -35,5 +35,5 @@ runParser :: List String
 runParser xs p = do
   toks <- G.lex xs
   vals <- P.runParser toks p
-  return $ G.reduce vals
+  return $ G.reduce (fst vals) (snd vals)
 
