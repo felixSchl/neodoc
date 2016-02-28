@@ -29,9 +29,10 @@ import qualified Data.String as Str
 
 import Language.Docopt.Types
 import Language.Docopt.Parser.Desc (Desc(..))
-import qualified Language.Docopt.Parser.Desc  as Desc
-import qualified Language.Docopt.Parser.Usage as U
+import qualified Language.Docopt.Parser.Desc           as Desc
+import qualified Language.Docopt.Parser.Usage          as U
 import qualified Language.Docopt.Parser.Usage.Argument as U
+import qualified Language.Docopt.Parser.Usage.Option   as UO
 
 data Result = Consumed (List Argument) | Unconsumed (List Argument)
 
@@ -72,25 +73,28 @@ solveBranch as ds = Branch <$> f as
             flip (Group o) r <$> do
               flip solveBranch ds `traverse` bs
 
-        solveArgs o@(U.Option n a r) y = do
+        solveArgs (U.Option (UO.LOpt o)) y = do
 
           -- XXX: Is `head` the right thing to do here? What if there are more
           -- matches? That would indicate ambigiutiy and needs to be treated,
           -- possibly with an error?
           let opt = flip maybe' id
-                      (\_ -> Option Nothing (Just n) (toArg a) r)
+                      (\_ -> Option Nothing
+                                    (Just o.name)
+                                    (toArg o.arg)
+                                    (o.repeatable))
                       (head $ catMaybes $ convert <$> ds)
 
           case opt of
             -- XXX: Non-exhaustive on purpose. How to improve?
             (Option f n a' _) ->
-              if (argMatches a a')
+              if (argMatches o.arg a')
                 then return unit
                 else throwError $ DescriptionError $ ArgumentMismatchError {
                         option: {
                           flag: f
-                        , name: n
-                        , arg:  a
+                        , name: pure o.name
+                        , arg:  o.arg
                         }
                       , description: {
                           arg: a' <#> \(OptionArgument an _) -> an
@@ -101,7 +105,7 @@ solveBranch as ds = Branch <$> f as
           -- Return either `Nothing` to signify that nothing should be consumed
           -- or a value signifieng that it should be consumed, and the
           -- `isRepeated` should be inherited.
-          let adjArg = if r
+          let adjArg = if o.repeatable
                 then Nothing
                 else
                   case y of
@@ -130,11 +134,17 @@ solveBranch as ds = Branch <$> f as
           where
             convert :: Desc -> Maybe Argument
             convert (Desc.OptionDesc (Desc.Option { name=Desc.Long n', arg=a' }))
-              | Str.toUpper n' == Str.toUpper n
-              = return $ Option Nothing (Just n) (resolveOptArg a a') r
+              | Str.toUpper n' == Str.toUpper o.name
+              = return $ Option Nothing
+                                (Just o.name)
+                                (resolveOptArg o.arg a')
+                                (o.repeatable)
             convert (Desc.OptionDesc (Desc.Option { name=Desc.Full f n', arg=a' }))
-              | Str.toUpper n' == Str.toUpper n
-              = return $ Option (Just f) (Just n) (resolveOptArg a a') r
+              | Str.toUpper n' == Str.toUpper o.name
+              = return $ Option (Just f)
+                                (Just o.name)
+                                (resolveOptArg o.arg a')
+                                (o.repeatable)
             convert _ = Nothing
 
         solveArgs o@(U.OptionStack f fs a r) y = do

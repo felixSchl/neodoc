@@ -25,8 +25,10 @@ import qualified Test.Support.Desc as Desc
 
 import Language.Docopt
 import Language.Docopt.Solver (solve)
-import qualified Language.Docopt.Parser.Usage as U
-import qualified Language.Docopt.Parser.Desc as D
+import Language.Docopt.Parser.Desc (Desc())
+import qualified Language.Docopt.Parser.Usage.Argument as U
+import qualified Language.Docopt.Parser.Usage          as U
+import qualified Language.Docopt.Parser.Desc           as Desc
 import Language.Docopt.Scanner (scan)
 import Language.Docopt.Parser.Lexer (lex)
 import Text.Wrap (dedent)
@@ -34,16 +36,16 @@ import Text.Wrap (dedent)
 newtype TestSuite = TestSuite { usages :: Array U.Usage
                               , cases  :: Array TestCase
                               }
-newtype TestCase = TestCase { descs    :: Array D.Desc
+newtype TestCase = TestCase { descs    :: Array Desc
                             , expected :: Either String (Array Usage) }
 
 test :: Array U.Usage -> Array TestCase -> TestSuite
 test us cs = TestSuite { usages: us, cases: cs }
 
-pass :: Array D.Desc -> Array Usage -> TestCase
+pass :: Array Desc -> Array Usage -> TestCase
 pass ds as = TestCase { descs: ds, expected: Right as }
 
-fail :: Array D.Desc -> String -> TestCase
+fail :: Array Desc -> String -> TestCase
 fail ds msg = TestCase { descs: ds, expected: Left msg }
 
 out :: Array (Array Argument) -> Usage
@@ -191,7 +193,7 @@ solverSpec = \_ ->
           \j (TestCase { descs, expected }) -> do
             describe
               ("\nOptions:\n" ++ intercalate "\n" (("  " ++) <$>
-                (D.prettyPrintDesc <$> descs))) do
+                (Desc.prettyPrintDesc <$> descs))) do
               it (
                 either
                   (\msg -> "Should fail with:\n" ++ msg)

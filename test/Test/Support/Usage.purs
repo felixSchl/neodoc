@@ -21,32 +21,6 @@ usage n xss = U.Usage n $ toList $ toList <$> xss
 co :: String -> U.Argument
 co = U.Command
 
--- short hand to create a short option node
-sopt :: Char -> Array Char -> String -> U.Argument
-sopt f fs a = U.OptionStack f fs (pure a) false
-
-sopt_ :: Char -> Array Char -> U.Argument
-sopt_ f fs = U.OptionStack f fs Nothing false
-
-soptR :: Char -> Array Char -> String -> U.Argument
-soptR f fs a = U.OptionStack f fs (pure a) true
-
-soptR_ :: Char -> Array Char -> U.Argument
-soptR_ f fs = U.OptionStack f fs Nothing true
-
--- short hand to create a long option node
-lopt :: String -> String -> U.Argument
-lopt n a = U.Option n (pure a) false
-
-lopt_ :: String -> U.Argument
-lopt_ n = U.Option n Nothing false
-
-loptR :: String -> String -> U.Argument
-loptR n a = U.Option n (pure a) true
-
-loptR_ :: String -> U.Argument
-loptR_ n = U.Option n Nothing true
-
 -- short hand to create a positional node
 po :: String -> U.Argument
 po n = U.Positional n false

@@ -26,9 +26,10 @@ import Control.Bind ((=<<))
 
 import Language.Docopt.Parser.Base
 import Language.Docopt.Parser.Common
-import Language.Docopt.Parser.Lexer
 import Language.Docopt.Parser.State
 import Language.Docopt.Parser.Usage.Argument
+import qualified Language.Docopt.Parser.Lexer as L
+import qualified Language.Docopt.Parser.Usage.Option as O
 
 -- | Represent a single program usage.
 -- | A single usage is made up of a list of mutually exclusive groups,
@@ -60,10 +61,7 @@ prettyPrintUsage (Usage name bs) =
       prettyPrintArg (Command n) = n
       prettyPrintArg (Positional n r)
         = n ++ if r then "..." else ""
-      prettyPrintArg (Option n a r)
-        = "--" ++ n
-          ++ (maybe "" ("="++) a)
-          ++ if r then "..." else ""
+      prettyPrintArg (Option o) = O.prettyPrintLOpt o
       prettyPrintArg (OptionStack f fs a r)
         = "-" ++ (fromChar f)
           ++ (intercalate "" $ fromChar <$> toList fs)
@@ -77,12 +75,12 @@ prettyPrintUsage (Usage name bs) =
       prettyPrintArg (EOA) = "--"
 
 run :: String -> Either P.ParseError (List Usage)
-run x = parse =<< lex x
+run x = parse =<< L.lex x
 
-parse :: (List PositionedToken) -> Either P.ParseError (List Usage)
-parse = flip runTokenParser usageParser
+parse :: (List L.PositionedToken) -> Either P.ParseError (List Usage)
+parse = flip L.runTokenParser usageParser
 
--- | TokenParser to parse the usage section
+-- | L.TokenParser to parse the usage section
 -- |
 -- | This parser is tricky because it has to solve the following problems:
 -- |    * What is the program name?
@@ -98,7 +96,7 @@ parse = flip runTokenParser usageParser
 -- |      are IGNORED.
 -- |    * A token at the identation mark starts a new usage pattern parse.
 -- |
-usageParser :: TokenParser (List Usage)
+usageParser :: L.TokenParser (List Usage)
 usageParser = do
 
   -- Calculate and mark the original program indentation.
@@ -112,15 +110,15 @@ usageParser = do
 
   where
 
-    usageLine :: String -> TokenParser Usage
+    usageLine :: String -> L.TokenParser Usage
     usageLine name = Usage name <$> do
-      xs  <- (many $ moreIndented *> elem) `P.sepBy1` vbar
+      xs  <- (many $ moreIndented *> elem) `P.sepBy1` L.vbar
       eoa <- P.choice [
         P.try $ do
-          moreIndented *> doubleDash
+          moreIndented *> L.doubleDash
           return $ Just EOA
       , do
-          eof <|> (P.lookAhead $ lessIndented)
+          L.eof <|> (P.lookAhead $ lessIndented)
           return Nothing
       ]
 
@@ -132,7 +130,7 @@ usageParser = do
           (\as -> as ++ (singleton e))
           xs
 
-    elem :: TokenParser Argument
+    elem :: L.TokenParser Argument
     elem = defer \_ -> do
       P.choice
         [ option
@@ -141,57 +139,55 @@ usageParser = do
         , group
         ] P.<?> "Option, Positional, Command or Group"
 
-    longOption :: TokenParser Argument
-    longOption = do
-      { name: name, arg: arg } <- lopt
-      Option name arg
-        <$> repetition
+    longOption :: L.TokenParser Argument
+    longOption = Option <$> do
+      { name: name, arg: arg } <- L.lopt
+      O.lopt' name arg <$> repetition
 
-    shortOption :: TokenParser Argument
+    shortOption :: L.TokenParser Argument
     shortOption = do
-      { flag: flag, stack: stack, arg: arg } <- sopt
-      OptionStack flag stack arg
-        <$> repetition
+      { flag: flag, stack: stack, arg: arg } <- L.sopt
+      OptionStack flag stack arg <$> repetition
 
-    option :: TokenParser Argument
+    option :: L.TokenParser Argument
     option = longOption <|> shortOption
 
-    positional :: TokenParser Argument
+    positional :: L.TokenParser Argument
     positional = Positional
-      <$> (angleName <|> shoutName)
+      <$> (L.angleName <|> L.shoutName)
       <*> repetition
 
-    command :: TokenParser Argument
+    command :: L.TokenParser Argument
     command = do
-      cmd <- Command <$> name
-      P.notFollowedBy tripleDot -- Commands may not repeat!
+      cmd <- Command <$> L.name
+      P.notFollowedBy L.tripleDot -- Commands may not repeat!
       pure cmd
 
-    group :: TokenParser Argument
+    group :: L.TokenParser Argument
     group = defer \_ -> P.choice
       [ reqGroup
       , optGroup ]
 
-    optGroup :: TokenParser Argument
+    optGroup :: L.TokenParser Argument
     optGroup = defer \_ -> Group true
       <$> (P.between
-            (indented *> lsquare)
-            (rsquare)
-            ((some elem) `P.sepBy1` vbar))
+            (indented *> L.lsquare)
+            (L.rsquare)
+            ((some elem) `P.sepBy1` L.vbar))
       <*> repetition
 
-    reqGroup :: TokenParser Argument
+    reqGroup :: L.TokenParser Argument
     reqGroup = defer \_ -> Group false
       <$> (P.between
-            (indented *> lparen)
-            (rparen)
-            ((some elem) `P.sepBy1` vbar))
+            (indented *> L.lparen)
+            (L.rparen)
+            ((some elem) `P.sepBy1` L.vbar))
       <*> repetition
 
-    repetition :: TokenParser Boolean
+    repetition :: L.TokenParser Boolean
     repetition = P.choice
-      [ P.try $ indented *> tripleDot *> pure true
+      [ P.try $ indented *> L.tripleDot *> pure true
       , pure false ]
 
-    program :: TokenParser String
-    program = (name <|> word) P.<?> "Program Name"
+    program :: L.TokenParser String
+    program = (L.name <|> L.word) P.<?> "Program Name"

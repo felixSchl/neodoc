@@ -33,7 +33,7 @@ data Desc = OptionDesc Option
 
 data Name = Flag Char | Long String | Full Char String
 newtype Argument = Argument { name :: String, default :: Maybe String }
-newtype Option = Option   { name :: Name, arg :: Maybe Argument }
+newtype Option = Option { name :: Name, arg :: Maybe Argument }
 data Content = Text | Default String
 
 derive instance genericDesc     :: Generic Desc
