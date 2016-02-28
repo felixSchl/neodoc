@@ -168,31 +168,33 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
           Just val -> return $ OptParse (D.StringValue val) Nothing false
           _  -> return case atok of
             Just (Lit s) -> OptParse (D.StringValue s) Nothing true
-            _ -> OptParse (D.BoolValue true) Nothing false
+            _ -> OptParse (D.BoolValue true)
+                          Nothing
+                          false
 
     -- case 2:
     -- The leading flag matches, there are stacked options, no explicit
     -- argument has been passed and the option takes an argument.
     go (SOpt f' xs Nothing) _ | (f' == f) && takesArg && (A.length xs > 0)
-      = return $ OptParse (D.StringValue $ fromCharArray xs) Nothing false
+      = return $ OptParse (D.StringValue $ fromCharArray xs)
+                          Nothing
+                          false
 
     -- case 3:
     -- The leading flag matches, there are stacked options, the option takes
     -- no argument and an explicit argument has not been provided.
     go (SOpt f' xs v) _ | (f' == f) && (takesArg == false) && (A.length xs > 0)
-      = return $ OptParse
-                (D.BoolValue true)
-                (Just $ SOpt (AU.head xs) (AU.tail xs) v)
-                false
+      = return $ OptParse (D.BoolValue true)
+                          (Just $ SOpt (AU.head xs) (AU.tail xs) v)
+                          false
 
     -- case 4:
     -- The leading flag matches, there are no stacked options and the option
     -- takes no argument - total consumption!
     go (SOpt f' xs _) _ | (f' == f) && (takesArg == false) && (A.length xs == 0)
-      = return $ OptParse
-                (D.BoolValue true)
-                Nothing
-                false
+      = return $ OptParse (D.BoolValue true)
+                          Nothing
+                          false
 
     go a b = Left $ "Invalid token " ++ show a ++ " (input: " ++ show b ++ ")"
 
