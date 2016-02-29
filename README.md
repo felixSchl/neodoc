@@ -33,16 +33,18 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * [x] Resolve ambiguities by combining the parsed usage and description sections
 * [x] Generate parser from the solved program specification
 * [x] Lex and parse user input on the CLI
-* [ ] Transform the parsed args into something more useful
+* [x] Transform the parsed args into something more useful
 * [ ] Provide seamless interface to be called from JS
 * [ ] Provide typescript typings
 * [ ] Fix all warnings
+* [ ] Read arguments from env vars
+* [ ] Implement special arguments
+    * [x] ~~`--` (end of args) not yet implemented~~
+    * [ ] `-` (stdin)
+    * [ ] `[options]`
 
 Known issues to work through:
 
-* [x] ~~`--` (end of args) not yet implemented~~
-* [ ] `-` (stdin) not yet implemented
-* [ ] `[options]` not yet implemented
 * [x] ~~Options that were not provided through argv but that have defaults, are
       currently not present in the output~~
 * [ ] Options that have a default value and are provided through argv without an
@@ -51,7 +53,6 @@ Known issues to work through:
 
 Further, the wishlist looks somewhat like this:
 
-* Read arguments from environment using a prefix (see yargs)
 * Make commands first class citizens, enabling easy subcommands, inheriting
   options and all that.
 * Allow for `--foo[=<bar>]` syntax (git style).
@@ -59,13 +60,8 @@ Further, the wishlist looks somewhat like this:
   monad, or the Writer monad, stacked on top of the Either monad.
 * Allow boolean negation. Let `--foo` be an option of type boolean, implicitly
   allow it's negation `--no-foo`.
-* Refactor the `Docopt.Spec.Parser.Usage.OptionStack` constructor to use
-  `NonEmpty` from `purescript-nonempty`
-* Refactor `Docopt.ParserGen.Parser.mkBranchParser` to use manual recursive iteration,
-  rather than a fold, like in `Docopt.Spec.Solver`.
-* Options should be able to specify default values straight in the
-  Usage section, i.e.: `Usage: foo --bar=100`. This *will* have an impact on the
-  solver implementation, however.
+* Refactor `Language.Docopt.ParserGen.Parser.genBranchParser` to use manual
+  recursive iteration, rather than a fold, like in `Language.Docopt.Solver`.
 * Rewrite recursive functions to be in tail position, using
   `purescript-tailrec` and consider trampolining using `purescript-free`.
 
