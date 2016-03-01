@@ -91,6 +91,18 @@ genSpec = \_ -> describe "The generator" do
         [ pass [] [] ]
 
     , test
+        [ D.opt 'h' "host" (D.oa "host[:port]"
+                           (D.str "http://localhost:3000")) ]
+        [ pass
+            [ "-hhttp://localhost:5000" ]
+            [ D.opt 'h'
+                    "host"
+                    (D.oa "host[:port]" (D.str "http://localhost:3000"))
+                      :> D.str "http://localhost:5000"
+            ]
+        ]
+
+    , test
         [ D.grr false [[
             D.opt 'i' "input" (D.oa_ "FILE")
           ]]

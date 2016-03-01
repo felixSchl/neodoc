@@ -41,7 +41,7 @@ docoptSpec = \_ ->
             """
             [ "push"
             , "-o", "~/foo/bar"
-            , "-h", "http://localhost:5000"
+            , "-hhttp://localhost:5000"
             , "x", "y"
             , "--", "0", "1", "3"
             ]

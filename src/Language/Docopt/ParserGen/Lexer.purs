@@ -51,14 +51,13 @@ parseToken = do
       P.char '-'
       x  <- alphaNum
       xs <- A.many alphaNum
+      P.optional do many space *> P.char '=' <* many space
       arg <- P.choice $ P.try <$> [
-        Just <$> do
-          many space *> P.char '=' <* many space
-          fromCharArray <$> do A.many P.anyChar
-      , pure Nothing
+        return <$> fromCharArray <$> do A.some P.anyChar
+      , return Nothing
       ]
       many space
-      pure $ SOpt x xs arg
+      return $ SOpt x xs arg
 
     -- | Parse a long option
     lopt :: P.Parser String Token

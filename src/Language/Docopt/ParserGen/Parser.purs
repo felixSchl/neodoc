@@ -127,7 +127,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     -- case 2:
     -- The name is an exact match and takes no argument
-    go (LOpt n' _) _ | (takesArg == false) && (n' == n)
+    go (LOpt n' _) _ | (not takesArg) && (n' == n)
       = return $ OptParse (D.BoolValue true) Nothing false
 
     -- case 3:
@@ -175,8 +175,10 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 2:
     -- The leading flag matches, there are stacked options, no explicit
     -- argument has been passed and the option takes an argument.
-    go (SOpt f' xs Nothing) _ | (f' == f) && takesArg && (A.length xs > 0)
-      = return $ OptParse (D.StringValue $ fromCharArray xs)
+    go (SOpt f' xs v) _ | (f' == f) && takesArg && (A.length xs > 0)
+      = do
+        let a = fromCharArray xs ++ maybe "" id v
+        return $ OptParse (D.StringValue a)
                           Nothing
                           false
 
