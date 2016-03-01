@@ -12,22 +12,22 @@ import Data.Foldable (intercalate)
 import Data.Monoid (Monoid)
 import Data.String (fromChar)
 import Data.Map (Map())
-import qualified Data.Map as Map
+import Data.Map as Map
 import Control.Apply ((*>))
 import Data.Bifunctor (lmap)
 import Data.Traversable (traverse)
-import qualified Text.Parsing.Parser as P
+import Text.Parsing.Parser as P
 import Text.Wrap (dedent)
 
-import qualified Language.Docopt.Errors          as D
-import qualified Language.Docopt.Value           as D
-import qualified Language.Docopt.ParserGen       as G
-import qualified Language.Docopt.ParserGen.Trans as T
+import Language.Docopt.Errors          as D
+import Language.Docopt.Value           as D
+import Language.Docopt.ParserGen       as G
+import Language.Docopt.ParserGen.Trans as T
 
-import qualified Language.Docopt.Scanner      as Scanner
-import qualified Language.Docopt.Solver       as Solver
-import qualified Language.Docopt.Parser.Usage as Usage
-import qualified Language.Docopt.Parser.Desc  as Desc
+import Language.Docopt.Scanner      as Scanner
+import Language.Docopt.Solver       as Solver
+import Language.Docopt.Parser.Usage as Usage
+import Language.Docopt.Parser.Desc  as Desc
 
 runDocopt :: String -- ^ The docopt text
           -> Array String -- ^ The user input

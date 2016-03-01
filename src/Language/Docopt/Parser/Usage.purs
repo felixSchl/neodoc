@@ -1,4 +1,9 @@
-module Language.Docopt.Parser.Usage where
+module Language.Docopt.Parser.Usage (
+    usageParser
+  , run
+  , parse
+  , module U
+  ) where
 
 import Prelude
 import Debug.Trace
@@ -27,48 +32,11 @@ import Control.Bind ((=<<))
 import Language.Docopt.Parser.Base
 import Language.Docopt.Parser.Common
 import Language.Docopt.Parser.State
+import Language.Docopt.Parser.Usage.Usage
 import Language.Docopt.Parser.Usage.Argument
-import qualified Language.Docopt.Parser.Lexer as L
-import qualified Language.Docopt.Parser.Usage.Option as O
-
--- | Represent a single program usage.
--- | A single usage is made up of a list of mutually exclusive groups,
--- | separated by a vertical bar `|`. Each of those groups can contain
--- | one or more `Argument`.
--- |
--- | node node | node | node
--- | ^^^^ ^^^^   ^^^^   ^^^^
--- |   |   |      |      |
--- | [ 0 , 1 ]  [ 0 ]  [ 0 ]
--- |    \ /       |      |
--- | [   0    ,   1   ,  2 ]
-data Usage = Usage String (List Branch)
-
-instance showUsage :: Show Usage where
-  show (Usage n xs) = "Usage " ++ show n ++ " " ++ show xs
-
-instance eqUsage :: Eq Usage where
-  eq (Usage n xs) (Usage n' xs') = (n == n') && (xs == xs')
-
-prettyPrintUsage :: Usage -> String
-prettyPrintUsage (Usage name bs) =
-  name ++ " " ++ intercalate " | " (prettyPrintBranch <$> bs)
-    where
-      prettyPrintBranch :: Branch -> String
-      prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
-
-      prettyPrintArg :: Argument -> String
-      prettyPrintArg (Command n) = n
-      prettyPrintArg (Positional n r)
-        = n ++ if r then "..." else ""
-      prettyPrintArg (Option o) = O.prettyPrintLOpt o
-      prettyPrintArg (OptionStack o) = O.prettyPrintSOpt o
-      prettyPrintArg (Group b xs r)
-        = if b then "(" else "["
-          ++ intercalate " | " (prettyPrintBranch <$> bs)
-          ++ if b then ")" else "]"
-          ++ if r then "..." else ""
-      prettyPrintArg (EOA) = "--"
+import Language.Docopt.Parser.Usage.Usage  as U
+import Language.Docopt.Parser.Lexer        as L
+import Language.Docopt.Parser.Usage.Option as O
 
 -- | L.TokenParser to parse the usage section
 -- |

@@ -22,9 +22,11 @@ data Argument
   | OptionStack O.SOpt
   | Group       IsOptional (List Branch) IsRepeatable
   | EOA
+  | Stdin
 
 instance showArgument :: Show Argument where
   show (EOA)            = "--"
+  show (Stdin)          = "-"
   show (Command n)      = "Command " ++ n
   show (Positional n b) = "Positional " ++ n ++ " " ++ show b
   show (Option o)       = "Option " ++ show o
@@ -32,6 +34,7 @@ instance showArgument :: Show Argument where
   show (Group n b o)    = "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
 
 instance eqArgument :: Eq Argument where
+  eq (Stdin)          (Stdin)            = true
   eq (EOA)            (EOA)              = true
   eq (Command s)      (Command s')       = (s == s')
   eq (Positional s r) (Positional s' r') = (s == s') && (r == r')

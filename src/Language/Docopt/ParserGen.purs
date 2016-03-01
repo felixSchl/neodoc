@@ -5,6 +5,7 @@ module Language.Docopt.ParserGen (
   ) where
 
 import Prelude
+import Debug.Trace
 import Data.List (List(..))
 import Data.Either (Either(..))
 import Data.Map (Map())
