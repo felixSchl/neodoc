@@ -48,7 +48,7 @@ data Token
   | TripleDot
   | LOpt String (Maybe String)
   | SOpt Char (Array Char) (Maybe String)
-  | Tag String String
+  | Tag String (Maybe String)
   | Name String
   | ShoutName String
   | AngleName String
@@ -73,7 +73,7 @@ prettyPrintToken Equal             = show '='
 prettyPrintToken TripleDot         = "..."
 prettyPrintToken DoubleDash        = "--"
 prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
-prettyPrintToken (Tag k v)         = "Tag "       ++ k ++ " "  ++ v
+prettyPrintToken (Tag k v)         = "Tag "       ++ k ++ " "  ++ (show v)
 prettyPrintToken (Name      n)     = "Name "      ++ show n
 prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
 prettyPrintToken (AngleName n)     = "AngleName " ++ show n
@@ -182,14 +182,20 @@ parseToken = P.choice
     P.between
       (P.char '[')
       (P.char ']')
-      do
+      (withValue <|> withoutValue)
+
+    where
+      withValue = do
         many whitespace
         k <- fromCharArray <$> do A.many (P.noneOf [':'])
         P.char ':'
         many whitespace
         v <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
         many whitespace
-        return (Tag k v)
+        return (Tag k (Just v))
+      withoutValue = do
+        k <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
+        return (Tag k Nothing)
 
   stringLiteral :: P.Parser String Token
   stringLiteral = StringLiteral <$> do
@@ -453,8 +459,8 @@ name = token go P.<?> "name"
 tag :: String -> TokenParser String
 tag s = token go P.<?> "default"
   where
-    go (Tag k v) | Str.toUpper k == Str.toUpper s = Just v
-    go _                                          = Nothing
+    go (Tag k (Just v)) | Str.toUpper k == Str.toUpper s = Just v
+    go _                                                 = Nothing
 
 word :: TokenParser String
 word = token go P.<?> "word"
