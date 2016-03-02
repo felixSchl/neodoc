@@ -95,7 +95,11 @@ usageParser = do
         , positional
         , command
         , group
+        , stdin
         ] P.<?> "Option, Positional, Command or Group"
+
+    stdin :: L.TokenParser Argument
+    stdin = L.dash *> return Stdin
 
     longOption :: L.TokenParser Argument
     longOption = Option <$> do

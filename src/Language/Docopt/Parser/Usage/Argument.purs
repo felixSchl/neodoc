@@ -3,13 +3,21 @@ module Language.Docopt.Parser.Usage.Argument (
   , IsRepeatable ()
   , IsOptional ()
   , Branch ()
+  , prettyPrintArg
+  , prettyPrintBranch
   , sopt, sopt_, soptR, soptR_
   , lopt, lopt_, loptR, loptR_
+  , eoa
+  , co
+  , po
+  , poR
+  , stdin
   ) where
 
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.List (List(..))
+import Data.Foldable (intercalate)
 import qualified Language.Docopt.Parser.Usage.Option as O
 
 type IsRepeatable = Boolean
@@ -43,6 +51,23 @@ instance eqArgument :: Eq Argument where
   eq (OptionStack o)  (OptionStack o')   = o == o'
   eq _                _                  = false
 
+prettyPrintBranch :: Branch -> String
+prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
+
+prettyPrintArg :: Argument -> String
+prettyPrintArg (Command n) = n
+prettyPrintArg (Positional n r)
+  = n ++ if r then "..." else ""
+prettyPrintArg (Option o) = O.prettyPrintLOpt o
+prettyPrintArg (OptionStack o) = O.prettyPrintSOpt o
+prettyPrintArg (Group b xs r)
+  =  (if b then "(" else "[")
+  ++ (intercalate " | " (prettyPrintBranch <$> xs))
+  ++ (if b then ")" else "]")
+  ++ (if r then "..." else "")
+prettyPrintArg (EOA) = "--"
+prettyPrintArg (Stdin) = "-"
+
 -- short hand to create a short option node
 sopt :: Char -> Array Char -> String -> Argument
 sopt f fs a = OptionStack $ O.sopt f fs a
@@ -69,3 +94,21 @@ loptR n a = Option $ O.loptR n a
 loptR_ :: String -> Argument
 loptR_ n = Option $ O.loptR_ n
 
+-- short hand to create an end-of-argument marker
+eoa :: Argument
+eoa = EOA
+
+-- short hand to create an stdin marker
+stdin :: Argument
+stdin = Stdin
+
+-- short hand to create a command node
+co :: String -> Argument
+co = Command
+
+-- short hand to create a positional node
+po :: String -> Argument
+po n = Positional n false
+
+poR :: String -> Argument
+poR n = Positional n true

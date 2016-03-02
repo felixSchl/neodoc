@@ -17,17 +17,6 @@ import Text.Wrap (dedent)
 usage :: String -> Array (Array U.Argument) -> U.Usage
 usage n xss = U.Usage n $ toList $ toList <$> xss
 
--- short hand to create a command node
-co :: String -> U.Argument
-co = U.Command
-
--- short hand to create a positional node
-po :: String -> U.Argument
-po n = U.Positional n false
-
-poR :: String -> U.Argument
-poR n = U.Positional n true
-
 -- short hand to create a required group node
 gr :: Array (Array U.Argument) -> Boolean -> U.Argument
 gr xs r = U.Group false ls r
@@ -37,7 +26,3 @@ gr xs r = U.Group false ls r
 go :: Array (Array U.Argument) -> Boolean -> U.Argument
 go xs r = U.Group true ls r
   where ls = toList <$> (toList xs)
-
--- short hand to create an end-of-argument marker
-eoa :: U.Argument
-eoa = U.EOA

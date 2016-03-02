@@ -150,6 +150,11 @@ usageParserSpec = \_ ->
         , pass "foo -- FOO... BAR" $ [[[ U.co "foo", U.eoa ]]]
         ]
 
+    describe "stdin" do
+      runTests
+        [ pass "-" $ [[[ U.stdin ]]]
+        ]
+
     -- | Test the scanner and lexer in combination with the parser.
     -- | This validates that the program source can successfully extracted
     -- | from the - possibly - unstructured usage description text.
@@ -234,7 +239,7 @@ usageParserSpec = \_ ->
             case o of
               P v -> do
                 let expected = v isRepeated
-                it (input ++ " -> " ++ show expected)  do
+                it (input ++ " -> " ++ U.prettyPrintArg expected)  do
                   vliftEff do
                     usage <- runEitherEff do
                       Lexer.lex input >>= U.parse

@@ -35,20 +35,4 @@ instance eqUsage :: Eq Usage where
 
 prettyPrintUsage :: Usage -> String
 prettyPrintUsage (Usage name bs) =
-  name ++ " " ++ intercalate " | " (prettyPrintBranch <$> bs)
-    where
-      prettyPrintBranch :: U.Branch -> String
-      prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
-
-      prettyPrintArg :: U.Argument -> String
-      prettyPrintArg (U.Command n) = n
-      prettyPrintArg (U.Positional n r)
-        = n ++ if r then "..." else ""
-      prettyPrintArg (U.Option o) = O.prettyPrintLOpt o
-      prettyPrintArg (U.OptionStack o) = O.prettyPrintSOpt o
-      prettyPrintArg (U.Group b xs r)
-        = if b then "(" else "["
-          ++ intercalate " | " (prettyPrintBranch <$> bs)
-          ++ if b then ")" else "]"
-          ++ if r then "..." else ""
-      prettyPrintArg (U.EOA) = "--"
+  name ++ " " ++ intercalate " | " (U.prettyPrintBranch <$> bs)
