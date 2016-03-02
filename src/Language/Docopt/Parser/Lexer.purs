@@ -8,13 +8,14 @@ import Control.Plus (empty)
 import Control.Monad.State (State(), evalState, get)
 import Control.Monad.Trans
 import Data.Foldable (foldl)
-import qualified Text.Parsing.Parser as P
-import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Token as P
-import qualified Text.Parsing.Parser.Pos as P
-import qualified Text.Parsing.Parser.String as P
-import qualified Data.List as L
-import qualified Data.Array as A
+import Data.String as Str
+import Text.Parsing.Parser as P
+import Text.Parsing.Parser.Combinators as P
+import Text.Parsing.Parser.Token as P
+import Text.Parsing.Parser.Pos as P
+import Text.Parsing.Parser.String as P
+import Data.List as L
+import Data.Array as A
 import Data.Char (toString, toLower, toUpper)
 import Data.String (fromCharArray, fromChar, trim)
 import Data.List (List(..), (:), fromList, many)
@@ -24,7 +25,7 @@ import Language.Docopt.Parser.Base
 import Language.Docopt.Parser.State
 import Data.Tuple
 import Data.Int
-import qualified Data.Int as I
+import Data.Int as I
 import Global (isNaN, readFloat)
 
 lex :: String -> Either P.ParseError (List PositionedToken)
@@ -47,7 +48,7 @@ data Token
   | TripleDot
   | LOpt String (Maybe String)
   | SOpt Char (Array Char) (Maybe String)
-  | Default String
+  | Tag String String
   | Name String
   | ShoutName String
   | AngleName String
@@ -72,7 +73,7 @@ prettyPrintToken Equal             = show '='
 prettyPrintToken TripleDot         = "..."
 prettyPrintToken DoubleDash        = "--"
 prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
-prettyPrintToken (Default   s)     = "Default "   ++ s
+prettyPrintToken (Tag k v)         = "Tag "       ++ k ++ " "  ++ v
 prettyPrintToken (Name      n)     = "Name "      ++ show n
 prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
 prettyPrintToken (AngleName n)     = "AngleName " ++ show n
@@ -145,7 +146,7 @@ parseToken :: P.Parser String Token
 parseToken = P.choice
   [ P.try $ P.char   '('   *> pure LParen
   , P.try $ P.char   ')'   *> pure RParen
-  , P.try $ default
+  , P.try $ tag
   , P.try $ P.char   '['   *> pure LSquare
   , P.try $ P.char   ']'   *> pure RSquare
   , P.try $ P.char   '|'   *> pure VBar
@@ -176,18 +177,19 @@ parseToken = P.choice
     P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     pure unit
 
-  default :: P.Parser String Token
-  default = Default <<< trim <<< fromCharArray <$>  do
+  tag :: P.Parser String Token
+  tag =
     P.between
       (P.char '[')
       (P.char ']')
       do
-        A.many whitespace
-        string' "default"
-        (void $ P.try $ P.char ':') <|> pure unit
-        val <- A.some $ P.noneOf [']']
-        A.many whitespace
-        pure val
+        many whitespace
+        k <- fromCharArray <$> do A.many (P.noneOf [':'])
+        P.char ':'
+        many whitespace
+        v <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
+        many whitespace
+        return (Tag k v)
 
   stringLiteral :: P.Parser String Token
   stringLiteral = StringLiteral <$> do
@@ -448,11 +450,11 @@ name = token go P.<?> "name"
     go (Name n) = Just n
     go _        = Nothing
 
-default :: TokenParser String
-default = token go P.<?> "default"
+tag :: String -> TokenParser String
+tag s = token go P.<?> "default"
   where
-    go (Default s) = Just s
-    go _         = Nothing
+    go (Tag k v) | Str.toUpper k == Str.toUpper s = Just v
+    go _                                          = Nothing
 
 word :: TokenParser String
 word = token go P.<?> "word"

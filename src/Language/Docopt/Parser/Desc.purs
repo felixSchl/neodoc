@@ -104,7 +104,7 @@ descParser =
     anyName = L.angleName <|> L.shoutName <|> L.name
 
     defaults :: L.TokenParser String
-    defaults = L.default
+    defaults = L.tag "default"
 
     option :: L.TokenParser Desc
     option = do
