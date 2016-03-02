@@ -65,7 +65,7 @@ prettyPrintArg (Group b xs r)
   ++ (intercalate " | " (prettyPrintBranch <$> xs))
   ++ (if b then ")" else "]")
   ++ (if r then "..." else "")
-prettyPrintArg (EOA) = "--"
+prettyPrintArg (EOA) = "-- ARGS..."
 prettyPrintArg (Stdin) = "-"
 
 -- short hand to create a short option node

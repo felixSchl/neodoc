@@ -12,7 +12,7 @@ import Data.Either (Either(..), isRight, isLeft, either)
 import Data.Either.Unsafe (fromLeft, fromRight)
 import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..))
-import Data.Foldable (foldMap, traverse_, for_)
+import Data.Foldable (intercalate, foldMap, traverse_, for_)
 import Data.Array ((..))
 
 import Language.Docopt
@@ -80,7 +80,6 @@ usageParserSpec = \_ ->
         , pass "--bar = fOo"   $ lopt  "bar" "fOo"
         , pass "--bar = <foo>" $ lopt  "bar" "foo"
         , pass "--barFOO"      $ lopt_ "barFOO"
-        , fail "- - bar"
         , fail "--bar="
         , fail "--bar=<>"
         , fail "--bar=--foo"
@@ -150,9 +149,17 @@ usageParserSpec = \_ ->
         , pass "foo -- FOO... BAR" $ [[[ U.co "foo", U.eoa ]]]
         ]
 
+    -- XXX
+    -- The lexer has no concept of a "correct" stdin placement.
+    -- This will be solved at a later stage, possibly during solving.
     describe "stdin" do
       runTests
         [ pass "-" $ [[[ U.stdin ]]]
+        , pass "-|-" $ [[[ U.stdin ], [ U.stdin ]]]
+        , pass "--foo - --bar" $ [[[ U.lopt_ "foo"
+                                   , U.stdin
+                                   , U.lopt_ "bar"
+                                   ]]]
         ]
 
     -- | Test the scanner and lexer in combination with the parser.
@@ -209,16 +216,21 @@ usageParserSpec = \_ ->
         let input = "foo " ++ i
         case o of
           P expected -> do
-            it (input ++ " -> " ++ show expected)  do
+            -- deeply convert array to list
+            -- (array is used for readability above)
+            let expected' = (U.Usage "foo" <$> do
+                              (((toList <$>) <$>) toList
+                                              <$> toList
+                                              <$> toList expected))
+            it (input
+                ++ " -> "
+                ++ intercalate "\n" (U.prettyPrintUsage <$> expected'))  do
               vliftEff do
                 usages <- runEitherEff do
                   Lexer.lex input >>= U.parse
                 flip assertEqual
                   usages
-                  (U.Usage "foo" <$> do
-                    -- deeply convert array to list
-                    -- (array is used for readability above)
-                    (((toList <$>) <$>) toList <$> toList <$> toList expected))
+                  expected'
           _ -> do
             it (input ++ " should fail") do
             vliftEff do
