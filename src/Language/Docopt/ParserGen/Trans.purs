@@ -43,6 +43,7 @@ byName m
                                 ]
     toKeys (D.Group _ _ _)    = []
     toKeys (D.EOA)            = ["--"]
+    toKeys (D.Stdin)          = ["-"]
     toKeys (D.Option (O.Option o))
                               = []
                               ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) o.flag

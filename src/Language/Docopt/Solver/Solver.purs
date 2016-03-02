@@ -66,6 +66,9 @@ solveBranch as ds = Branch <$> f as
         solveArgs (U.EOA) _
           = Unconsumed <<< singleton <$> return (EOA)
 
+        solveArgs (U.Stdin) _
+          = Unconsumed <<< singleton <$> return (Stdin)
+
         solveArgs (U.Command s) _
           = Unconsumed <<< singleton <$> return (Command s)
 

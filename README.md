@@ -40,7 +40,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * [ ] Read arguments from env vars
 * [ ] Implement special arguments
     * [x] ~~`--` (end of args) not yet implemented~~
-    * [ ] `-` (stdin)
+    * [x] `-` (stdin)
     * [ ] `[options]`
 
 Known issues to work through:

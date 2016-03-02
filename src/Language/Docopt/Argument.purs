@@ -39,6 +39,7 @@ data Argument
   | Option      O.Option
   | Group       IsOptional (List Branch) IsRepeatable
   | EOA
+  | Stdin
 
 instance showBranch :: Show Branch where
   show (Branch xs) = "Branch " ++ show (show <$> xs)
@@ -48,6 +49,7 @@ instance eqBranch :: Eq Branch where
 
 instance showArgument :: Show Argument where
   show (EOA) = "EOA"
+  show (Stdin) = "Stdin"
   show (Command n)
     = intercalate " " [ "Command", show n ]
   show (Positional n r)
@@ -62,6 +64,7 @@ instance ordArgument :: Ord Argument where
 
 instance eqArgument :: Eq Argument where
   eq (EOA) (EOA) = true
+  eq (Stdin) (Stdin) = true
   eq (Command n) (Command n') = (n == n')
   eq (Positional n r) (Positional n' r')
     = (Str.toUpper n == Str.toUpper n') && (r == r')
@@ -73,18 +76,17 @@ prettyPrintBranch :: Branch -> String
 prettyPrintBranch (Branch xs) = intercalate " " (prettyPrintArg <$> xs)
 
 prettyPrintArg :: Argument -> String
-prettyPrintArg (EOA)               = "--"
+prettyPrintArg (Stdin)             = "-"
+prettyPrintArg (EOA)               = "-- ARGS..."
 prettyPrintArg (Command name)      = name
 prettyPrintArg (Positional name r) = name ++ (if r then "..." else "")
 prettyPrintArg (Option o)          = O.prettyPrintOption o
-
-prettyPrintArg (Group o bs r) = open ++ inner ++ close ++ repetition
+prettyPrintArg (Group o bs r)      = open ++ inner ++ close ++ repetition
   where
     open       = if o then "[" else "("
     close      = if o then "]" else ")"
     inner      = intercalate " | " (prettyPrintBranch <$> bs)
     repetition = if r then "..." else ""
-
 
 isRepeatable :: Argument -> Boolean
 isRepeatable (Option o)       = O.isRepeatable o

@@ -29,7 +29,7 @@ docoptSpec = \_ ->
           output <- runDocopt
             """
             Usage:
-              foo push -h=<host[:port]> -o <file> FILE... -- ARGS
+              foo push -h=<host[:port]> -o <file> [x -] FILE... -- ARGS
 
             Options:
               -o, --output=ILE
@@ -42,6 +42,7 @@ docoptSpec = \_ ->
             [ "push"
             , "-o", "~/foo/bar"
             , "-hhttp://localhost:5000"
+            , "x"
             , "x", "y"
             , "--", "0", "1", "3"
             ]

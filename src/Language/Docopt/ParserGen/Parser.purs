@@ -312,6 +312,15 @@ genBranchParser (D.Branch xs) = do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
       ) P.<?> "end of arguments: \"--\""
 
+    -- Generate a parser for a `Stdin` argument
+    genParser x@(D.Stdin) = (do
+      singleton <<< Tuple x <$> do
+        -- stdin always succeeds, as it is not actually an argument on argv.
+        -- XXX: Should docopt check `process.stdin.isTTY` at this stage, or
+        --      even at all?
+        return (D.BoolValue true)
+      ) P.<?> "stdin: \"-\""
+
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional n r) = (do
       if r then (some go) else (singleton <$> go)

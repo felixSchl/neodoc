@@ -22,6 +22,7 @@ data Token
   = LOpt String (Maybe String)
   | SOpt Char (Array Char) (Maybe String)
   | EOA (List D.Value)
+  | Stdin
   | Lit String
 
 instance showToken :: Show Token where
@@ -29,8 +30,10 @@ instance showToken :: Show Token where
   show (SOpt c cs a) = "SOpt " ++ show c ++ " " ++ show cs ++ " " ++ show a
   show (Lit  s)      = "Lit "  ++ show s
   show (EOA  xs)     = "EOA "  ++ show xs
+  show (Stdin)       = "Stdin"
 
 prettyPrintToken :: Token -> String
+prettyPrintToken (Stdin) = "-"
 prettyPrintToken (EOA xs) = "-- " ++ intercalate " " (D.prettyPrintValue <$> xs)
 prettyPrintToken (Lit s) = show s
 prettyPrintToken (LOpt n a) = "--" ++ n ++ arg
