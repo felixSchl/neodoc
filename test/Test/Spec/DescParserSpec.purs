@@ -42,38 +42,47 @@ descParserSpec = \_ ->
             """
             -f enable the --foo flag
             """)
-            [ o { name: Desc.Flag 'f', arg: Nothing } ]
+            [ o { name: Desc.Flag 'f', arg: Nothing, env: Nothing } ]
         , pass (dedent
             """
             --foo enable the --foo flag
             """)
-            [ o { name: Desc.Long "foo", arg: Nothing } ]
+            [ o { name: Desc.Long "foo", arg: Nothing, env: Nothing } ]
         , pass (dedent
             """
             -f, --foo
             """)
-            [ o { name: Desc.Full 'f' "foo", arg: Nothing } ]
+            [ o { name: Desc.Full 'f' "foo", arg: Nothing, env: Nothing } ]
         , pass (dedent
             """
             -f=BAZ, --foo=BAZ
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" Nothing } ]
+                , arg:  Just $ Desc.argument "BAZ" Nothing, env: Nothing }
+            ]
         , pass (dedent
             """
             -f=BAZ, --foo=BAZ [default: 100]
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" (Just "100") } ]
+                , arg:  Just $ Desc.argument "BAZ" (Just "100")
+                , env:  Nothing
+                }
+            ]
         , pass (dedent
             """
             -f=BAZ, --foo=BAZ [default: 100]
             -q=BAZ, --qux=BAZ [default: 200]
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" (Just "100") }
+                , arg:  Just $ Desc.argument "BAZ" (Just "100")
+                , env:  Nothing
+                }
             , o { name: Desc.Full 'q' "qux"
-                , arg:  Just $ Desc.argument "BAZ" (Just "200") } ]
+                , arg:  Just $ Desc.argument "BAZ" (Just "200")
+                , env:  Nothing
+                }
+            ]
         , pass (dedent
             """
             -f=BAZ, --foo=BAZ this is
@@ -84,20 +93,29 @@ descParserSpec = \_ ->
               text [default: 200]
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" (Just "100") }
+                , arg:  Just $ Desc.argument "BAZ" (Just "100")
+                , env:  Nothing
+                }
             , o { name: Desc.Full 'q' "qux"
-                , arg:  Just $ Desc.argument "QIZ" (Just "200") } ]
+                , arg:  Just $ Desc.argument "QIZ" (Just "200")
+                , env:  Nothing
+                }
+            ]
         , fail
               "-f=BAZ, --foo=qux"
               "Arguments mismatch: \"BAZ\" and \"qux\""
         , pass (dedent
             """
             -f=BAZ, --foo=BAZ this is some more text [default: 100]
+                                                     [env: QARK]
                 -q=QIZ, --qux=QIZ this option is over-indented and won't
                                   be parsed.
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" (Just "100") } ]
+                , arg:  Just $ Desc.argument "BAZ" (Just "100")
+                , env:  Just "QARK"
+                }
+            ]
         , fail (dedent
             """
             -q, --qux
@@ -110,6 +128,11 @@ descParserSpec = \_ ->
             -f=BAZ, --foo=BAZ [default: 100] [default: 100]
             """)
             "Option \"-f, --foo=BAZ\" has multiple defaults!"
+        , fail (dedent
+            """
+            -f=BAZ, --foo=BAZ [env: FOO_BAR] [env: BAR_FOO]
+            """)
+            "Option \"-f, --foo=BAZ\" has multiple environment mappings!"
         ]
         runtest
   where

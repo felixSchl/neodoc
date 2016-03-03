@@ -9,7 +9,7 @@ arg :: String -> Maybe String -> Desc.Argument
 arg = Desc.argument
 
 opt :: Desc.Name -> Maybe Desc.Argument -> Desc.Desc
-opt n a = Desc.OptionDesc $ Desc.Option { name: n, arg: a }
+opt n a = Desc.OptionDesc $ Desc.Option { name: n, arg: a, env: Nothing }
 
 lname :: String -> Desc.Name
 lname = Desc.Long

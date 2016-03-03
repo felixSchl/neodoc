@@ -33,9 +33,44 @@ data Desc = OptionDesc Option
           | CommandDesc
 
 data Name = Flag Char | Long String | Full Char String
-newtype Argument = Argument { name :: String, default :: Maybe Value }
-newtype Option = Option { name :: Name, arg :: Maybe Argument }
-data Content = Text | Default String
+
+newtype Argument = Argument {
+  name    :: String
+, default :: Maybe Value
+}
+
+runArgument :: Argument -> {
+  name    :: String
+, default :: Maybe Value
+}
+runArgument (Argument a) = a
+
+newtype Option = Option {
+  name :: Name
+, arg  :: Maybe Argument
+, env     :: Maybe String
+}
+
+data Content
+  = Text
+  | Default String
+  | Env     String
+
+isDefaultTag :: Content -> Boolean
+isDefaultTag (Default _) = true
+isDefaultTag _           = false
+
+getDefaultValue :: Content -> Maybe String
+getDefaultValue (Default v) = Just v
+getDefaultValue _           = Nothing
+
+isEnvTag :: Content -> Boolean
+isEnvTag (Env _) = true
+isEnvTag _       = false
+
+getEnvKey :: Content -> Maybe String
+getEnvKey (Env k) = Just k
+getEnvKey _       = Nothing
 
 derive instance genericDesc     :: Generic Desc
 derive instance genericArgument :: Generic Argument
@@ -75,18 +110,32 @@ prettyPrintDesc (OptionDesc opt) = "Option " ++ prettyPrintOption opt
 
 prettyPrintOption :: Option -> String
 prettyPrintOption (Option opt)
-  = name opt.name ++ maybe "" (\a -> "=" ++ prettyPrintArgument a) opt.arg
-  where name (Flag c)   = "-" ++ fromChar c
-        name (Long n)   = "--" ++ n
-        name (Full c n) = "-" ++ fromChar c ++ ", --" ++ n
+  = (name opt.name) ++ arg ++ env
+  where
+      name (Flag c)   = "-" ++ fromChar c
+      name (Long n)   = "--" ++ n
+      name (Full c n) = "-" ++ fromChar c ++ ", --" ++ n
+
+      arg = maybe "" id do
+        (Argument a) <- opt.arg
+        return $ "=" ++ a.name ++ case a.default of
+                                    Nothing  -> ""
+                                    (Just v) -> " [default: "
+                                                    ++ prettyPrintValue v
+                                                    ++ "]"
+
+      env = maybe "" id do
+        k <- opt.env
+        return $ " [env: " ++ k ++ "]"
 
 prettyPrintArgument :: Argument -> String
 prettyPrintArgument (Argument { name: n, default: d })
   = n ++ maybe "" (\v -> " [default: " ++ (prettyPrintValue v) ++  "]") d
 
 argument :: String -> Maybe String -> Argument
-argument name default = Argument { name: name
-                                 , default: StringValue <$> default }
+argument name default = Argument { name:    name
+                                 , default: StringValue <$> default
+                                 }
 
 run :: String -> Either P.ParseError (List Desc)
 run x = lex x >>= parse
@@ -105,9 +154,6 @@ descParser =
     anyName :: L.TokenParser String
     anyName = L.angleName <|> L.shoutName <|> L.name
 
-    defaults :: L.TokenParser String
-    defaults = L.tag "default"
-
     option :: L.TokenParser Desc
     option = do
       xopt@(Option opt) <- start
@@ -115,34 +161,47 @@ descParser =
       description <- do
         flip P.manyTill (L.eof <|> (P.lookAhead $ P.try $ void start)) do
           P.choice $ P.try <$> [
-            Default <$> defaults
+            Default <$> L.tag "default"
+          , Env     <$> L.tag "env"
           , L.anyToken *> pure Text
           ]
 
-      let defaults = flip filter description \s -> case s of Default _ -> true
-                                                             _         -> false
-          default = maybe Nothing (\(Default v) -> Just v) $ head defaults
+
+      let defaults = getDefaultValue <$> filter isDefaultTag description
+          envs     = getEnvKey       <$> filter isEnvTag     description
 
       if (length defaults > 1)
-         then P.fail $ "Option " ++ (show $ prettyPrintOption xopt)
+         then P.fail $
+          "Option " ++ (show $ prettyPrintOption xopt)
                     ++ " has multiple defaults!"
          else return unit
 
-      if (isJust default) && (not $ isJust opt.arg)
-         then P.fail $ "Option " ++ (show $ prettyPrintOption xopt)
-                    ++ " does not take arguments. Cannot specify defaults."
+      if (length envs > 1)
+         then P.fail $
+          "Option " ++ (show $ prettyPrintOption xopt)
+                    ++ " has multiple environment mappings!"
          else return unit
 
-      OptionDesc <$> do
-        either P.fail return $ setDefault xopt default
+      let default = head defaults >>= id
+          env     = head envs     >>= id
+
+      if (isJust default) && (not $ isJust opt.arg)
+         then P.fail $
+          "Option " ++ (show $ prettyPrintOption xopt)
+                    ++ " does not take arguments. "
+                    ++ "Cannot specify defaults."
+         else return unit
+
+      return $ OptionDesc $ Option $
+        opt { env = env
+            , arg = do
+                (Argument arg) <- opt.arg
+                return $ Argument $ arg {
+                  default = StringValue <$> default
+                }
+            }
 
       where
-
-        setDefault :: Option -> Maybe String -> Either String Option
-        setDefault (Option o) d = return $ Option $
-          o { arg = do
-                (Argument arg) <- o.arg
-                return $ Argument $ arg { default = StringValue <$> d } }
 
         start :: L.TokenParser Option
         start = do
@@ -160,15 +219,17 @@ descParser =
         short = do
           opt <- sopt
           return $ Option { name: Flag opt.flag
-                          , arg:  do a <- opt.arg
-                                     return $ argument a Nothing }
+                          , arg:  flip argument Nothing <$> opt.arg
+                          , env:  Nothing
+                          }
 
         long :: L.TokenParser Option
         long = do
           opt <- lopt
           return $ Option { name: Long opt.name
-                          , arg:  do a <- opt.arg
-                                     return $ argument a Nothing }
+                          , arg:  flip argument Nothing <$>  opt.arg
+                          , env:  Nothing
+                          }
 
         both :: L.TokenParser Option
         both = markLine do
@@ -187,14 +248,18 @@ descParser =
             combine (Option x@{ name: Flag f }) (Option y@{ name: Long n }) = do
               either P.fail return do
                 arg <- combineArg x.arg y.arg
-                return $ Option { name: Full f n, arg: arg }
+                return $ Option {
+                  name: Full f n
+                , arg: arg
+                , env: Nothing -- No need to keep at this stage
+                }
 
               where
-                combineArg (Just a) (Just b) | (a == b) = Right $ Just a
-                combineArg Nothing  (Just b)            = Right $ Just b
-                combineArg (Just a) Nothing             = Right $ Just a
-                combineArg Nothing Nothing              = Right $ Nothing
-                combineArg (Just a) (Just b) | (a /= b) = Left  $
+                combineArg (Just a) (Just b) | (a == b) = return (pure a)
+                combineArg Nothing  (Just b)            = return (pure b)
+                combineArg (Just a) Nothing             = return (pure a)
+                combineArg Nothing Nothing              = return Nothing
+                combineArg (Just a) (Just b) | (a /= b) = Left $
                         "Arguments mismatch: " ++ (show $ prettyPrintArgument a)
                                     ++ " and " ++ (show $ prettyPrintArgument b)
 

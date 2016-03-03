@@ -457,7 +457,7 @@ name = token go P.<?> "name"
     go _        = Nothing
 
 tag :: String -> TokenParser String
-tag s = token go P.<?> "default"
+tag s = token go P.<?> ("tag: " ++ s)
   where
     go (Tag k (Just v)) | Str.toUpper k == Str.toUpper s = Just v
     go _                                                 = Nothing
