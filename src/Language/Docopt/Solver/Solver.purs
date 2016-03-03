@@ -103,7 +103,7 @@ solveBranch as ds = Branch <$> f as
                         , arg:  o.arg
                         }
                       , description: {
-                          arg: o'.arg <#> \(O.Argument an _) -> an
+                          arg: o'.arg <#> \(O.Argument a') -> a'.name
                         }
                       }
 
@@ -117,13 +117,13 @@ solveBranch as ds = Branch <$> f as
                   case y of
                     Just (U.Positional n r) ->
                       case opt of
-                        (Option (O.Option { arg: Just (O.Argument n' _) }))
-                          | n == n' -> Just r
+                        (Option (O.Option { arg: Just (O.Argument a') }))
+                          | n == a'.name -> Just r
                         _ -> Nothing
                     Just (U.Command n) ->
                       case opt of
-                        (Option (O.Option { arg: Just (O.Argument n' _) }))
-                          | n == n' -> Just false
+                        (Option (O.Option { arg: Just (O.Argument a') }))
+                          | n == a'.name -> Just false
                         _ -> Nothing
                     _ -> Nothing
 
@@ -184,7 +184,7 @@ solveBranch as ds = Branch <$> f as
                         , arg:  o.arg
                         }
                       , description: {
-                          arg: o'.arg <#> \(O.Argument an _) -> an
+                          arg: o'.arg <#> \(O.Argument a') -> a'.name
                         }
                       }
 
@@ -198,13 +198,13 @@ solveBranch as ds = Branch <$> f as
                   case y of
                     Just (U.Positional n r) ->
                       case x of
-                        (Option (O.Option { arg: Just (O.Argument n' _) } ))
-                          | Str.toUpper n == Str.toUpper n' -> Just r
+                        (Option (O.Option { arg: Just (O.Argument a') } ))
+                          | Str.toUpper n == Str.toUpper a'.name -> Just r
                         _ -> Nothing
                     Just (U.Command n) ->
                       case x of
-                        (Option (O.Option { arg: Just (O.Argument n' _) } ))
-                          | Str.toUpper n == Str.toUpper n' -> Just false
+                        (Option (O.Option { arg: Just (O.Argument a') } ))
+                          | Str.toUpper n == Str.toUpper a'.name -> Just false
                         _ -> Nothing
                     _ -> Nothing
 
@@ -256,22 +256,31 @@ solveBranch as ds = Branch <$> f as
         resolveOptArg :: Maybe String
                       -> Maybe Desc.Argument
                       -> Maybe O.Argument
-        resolveOptArg (Just n) Nothing = return $ O.Argument n Nothing
+        resolveOptArg (Just n) Nothing = do
+          return $ O.Argument { name: n
+                              , value: Nothing }
         resolveOptArg Nothing (Just (Desc.Argument a))
           = do
           -- XXX: The conversion to `StringValue` should not be needed,
           -- `Desc.Argument` should be of type `Maybe Value`.
-          return $ O.Argument a.name (StringValue <$> a.default)
+          return $ O.Argument { name: a.name
+                              , value: StringValue <$> a.default
+                              }
         resolveOptArg (Just an) (Just (Desc.Argument a))
           = do
           -- XXX: Do we need to guard that `an == a.name` here?
           -- XXX: The conversion to `StringValue` should not be needed,
           -- `Desc.Argument` should be of type `Maybe Value`.
-          return $ O.Argument a.name (StringValue <$> a.default)
+          return $ O.Argument { name: a.name
+                              , value: StringValue <$> a.default
+                              }
         resolveOptArg _ _ = Nothing
 
         toArg:: Maybe String -> Maybe O.Argument
-        toArg a = a >>= \an -> return $ O.Argument an Nothing
+        toArg a = do
+          an <- a
+          return $ O.Argument { name: an
+                              , value: Nothing }
 
         argMatches :: Maybe String
                    -> Maybe O.Argument
@@ -280,9 +289,9 @@ solveBranch as ds = Branch <$> f as
           =  (isNothing a)
           || (isNothing a && isNothing a')
           || (maybe false id do
-              a' >>= \(O.Argument an' _) -> do
-                an <- a
-                return (Str.toUpper an == Str.toUpper an')
+              an <- a
+              (O.Argument { name: an' }) <- a'
+              return $ Str.toUpper an == Str.toUpper an'
             )
 
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage

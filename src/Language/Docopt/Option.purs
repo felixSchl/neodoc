@@ -16,7 +16,7 @@ module Language.Docopt.Option (
   ) where
 
 import Prelude
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), maybe, isJust)
 import Data.String (fromChar)
 import Control.Apply ((*>))
 import qualified Data.String as Str
@@ -29,7 +29,10 @@ type Name = String
 type IsRepeatable = Boolean
 type IsOptional = Boolean
 
-data Argument = Argument String (Maybe Value)
+newtype Argument = Argument {
+  name  :: String
+, value :: Maybe Value
+}
 
 newtype Option = Option {
   flag       :: Maybe Flag
@@ -57,15 +60,15 @@ isRepeatable :: Option -> Boolean
 isRepeatable (Option o) = o.repeatable
 
 hasDefault :: Option -> Boolean
-hasDefault (Option { arg: Just (Argument _ (Just _)) }) = true
-hasDefault _ = false
+hasDefault (Option { arg: Just (Argument a) }) = isJust a.value
+hasDefault _                                   = false
 
 takesArgument :: Option -> Boolean
-takesArgument (Option { arg: Just _ }) = true
-takesArgument _ = false
+takesArgument (Option { arg: a }) = isJust a
+takesArgument _                   = false
 
 isFlag :: Option -> Boolean
-isFlag (Option { arg: Just (Argument _ (Just (BoolValue _))) }) = true
+isFlag (Option { arg: Just (Argument { value: Just (BoolValue _)})}) = true
 isFlag _ = false
 
 prettyPrintOption :: Option -> String
@@ -76,10 +79,10 @@ prettyPrintOption (Option o)
     long    = maybe "" (const ", ") (o.flag *> o.name)
               ++ maybe "" ("--" ++) o.name
     rep     = if o.repeatable then "..." else ""
-    arg'    = flip (maybe "") o.arg \(Argument n _) -> "="  ++ n
-    default = flip (maybe "") o.arg \(Argument _ d) ->
-                flip (maybe "") d \d' ->
-                  " [default: " ++ (prettyPrintValue d') ++  "]"
+    arg'    = flip (maybe "") o.arg \(Argument { name }) -> "="  ++ name
+    default = flip (maybe "") o.arg \(Argument { value }) ->
+                flip (maybe "") value \v->
+                  " [default: " ++ (prettyPrintValue v) ++  "]"
 
 -- short hand to create an Option argument
 opt' :: Maybe Flag -> Maybe Name -> Maybe Argument -> IsRepeatable -> Option

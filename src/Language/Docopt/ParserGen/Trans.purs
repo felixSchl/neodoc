@@ -87,8 +87,8 @@ reduce b m =
           |    (o.name == o'.name)
             && (o.flag == o'.flag)
             && ((isNothing o.arg && isNothing o'.arg) || isJust do
-                  (O.Argument an  _) <- o.arg
-                  (O.Argument an' _) <- o'.arg
+                  (O.Argument { name: an  }) <- o.arg
+                  (O.Argument { name: an' }) <- o'.arg
                   guard (Str.toUpper an == Str.toUpper an')
                 )
           = D.Option $ O.Option {
@@ -141,7 +141,7 @@ reduce b m =
 
         toDefVal :: D.Argument -> Maybe D.Value
         toDefVal (D.Option (O.Option o@{
-                  arg: Just (O.Argument _ (Just v))
+                  arg: Just (O.Argument { value: Just v })
                 }))
           = return $
               if (D.isArrayValue v || not o.repeatable)

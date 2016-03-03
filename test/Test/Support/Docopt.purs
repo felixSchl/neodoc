@@ -39,10 +39,12 @@ br :: (Array Argument) -> Branch
 br xs = Branch (toList xs)
 
 oa :: String -> Value -> O.Argument
-oa n v = O.Argument n (Just v)
+oa n v = O.Argument { name: n
+                    , value: Just v }
 
 oa_ :: String -> O.Argument
-oa_ n = O.Argument n Nothing
+oa_ n = O.Argument { name: n
+                   , value: Nothing }
 
 -- short hand for values
 array = ArrayValue

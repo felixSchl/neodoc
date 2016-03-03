@@ -158,7 +158,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   where
 
     takesArg = isJust a
-    def      = maybe Nothing (\(O.Argument _ v) -> v) a
+    def      = maybe Nothing (\(O.Argument { value: v }) -> v) a
 
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
