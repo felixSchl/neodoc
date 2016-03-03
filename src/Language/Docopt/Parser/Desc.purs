@@ -22,6 +22,7 @@ import Data.String (toLower, fromChar)
 import qualified Data.Array as A
 import qualified Data.String as Str
 
+import Language.Docopt.Value
 import Language.Docopt.Parser.Base
 import Language.Docopt.Parser.Common
 import Language.Docopt.Parser.State
@@ -32,7 +33,7 @@ data Desc = OptionDesc Option
           | CommandDesc
 
 data Name = Flag Char | Long String | Full Char String
-newtype Argument = Argument { name :: String, default :: Maybe String }
+newtype Argument = Argument { name :: String, default :: Maybe Value }
 newtype Option = Option { name :: Name, arg :: Maybe Argument }
 data Content = Text | Default String
 
@@ -81,10 +82,11 @@ prettyPrintOption (Option opt)
 
 prettyPrintArgument :: Argument -> String
 prettyPrintArgument (Argument { name: n, default: d })
-  = n ++ maybe "" (\v -> " [default: " ++ v ++  "]") d
+  = n ++ maybe "" (\v -> " [default: " ++ (prettyPrintValue v) ++  "]") d
 
 argument :: String -> Maybe String -> Argument
-argument name default = Argument { name: name, default: default }
+argument name default = Argument { name: name
+                                 , default: StringValue <$> default }
 
 run :: String -> Either P.ParseError (List Desc)
 run x = lex x >>= parse
@@ -140,7 +142,7 @@ descParser =
         setDefault (Option o) d = return $ Option $
           o { arg = do
                 (Argument arg) <- o.arg
-                return $ Argument $ arg { default = d } }
+                return $ Argument $ arg { default = StringValue <$> d } }
 
         start :: L.TokenParser Option
         start = do

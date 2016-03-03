@@ -264,7 +264,7 @@ solveBranch as ds = Branch <$> f as
           -- XXX: The conversion to `StringValue` should not be needed,
           -- `Desc.Argument` should be of type `Maybe Value`.
           return $ O.Argument { name: a.name
-                              , default: StringValue <$> a.default
+                              , default: a.default
                               }
         resolveOptArg (Just an) (Just (Desc.Argument a))
           = do
@@ -272,7 +272,7 @@ solveBranch as ds = Branch <$> f as
           -- XXX: The conversion to `StringValue` should not be needed,
           -- `Desc.Argument` should be of type `Maybe Value`.
           return $ O.Argument { name: a.name
-                              , default: StringValue <$> a.default
+                              , default: a.default
                               }
         resolveOptArg _ _ = Nothing
 
