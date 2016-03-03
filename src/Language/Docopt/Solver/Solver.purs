@@ -258,13 +258,13 @@ solveBranch as ds = Branch <$> f as
                       -> Maybe O.Argument
         resolveOptArg (Just n) Nothing = do
           return $ O.Argument { name: n
-                              , value: Nothing }
+                              , default: Nothing }
         resolveOptArg Nothing (Just (Desc.Argument a))
           = do
           -- XXX: The conversion to `StringValue` should not be needed,
           -- `Desc.Argument` should be of type `Maybe Value`.
           return $ O.Argument { name: a.name
-                              , value: StringValue <$> a.default
+                              , default: StringValue <$> a.default
                               }
         resolveOptArg (Just an) (Just (Desc.Argument a))
           = do
@@ -272,7 +272,7 @@ solveBranch as ds = Branch <$> f as
           -- XXX: The conversion to `StringValue` should not be needed,
           -- `Desc.Argument` should be of type `Maybe Value`.
           return $ O.Argument { name: a.name
-                              , value: StringValue <$> a.default
+                              , default: StringValue <$> a.default
                               }
         resolveOptArg _ _ = Nothing
 
@@ -280,7 +280,7 @@ solveBranch as ds = Branch <$> f as
         toArg a = do
           an <- a
           return $ O.Argument { name: an
-                              , value: Nothing }
+                              , default: Nothing }
 
         argMatches :: Maybe String
                    -> Maybe O.Argument

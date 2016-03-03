@@ -141,7 +141,7 @@ reduce b m =
 
         toDefVal :: D.Argument -> Maybe D.Value
         toDefVal (D.Option (O.Option o@{
-                  arg: Just (O.Argument { value: Just v })
+                  arg: Just (O.Argument { default: Just v })
                 }))
           = return $
               if (D.isArrayValue v || not o.repeatable)

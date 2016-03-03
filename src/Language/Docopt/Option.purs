@@ -30,8 +30,8 @@ type IsRepeatable = Boolean
 type IsOptional = Boolean
 
 newtype Argument = Argument {
-  name  :: String
-, value :: Maybe Value
+  name    :: String
+, default :: Maybe Value
 }
 
 newtype Option = Option {
@@ -60,7 +60,7 @@ isRepeatable :: Option -> Boolean
 isRepeatable (Option o) = o.repeatable
 
 hasDefault :: Option -> Boolean
-hasDefault (Option { arg: Just (Argument a) }) = isJust a.value
+hasDefault (Option { arg: Just (Argument a) }) = isJust a.default
 hasDefault _                                   = false
 
 takesArgument :: Option -> Boolean
@@ -68,7 +68,7 @@ takesArgument (Option { arg: a }) = isJust a
 takesArgument _                   = false
 
 isFlag :: Option -> Boolean
-isFlag (Option { arg: Just (Argument { value: Just (BoolValue _)})}) = true
+isFlag (Option { arg: Just (Argument { default: Just (BoolValue _)})}) = true
 isFlag _ = false
 
 prettyPrintOption :: Option -> String
@@ -80,8 +80,8 @@ prettyPrintOption (Option o)
               ++ maybe "" ("--" ++) o.name
     rep     = if o.repeatable then "..." else ""
     arg'    = flip (maybe "") o.arg \(Argument { name }) -> "="  ++ name
-    default = flip (maybe "") o.arg \(Argument { value }) ->
-                flip (maybe "") value \v->
+    default = flip (maybe "") o.arg \(Argument { default }) ->
+                flip (maybe "") default \v->
                   " [default: " ++ (prettyPrintValue v) ++  "]"
 
 -- short hand to create an Option argument

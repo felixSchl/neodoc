@@ -40,11 +40,11 @@ br xs = Branch (toList xs)
 
 oa :: String -> Value -> O.Argument
 oa n v = O.Argument { name: n
-                    , value: Just v }
+                    , default: Just v }
 
 oa_ :: String -> O.Argument
 oa_ n = O.Argument { name: n
-                   , value: Nothing }
+                   , default: Nothing }
 
 -- short hand for values
 array = ArrayValue
