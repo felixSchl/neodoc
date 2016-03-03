@@ -158,7 +158,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   where
 
     takesArg = isJust a
-    def      = maybe Nothing (\(O.Argument { value: v }) -> v) a
+    def      = a >>= (\(O.Argument a) -> a.value)
 
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
@@ -185,7 +185,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 3:
     -- The leading flag matches, there are stacked options, the option takes
     -- no argument and an explicit argument has not been provided.
-    go (SOpt f' xs v) _ | (f' == f) && (takesArg == false) && (A.length xs > 0)
+    go (SOpt f' xs v) _ | (f' == f) && (not takesArg) && (A.length xs > 0)
       = return $ OptParse (D.BoolValue true)
                           (Just $ SOpt (AU.head xs) (AU.tail xs) v)
                           false
@@ -193,7 +193,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 4:
     -- The leading flag matches, there are no stacked options and the option
     -- takes no argument - total consumption!
-    go (SOpt f' xs _) _ | (f' == f) && (takesArg == false) && (A.length xs == 0)
+    go (SOpt f' xs _) _ | (f' == f) && (not takesArg) && (A.length xs == 0)
       = return $ OptParse (D.BoolValue true)
                           Nothing
                           false
