@@ -40,6 +40,9 @@ import qualified Language.Docopt.Parser.Usage.Option   as UO
 
 data Result = Consumed (List Argument) | Unconsumed (List Argument)
 
+(^=) :: String -> String -> Boolean
+(^=) a b = Str.toUpper a == Str.toUpper b
+
 solveBranch :: U.Branch -> List Desc -> Either SolveError Branch
 solveBranch as ds = Branch <$> f as
   where f :: U.Branch -> Either SolveError (List Argument)
@@ -85,20 +88,17 @@ solveBranch as ds = Branch <$> f as
           -- XXX: Is `head` the right thing to do here? What if there are more
           -- matches? That would indicate ambigiutiy and needs to be treated,
           -- possibly with an error?
-          let o' = O.runOption $ flip maybe' id
+          let x = O.runOption $ flip maybe' id
                     (\_ -> O.lopt' o.name (toArg o.arg) (o.repeatable))
                     (head $ catMaybes $ convert <$> ds)
 
-          if (argMatches o.arg o'.arg)
+          -- Validate the argument matches
+          if (argMatches o.arg x.arg)
             then return unit
             else throwError $ DescriptionError $ ArgumentMismatchError {
-                    option: {
-                      flag: o'.flag
-                    , name: o'.name
-                    , arg:  o.arg
-                    }
+                    option: O.Option x
                   , description: {
-                      arg: o'.arg <#> \(O.Argument a') -> a'.name
+                      arg: x.arg <#> O.runArgument >>> _.name
                     }
                   }
 
@@ -108,7 +108,7 @@ solveBranch as ds = Branch <$> f as
           -- `isRepeated` should be inherited.
           let mr = do
                 guard (not o.repeatable)
-                arg' <- O.runArgument <$> o'.arg
+                arg' <- O.runArgument <$> x.arg
                 case y of
                   Just (U.Positional n r) | n == arg'.name -> return r
                   Just (U.Command n)      | n == arg'.name -> return false
@@ -117,120 +117,90 @@ solveBranch as ds = Branch <$> f as
           return $ (maybe Unconsumed (const Consumed) mr)
                  $ singleton
                  $ Option
-                 $ O.Option (o' { repeatable = maybe (o'.repeatable) id mr })
+                 $ O.Option (x { repeatable = maybe (x.repeatable) id mr })
 
           where
             convert :: Desc -> Maybe O.Option
-            convert (Desc.OptionDesc (Desc.Option {
-                      name=Desc.Long n'
-                    , arg=a'
-                    }))
-              | Str.toUpper n' == Str.toUpper o.name
-              = return $ O.lopt' o.name
-                                (resolveOptArg o.arg a')
-                                (o.repeatable)
-            convert (Desc.OptionDesc (Desc.Option {
-                      name=Desc.Full f n'
-                    , arg=a'
-                    }))
-              | Str.toUpper n' == Str.toUpper o.name
-              = return $ O.opt' (Just f)
-                                (Just o.name)
-                                (resolveOptArg o.arg a')
-                                (o.repeatable)
+            convert (Desc.OptionDesc (Desc.Option x))
+              = convert' x
+                where
+                  convert' { name = Desc.Long n', arg = arg' }
+                    | n' ^= o.name
+                    = return $ O.lopt' (o.name)
+                                       (resolveOptArg o.arg arg')
+                                       (o.repeatable)
+                  convert' { name = Desc.Full f' n', arg = arg' }
+                    | n' ^= o.name
+                    = return $ O.opt' (Just f')
+                                      (Just o.name)
+                                      (resolveOptArg o.arg arg')
+                                      (o.repeatable)
             convert _ = Nothing
 
         solveArgs (U.OptionStack (UO.SOpt o)) y = do
 
           -- Figure out trailing flag, in order to couple it with an adjacent
           -- option where needed.
-          let fs' = toList o.stack
-              x   = case last fs' of
-                      Just f' -> Tuple (o.flag:(fromJust $ init fs')) f'
-                      Nothing -> Tuple Nil o.flag
-              fs'' = fst x
-              f''  = snd x
+          (Tuple xs x) <- do
+              let fs = toList o.stack
+                  t  = case last fs of
+                        Just f  -> Tuple (o.flag:(fromJust $ init fs)) f
+                        Nothing -> Tuple Nil o.flag
+              Tuple
+                <$> (match false `traverse` (fst t))
+                <*> (O.runOption <$> do match true (snd t))
 
-          xs <- match false `traverse` fs''
-          x  <- match true f''
-
-          case x of
-            -- XXX: Non-exhaustive on purpose. How to improve?
-            (Option (O.Option o')) ->
-              if (argMatches o.arg o'.arg)
-                then return unit
-                else throwError $ DescriptionError $ ArgumentMismatchError {
-                        option: {
-                          flag: o'.flag
-                        , name: o'.name
-                        , arg:  o.arg
-                        }
-                      , description: {
-                          arg: o'.arg <#> \(O.Argument a') -> a'.name
-                        }
-                      }
+          -- Validate the argument matches
+          if (argMatches o.arg x.arg)
+            then return unit
+            else throwError $ DescriptionError $ ArgumentMismatchError {
+                    option: O.Option x
+                  , description: {
+                      arg: x.arg <#> O.runArgument >>> _.name
+                    }
+                  }
 
           -- Look ahead if any of the following arguments should be consumed.
           -- Return either `Nothing` to signify that nothing should be consumed
           -- or a value signifieng that it should be consumed, and the
           -- `isRepeated` should be inherited.
-          let adjArg = if (isRepeatable x)
-                then Nothing
-                else
-                  case y of
-                    Just (U.Positional n r) ->
-                      case x of
-                        (Option (O.Option { arg: Just (O.Argument a') } ))
-                          | Str.toUpper n == Str.toUpper a'.name -> Just r
-                        _ -> Nothing
-                    Just (U.Command n) ->
-                      case x of
-                        (Option (O.Option { arg: Just (O.Argument a') } ))
-                          | Str.toUpper n == Str.toUpper a'.name -> Just false
-                        _ -> Nothing
-                    _ -> Nothing
+          let mr = do
+                guard (not x.repeatable)
+                arg' <- O.runArgument <$> x.arg
+                case y of
+                    Just (U.Positional n r) | n == arg'.name -> return r
+                    Just (U.Command n)      | n == arg'.name -> return false
+                    _                                        -> Nothing
 
-          -- Apply adjacent argument
-          return $ maybe'
-            (\_ -> Unconsumed $ xs ++ singleton x)
-            (\r -> case x of
-              -- XXX: Non-exhaustive on purpose. How to improve?
-              (Option (O.Option o')) -> do
-                Consumed $ xs ++ (singleton $ Option $ O.Option o' {
-                                                        repeatable = r
-                                                       })
-            )
-            adjArg
+          return $ (maybe Unconsumed (const Consumed) mr)
+                 $ (Option <$> xs)
+                    ++ (singleton $ Option $ O.Option $ x {
+                          repeatable = maybe (x.repeatable) id mr
+                        })
 
           where
-            match :: Boolean -> Char -> Either SolveError Argument
-            match isTrailing f = do
-              return $ flip maybe' id
-                        (\_ -> sopt' f
-                                     (toArg o.arg)
-                                     o.repeatable)
-                        (head $ catMaybes $ convert f isTrailing <$> ds)
+            match :: Boolean -> Char -> Either SolveError O.Option
+            match isTrailing f = return $
+              maybe' (\_ -> O.sopt' f (toArg o.arg) (o.repeatable))
+                    id
+                    (head $ catMaybes $ convert f isTrailing <$> ds)
 
-            convert :: Char -> Boolean -> Desc -> Maybe Argument
-            convert f isTrailing (Desc.OptionDesc (Desc.Option {
-                                  name=Desc.Flag f'
-                                , arg=a'
-                                }))
-              | (f == f')
-                && (isTrailing || isNothing a')
-              = return $ sopt' f
-                               (resolveOptArg o.arg a')
-                               o.repeatable
-            convert f isTrailing (Desc.OptionDesc (Desc.Option {
-                                  name=Desc.Full f' n
-                                , arg=a'
-                                }))
-              | (f == f')
-                && (isTrailing || isNothing a')
-              = return $ opt' (Just f)
-                              (Just n)
-                              (resolveOptArg o.arg a')
-                              o.repeatable
+            convert :: Char -> Boolean -> Desc -> Maybe O.Option
+            convert f isTrailing (Desc.OptionDesc (Desc.Option y))
+              = convert' y
+                where
+                  convert' { name = Desc.Flag f', arg = arg' }
+                    | (f == f') && (isTrailing || isNothing arg')
+                    = return $ O.sopt' (f)
+                                       (resolveOptArg o.arg arg')
+                                       (o.repeatable)
+                  convert' { name = Desc.Full f' n', arg = arg' }
+                    | (f == f') && (isTrailing || isNothing arg')
+                    = return $ O.opt' (Just f)
+                                      (Just n')
+                                      (resolveOptArg o.arg arg')
+                                      (o.repeatable)
+                  convert' _ = Nothing
             convert _ _ _ = Nothing
 
         -- | Resolve an option's argument name against that given in the
