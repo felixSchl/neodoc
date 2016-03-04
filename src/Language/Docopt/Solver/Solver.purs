@@ -85,77 +85,59 @@ solveBranch as ds = Branch <$> f as
           -- XXX: Is `head` the right thing to do here? What if there are more
           -- matches? That would indicate ambigiutiy and needs to be treated,
           -- possibly with an error?
-          let opt = flip maybe' id
-                      (\_ -> lopt' o.name
-                                   (toArg o.arg)
-                                   (o.repeatable))
-                      (head $ catMaybes $ convert <$> ds)
+          let o' = O.runOption $ flip maybe' id
+                    (\_ -> O.lopt' o.name (toArg o.arg) (o.repeatable))
+                    (head $ catMaybes $ convert <$> ds)
 
-          case opt of
-            -- XXX: Non-exhaustive on purpose. How to improve?
-            (Option (O.Option o')) ->
-              if (argMatches o.arg o'.arg)
-                then return unit
-                else throwError $ DescriptionError $ ArgumentMismatchError {
-                        option: {
-                          flag: o'.flag
-                        , name: o'.name
-                        , arg:  o.arg
-                        }
-                      , description: {
-                          arg: o'.arg <#> \(O.Argument a') -> a'.name
-                        }
-                      }
+          if (argMatches o.arg o'.arg)
+            then return unit
+            else throwError $ DescriptionError $ ArgumentMismatchError {
+                    option: {
+                      flag: o'.flag
+                    , name: o'.name
+                    , arg:  o.arg
+                    }
+                  , description: {
+                      arg: o'.arg <#> \(O.Argument a') -> a'.name
+                    }
+                  }
 
           -- Look ahead if any of the following arguments should be consumed.
           -- Return either `Nothing` to signify that nothing should be consumed
           -- or a value signifieng that it should be consumed, and the
           -- `isRepeated` should be inherited.
-          let adjArg = if o.repeatable
-                then Nothing
-                else
-                  case y of
-                    Just (U.Positional n r) ->
-                      case opt of
-                        (Option (O.Option { arg: Just (O.Argument a') }))
-                          | n == a'.name -> Just r
-                        _ -> Nothing
-                    Just (U.Command n) ->
-                      case opt of
-                        (Option (O.Option { arg: Just (O.Argument a') }))
-                          | n == a'.name -> Just false
-                        _ -> Nothing
-                    _ -> Nothing
+          let mr = do
+                guard (not o.repeatable)
+                arg' <- O.runArgument <$> o'.arg
+                case y of
+                  Just (U.Positional n r) | n == arg'.name -> return r
+                  Just (U.Command n)      | n == arg'.name -> return false
+                  _                                        -> Nothing
 
-          -- Apply adjacent argument
-          return $ maybe'
-            (\_ -> Unconsumed $ singleton opt)
-            (\r -> case opt of
-              -- XXX: non-exhaustive, because doesn't need to be...
-              (Option (O.Option o)) -> do
-                Consumed $ singleton $ Option (O.Option o { repeatable = r })
-            )
-            adjArg
+          return $ (maybe Unconsumed (const Consumed) mr)
+                 $ singleton
+                 $ Option
+                 $ O.Option (o' { repeatable = maybe (o'.repeatable) id mr })
 
           where
-            convert :: Desc -> Maybe Argument
+            convert :: Desc -> Maybe O.Option
             convert (Desc.OptionDesc (Desc.Option {
                       name=Desc.Long n'
                     , arg=a'
                     }))
               | Str.toUpper n' == Str.toUpper o.name
-              = return $ lopt' o.name
-                               (resolveOptArg o.arg a')
-                               (o.repeatable)
+              = return $ O.lopt' o.name
+                                (resolveOptArg o.arg a')
+                                (o.repeatable)
             convert (Desc.OptionDesc (Desc.Option {
                       name=Desc.Full f n'
                     , arg=a'
                     }))
               | Str.toUpper n' == Str.toUpper o.name
-              = return $ opt' (Just f)
-                              (Just o.name)
-                              (resolveOptArg o.arg a')
-                              (o.repeatable)
+              = return $ O.opt' (Just f)
+                                (Just o.name)
+                                (resolveOptArg o.arg a')
+                                (o.repeatable)
             convert _ = Nothing
 
         solveArgs (U.OptionStack (UO.SOpt o)) y = do

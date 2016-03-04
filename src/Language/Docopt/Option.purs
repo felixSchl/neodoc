@@ -5,6 +5,8 @@ module Language.Docopt.Option (
   , Name ()
   , IsOptional ()
   , IsRepeatable ()
+  , runOption
+  , runArgument
   , isRepeatable
   , hasDefault
   , isFlag
@@ -34,12 +36,25 @@ newtype Argument = Argument {
 , default :: Maybe Value
 }
 
+runArgument :: Argument -> { name    :: String
+                           , default :: Maybe Value
+                           }
+runArgument (Argument a) = a
+
+
 newtype Option = Option {
   flag       :: Maybe Flag
 , name       :: Maybe Name
 , arg        :: Maybe Argument
 , repeatable :: IsRepeatable
 }
+
+runOption :: Option -> { flag       :: Maybe Flag
+                       , name       :: Maybe Name
+                       , arg        :: Maybe Argument
+                       , repeatable :: IsRepeatable
+                       }
+runOption (Option o) = o
 
 derive instance genericOption :: Generic Option
 derive instance genericArgument :: Generic Argument
