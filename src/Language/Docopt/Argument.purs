@@ -23,6 +23,7 @@ import Data.Foldable (intercalate)
 import qualified Data.String as Str
 import Data.Function (on)
 import Data.String (fromChar)
+import Data.String.Ext ((^=))
 import Control.Apply ((*>))
 
 import Language.Docopt.Value (Value(..), prettyPrintValue)
@@ -66,8 +67,7 @@ instance eqArgument :: Eq Argument where
   eq (EOA) (EOA) = true
   eq (Stdin) (Stdin) = true
   eq (Command n) (Command n') = (n == n')
-  eq (Positional n r) (Positional n' r')
-    = (Str.toUpper n == Str.toUpper n') && (r == r')
+  eq (Positional n r) (Positional n' r') = (n ^= n') && (r == r')
   eq (Group o bs r) (Group o' bs' r') = (o == o') && (bs == bs') && (r == r')
   eq (Option o) (Option o') = o == o'
   eq _ _ = false

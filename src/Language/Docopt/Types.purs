@@ -25,14 +25,8 @@ import qualified Text.Parsing.Parser as P
 
 data DescriptionError
   = ArgumentMismatchError {
-      option :: {
-        flag :: Maybe O.Flag
-      , name :: Maybe O.Name
-      , arg  :: Maybe String
-      }
-    , description :: {
-        arg :: Maybe String
-      }
+      option :: O.Option
+    , description :: { arg :: Maybe String }
     }
 
 data SolveError

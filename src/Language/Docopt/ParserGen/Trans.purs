@@ -9,19 +9,20 @@ import Data.Maybe (Maybe(..), isJust, isNothing, maybe)
 import Data.Foldable (foldl)
 import Control.Plus (empty)
 import Data.Bifunctor (lmap)
-import qualified Data.Array as A
+import Data.Array as A
 import Data.Map (Map())
 import Data.String (fromChar)
-import qualified Data.Map as Map
-import qualified Data.String as Str
+import Data.Map as Map
+import Data.String as Str
 import Data.Tuple (Tuple(..), fst)
 import Control.MonadPlus (guard)
-import qualified Language.Docopt.Errors   as D
-import qualified Language.Docopt.Value    as D
-import qualified Language.Docopt.Argument as D
-import qualified Language.Docopt.Option   as O
+import Language.Docopt.Errors   as D
+import Language.Docopt.Value    as D
+import Language.Docopt.Argument as D
+import Language.Docopt.Option   as O
+import Data.String.Ext ((^=))
 import Data.List (List(..), toList, concat)
-import qualified Data.List as L
+import Data.List as L
 import Language.Docopt.ParserGen.ValueMapping
 
 -- Transform the map of (Argument, Value) mappings to a map of (String, Value),
@@ -56,11 +57,6 @@ byName m
     resolve :: D.Value -> D.Value -> D.Value
     resolve _ v' = v'
 
-newtype ArgKey = ArgKey D.Argument
-
-instance showArgKey :: Show ArgKey where
-  show (ArgKey a) = "ArgKey " ++ show a
-
 -- Reduce the list of (Argument, Value) mappings down to a Set.
 -- This means that duplicate Arguments must somehow be resolved.
 --
@@ -70,18 +66,20 @@ instance showArgKey :: Show ArgKey where
 --      * Their argument name           -> ?
 --      * Their argument default value  -> ?
 --
-reduce :: D.Branch -> List ValueMapping -> Map D.Argument D.Value
+reduce :: D.Branch               -- ^ the specification
+       -> List ValueMapping      -- ^ the parse result
+       -> Map D.Argument D.Value -- ^ the output set of (arg => val)
 reduce b m =
   let m' = lmap findLCD <$> m
    in mergeDefVals b $ toValMap m'
 
   where
+    -- Find the lowest comment denominator between two arguments
     findLCD :: D.Argument -> D.Argument
     findLCD a = foldl step a (fst <$> m)
       where
         step :: D.Argument -> D.Argument -> D.Argument
-        step (D.Positional n r) (D.Positional n' r')
-          | (Str.toUpper n == Str.toUpper n')
+        step (D.Positional n r) (D.Positional n' r') | n ^= n'
           = D.Positional n (r || r')
         step (D.Option (O.Option o)) (D.Option (O.Option o'))
           |    (o.name == o'.name)
@@ -89,13 +87,10 @@ reduce b m =
             && ((isNothing o.arg && isNothing o'.arg) || isJust do
                   (O.Argument { name: an  }) <- o.arg
                   (O.Argument { name: an' }) <- o'.arg
-                  guard (Str.toUpper an == Str.toUpper an')
+                  guard (an ^= an')
                 )
-          = D.Option $ O.Option {
-              flag:       o.flag
-            , name:       o.name
-            , arg:        o.arg
-            , repeatable: (o.repeatable || o'.repeatable)
+          = D.Option $ O.Option $ o {
+              repeatable = o.repeatable || o'.repeatable
             }
         step a _ = a
 

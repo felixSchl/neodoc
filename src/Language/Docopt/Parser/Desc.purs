@@ -48,7 +48,7 @@ runArgument (Argument a) = a
 newtype Option = Option {
   name :: Name
 , arg  :: Maybe Argument
-, env     :: Maybe String
+, env  :: Maybe String
 }
 
 data Content

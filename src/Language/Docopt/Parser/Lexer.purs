@@ -21,6 +21,7 @@ import Data.String (fromCharArray, fromChar, trim)
 import Data.List (List(..), (:), fromList, many)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
+import Data.String.Ext ((^=))
 import Language.Docopt.Parser.Base
 import Language.Docopt.Parser.State
 import Data.Tuple
@@ -459,8 +460,8 @@ name = token go P.<?> "name"
 tag :: String -> TokenParser String
 tag s = token go P.<?> ("tag: " ++ s)
   where
-    go (Tag k (Just v)) | Str.toUpper k == Str.toUpper s = Just v
-    go _                                                 = Nothing
+    go (Tag k (Just v)) | k ^= s = Just v
+    go _                         = Nothing
 
 word :: TokenParser String
 word = token go P.<?> "word"
