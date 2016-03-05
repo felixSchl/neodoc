@@ -202,7 +202,7 @@ parseToken = P.choice
   stringLiteral = StringLiteral <$> do
     P.choice [
       P.between (P.char '\'') (P.char '\'') (p '\'')
-    , P.between (P.char '"') (P.char '"') (p '"')
+    , P.between (P.char '"')  (P.char '"')  (p '"')
     ]
     where
       p :: Char -> P.Parser String String

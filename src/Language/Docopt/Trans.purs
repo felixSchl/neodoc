@@ -1,4 +1,4 @@
-module Language.Docopt.ParserGen.Trans (
+module Language.Docopt.Trans (
     reduce
   , byName
   ) where
@@ -10,6 +10,8 @@ import Data.Foldable (foldl)
 import Control.Plus (empty)
 import Data.Bifunctor (lmap)
 import Data.Array as A
+import Data.StrMap as StrMap
+import Data.StrMap (StrMap())
 import Data.Map (Map())
 import Data.String (fromChar)
 import Data.Map as Map
@@ -68,8 +70,9 @@ byName m
 --
 reduce :: D.Branch               -- ^ the specification
        -> List ValueMapping      -- ^ the parse result
+       -> StrMap String          -- ^ the environment
        -> Map D.Argument D.Value -- ^ the output set of (arg => val)
-reduce b m =
+reduce b m env =
   let m' = lmap findLCD <$> m
    in mergeDefVals b $ toValMap m'
 

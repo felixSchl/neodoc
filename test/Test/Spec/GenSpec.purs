@@ -9,11 +9,14 @@ import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), either)
 import Data.List (List(..), toList, length, fromList, singleton)
 import Data.Map (Map(..))
-import qualified Data.Map as Map
-import qualified Data.Array as A
+import Data.StrMap as StrMap
+import Data.StrMap (StrMap())
+import Data.Tuple (uncurry)
+import Data.Map as Map
+import Data.Array as A
 import Data.Foldable (for_, intercalate)
 import Control.Monad.Eff.Exception (error, throwException)
-import qualified Text.Parsing.Parser as P
+import Text.Parsing.Parser as P
 
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())
@@ -26,8 +29,9 @@ import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.ParserGen (genParser, runParser)
-import qualified Language.Docopt.Argument as D
-import qualified Test.Support.Docopt      as D
+import Language.Docopt.Argument as D
+import Language.Docopt.Trans    as T
+import Test.Support.Docopt      as D
 
 data Test = Test (Array Argument) (Array Case)
 data Case = Case (Array String) (Either String (Map Argument Value))
@@ -284,10 +288,12 @@ genSpec = \_ -> describe "The generator" do
                             -> Either String (Map Argument Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate args argv expected = do
-        let result = do
-              runParser
-                (toList argv)
-                (genParser $ singleton $ Usage $ singleton $ D.br args)
+        let result = uncurry T.reduce
+              <$> runParser
+                    argv
+                    (genParser $ singleton $ Usage $ singleton $ D.br args)
+              <*> pure StrMap.empty
+
         case result of
           Left (e@(P.ParseError { message: msg })) ->
             either

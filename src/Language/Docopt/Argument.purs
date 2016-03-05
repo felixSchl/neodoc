@@ -6,6 +6,7 @@ module Language.Docopt.Argument (
   , IsRepeatable ()
   , prettyPrintBranch
   , prettyPrintArg
+  , runBranch
   , isRepeatable
   , hasDefault
   , takesArgument
@@ -33,6 +34,9 @@ type IsRepeatable = Boolean
 type IsOptional = Boolean
 
 newtype Branch = Branch (List Argument) -- XXX: Move to type alias
+
+runBranch :: Branch -> List Argument
+runBranch (Branch xs) = xs
 
 data Argument
   = Command     String

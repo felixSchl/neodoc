@@ -9,17 +9,17 @@ import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), either)
 import Data.List (List(..), toList, length, fromList, singleton)
 import Data.Map (Map(..))
-import qualified Data.Map as Map
-import qualified Data.Array as A
+import Data.Map as Map
+import Data.Array as A
 import Data.Foldable (for_, intercalate)
 import Control.Monad.Eff.Exception (error, throwException)
-import qualified Text.Parsing.Parser as P
+import Text.Parsing.Parser as P
 
 import Language.Docopt.Errors
 import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.ParserGen (genParser, runParser)
-import qualified Language.Docopt.ParserGen.Trans as T
+import Language.Docopt.Trans as T
 
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())
