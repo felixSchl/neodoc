@@ -26,6 +26,8 @@ import Data.Monoid (mempty)
 import Control.Monad.Error.Class (throwError)
 import Data.Array as A
 import Data.String as Str
+import Data.StrMap as StrMap
+import Data.StrMap (StrMap())
 
 import Data.String.Ext ((^=))
 import Language.Docopt.Errors
@@ -45,7 +47,31 @@ runResult :: Result -> List Argument
 runResult (Consumed   xs) = xs
 runResult (Unconsumed xs) = xs
 
-solveBranch :: U.Branch -> List Desc -> Either SolveError Branch
+-- | Update the option descriptions's default values
+-- | from the environment.
+-- |
+-- | XXX: Is this even the right way to do it?
+-- |      This method was chosen since it leaves the more complicated
+-- |      parser code alone, which should not care where default values
+-- |      are coming from (for now).
+applyEnvToDesc :: StrMap String -- ^ the environment
+               -> List Desc     -- ^ the option descriptions
+               -> List Desc     -- ^ the updated option descriptions
+applyEnvToDesc env xs = xs <#> (\x -> maybe x id (applyEnv x))
+  where applyEnv (DE.OptionDesc (DE.Option x)) = do
+          arg <- DE.runArgument <$> x.arg
+          k   <- x.env
+          v   <- StrMap.lookup k env
+          return $ DE.OptionDesc $ DE.Option $ x {
+            arg = pure $ DE.Argument $ arg {
+              default = pure (StringValue v)
+            }
+          }
+        applyEnv x = Nothing
+
+solveBranch :: U.Branch                 -- ^ the usage branch
+            -> List Desc                -- ^ the option descriptions
+            -> Either SolveError Branch -- ^ the canonical usage branch
 solveBranch as ds = Branch <$> go as
   where
     go :: U.Branch -> Either SolveError (List Argument)
@@ -81,7 +107,10 @@ solveBranch as ds = Branch <$> go as
       -- matches? That would indicate ambigiutiy and needs to be treated,
       -- possibly with an error?
       let x = O.runOption $ flip maybe' id
-                (\_ -> O.lopt' o.name (toArg o.arg) (o.repeatable))
+                (\_ -> O.Option $ O.empty { name       = pure o.name
+                                          , arg        = toArg o.arg
+                                          , repeatable = o.repeatable
+                                          })
                 (head $ catMaybes $ convert <$> ds)
 
       -- Validate the argument matches
@@ -116,17 +145,22 @@ solveBranch as ds = Branch <$> go as
         convert (DE.OptionDesc (DE.Option x))
           = convert' x
             where
-              convert' { name = DE.Long n', arg = arg' }
+              convert' { name = DE.Long n' }
                 | n' ^= o.name
-                = return $ O.lopt' (o.name)
-                                   (resolveOptArg o.arg arg')
-                                   (o.repeatable)
-              convert' { name = DE.Full f' n', arg = arg' }
+                = return $ O.Option { name:       pure o.name
+                                    , flag:       Nothing
+                                    , arg:        resolveOptArg o.arg x.arg
+                                    , env:        x.env
+                                    , repeatable: o.repeatable
+                                    }
+              convert' { name = DE.Full f' n' }
                 | n' ^= o.name
-                = return $ O.opt' (Just f')
-                                  (Just o.name)
-                                  (resolveOptArg o.arg arg')
-                                  (o.repeatable)
+                = return $ O.Option { name:       pure o.name
+                                    , flag:       pure f'
+                                    , arg:        resolveOptArg o.arg x.arg
+                                    , env:        x.env
+                                    , repeatable: o.repeatable
+                                    }
         convert _ = Nothing
 
     solveArgs (U.OptionStack (UO.SOpt o)) y = do
@@ -173,25 +207,33 @@ solveBranch as ds = Branch <$> go as
       where
         match :: Boolean -> Char -> Either SolveError O.Option
         match isTrailing f = return $
-          maybe' (\_ -> O.sopt' f (toArg o.arg) (o.repeatable))
-                id
+          flip maybe' id
+                (\_ -> O.Option $ O.empty { flag = pure f
+                                          , arg = toArg o.arg
+                                          , repeatable = o.repeatable
+                                          })
                 (head $ catMaybes $ convert f isTrailing <$> ds)
 
         convert :: Char -> Boolean -> Desc -> Maybe O.Option
         convert f isTrailing (DE.OptionDesc (DE.Option y))
           = convert' y
             where
-              convert' { name = DE.Flag f', arg = arg' }
-                | (f == f') && (isTrailing || isNothing arg')
-                = return $ O.sopt' (f)
-                                   (resolveOptArg o.arg arg')
-                                   (o.repeatable)
-              convert' { name = DE.Full f' n', arg = arg' }
-                | (f == f') && (isTrailing || isNothing arg')
-                = return $ O.opt' (Just f)
-                                  (Just n')
-                                  (resolveOptArg o.arg arg')
-                                  (o.repeatable)
+              convert' { name = DE.Flag f' }
+                | (f == f') && (isTrailing || isNothing y.arg)
+                = return $ O.Option { flag:       pure f
+                                    , name:       Nothing
+                                    , arg:        resolveOptArg o.arg y.arg
+                                    , env:        y.env
+                                    , repeatable: o.repeatable
+                                    }
+              convert' { name = DE.Full f' n' }
+                | (f == f') && (isTrailing || isNothing y.arg)
+                = return $ O.Option { flag:       pure f'
+                                    , name:       pure n'
+                                    , arg:        resolveOptArg o.arg y.arg
+                                    , env:        y.env
+                                    , repeatable: o.repeatable
+                                  }
               convert' _ = Nothing
         convert _ _ _ = Nothing
 

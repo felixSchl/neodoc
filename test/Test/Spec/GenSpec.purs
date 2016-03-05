@@ -62,7 +62,8 @@ genSpec = \_ -> describe "The generator" do
 
   let testCases = [
 
-      test [ pos_arg_r ]
+      test
+        [ pos_arg_r ]
         [ pass
             [ "a", "b", "c" ]
             [ pos_arg_r :> D.array [ D.str "a" , D.str "b" , D.str "c" ] ]
@@ -73,7 +74,8 @@ genSpec = \_ -> describe "The generator" do
             "Trailing input: --foo, -f=10"
         ]
 
-    , test [ pos_arg_r, D.eoa ]
+    , test
+        [ pos_arg_r, D.eoa ]
         [ pass
             [ "a", "b", "c", "--" ]
             [ pos_arg_r :> D.array [ D.str "a" , D.str "b" , D.str "c" ]
@@ -104,6 +106,17 @@ genSpec = \_ -> describe "The generator" do
                     (D.oa "host[:port]" (D.str "http://localhost:3000"))
                       :> D.str "http://localhost:5000"
             ]
+        ]
+
+    , test
+        [ D.grr false [[
+            D.opt 'i' "input" (D.oa_ "FILE")
+          ]]
+        ]
+        [ fail [] "Missing required options: (-i, --input=FILE)"
+        , pass
+            [ "-i", "bar" ]
+            [ D.opt 'i' "input" (D.oa_ "FILE") :> (D.str "bar") ]
         ]
 
     , test
@@ -186,7 +199,6 @@ genSpec = \_ -> describe "The generator" do
         , opt_f_foo_FOZ__r
         , cmd_baz
         ]
-
         [ pass
             [ "foo" , "--out", "--input", "--qux", "--foo=ox", "baz" ]
             [ cmd_foo          :> D.bool true
@@ -283,7 +295,7 @@ genSpec = \_ -> describe "The generator" do
         Map.toList m <#> \(Tuple arg val) ->
           p arg ++ " => " ++ prettyPrintValue val
 
-      validate :: forall eff. Array Argument
+      validate :: forall eff.  Array Argument
                             -> Array String
                             -> Either String (Map Argument Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
@@ -292,7 +304,6 @@ genSpec = \_ -> describe "The generator" do
               <$> runParser
                     argv
                     (genParser $ singleton $ Usage $ singleton $ D.br args)
-              <*> pure StrMap.empty
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->

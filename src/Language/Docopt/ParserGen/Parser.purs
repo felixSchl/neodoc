@@ -8,6 +8,7 @@
 module Language.Docopt.ParserGen.Parser (
     genUsageParser
   , Parser()
+  , Env()
   ) where
 
 import Prelude
@@ -28,27 +29,30 @@ import qualified Data.List.Unsafe as LU
 import qualified Data.Array as A
 import qualified Data.Array.Unsafe as AU
 import Data.Array (uncons)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import Data.Monoid (mempty)
 import Data.Map (Map())
-import qualified Data.Map as Map
+import Control.Monad.Reader (Reader())
+import Data.Map as Map
+import Data.StrMap (StrMap())
 
-import qualified Text.Parsing.Parser             as P
-import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Pos         as P
-import qualified Text.Parsing.Parser.String      as P
+import Text.Parsing.Parser             as P
+import Text.Parsing.Parser.Combinators as P
+import Text.Parsing.Parser.Pos         as P
+import Text.Parsing.Parser.String      as P
 
-import qualified Language.Docopt.Errors   as D
-import qualified Language.Docopt.Value    as D
-import qualified Language.Docopt.Argument as D
-import qualified Language.Docopt.Usage    as D
-import qualified Language.Docopt.Option   as O
+import Language.Docopt.Errors   as D
+import Language.Docopt.Value    as D
+import Language.Docopt.Argument as D
+import Language.Docopt.Usage    as D
+import Language.Docopt.Option   as O
 
 import Language.Docopt.ParserGen.Token
 import Language.Docopt.ParserGen.ValueMapping
 import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
-type Parser a = P.Parser (List Token) a
+type Env = StrMap String
+type Parser a = P.ParserT (List Token) (Reader Unit) a
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
@@ -238,17 +242,17 @@ genBranchParser (D.Branch xs) = do
         draw :: List D.Argument
              -> Int
              -> Parser (List (Tuple D.Argument D.Value))
+
         draw pss@(Cons p ps') n | n >= 0 = (do
           xs <- genParser p
 
           -- verify the arguments for parsed set of options
           -- when an option takes anything but a bool value, i.e. it is not
           -- a switch, an explicit argument *must* be provided.
-          let ys = map (\(Tuple a _) -> a) $
-                    filter
-                      (\(Tuple a v) -> (D.takesArgument a)
-                                    && (not $ D.isFlag a)
-                                    && (D.isBoolValue v))
+          let ys = fst <$> filter
+                    (\(Tuple a v) -> (D.takesArgument a)
+                                  && (not $ D.isFlag a)
+                                  && (D.isBoolValue v))
                       xs
           if (length ys > 0)
             then P.fail $ "Missing required arguments for "
@@ -260,6 +264,7 @@ genBranchParser (D.Branch xs) = do
                       else draw (ps') (length ps')
           return $ xs ++ xss
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
+
         draw ps' n | (length ps' > 0) && (n < 0) = do
           let rest = filter
                       (\p -> (not $ D.isRepeatable p)
@@ -270,6 +275,7 @@ genBranchParser (D.Branch xs) = do
               "Missing required options: "
                 ++ intercalate ", " (D.prettyPrintArg <$> rest)
             else return empty
+
         draw _ _ = return empty
 
     -- Options always transition to the `Pending state`

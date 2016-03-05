@@ -30,7 +30,7 @@ docoptSpec = \_ ->
     it "..." do
       vliftEff do
         let env = StrMap.fromFoldable [
-                    Tuple "FOO" "BAR"
+                    Tuple "FOO_OUTPUT" "BAR"
                   ]
         runEitherEff do
           output <- runDocopt env
@@ -41,13 +41,14 @@ docoptSpec = \_ ->
             Options:
               -o, --output=ILE
                 The file to write to
+                [env: FOO_OUTPUT]
 
               -h, --host=<host[:port]>
                 The host to connect to
                 [default: http://localhost:3000]
             """
             [ "push"
-            , "-o", "~/foo/bar"
+            -- , "-o", "~/foo/bar" (provide from env)
             , "-hhttp://localhost:5000"
             , "x"
             , "x", "y"

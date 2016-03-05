@@ -70,16 +70,15 @@ byName m
 --
 reduce :: D.Branch               -- ^ the specification
        -> List ValueMapping      -- ^ the parse result
-       -> StrMap String          -- ^ the environment
        -> Map D.Argument D.Value -- ^ the output set of (arg => val)
-reduce b m env =
-  let m' = lmap findLCD <$> m
-   in mergeDefVals b $ toValMap m'
+reduce b m =
+  let unified = lmap unify <$> m
+   in toValMap unified # applyDefVals b
 
   where
     -- Find the lowest comment denominator between two arguments
-    findLCD :: D.Argument -> D.Argument
-    findLCD a = foldl step a (fst <$> m)
+    unify :: D.Argument -> D.Argument
+    unify a = foldl step a (fst <$> m)
       where
         step :: D.Argument -> D.Argument -> D.Argument
         step (D.Positional n r) (D.Positional n' r') | n ^= n'
@@ -125,17 +124,19 @@ reduce b m env =
               ) ++ [v]
         resolve _ v v' = v
 
-    mergeDefVals :: D.Branch -> Map D.Argument D.Value -> Map D.Argument D.Value
-    mergeDefVals (D.Branch b) m = foldl step m b
+    applyDefVals :: D.Branch               -- ^ the specification
+                 -> Map D.Argument D.Value -- ^ the input set
+                 -> Map D.Argument D.Value -- ^ the output set
+    applyDefVals (D.Branch b) m = foldl step m b
       where
         step :: Map D.Argument D.Value
-            -> D.Argument
-            -> Map D.Argument D.Value
+             -> D.Argument
+             -> Map D.Argument D.Value
         step m d = maybe m (`Map.unionWith resolve` m)
                            (Map.singleton d <$> toDefVal d)
 
         resolve :: D.Value -> D.Value -> D.Value
-        resolve _ v = v
+        resolve _ v = v -- choose existing value, not default
 
         toDefVal :: D.Argument -> Maybe D.Value
         toDefVal (D.Option (O.Option o@{

@@ -113,9 +113,18 @@ isOption :: Argument -> Boolean
 isOption (Option _) = true
 isOption _          = false
 
+--------------------------------------------------------------------------------
+-- Short hand option creation
+--------------------------------------------------------------------------------
+
 -- short hand to create an Option argument
-opt' :: Maybe O.Flag -> Maybe O.Name -> Maybe O.Argument -> IsRepeatable -> Argument
-opt' f n a r = Option $ O.opt' f n a r
+opt' :: Maybe O.Flag
+     -> Maybe O.Name
+     -> Maybe O.Argument
+     -> Maybe String
+     -> IsRepeatable
+     -> Argument
+opt' f n a e r = Option $ O.opt' f n a e r
 
 opt :: O.Flag -> O.Name -> O.Argument -> Argument
 opt f n a = Option $ O.opt f n a

@@ -25,7 +25,7 @@ newtype SOpt = SOpt {
 }
 
 newtype LOpt = LOpt {
-  name :: String
+  name       :: String
 , arg        :: Maybe Argument
 , repeatable :: Boolean
 }

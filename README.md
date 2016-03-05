@@ -37,7 +37,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * [ ] Provide seamless interface to be called from JS
 * [ ] Provide typescript typings
 * [ ] Fix all warnings
-* [ ] Read arguments from env vars
+* [x] Read arguments from env vars
 * [ ] Implement special arguments
     * [x] ~~`--` (end of args) not yet implemented~~
     * [x] `-` (stdin)
@@ -53,6 +53,7 @@ Known issues to work through:
 
 Further, the wishlist looks somewhat like this:
 
+* Read options from config file
 * Make commands first class citizens, enabling easy subcommands, inheriting
   options and all that.
 * Allow for `--foo[=<bar>]` syntax (git style).
@@ -98,6 +99,41 @@ The project can roughly be broken up into 4 distinct areas of work:
 
 <sub>\*Highlighted items are yet-to-be-done.</sub>
 
+### Dev Notes ###
+
+#### Reading options from the environment ####
+
+> Options should fall back to environment variables, declared via the "env"
+> tag in the option's description.
+
+Todo:
+
+* [ ] Write tests
+
+Problems:
+
+* If an option specifies itself as `[env: FOOBAR]`, does this mean it may be
+  omitted from the input entirely? This means changes to the parser -> The
+  parser needs to be aware of the environment.
+  * Alternatively, we could opaquely change the option's `[default: ...]` to
+    the environment's value during solving. This would retain all semantics in
+    the parser. The downside is that it is semantically awkward since we are
+    changing the specification based on the environment, rather than the parse
+    result. **(this is currenlty implemented)**
+
+#### Reading options from config files ####
+
+> Options should fall back values read from file.
+
+Todo:
+
+* [ ] Design/implement ...
+
+Problems:
+
+* The `--config` option (or similar) needs to be documented, in docopt. This
+  is impossible without running twice, because in order to parse, all values
+  and fall backs need to be already discovered.
 
 ---
 
