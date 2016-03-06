@@ -1,4 +1,4 @@
-module Test.Spec.GenTransSpec (genTransSpec) where
+module Test.Spec.TransSpec (transSpec) where
 
 import Prelude
 import Debug.Trace
@@ -41,7 +41,7 @@ shouldBecome :: Array (Tuple Argument Value)
              -> Test
 shouldBecome i o = Test { i: i, o: o }
 
-genTransSpec = \_ ->
+transSpec = \_ ->
   describe "The output transformer" do
 
     let tests = [

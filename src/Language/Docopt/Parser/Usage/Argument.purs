@@ -11,6 +11,7 @@ module Language.Docopt.Parser.Usage.Argument (
   , co
   , po
   , poR
+  , ref
   , stdin
   ) where
 
@@ -31,10 +32,12 @@ data Argument
   | Group       IsOptional (List Branch) IsRepeatable
   | EOA
   | Stdin
+  | Reference String
 
 instance showArgument :: Show Argument where
   show (EOA)            = "--"
   show (Stdin)          = "-"
+  show (Reference r)    = "Reference " ++ r
   show (Command n)      = "Command " ++ n
   show (Positional n b) = "Positional " ++ n ++ " " ++ show b
   show (Option o)       = "Option " ++ show o
@@ -49,6 +52,7 @@ instance eqArgument :: Eq Argument where
   eq (Option o)       (Option o')        = o == o'
   eq (Group b xs r)   (Group b' xs' r')  = (b == b') && (xs == xs') && (r == r')
   eq (OptionStack o)  (OptionStack o')   = o == o'
+  eq (Reference r)    (Reference r')     = r == r'
   eq _                _                  = false
 
 prettyPrintBranch :: Branch -> String
@@ -61,12 +65,16 @@ prettyPrintArg (Positional n r)
 prettyPrintArg (Option o) = O.prettyPrintLOpt o
 prettyPrintArg (OptionStack o) = O.prettyPrintSOpt o
 prettyPrintArg (Group b xs r)
-  =  (if b then "(" else "[")
+  =  (if b then "[" else "(")
   ++ (intercalate " | " (prettyPrintBranch <$> xs))
-  ++ (if b then ")" else "]")
+  ++ (if b then "]" else ")")
   ++ (if r then "..." else "")
 prettyPrintArg (EOA) = "-- ARGS..."
 prettyPrintArg (Stdin) = "-"
+prettyPrintArg (Reference r) = "[" ++ show r ++ " options...]"
+
+ref :: String -> Argument
+ref = Reference
 
 -- short hand to create a short option node
 sopt :: Char -> Array Char -> String -> Argument

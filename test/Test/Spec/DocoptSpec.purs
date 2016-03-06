@@ -36,7 +36,7 @@ docoptSpec = \_ ->
           output <- runDocopt env
             """
             Usage:
-              foo push -h=<host[:port]> -o <file> [x -] FILE... -- ARGS
+              foo push [options...]
 
             Options:
               -o, --output=ILE
@@ -46,6 +46,10 @@ docoptSpec = \_ ->
               -h, --host=<host[:port]>
                 The host to connect to
                 [default: http://localhost:3000]
+
+              -f, --force
+                Force the operation.
+
             """
             [ "push"
             -- , "-o", "~/foo/bar" (provide from env)

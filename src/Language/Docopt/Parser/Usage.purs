@@ -75,9 +75,12 @@ usageParser = do
         P.try $ do
           moreIndented *> L.doubleDash
           return $ Just EOA
-      , do
+      , (do
           L.eof <|> (P.lookAhead $ lessIndented)
           return Nothing
+        )
+        -- XXX: We could show the last token that failed to be consumed, here
+        P.<?> "start of next usage line or end of usage section"
       ]
 
       -- Push the EOA onto the last branch (the most right branch)
@@ -90,13 +93,14 @@ usageParser = do
 
     elem :: L.TokenParser Argument
     elem = defer \_ -> do
-      P.choice
+      P.choice $ P.try <$>
         [ option
         , positional
         , command
         , group
+        , reference
         , stdin
-        ] P.<?> "Option, Positional, Command or Group"
+        ] P.<?> "Option, Positional, Command, Group or Reference"
 
     stdin :: L.TokenParser Argument
     stdin = L.dash *> return Stdin
@@ -113,6 +117,9 @@ usageParser = do
 
     option :: L.TokenParser Argument
     option = longOption <|> shortOption
+
+    reference :: L.TokenParser Argument
+    reference = Reference <$> L.reference
 
     positional :: L.TokenParser Argument
     positional = Positional

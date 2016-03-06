@@ -47,6 +47,7 @@ data Token
   | Comma
   | Equal
   | TripleDot
+  | Reference String
   | LOpt String (Maybe String)
   | SOpt Char (Array Char) (Maybe String)
   | Tag String (Maybe String)
@@ -73,6 +74,7 @@ prettyPrintToken Comma             = show ','
 prettyPrintToken Equal             = show '='
 prettyPrintToken TripleDot         = "..."
 prettyPrintToken DoubleDash        = "--"
+prettyPrintToken (Reference r)     = "Reference " ++ show r
 prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
 prettyPrintToken (Tag k v)         = "Tag "       ++ k ++ " "  ++ (show v)
 prettyPrintToken (Name      n)     = "Name "      ++ show n
@@ -116,6 +118,7 @@ instance eqToken :: Eq Token where
   eq Equal             Equal              = true
   eq DoubleDash        DoubleDash         = true
   eq TripleDot         TripleDot          = true
+  eq (Reference r)     (Reference r')     = r == r'
   eq (LOpt n a)        (LOpt n' a')       = (n == n') && (a == a')
   eq (SOpt n s a)      (SOpt n' s' a')    = (n == n') && (s' == s') && (a == a')
   eq (StringLiteral s) (StringLiteral s') = s == s'
@@ -148,6 +151,7 @@ parseToken = P.choice
   [ P.try $ P.char   '('   *> pure LParen
   , P.try $ P.char   ')'   *> pure RParen
   , P.try $ tag
+  , P.try $ reference
   , P.try $ P.char   '['   *> pure LSquare
   , P.try $ P.char   ']'   *> pure RSquare
   , P.try $ P.char   '|'   *> pure VBar
@@ -178,12 +182,30 @@ parseToken = P.choice
     P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     pure unit
 
+  reference :: P.Parser String Token
+  reference = Reference <$> do
+    P.between (P.char '[') (P.char ']') go
+
+    where
+      go = do
+        many space
+        x <- fromCharArray <<< fromList <$> do
+          flip P.manyTill (P.lookAhead $ P.try end) do
+            P.anyChar
+        end
+        many space
+        return x
+
+      end = do
+        many space
+        P.optional $ P.string "-"
+        string' "options"
+        P.optional $ P.string "..."
+
   tag :: P.Parser String Token
-  tag =
-    P.between
-      (P.char '[')
-      (P.char ']')
-      (withValue <|> withoutValue)
+  tag = P.between (P.char '[')
+                  (P.char ']')
+                  (withValue <|> withoutValue)
 
     where
       withValue = do
@@ -462,6 +484,12 @@ tag s = token go P.<?> ("tag: " ++ s)
   where
     go (Tag k (Just v)) | k ^= s = Just v
     go _                         = Nothing
+
+reference :: TokenParser String
+reference = token go P.<?> "reference"
+  where
+    go (Reference r) = Just r
+    go _             = Nothing
 
 word :: TokenParser String
 word = token go P.<?> "word"

@@ -139,8 +139,7 @@ usageParserSpec = \_ ->
         , fail "[...]"
         ]
 
-    -- Test positionals in various formats.
-    -- Each entry is run for both singular and repeated version.
+    -- Test the EOA marker "--"
     describe "end-of-args" do
       runTests
         [ pass "--" $ [[[ U.eoa ]]]
@@ -149,9 +148,7 @@ usageParserSpec = \_ ->
         , pass "foo -- FOO... BAR" $ [[[ U.co "foo", U.eoa ]]]
         ]
 
-    -- XXX
-    -- The lexer has no concept of a "correct" stdin placement.
-    -- This will be solved at a later stage, possibly during solving.
+    -- Test the stdin marker "-"
     describe "stdin" do
       runTests
         [ pass "-" $ [[[ U.stdin ]]]
@@ -160,6 +157,15 @@ usageParserSpec = \_ ->
                                    , U.stdin
                                    , U.lopt_ "bar"
                                    ]]]
+        ]
+
+    -- Test the "[options...]", "[options]", etc. syntax
+    describe "stdin" do
+      runTests
+        [ pass "[options...]"     $ [[[ U.ref ""    ]]]
+        , pass "[options]"        $ [[[ U.ref ""    ]]]
+        , pass "[foo-options]"    $ [[[ U.ref "foo" ]]]
+        , pass "[foo-options...]" $ [[[ U.ref "foo" ]]]
         ]
 
     -- | Test the scanner and lexer in combination with the parser.
@@ -229,8 +235,8 @@ usageParserSpec = \_ ->
                 usages <- runEitherEff do
                   Lexer.lex input >>= U.parse
                 flip assertEqual
-                  usages
-                  expected'
+                  (U.prettyPrintUsage <$> usages)
+                  (U.prettyPrintUsage <$> expected')
           _ -> do
             it (input ++ " should fail") do
             vliftEff do
