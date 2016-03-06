@@ -8,7 +8,6 @@
 module Language.Docopt.ParserGen.Parser (
     genUsageParser
   , Parser()
-  , Env()
   ) where
 
 import Prelude
@@ -32,27 +31,29 @@ import Data.Array (uncons)
 import Data.Tuple (Tuple(..), fst)
 import Data.Monoid (mempty)
 import Data.Map (Map())
-import Control.Monad.Reader (Reader())
+import Control.Monad.Reader (Reader(), ask)
 import Data.Map as Map
 import Data.StrMap (StrMap())
+import Control.Monad.Trans (lift)
 
 import Text.Parsing.Parser             as P
 import Text.Parsing.Parser.Combinators as P
 import Text.Parsing.Parser.Pos         as P
 import Text.Parsing.Parser.String      as P
 
+import Language.Docopt.Env      as Env
 import Language.Docopt.Errors   as D
 import Language.Docopt.Value    as D
 import Language.Docopt.Argument as D
 import Language.Docopt.Usage    as D
+import Language.Docopt.Env      as D
 import Language.Docopt.Option   as O
 
 import Language.Docopt.ParserGen.Token
 import Language.Docopt.ParserGen.ValueMapping
 import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
-type Env = StrMap String
-type Parser a = P.ParserT (List Token) (Reader Unit) a
+type Parser a = P.ParserT (List Token) (Reader D.Env) a
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
@@ -232,7 +233,7 @@ genBranchParser (D.Branch xs) = do
     -- Given a list of arguments, try parse them all in any order.
     -- The only requirement is that all input is consumed in the end.
     genExhaustiveParser :: List D.Argument
-                       -> Parser (List (Tuple D.Argument D.Value))
+                        -> Parser (List (Tuple D.Argument D.Value))
     genExhaustiveParser Nil = pure empty
     genExhaustiveParser ps  = do
       draw ps (length ps)
@@ -266,9 +267,11 @@ genBranchParser (D.Branch xs) = do
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
 
         draw ps' n | (length ps' > 0) && (n < 0) = do
+          env <- lift ask
           let rest = filter
                       (\p -> (not $ D.isRepeatable p)
-                          && (not $ D.hasDefault p))
+                          && (not $ D.hasDefault p)
+                          && (not $ D.hasEnvBacking p env))
                       (reverse ps')
           if (length rest > 0)
             then P.fail $

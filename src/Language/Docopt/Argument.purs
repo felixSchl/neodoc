@@ -9,26 +9,33 @@ module Language.Docopt.Argument (
   , runBranch
   , isRepeatable
   , hasDefault
+  , getEnvKey
+  , hasEnvBacking
   , takesArgument
   , isOption
   , isFlag
-  , opt',  opt,  optR,  opt_,  optR_
-  , lopt', lopt, loptR, lopt_, loptR_
-  , sopt', sopt, soptR, sopt_, soptR_
+  , opt',   opt,   optR,   opt_,   optR_
+  , lopt',  lopt,  loptR,  lopt_,  loptR_
+  , sopt',  sopt,  soptR,  sopt_,  soptR_
+  ,         optE,  optER,  optE_,  optER_
+  , loptE', loptE, loptER, loptE_, loptER_
+  , soptE', soptE, soptER, soptE_, soptER_
   ) where
 
 import Prelude
 import Data.Maybe (Maybe(..), maybe)
 import Data.List (List())
 import Data.Foldable (intercalate)
-import qualified Data.String as Str
+import Data.String as Str
 import Data.Function (on)
 import Data.String (fromChar)
 import Data.String.Ext ((^=))
 import Control.Apply ((*>))
 
 import Language.Docopt.Value (Value(..), prettyPrintValue)
-import qualified Language.Docopt.Option as O
+import Language.Docopt.Option as O
+import Language.Docopt.Env as Env
+import Language.Docopt.Env (Env())
 
 type IsRepeatable = Boolean
 type IsOptional = Boolean
@@ -105,6 +112,13 @@ takesArgument :: Argument -> Boolean
 takesArgument (Option o) = O.takesArgument o
 takesArgument _          = false
 
+getEnvKey :: Argument -> Maybe String
+getEnvKey (Option (O.Option o)) = o.env
+getEnvKey _                     = Nothing
+
+hasEnvBacking :: Argument -> Env -> Boolean
+hasEnvBacking p env = maybe false id $ flip Env.member env <$> getEnvKey p
+
 isFlag :: Argument -> Boolean
 isFlag (Option o) = O.isFlag o
 isFlag _          = false
@@ -169,3 +183,52 @@ lopt_ n = Option $ O.lopt_ n
 
 loptR_ :: O.Name -> Argument
 loptR_ n = Option $ O.loptR_ n
+
+--------------------------------------------------------------------------------
+-- Short hand option creation (with env tag)
+--------------------------------------------------------------------------------
+
+optE :: O.Flag -> O.Name -> O.Argument -> String -> Argument
+optE f n a e = Option $ O.optE f n a e
+
+optER :: O.Flag -> O.Name -> O.Argument -> String -> Argument
+optER f n a e = Option $ O.optER f n a e
+
+optE_ :: O.Flag -> O.Name -> String -> Argument
+optE_ f n e = Option $ O.optE_ f n e
+
+optER_ :: O.Flag -> O.Name -> String -> Argument
+optER_ f n e = Option $ O.optER_ f n e
+
+-- short hand to create an Short-Option argument
+soptE' :: O.Flag -> (Maybe O.Argument) -> IsRepeatable -> String -> Argument
+soptE' f a r e = Option $ O.soptE' f a r e
+
+soptE :: O.Flag -> O.Argument -> String -> Argument
+soptE f a e = Option $ O.soptE f a e
+
+soptER :: O.Flag -> O.Argument -> String -> Argument
+soptER f a e = Option $ O.soptER f a e
+
+soptE_ :: O.Flag -> String -> Argument
+soptE_ f e = Option $ O.soptE_ f e
+
+soptER_ :: O.Flag -> String -> Argument
+soptER_ f e = Option $ O.soptER_ f e
+
+-- short hand to create an Long-Option argument
+loptE' :: O.Name -> (Maybe O.Argument) -> IsRepeatable -> String -> Argument
+loptE' n a r e = Option $ O.loptE' n a r e
+
+loptE :: O.Name -> O.Argument -> String -> Argument
+loptE n a e = Option $ O.loptE n a e
+
+loptER :: O.Name -> O.Argument -> String -> Argument
+loptER n a e = Option $ O.loptER n a e
+
+loptE_ :: O.Name -> String -> Argument
+loptE_ n e = Option $ O.loptE_ n e
+
+loptER_ :: O.Name -> String -> Argument
+loptER_ n e = Option $ O.loptER_ n e
+

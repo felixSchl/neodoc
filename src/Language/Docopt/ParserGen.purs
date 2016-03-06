@@ -26,6 +26,7 @@ import Language.Docopt.Value    as D
 import Language.Docopt.Errors   as D
 import Language.Docopt.Argument as D
 import Language.Docopt.Usage    as D
+import Language.Docopt.Env      as D
 import Language.Docopt.ParserGen.Token        as G
 import Language.Docopt.ParserGen.Parser       as G
 import Language.Docopt.ParserGen.Lexer        as G
@@ -39,12 +40,13 @@ genParser :: D.Program       -- ^ the program to generate a parser for
 genParser us = foldl (<|>) empty (G.genUsageParser <$> us)
 
 -- | Run a parser against user input.
-runParser :: Array String               -- ^ the user input
+runParser :: D.Env                      -- ^ the user input
+          -> Array String               -- ^ the environment
           -> G.Parser Result            -- ^ the program parser
           -> Either P.ParseError Result -- ^ the parsed output
-runParser argv p = do
+runParser env argv p = do
   toks <- G.lex (toList argv)
-  runReader (runParser toks p) unit
+  runReader (runParser toks p) env
   where runParser i = P.runParserT (P.PState { input: i
                                              , position: P.initialPos
                                              })

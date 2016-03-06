@@ -40,9 +40,9 @@ runDocopt env docopt argv = do
   doc <- toScanErr  $ Scanner.scan $ dedent docopt
   us  <- toParseErr $ Usage.run doc.usage
   ds  <- toParseErr $ concat <$> Desc.run `traverse` doc.options
-  prg <- toSolveErr $ Solver.solve us (Solver.applyEnvToDesc env ds)
-  vs  <- toParseErr $ G.runParser argv (G.genParser prg)
-  return $ T.byName $ uncurry T.reduce vs
+  prg <- toSolveErr $ Solver.solve us ds
+  vs  <- toParseErr $ G.runParser env argv (G.genParser prg)
+  return $ T.byName $ uncurry (T.reduce env) vs
 
 toScanErr :: forall a. Either P.ParseError a -> Either D.DocoptError a
 toScanErr  = lmap D.DocoptScanError

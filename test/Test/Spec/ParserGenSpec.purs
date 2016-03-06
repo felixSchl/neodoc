@@ -28,22 +28,38 @@ import Language.Docopt.Errors
 import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage
+import Language.Docopt.Env (Env())
 import Language.Docopt.ParserGen (genParser, runParser)
 import Language.Docopt.Argument as D
+import Language.Docopt.Env      as Env
 import Language.Docopt.Trans    as T
 import Test.Support.Docopt      as D
 
 data Test = Test (Array Argument) (Array Case)
-data Case = Case (Array String) (Either String (Map Argument Value))
+data Case = Case (Array String)
+                 (Array (Tuple String String))
+                 (Either String (Map Argument Value))
 
 test :: Array Argument -> Array Case -> Test
 test = Test
 
 pass :: Array String -> (Array (Tuple Argument Value)) -> Case
-pass i o = Case i (Right $ Map.fromList $ toList o)
+pass i o = Case i [] (Right $ Map.fromList $ toList o)
+
+pass' :: Array String
+      -> (Array (Tuple String String))
+      -> (Array (Tuple Argument Value))
+      -> Case
+pass' i e o = Case i e (Right $ Map.fromList $ toList o)
 
 fail :: Array String -> String -> Case
-fail i e = Case i (Left e)
+fail i e = Case i [] (Left e)
+
+fail' :: Array String
+      -> (Array (Tuple String String))
+      -> String
+      -> Case
+fail' i e err = Case i e (Left err)
 
 (:>) = Tuple
 infixr 0 :>
@@ -204,6 +220,22 @@ parserGenSpec = \_ -> describe "The generator" do
         ]
 
     , test
+        [ D.optE 'o' "out" (D.oa_ "FOO") "FOO" ]
+        [ pass'
+            []
+            [ "FOO" :> "BAR" ]
+            [  D.optE 'o' "out" (D.oa_ "FOO") "FOO" :> D.str "BAR" ]
+        ]
+
+    , test
+        [ D.optE 'o' "out" (D.oa "FOO" (D.str "ADLER")) "FOO" ]
+        [ pass'
+            []
+            [ "FOO" :> "BAR" ]
+            [  D.optE 'o' "out" (D.oa "FOO" (D.str "ADLER")) "FOO" :> D.str "BAR" ]
+        ]
+
+    , test
         [ D.co    "foo"
         , D.opt_  'o' "out"
         , D.optR_ 'q' "qux"
@@ -293,14 +325,17 @@ parserGenSpec = \_ -> describe "The generator" do
 
   for_ testCases \(Test branch kases) -> do
     describe (prettyPrintBranch $ D.br branch) do
-      for_ kases \(Case input expected) ->
+      for_ kases \(Case input env expected) ->
             let msg = either
                   (\e -> "Should fail with \"" ++ e ++ "\"")
                   prettyPrintOut
                   expected
             in it (intercalate " " input ++ " -> " ++ msg) do
                   vliftEff do
-                    validate branch input expected
+                    validate branch
+                             input
+                             (Env.fromFoldable env)
+                             expected
 
     where
 
@@ -314,13 +349,15 @@ parserGenSpec = \_ -> describe "The generator" do
 
       validate :: forall eff.  Array Argument
                             -> Array String
+                            -> Env
                             -> Either String (Map Argument Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
-      validate args argv expected = do
-        let result = uncurry T.reduce
-              <$> runParser
-                    argv
-                    (genParser $ singleton $ Usage $ singleton $ D.br args)
+      validate args argv env expected = do
+        let result = uncurry (T.reduce env)
+                <$> runParser
+                      env
+                      argv
+                      (genParser $ singleton $ Usage $ singleton $ D.br args)
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->

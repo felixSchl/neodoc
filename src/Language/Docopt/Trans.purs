@@ -18,10 +18,13 @@ import Data.Map as Map
 import Data.String as Str
 import Data.Tuple (Tuple(..), fst)
 import Control.MonadPlus (guard)
+import Language.Docopt.Env (Env())
 import Language.Docopt.Errors   as D
+import Language.Docopt.Env      as D
 import Language.Docopt.Value    as D
 import Language.Docopt.Argument as D
 import Language.Docopt.Option   as O
+import Language.Docopt.Env      as Env
 import Data.String.Ext ((^=))
 import Data.List (List(..), toList, concat)
 import Data.List as L
@@ -68,12 +71,15 @@ byName m
 --      * Their argument name           -> ?
 --      * Their argument default value  -> ?
 --
-reduce :: D.Branch               -- ^ the specification
+reduce :: D.Env                  -- ^ the environment
+       -> D.Branch               -- ^ the specification
        -> List ValueMapping      -- ^ the parse result
        -> Map D.Argument D.Value -- ^ the output set of (arg => val)
-reduce b m =
+reduce env b m =
   let unified = lmap unify <$> m
-   in toValMap unified # applyDefVals b
+   in toValMap unified
+    # applyEnvVals b
+    # applyDefVals b
 
   where
     -- Find the lowest comment denominator between two arguments
@@ -123,6 +129,25 @@ reduce b m =
                 _               -> [v']
               ) ++ [v]
         resolve _ v v' = v
+
+    applyEnvVals :: D.Branch               -- ^ the specification
+                 -> Map D.Argument D.Value -- ^ the input set
+                 -> Map D.Argument D.Value -- ^ the output set
+    applyEnvVals (D.Branch b) m = foldl step m b
+      where
+        step :: Map D.Argument D.Value
+             -> D.Argument
+             -> Map D.Argument D.Value
+        step m d = maybe m (`Map.unionWith resolve` m)
+                           (Map.singleton d <$> toEnvVal d)
+
+        resolve :: D.Value -> D.Value -> D.Value
+        resolve _ v = v -- choose existing value, not env
+
+        toEnvVal :: D.Argument -> Maybe D.Value
+        toEnvVal (D.Option (O.Option o@{ env: Just k }))
+          = D.StringValue <$> Env.lookup k env
+        toEnvVal _ = Nothing
 
     applyDefVals :: D.Branch               -- ^ the specification
                  -> Map D.Argument D.Value -- ^ the input set

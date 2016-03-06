@@ -47,28 +47,6 @@ runResult :: Result -> List Argument
 runResult (Consumed   xs) = xs
 runResult (Unconsumed xs) = xs
 
--- | Update the option descriptions's default values
--- | from the environment.
--- |
--- | XXX: Is this even the right way to do it?
--- |      This method was chosen since it leaves the more complicated
--- |      parser code alone, which should not care where default values
--- |      are coming from (for now).
-applyEnvToDesc :: StrMap String -- ^ the environment
-               -> List Desc     -- ^ the option descriptions
-               -> List Desc     -- ^ the updated option descriptions
-applyEnvToDesc env xs = xs <#> (\x -> maybe x id (applyEnv x))
-  where applyEnv (DE.OptionDesc (DE.Option x)) = do
-          arg <- DE.runArgument <$> x.arg
-          k   <- x.env
-          v   <- StrMap.lookup k env
-          return $ DE.OptionDesc $ DE.Option $ x {
-            arg = pure $ DE.Argument $ arg {
-              default = pure (StringValue v)
-            }
-          }
-        applyEnv x = Nothing
-
 solveBranch :: U.Branch                 -- ^ the usage branch
             -> List Desc                -- ^ the option descriptions
             -> Either SolveError Branch -- ^ the canonical usage branch
