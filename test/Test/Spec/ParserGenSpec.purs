@@ -138,11 +138,17 @@ parserGenSpec = \_ -> describe "The generator" do
           ]]
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
-        [ fail [] "Missing required options: -o, --output=FILE, (-i, --input=FILE)"
-        , fail [ "-i", "bar" ] "Missing required options: -o, --output=FILE"
+        [ fail []
+          $ "Missing required options: "
+              ++ "-o, --output=FILE, (-i, --input=FILE)"
+
+        , fail [ "-i", "bar" ]
+          $ "Missing required options: -o, --output=FILE"
+
         , pass [ "-i", "bar", "-o", "bar" ]
             [ D.opt 'i' "input"  (D.oa_ "FILE") :> D.str "bar"
             , D.opt 'o' "output" (D.oa_ "FILE") :> D.str "bar" ]
+
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-i", "bar" ]
             [ D.opt 'i' "input"  (D.oa_ "FILE") :> D.str "bar"
@@ -159,13 +165,18 @@ parserGenSpec = \_ -> describe "The generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-            "Missing required options: -o, --output=FILE, ((-i, --input=FILE) -r, --redirect=FILE)"
+          $ "Missing required options: "
+              ++ "-o, --output=FILE, "
+              ++ "((-i, --input=FILE) -r, --redirect=FILE)"
+
         , fail [ "-i", "bar", "-r", "bar" ]
             "Missing required options: -o, --output=FILE"
+
         , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
             [ D.opt 'i' "input"  (D.oa_ "FILE")   :> D.str "bar"
             , D.opt 'r' "redirect" (D.oa_ "FILE") :> D.str "bar"
             , D.opt 'o' "output" (D.oa_ "FILE")   :> D.str "bar" ]
+
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-r", "bar", "-i", "bar" ]
             [ D.opt 'i' "input"  (D.oa_ "FILE")   :> D.str "bar"
@@ -193,22 +204,22 @@ parserGenSpec = \_ -> describe "The generator" do
         ]
 
     , test
-        [ D.co "foo"
+        [ D.co    "foo"
         , D.opt_  'o' "out"
         , D.optR_ 'q' "qux"
-        , D.opt 'b' "baz" (D.oa "BAZ" $ D.str "ax")
+        , D.opt   'b' "baz" (D.oa "BAZ" $ D.str "ax")
         , D.opt_  'i' "input"
         , D.optR  'f' "foo" (D.oa_ "FOZ")
         , D.co     "baz"
         ]
         [ pass
-            [ "foo" , "--out", "--input", "--qux", "--foo=ox", "baz" ]
+            [ "foo", "--out", "--input", "--qux", "--foo=ox", "baz" ]
             [ D.co    "foo"                   :> D.bool true
             , D.opt_  'o' "out"               :> D.bool true
             , D.opt_  'i' "input"             :> D.bool true
             , D.optR_ 'q' "qux"               :> D.array [ D.bool true ]
             , D.optR  'f' "foo" (D.oa_ "FOZ") :> D.array [ D.str "ox" ]
-            , D.co     "baz"                  :> D.bool true
+            , D.co    "baz"                   :> D.bool true
             -- should have added default value that was not provided above:
             , D.opt 'b' "baz" (D.oa "BAZ" $ D.str "ax") :> D.str "ax"
             ]
