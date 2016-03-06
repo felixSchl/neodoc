@@ -1,7 +1,6 @@
 module Language.Docopt (
-  module D
-, runDocopt
-) where
+  runDocopt
+  ) where
 
 import Prelude
 import Debug.Trace

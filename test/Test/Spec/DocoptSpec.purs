@@ -23,7 +23,8 @@ import Test.Support.Usage  as U
 import Test.Support.Docopt as D
 import Test.Support.Desc   as Desc
 
-import Language.Docopt (runDocopt, prettyPrintValue)
+import Language.Docopt (runDocopt)
+import Language.Docopt.Value as D
 
 docoptSpec = \_ ->
   describe "Docopt" do
@@ -58,5 +59,5 @@ docoptSpec = \_ ->
             , "x", "y"
             , "--", "0", "1", "3"
             ]
-          traceA (prettyPrintMap output show prettyPrintValue)
+          traceA (prettyPrintMap output show D.prettyPrintValue)
           return unit
