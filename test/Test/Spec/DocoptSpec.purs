@@ -36,7 +36,7 @@ docoptSpec = \_ ->
           output <- runDocopt env
             """
             Usage:
-              foo push [options...]
+              foo push [options...] ARG... --
 
             Options:
               -o, --output=ILE

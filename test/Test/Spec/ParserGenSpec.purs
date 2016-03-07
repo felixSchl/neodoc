@@ -308,9 +308,7 @@ parserGenSpec = \_ -> describe "The generator" do
         , fail
             [ "foo" ]
             -- TODO: Create a more sophisticated way to test this
-            $ "Missing required options: "
-                ++ "-o, --out, "
-                ++ "-i, --input"
+            "Expected command: \"baz\""
         , fail
             [ "foo", "-o", "-i", "-bax" ]
             -- TODO: Create a more sophisticated way to test this

@@ -99,19 +99,8 @@ solveBranch as ds = Branch <$> go as
                                                 --      able to indicate this!
                             }
           where
-            convertArg (Just (DE.Argument arg))
-              = return $ O.Argument arg
-
-            -- If the option description species it takes no argument, it's a
-            -- flag, and it's absence is counted as "false" via the default
-            -- value.
-            -- XXX: Note that this breaks, in some sense the idea that
-            --      only named arguments take values. Does the argument
-            --      structure need to change?
-            convertArg _
-              = return $ O.Argument { name: "" -- XXX: see comment above
-                                    , default: pure $ BoolValue false
-                                    }
+            convertArg (Just (DE.Argument arg)) = return $ O.Argument arg
+            convertArg _                        = Nothing
         convert _ = Nothing
 
     solveArgs (U.Option (UO.LOpt o)) y = do

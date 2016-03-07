@@ -270,6 +270,7 @@ genBranchParser (D.Branch xs) = do
           env <- lift ask
           let missing = filter (\o -> not $ D.isRepeatable  o
                                          || D.hasDefault    o
+                                         || D.isFlag        o
                                          || D.hasEnvBacking o env
                                )
                                $ reverse ps'
