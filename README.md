@@ -47,9 +47,9 @@ Known issues to work through:
 
 * [x] ~~Options that were not provided through argv but that have defaults, are
       currently not present in the output~~
-* [ ] Options that have a default value and are provided through argv without an
+* [x] ~~Options that have a default value and are provided through argv without an
       argument should produce an error if the argument type is not a boolean
-      (toggle)
+      (toggle)~~
 
 Further, the wishlist looks somewhat like this:
 
