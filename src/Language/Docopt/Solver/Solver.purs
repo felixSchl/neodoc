@@ -91,24 +91,27 @@ solveBranch as ds = Branch <$> go as
       where
         convert (DE.OptionDesc (DE.Option y)) =
           return $ Option
-                 $ O.Option { flag: DE.getFlag y.name
-                            , name: DE.getName y.name
-                            , arg:  do
-                                -- XXX: Use alt <|> here, in case the option
-                                --      is a flag (takes no argument) and
-                                --      overwrite it to take an argument of
-                                --      with a default BoolValue of "false".
-                                --      How to name the anonymous argument?
-                                --      This may require a change to the option
-                                --      structure: move "name" and "default"
-                                --      out of the "Argument" structure into
-                                --      the "Option" structure?
-                                a <- DE.runArgument <$> y.arg
-                                return $ O.Argument a
-                            , env: y.env
+                 $ O.Option { flag:       DE.getFlag y.name
+                            , name:       DE.getName y.name
+                            , arg:        convertArg y.arg
+                            , env:        y.env
                             , repeatable: false -- XXX: desc options must be
                                                 --      able to indicate this!
                             }
+          where
+            convertArg (Just (DE.Argument arg))
+              = return $ O.Argument arg
+
+            -- If the option description species it takes no argument, it's a
+            -- flag, and it's absence is counted as "false" via the default
+            -- value.
+            -- XXX: Note that this breaks, in some sense the idea that
+            --      only named arguments take values. Does the argument
+            --      structure need to change?
+            convertArg _
+              = return $ O.Argument { name: "" -- XXX: see comment above
+                                    , default: pure $ BoolValue false
+                                    }
         convert _ = Nothing
 
     solveArgs (U.Option (UO.LOpt o)) y = do
