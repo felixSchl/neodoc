@@ -164,6 +164,8 @@ reduce env b m =
         resolve _ v = v -- choose existing value, not default
 
         toDefVal :: D.Argument -> Maybe D.Value
+
+        -- Handle options that have an explicit argument binding.
         toDefVal (D.Option (O.Option o@{
                   arg: Just (O.Argument { default: Just v })
                 }))
@@ -171,9 +173,19 @@ reduce env b m =
               if (D.isArrayValue v || not o.repeatable)
                 then v
                 else D.ArrayValue [v]
+
+        -- Handle option flags. Flags indicate only truthiness via their
+        -- presence. Absent flags are always falsy!
+        toDefVal (D.Option (O.Option o@{ arg: Nothing }))
+          = return $ if o.repeatable
+              then D.ArrayValue [ D.BoolValue false ]
+              else D.BoolValue false
+
         toDefVal (D.Positional _ r)
           = if r
               then return $ D.ArrayValue []
               else Nothing
+
         toDefVal (D.EOA) = Just $ D.ArrayValue []
+
         toDefVal _ = Nothing

@@ -290,6 +290,7 @@ parserGenSpec = \_ -> describe "The generator" do
             , D.optR  'f' "foo" (D.oa_ "FOZ") :> D.array [ D.str "ox" ]
             , D.opt_  'i' "input" :> D.bool true
             , D.co     "baz"      :> D.bool true
+            , D.optR_ 'q' "qux"   :> D.array [ D.bool false ]
             ]
 
         , pass
@@ -301,6 +302,7 @@ parserGenSpec = \_ -> describe "The generator" do
             , D.co    "baz"       :> D.bool true
             -- should have added default value that was not provided above:
             , D.opt   'b' "baz" (D.oa "BAZ" $ D.str "ax") :> D.str "ax"
+            , D.optR_ 'q' "qux" :> D.array [ D.bool false ]
             ]
 
         , fail
