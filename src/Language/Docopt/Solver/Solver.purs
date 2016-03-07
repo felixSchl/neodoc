@@ -79,6 +79,29 @@ solveBranch as ds = Branch <$> go as
         flip (Group o) r <$> do
           flip solveBranch ds `traverse` bs
 
+    -- | Resolve the refernce by expanding into real
+    -- | options, as derived from the descriptions.
+    -- |
+    -- | XXX: Currently `r` is unused as all descriptions are in a flat list.
+    -- |      once option descriptions are keyed, `r` can be used as the lookup
+    -- |      into the map of `key => [Description]`
+    solveArgs (U.Reference r) _ = do
+      return $ Unconsumed (catMaybes $ convert <$> ds)
+
+      where
+        convert (DE.OptionDesc (DE.Option y)) =
+          return $ Option
+                 $ O.Option { flag: DE.getFlag y.name
+                            , name: DE.getName y.name
+                            , arg:  do
+                                a <- DE.runArgument <$> y.arg
+                                return $ O.Argument a
+                            , env: y.env
+                            , repeatable: false -- XXX: desc options must be
+                                                --      able to indicate this!
+                            }
+        convert _ = Nothing
+
     solveArgs (U.Option (UO.LOpt o)) y = do
 
       -- XXX: Is `head` the right thing to do here? What if there are more
@@ -89,7 +112,7 @@ solveBranch as ds = Branch <$> go as
                                           , arg        = toArg o.arg
                                           , repeatable = o.repeatable
                                           })
-                (head $ catMaybes $ convert <$> ds)
+                (head $ catMaybes $ coerce <$> ds)
 
       -- Validate the argument matches
       if (argMatches o.arg x.arg)
@@ -119,11 +142,11 @@ solveBranch as ds = Branch <$> go as
              $ O.Option (x { repeatable = maybe (x.repeatable) id mr })
 
       where
-        convert :: Desc -> Maybe O.Option
-        convert (DE.OptionDesc (DE.Option x))
-          = convert' x
+        coerce :: Desc -> Maybe O.Option
+        coerce (DE.OptionDesc (DE.Option x))
+          = coerce' x
             where
-              convert' { name = DE.Long n' }
+              coerce' { name = DE.Long n' }
                 | n' ^= o.name
                 = return $ O.Option { name:       pure o.name
                                     , flag:       Nothing
@@ -131,7 +154,7 @@ solveBranch as ds = Branch <$> go as
                                     , env:        x.env
                                     , repeatable: o.repeatable
                                     }
-              convert' { name = DE.Full f' n' }
+              coerce' { name = DE.Full f' n' }
                 | n' ^= o.name
                 = return $ O.Option { name:       pure o.name
                                     , flag:       pure f'
@@ -139,7 +162,7 @@ solveBranch as ds = Branch <$> go as
                                     , env:        x.env
                                     , repeatable: o.repeatable
                                     }
-        convert _ = Nothing
+        coerce _ = Nothing
 
     solveArgs (U.OptionStack (UO.SOpt o)) y = do
 
@@ -190,13 +213,13 @@ solveBranch as ds = Branch <$> go as
                                           , arg = toArg o.arg
                                           , repeatable = o.repeatable
                                           })
-                (head $ catMaybes $ convert f isTrailing <$> ds)
+                (head $ catMaybes $ coerce f isTrailing <$> ds)
 
-        convert :: Char -> Boolean -> Desc -> Maybe O.Option
-        convert f isTrailing (DE.OptionDesc (DE.Option y))
-          = convert' y
+        coerce :: Char -> Boolean -> Desc -> Maybe O.Option
+        coerce f isTrailing (DE.OptionDesc (DE.Option y))
+          = coerce' y
             where
-              convert' { name = DE.Flag f' }
+              coerce' { name = DE.Flag f' }
                 | (f == f') && (isTrailing || isNothing y.arg)
                 = return $ O.Option { flag:       pure f
                                     , name:       Nothing
@@ -204,7 +227,7 @@ solveBranch as ds = Branch <$> go as
                                     , env:        y.env
                                     , repeatable: o.repeatable
                                     }
-              convert' { name = DE.Full f' n' }
+              coerce' { name = DE.Full f' n' }
                 | (f == f') && (isTrailing || isNothing y.arg)
                 = return $ O.Option { flag:       pure f'
                                     , name:       pure n'
@@ -212,8 +235,8 @@ solveBranch as ds = Branch <$> go as
                                     , env:        y.env
                                     , repeatable: o.repeatable
                                   }
-              convert' _ = Nothing
-        convert _ _ _ = Nothing
+              coerce' _ = Nothing
+        coerce _ _ _ = Nothing
 
     -- | Resolve an option's argument name against that given in the
     -- | description, returning the most complete argument known.
