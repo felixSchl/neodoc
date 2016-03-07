@@ -38,10 +38,10 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * [ ] Provide typescript typings
 * [ ] Fix all warnings
 * [x] Read arguments from env vars
-* [ ] Implement special arguments
+* [x] Implement special arguments
     * [x] ~~`--` (end of args) not yet implemented~~
     * [x] `-` (stdin)
-    * [ ] `[options]`
+    * [x] `[options]`
 
 Known issues to work through:
 
