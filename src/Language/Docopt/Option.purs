@@ -103,6 +103,7 @@ takesArgument _                   = false
 
 isFlag :: Option -> Boolean
 isFlag (Option { arg: Just (Argument { default: Just (BoolValue _)})}) = true
+isFlag (Option { arg: Nothing }) = true
 isFlag _ = false
 
 prettyPrintOption :: Option -> String

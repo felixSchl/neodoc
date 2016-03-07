@@ -11,7 +11,6 @@ import Data.StrMap (StrMap())
 import Data.Tuple (Tuple(..))
 import Data.Either (Either(..))
 import Text.Wrap (dedent)
-import Node.Process (getEnv)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
@@ -37,7 +36,7 @@ docoptSpec = \_ ->
           output <- runDocopt env
             """
             Usage:
-              foo push [options...]
+              foo push [options...] ARG... --
 
             Options:
               -o, --output=ILE

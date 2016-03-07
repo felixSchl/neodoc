@@ -268,15 +268,16 @@ genBranchParser (D.Branch xs) = do
 
         draw ps' n | (length ps' > 0) && (n < 0) = do
           env <- lift ask
-          let rest = filter
-                      (\p -> (not $ D.isRepeatable p)
-                          && (not $ D.hasDefault p)
-                          && (not $ D.hasEnvBacking p env))
-                      (reverse ps')
-          if (length rest > 0)
+          let missing = filter (\o -> not $ D.isRepeatable  o
+                                         || D.hasDefault    o
+                                         || D.isFlag        o
+                                         || D.hasEnvBacking o env
+                               )
+                               $ reverse ps'
+          if (length missing > 0)
             then P.fail $
               "Missing required options: "
-                ++ intercalate ", " (D.prettyPrintArg <$> rest)
+                ++ intercalate ", " (D.prettyPrintArg <$> missing)
             else return empty
 
         draw _ _ = return empty

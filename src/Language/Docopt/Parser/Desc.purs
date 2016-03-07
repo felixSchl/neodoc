@@ -34,6 +34,16 @@ data Desc = OptionDesc Option
 
 data Name = Flag Char | Long String | Full Char String
 
+getFlag :: Name -> Maybe Char
+getFlag (Flag c)   = pure c
+getFlag (Full c _) = pure c
+getFlag _          = Nothing
+
+getName :: Name -> Maybe String
+getName (Long   n) = pure n
+getName (Full _ n) = pure n
+getName _          = Nothing
+
 newtype Argument = Argument {
   name    :: String
 , default :: Maybe Value
