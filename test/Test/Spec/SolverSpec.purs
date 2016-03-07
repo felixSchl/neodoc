@@ -19,9 +19,9 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 
 import Test.Support (vliftEff, runEitherEff)
-import qualified Test.Support.Usage as U
-import qualified Test.Support.Docopt as D
-import qualified Test.Support.Desc as Desc
+import Test.Support.Usage as U
+import Test.Support.Docopt as D
+import Test.Support.Desc as DE
 
 import Language.Docopt.Errors
 import Language.Docopt.Argument
@@ -29,11 +29,11 @@ import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.Solver (solve)
 import Language.Docopt.Parser.Desc (Desc())
-import qualified Language.Docopt.Argument as D
-import qualified Test.Support.Docopt      as D
-import qualified Language.Docopt.Parser.Usage.Argument as U
-import qualified Language.Docopt.Parser.Usage          as U
-import qualified Language.Docopt.Parser.Desc           as Desc
+import Language.Docopt.Argument as D
+import Test.Support.Docopt      as D
+import Language.Docopt.Parser.Usage.Argument as U
+import Language.Docopt.Parser.Usage          as U
+import Language.Docopt.Parser.Desc           as DE
 import Language.Docopt.Scanner (scan)
 import Language.Docopt.Parser.Lexer (lex)
 import Text.Wrap (dedent)
@@ -56,32 +56,34 @@ fail ds msg = TestCase { descs: ds, expected: Left msg }
 out :: Array (Array Argument) -> Usage
 out xss = Usage $ toList $ (\xs -> Branch $ toList xs) <$> xss
 
+u = U.usage "foo"
+
 solverSpec = \_ ->
   describe "The solver" do
     (flip traverseWithIndex_) (toList [
 
-      test ([ U.usage "foo" [ [ U.co "foo" ] ] ])
+      test ([ u [ [ U.co "foo" ] ] ])
         [ pass  ([])
                 ([ out [ [ D.co "foo" ] ] ])
         ]
 
-    , test ([ U.usage "foo" [ [ U.poR "foo" ] ] ])
+    , test ([ u [ [ U.poR "foo" ] ] ])
         [ pass  ([])
                 ([ out [ [ D.poR "foo" ] ] ])
         ]
 
-    , test ([ U.usage "foo" [ [ U.loptR_ "foo" ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
-                            (Just $ Desc.arg "bar" (Just "qux"))
+    , test ([ u [ [ U.loptR_ "foo" ] ] ])
+        [ pass  ([ DE.opt (DE.fname 'f' "foo")
+                            (Just $ DE.arg "bar" (Just "qux"))
                 ])
                 ([ out [
                     [ D.optR 'f' "foo" (D.oa "bar" (StringValue "qux")) ]
                 ] ])
         ]
 
-    , test ([ U.usage "foo" [ [ U.loptR_ "foo", U.co "BAR" ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
-                            (Just $ Desc.arg "BAR" (Just "qux"))
+    , test ([ u [ [ U.loptR_ "foo", U.co "BAR" ] ] ])
+        [ pass  ([ DE.opt (DE.fname 'f' "foo")
+                            (Just $ DE.arg "BAR" (Just "qux"))
                 ])
                 ([ out [
                     [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
@@ -90,27 +92,27 @@ solverSpec = \_ ->
                 ] ])
         ]
 
-    , test ([ U.usage "foo" [ [ U.lopt_ "foo", U.poR "BAR" ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
-                            (Just $ Desc.arg "BAR" (Just "qux"))
+    , test ([ u [ [ U.lopt_ "foo", U.poR "BAR" ] ] ])
+        [ pass  ([ DE.opt (DE.fname 'f' "foo")
+                            (Just $ DE.arg "BAR" (Just "qux"))
                 ])
                 ([ out [
                     [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
                 ] ])
         ]
 
-    , test ([ U.usage "foo" [ [ U.lopt_ "foo", U.po "BAR" ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
-                            (Just $ Desc.arg "BAR" (Just "qux"))
+    , test ([ u [ [ U.lopt_ "foo", U.po "BAR" ] ] ])
+        [ pass  ([ DE.opt (DE.fname 'f' "foo")
+                            (Just $ DE.arg "BAR" (Just "qux"))
                 ])
                 ([ out [
                     [ D.opt 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
                 ] ])
         ]
 
-    , test ([ U.usage "foo" [ [ U.loptR_ "foo", U.poR "BAR" ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "foo")
-                            (Just $ Desc.arg "BAR" (Just "qux"))
+    , test ([ u [ [ U.loptR_ "foo", U.poR "BAR" ] ] ])
+        [ pass  ([ DE.opt (DE.fname 'f' "foo")
+                            (Just $ DE.arg "BAR" (Just "qux"))
                 ])
                 ([ out [
                     [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
@@ -119,9 +121,9 @@ solverSpec = \_ ->
                 ] ])
         ]
 
-    , test ([ U.usage "foo" [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
-                            (Just $ Desc.arg "FILE" (Just "foo"))
+    , test ([ u [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
+        [ pass  ([ DE.opt (DE.fname 'f' "file")
+                            (Just $ DE.arg "FILE" (Just "foo"))
                 ])
                 ([ out [
                     [ D.soptR_ 'x'
@@ -132,20 +134,20 @@ solverSpec = \_ ->
                 ] ])
         ]
 
-    , test ([ U.usage "foo" [ [ U.sopt_ 'f' [], U.poR "FILE" ] ] ])
-        [ pass  [ Desc.opt (Desc.fname 'f' "file")
-                           (Just $ Desc.arg "FILE" (Just "foo"))
-                , Desc.opt (Desc.fname 'f' "file")
-                           (Just $ Desc.arg "FILE" (Just "foo"))
+    , test ([ u [ [ U.sopt_ 'f' [], U.poR "FILE" ] ] ])
+        [ pass  [ DE.opt (DE.fname 'f' "file")
+                           (Just $ DE.arg "FILE" (Just "foo"))
+                , DE.opt (DE.fname 'f' "file")
+                           (Just $ DE.arg "FILE" (Just "foo"))
                 ]
                 ([ out [
                     [ D.optR 'f' "file" (D.oa "FILE" (StringValue "foo")) ]
                 ] ])
         ]
 
-    , test ([ U.usage "foo" [ [ U.soptR_ 'f' ['x'] ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
-                            (Just $ Desc.arg "FILE" (Just "foo"))
+    , test ([ u [ [ U.soptR_ 'f' ['x'] ] ] ])
+        [ pass  ([ DE.opt (DE.fname 'f' "file")
+                            (Just $ DE.arg "FILE" (Just "foo"))
                 ])
                 ([ out [
                     [ D.soptR_ 'f'
@@ -157,9 +159,9 @@ solverSpec = \_ ->
       -- Note: `f` should not adopt `file` as it's full name since it's in an
       -- option stack and not in trailing position (therefore cannot inherit the
       -- description's argument, rendering it an unfit candidate)
-    , test ([ U.usage "foo" [ [ U.soptR_ 'f' ['v', 'z', 'x'] ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
-                            (Just $ Desc.arg "FILE" (Just "foo"))
+    , test ([ u [ [ U.soptR_ 'f' ['v', 'z', 'x'] ] ] ])
+        [ pass  ([ DE.opt (DE.fname 'f' "file")
+                            (Just $ DE.arg "FILE" (Just "foo"))
                 ])
                 ([ out [
                     [ D.soptR_ 'f'
@@ -169,9 +171,9 @@ solverSpec = \_ ->
                     ]
                 ] ])
         ]
-    , test ([ U.usage "foo" [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
-        [ pass  ([ Desc.opt (Desc.fname 'f' "file")
-                            (Just $ Desc.arg "FILE" (Just "foo"))
+    , test ([ u [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
+        [ pass  ([ DE.opt (DE.fname 'f' "file")
+                            (Just $ DE.arg "FILE" (Just "foo"))
                 ])
                 ([ out [
                     [ D.soptR_ 'x'
@@ -180,6 +182,14 @@ solverSpec = \_ ->
                     , D.optR 'f' "file" (D.oa "FILE" (StringValue "foo"))
                     ]
                 ] ])
+        ]
+
+    , test ([ u [ [ U.Reference "" ] ] ])
+        [ pass
+            [ DE.opt (DE.fname 'f' "file")
+                     (Just $ DE.arg "FILE" (Just "foo"))
+            ]
+            [ out [ [ D.opt 'f' "file" (D.oa "FILE" $ StringValue "foo") ] ] ]
         ]
     ]) runtest
 
@@ -198,7 +208,7 @@ solverSpec = \_ ->
           \j (TestCase { descs, expected }) -> do
             describe
               ("\nOptions:\n" ++ intercalate "\n" (("  " ++) <$>
-                (Desc.prettyPrintDesc <$> descs))) do
+                (DE.prettyPrintDesc <$> descs))) do
               it (
                 either
                   (\msg -> "Should fail with:\n" ++ msg)
