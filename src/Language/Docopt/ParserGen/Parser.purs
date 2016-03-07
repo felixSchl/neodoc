@@ -53,8 +53,11 @@ import Language.Docopt.ParserGen.Token
 import Language.Docopt.ParserGen.ValueMapping
 import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
+type ValueMapping = Tuple D.Argument D.Value
 type Parser a = P.ParserT (List Token) (Reader D.Env) a
-type Scored a = Tuple Int a
+newtype ScoredResult = ScoredResult { score  :: Int
+                                    , result :: List ValueMapping
+                                    }
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
@@ -214,8 +217,9 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 -- | Generate a parser for a single program usage.
 genUsageParser :: D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
 genUsageParser (D.Usage xs) = do
-  P.choice $ xs <#> \x -> Tuple x <$> genBranchParser x
-  <* eof
+  P.fail "..."
+  -- P.choice $ xs <#> \x -> Tuple x <$> genBranchParser x
+  -- <* eof
 
 -- | Generate a parser for a single usage branch
 genBranchParser :: D.Branch
@@ -229,7 +233,7 @@ genBranchParser (D.Branch xs) = do
         (Tuple score  a)  <- p
         (Tuple score' as) <- genExhaustiveParser xs
         return $ Tuple (score + score') (a ++ as))
-    (foldM step (Free $ pure empty) xs)
+    (foldM step (Free $ pure (Tuple 0 empty)) xs)
   where
 
     -- Given a list of arguments, try parse them all in any order.
@@ -367,14 +371,16 @@ genBranchParser (D.Branch xs) = do
 
     -- Generate a parser for a argument `Group`
     genParser x@(D.Group optional bs repeated) = do
-      Tuple 1 <$> do
-        concat <$>
-          let mod    = if optional then P.option (Tuple 0 empty) else \p -> p
-              parser = if repeated then many go else singleton <$> go
-          in mod parser
-        where go = if length bs > 0
-                      then P.choice $ P.try <<< genBranchParser <$> bs
-                      else return (Tuple 0 empty)
+      Tuple 1 <<< singleton <<< Tuple x <$> do
+        return (D.BoolValue true)
+      -- Tuple 1 <$> do
+        -- concat <$>
+        --   let mod    = if optional then P.option (Tuple 0 empty) else \p -> p
+        --       parser = if repeated then many go else singleton <$> go
+        --   in mod parser
+        -- where go = if length bs > 0
+        --               then P.choice $ P.try <<< genBranchParser <$> bs
+        --               else return (Tuple 0 empty)
 
     isFree :: D.Argument -> Boolean
     isFree (D.Option _)     = true
