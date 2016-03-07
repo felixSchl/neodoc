@@ -94,6 +94,15 @@ solveBranch as ds = Branch <$> go as
                  $ O.Option { flag: DE.getFlag y.name
                             , name: DE.getName y.name
                             , arg:  do
+                                -- XXX: Use alt <|> here, in case the option
+                                --      is a flag (takes no argument) and
+                                --      overwrite it to take an argument of
+                                --      with a default BoolValue of "false".
+                                --      How to name the anonymous argument?
+                                --      This may require a change to the option
+                                --      structure: move "name" and "default"
+                                --      out of the "Argument" structure into
+                                --      the "Option" structure?
                                 a <- DE.runArgument <$> y.arg
                                 return $ O.Argument a
                             , env: y.env
