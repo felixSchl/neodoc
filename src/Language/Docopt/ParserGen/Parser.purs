@@ -19,7 +19,7 @@ import Data.Function (on)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
-                 , head, many, tail, fromList, filter, reverse, concat)
+                 , head, many, tail, fromList, filter, reverse, concat, catMaybes)
 import Control.Alt ((<|>))
 import Data.Traversable (class Traversable, traverse, for)
 import Control.Lazy (defer)
@@ -64,8 +64,8 @@ type Parser a = P.ParserT (List Token) (Reader D.Env) a
 
 newtype ScoredResult a = ScoredResult { score :: Int, result :: a }
 
-runScoredResult :: forall a. ScoredResult a -> { score :: Int, result :: a }
-runScoredResult (ScoredResult r) = r
+unScoredResult :: forall a. ScoredResult a -> { score :: Int, result :: a }
+unScoredResult (ScoredResult r) = r
 
 instance semigroupScoredResult :: (Semigroup a) => Semigroup (ScoredResult a)
   where append (ScoredResult s) (ScoredResult s')
@@ -80,13 +80,16 @@ instance showScoredResult :: (Show a) => Show (ScoredResult a)
           = "ScoredResult " ++ show score ++ ": " ++ show result
 
 instance ordScoredResult :: Ord (ScoredResult a)
-  where compare = compare `on` (_.score <<< runScoredResult)
+  where compare = compare `on` (_.score <<< unScoredResult)
 
 instance eqScoredResult :: Eq (ScoredResult a)
-  where eq = eq `on` (_.score <<< runScoredResult)
+  where eq = eq `on` (_.score <<< unScoredResult)
 
 scoreFromList :: forall a. List a -> ScoredResult (List a)
 scoreFromList xs = ScoredResult { score: length xs, result: xs }
+
+rmapScoreResult :: forall a b. (a -> b) -> ScoredResult a -> ScoredResult b
+rmapScoreResult f (ScoredResult (x@{ result })) = ScoredResult $ x { result = f result }
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
@@ -247,25 +250,19 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 genUsageParser :: D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
 genUsageParser (D.Usage xs) = genBranchesParser xs <* eof
 
-genBranchesParser :: forall a. (Traversable a)
-                  => a D.Branch
+genBranchesParser :: List D.Branch
                   -> Parser (Tuple D.Branch (List ValueMapping))
 genBranchesParser xs = do
-  results <- for xs \x -> do
-    either
-      Nothing
-      (ScoredResult { score, result }) -> return $ ScoredResult {
-        score:  score
-      , result: Tuple x result
-      }
-      (genBranchParser x)
+  results <- filter ((/= 0) <<< _.score <<< unScoredResult) <$> do
+    catMaybes <$> for xs \x -> do
+      P.optionMaybe do
+        rmapScoreResult (Tuple x) <$> genBranchParser x
 
   maybe
     -- XXX: ... need better errors!
     (P.fail "No branch matches")
-    (return <<< _.result <<< runScoredResult)
+    (return <<< _.result <<< unScoredResult)
     (maximum results)
-
 
 -- | Generate a parser for a single usage branch
 genBranchParser :: D.Branch -> Parser (ScoredResult (List ValueMapping))
@@ -297,7 +294,7 @@ genBranchParser (D.Branch xs) = do
              -> Parser (ScoredResult (List ValueMapping))
 
         draw pss@(Cons p ps') n | n >= 0 = (do
-          r <- runScoredResult <$> genParser p
+          r <- unScoredResult <$> genParser p
 
           -- verify the arguments for parsed set of options
           -- when an option takes anything but a bool value, i.e. it is not
@@ -312,7 +309,7 @@ genBranchParser (D.Branch xs) = do
             else P.fail $ "Missing required arguments for "
                         ++ intercalate ", " (D.prettyPrintArg <$> ys)
 
-          r' <- runScoredResult <$> do
+          r' <- unScoredResult <$> do
                   if D.isRepeatable p
                         then draw pss (length pss)
                         else draw ps' (length ps')
