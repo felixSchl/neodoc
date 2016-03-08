@@ -17,7 +17,7 @@ import Control.Monad.State (State(), evalState)
 import Control.Apply ((*>), (<*))
 import Data.Function (on)
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), isJust, maybe, maybe')
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
                  , head, many, tail, fromList, filter, reverse, concat, catMaybes)
 import Control.Alt ((<|>))
@@ -39,7 +39,7 @@ import Control.Monad.Reader (Reader(), ask)
 import Data.Map as Map
 import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
-import Control.MonadPlus.Partial (mrights)
+import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Control.Bind ((=<<))
 
 import Text.Parsing.Parser             as P
@@ -250,19 +250,71 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 genUsageParser :: D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
 genUsageParser (D.Usage xs) = genBranchesParser xs <* eof
 
+-- Fold over a list of parsers, applying each in turn onto the result of the
+-- previous, keeping both errors and results.
+collect :: forall s m a. (Monad m)
+    => List (P.ParserT s m a)
+    -> P.ParserT s m (List (Either P.ParseError a))
+collect xs = foldl step (pure mempty) xs
+  where
+    step :: forall s m a. (Monad m)
+          => P.ParserT s m (List (Either P.ParseError a))
+          -> P.ParserT s m a
+          -> P.ParserT s m (List (Either P.ParseError a))
+    step acc p = do
+      a <- acc
+      b <- P.ParserT $ \s -> P.unParserT p s >>= \o ->
+            case o.result of
+              Left e ->
+                return {
+                  input: o.input
+                , result: Right (Left e)
+                , consumed: o.consumed
+                , position: o.position }
+              Right a ->
+                return {
+                  input: o.input
+                , result: Right (Right a)
+                , consumed: o.consumed
+                , position: o.position }
+      return $ a ++ singleton b
+
+-- | Generate a parser that selects the best branch it parses and
+-- | fails if no branch was parsed.
 genBranchesParser :: List D.Branch
                   -> Parser (Tuple D.Branch (List ValueMapping))
 genBranchesParser xs = do
-  results <- filter ((/= 0) <<< _.score <<< unScoredResult) <$> do
-    catMaybes <$> for xs \x -> do
-      P.optionMaybe do
-        rmapScoreResult (Tuple x) <$> genBranchParser x
+  results <- collect $ xs <#> \x ->
+              rmapScoreResult (Tuple x) <$> do
+                genBranchParser x
 
-  maybe
-    -- XXX: ... need better errors!
-    (P.fail "No branch matches")
+  -- if there's just nothing but 0-scores, result in an ambiguity
+  -- error, since there is no way we can know which branch the user
+  -- wanted to complete. (XXX: or should all branches complete?)
+
+  (Tuple zeros as) <- return $
+    mpartition ((== 0) <<< _.score <<< unScoredResult)
+             $ mrights results
+
+  maybe'
+    (\_ ->
+      maybe'
+        (\_ -> if (length xs == 1)
+          then return $ _.result $ unScoredResult $ LU.head zeros
+          else P.fail "ambigious match"
+        )
+        (\e -> do
+          (P.ParseError err) <- return e
+          P.ParserT $ \_ -> pure { input: Nil
+                                  , result: Left $ P.ParseError err
+                                  , consumed: true
+                                  , position: err.position
+                                  }
+        )
+        (head $ mlefts results)
+    )
     (return <<< _.result <<< unScoredResult)
-    (maximum results)
+    (maximum as)
 
 -- | Generate a parser for a single usage branch
 genBranchParser :: D.Branch -> Parser (ScoredResult (List ValueMapping))

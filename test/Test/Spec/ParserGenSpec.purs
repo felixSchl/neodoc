@@ -246,9 +246,9 @@ parserGenSpec = \_ -> describe "The generator" do
         , pass
             [ "-b" ]
             [ D.sopt_ 'b' :> D.bool true ]
-        , pass
+        , fail
             []
-            []
+            "ambigious match"
         ]
 
     , test'
@@ -259,9 +259,9 @@ parserGenSpec = \_ -> describe "The generator" do
         , pass
             [ "b" ]
             [ D.co "b" :> D.bool true ]
-        , pass
+        , fail
             []
-            []
+            "Expected command: \"a\""
         ]
 
     , test
