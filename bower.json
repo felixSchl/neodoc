@@ -23,7 +23,8 @@
     "purescript-transformers": "~0.8.1",
     "purescript-integers": "~0.2.1",
     "purescript-globals": "~0.2.1",
-    "purescript-maps": "~0.5.4"
+    "purescript-maps": "~0.5.4",
+    "purescript-monadplus-partial": "~0.2.2"
   },
   "resolutions": {
     "purescript-transformers": "^0.7.1",

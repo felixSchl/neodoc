@@ -246,6 +246,22 @@ parserGenSpec = \_ -> describe "The generator" do
         , pass
             [ "-b" ]
             [ D.sopt_ 'b' :> D.bool true ]
+        , pass
+            []
+            []
+        ]
+
+    , test'
+        [ [ D.co "a" ], [ D.co "b" ] ]
+        [ pass
+            [ "a" ]
+            [ D.co "a" :> D.bool true ]
+        , pass
+            [ "b" ]
+            [ D.co "b" :> D.bool true ]
+        , pass
+            []
+            []
         ]
 
     , test
