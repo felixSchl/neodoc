@@ -53,6 +53,8 @@ Known issues to work through:
 
 Further, the wishlist looks somewhat like this:
 
+* Put the "source" of a parsed option's value into the output, e.g. "env",
+  "default", "user"
 * Read options from config file
 * Make commands first class citizens, enabling easy subcommands, inheriting
   options and all that.
