@@ -134,7 +134,7 @@ parserGenSpec = \_ -> describe "The generator" do
             D.opt 'i' "input" (D.oa_ "FILE")
           ]]
         ]
-        [ fail [] "Missing required options: (-i, --input=FILE)"
+        [ fail [] "Missing required options: -i, --input=FILE"
         , pass
             [ "-i", "bar" ]
             [ D.opt 'i' "input" (D.oa_ "FILE") :> (D.str "bar") ]
@@ -145,7 +145,7 @@ parserGenSpec = \_ -> describe "The generator" do
             D.opt 'i' "input" (D.oa_ "FILE")
           ]]
         ]
-        [ fail [] "Missing required options: (-i, --input=FILE)"
+        [ fail [] "Missing required options: -i, --input=FILE"
         , pass
             [ "-i", "bar" ]
             [ D.opt 'i' "input" (D.oa_ "FILE") :> (D.str "bar") ]
@@ -159,7 +159,7 @@ parserGenSpec = \_ -> describe "The generator" do
         ]
         [ fail []
           $ "Missing required options: "
-              ++ "-o, --output=FILE, (-i, --input=FILE)"
+              ++ "-i, --input=FILE"
 
         , fail [ "-i", "bar" ]
           $ "Missing required options: -o, --output=FILE"
@@ -184,9 +184,7 @@ parserGenSpec = \_ -> describe "The generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Missing required options: "
-              ++ "-o, --output=FILE, "
-              ++ "((-i, --input=FILE) -r, --redirect=FILE)"
+          $ "Missing required options: -i, --input=FILE"
 
         , fail [ "-i", "bar", "-r", "bar" ]
             "Missing required options: -o, --output=FILE"
