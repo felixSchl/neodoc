@@ -108,7 +108,7 @@ isFlag _ = false
 
 prettyPrintOption :: Option -> String
 prettyPrintOption (Option o)
-  = short ++ long ++ arg' ++ rep ++ default
+  = short ++ long ++ arg' ++ rep ++ default ++ env
   where
     short   = maybe "" (\f -> "-" ++ (fromChar f)) o.flag
     long    = maybe "" (const ", ") (o.flag *> o.name)
@@ -118,6 +118,7 @@ prettyPrintOption (Option o)
     default = flip (maybe "") o.arg \(Argument { default }) ->
                 flip (maybe "") default \v->
                   " [default: " ++ (prettyPrintValue v) ++  "]"
+    env = flip (maybe "") o.env \k -> " [env: " ++ k ++ "]"
 
 --------------------------------------------------------------------------------
 -- Short hand option creation

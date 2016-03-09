@@ -14,6 +14,7 @@ import Data.StrMap as StrMap
 import Data.StrMap (StrMap())
 import Data.Map (Map())
 import Data.String (fromChar)
+import Data.Monoid (mempty)
 import Data.Map as Map
 import Data.String as Str
 import Data.Tuple (Tuple(..), fst)
@@ -26,7 +27,7 @@ import Language.Docopt.Argument as D
 import Language.Docopt.Option   as O
 import Language.Docopt.Env      as Env
 import Data.String.Ext ((^=))
-import Data.List (List(..), toList, concat)
+import Data.List (List(..), toList, concat, singleton)
 import Data.List as L
 import Language.Docopt.ParserGen.ValueMapping
 
@@ -76,12 +77,24 @@ reduce :: D.Env                  -- ^ the environment
        -> List ValueMapping      -- ^ the parse result
        -> Map D.Argument D.Value -- ^ the output set of (arg => val)
 reduce env b m =
-  let unified = lmap unify <$> m
+  let unrolled = flatten b
+      unified  = lmap unify <$> m
    in toValMap unified
-    # applyEnvVals b
-    # applyDefVals b
+    # applyEnvVals unrolled
+    # applyDefVals unrolled
 
   where
+
+    -- Remove all groups from the branch, by concatenation
+    flatten :: D.Branch -> D.Branch
+    flatten (D.Branch bs) = D.Branch $ foldl (\a b -> a ++ expand b) mempty bs
+      where
+        expand :: D.Argument -> List D.Argument
+        expand (D.Group _ xs _) = concat
+                                $ concat
+                                $ xs <#> D.runBranch >>> (expand <$>)
+        expand x                = singleton x
+
     -- Find the lowest comment denominator between two arguments
     unify :: D.Argument -> D.Argument
     unify a = foldl step a (fst <$> m)

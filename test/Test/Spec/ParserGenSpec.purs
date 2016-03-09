@@ -130,6 +130,16 @@ parserGenSpec = \_ -> describe "The generator" do
         ]
 
     , test
+        [ D.optE 'h' "host" (D.oa "FOO" (D.str "BAR")) "HOST" ]
+        [ pass'
+            []
+            [ "HOST" :> "HOME" ]
+            [ D.optE 'h' "host" (D.oa "FOO" (D.str "BAR")) "HOST"
+                :> D.str "HOME"
+            ]
+        ]
+
+    , test
         [ D.grr false [[
             D.opt 'i' "input" (D.oa_ "FILE")
           ]]
@@ -158,8 +168,7 @@ parserGenSpec = \_ -> describe "The generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Missing required options: "
-              ++ "-i, --input=FILE"
+          $ "Missing required options: -i, --input=FILE"
 
         , fail [ "-i", "bar" ]
           $ "Missing required options: -o, --output=FILE"
@@ -179,7 +188,7 @@ parserGenSpec = \_ -> describe "The generator" do
             D.grr false [[
               D.opt 'i' "input" (D.oa_ "FILE")
             ]]
-          , D.opt 'r' "redirect" (D.oa_ "FILE")
+          , D.optE 'r' "redirect" (D.oa_ "FILE") "QUX"
           ]]
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
@@ -190,15 +199,22 @@ parserGenSpec = \_ -> describe "The generator" do
             "Missing required options: -o, --output=FILE"
 
         , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
-            [ D.opt 'i' "input"  (D.oa_ "FILE")   :> D.str "bar"
-            , D.opt 'r' "redirect" (D.oa_ "FILE") :> D.str "bar"
-            , D.opt 'o' "output" (D.oa_ "FILE")   :> D.str "bar" ]
+            [ D.opt  'i' "input"  (D.oa_ "FILE")         :> D.str "bar"
+            , D.optE 'r' "redirect" (D.oa_ "FILE") "QUX" :> D.str "bar" 
+            , D.opt  'o' "output" (D.oa_ "FILE")         :> D.str "bar" ]
 
           -- group should be interchangable if it's only of options:
         , pass [ "-o", "bar", "-r", "bar", "-i", "bar" ]
-            [ D.opt 'i' "input"  (D.oa_ "FILE")   :> D.str "bar"
-            , D.opt 'r' "redirect" (D.oa_ "FILE") :> D.str "bar"
-            , D.opt 'o' "output" (D.oa_ "FILE")   :> D.str "bar" ]
+            [ D.opt  'i' "input"  (D.oa_ "FILE")         :> D.str "bar"
+            , D.optE 'r' "redirect" (D.oa_ "FILE") "QUX" :> D.str "bar"
+            , D.opt  'o' "output" (D.oa_ "FILE")         :> D.str "bar" ]
+
+        , pass'
+            [ "-o", "bar", "-i", "bar" ]
+            [ "QUX" :> "BAR" ]
+            [ D.opt  'i' "input"  (D.oa_ "FILE")         :> D.str "bar"
+            , D.optE 'r' "redirect" (D.oa_ "FILE") "QUX" :> D.str "BAR"
+            , D.opt  'o' "output" (D.oa_ "FILE")         :> D.str "bar" ]
         ]
 
     , test
