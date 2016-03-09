@@ -11,30 +11,36 @@ module Language.Docopt.ParserGen.Parser (
   ) where
 
 import Prelude
-import Control.Plus (empty)
+import Control.Plus (class Plus, empty)
 import Debug.Trace
 import Control.Monad.State (State(), evalState)
 import Control.Apply ((*>), (<*))
+import Data.Function (on)
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), isJust, maybe, maybe')
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
-                 , head, many, tail, fromList, filter, reverse, concat)
+                 , head, many, tail, fromList, filter, reverse, concat, catMaybes)
 import Control.Alt ((<|>))
+import Data.Traversable (class Traversable, traverse, for)
 import Control.Lazy (defer)
-import Data.Foldable (foldl, intercalate, for_, all)
+import Data.Foldable (class Foldable, maximum, foldl, intercalate, for_, all)
 import Data.String (fromCharArray, stripPrefix)
-import qualified Data.List as L
-import qualified Data.List.Unsafe as LU
-import qualified Data.Array as A
-import qualified Data.Array.Unsafe as AU
+import Data.Bifunctor (class Bifunctor, rmap)
+import Data.List as L
+import Data.List.Unsafe as LU
+import Data.Array as A
+import Data.Array.Unsafe as AU
 import Data.Array (uncons)
-import Data.Tuple (Tuple(..), fst)
+import Data.Monoid (Monoid)
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.Monoid (mempty)
 import Data.Map (Map())
 import Control.Monad.Reader (Reader(), ask)
 import Data.Map as Map
 import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
+import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
+import Control.Bind ((=<<))
 
 import Text.Parsing.Parser             as P
 import Text.Parsing.Parser.Combinators as P
@@ -53,7 +59,37 @@ import Language.Docopt.ParserGen.Token
 import Language.Docopt.ParserGen.ValueMapping
 import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
+type ValueMapping = Tuple D.Argument D.Value
 type Parser a = P.ParserT (List Token) (Reader D.Env) a
+
+newtype ScoredResult a = ScoredResult { score :: Int, result :: a }
+
+unScoredResult :: forall a. ScoredResult a -> { score :: Int, result :: a }
+unScoredResult (ScoredResult r) = r
+
+instance semigroupScoredResult :: (Semigroup a) => Semigroup (ScoredResult a)
+  where append (ScoredResult s) (ScoredResult s')
+          = ScoredResult { score:  s.score  + s'.score
+                         , result: s.result ++ s'.result }
+
+instance monoidScoredResult :: (Monoid a) => Monoid (ScoredResult a)
+  where mempty = ScoredResult { score: 0, result: mempty }
+
+instance showScoredResult :: (Show a) => Show (ScoredResult a)
+  where show (ScoredResult { score, result })
+          = "ScoredResult " ++ show score ++ ": " ++ show result
+
+instance ordScoredResult :: Ord (ScoredResult a)
+  where compare = compare `on` (_.score <<< unScoredResult)
+
+instance eqScoredResult :: Eq (ScoredResult a)
+  where eq = eq `on` (_.score <<< unScoredResult)
+
+scoreFromList :: forall a. List a -> ScoredResult (List a)
+scoreFromList xs = ScoredResult { score: length xs, result: xs }
+
+rmapScoreResult :: forall a b. (a -> b) -> ScoredResult a -> ScoredResult b
+rmapScoreResult f (ScoredResult (x@{ result })) = ScoredResult $ x { result = f result }
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
@@ -212,58 +248,125 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 
 -- | Generate a parser for a single program usage.
 genUsageParser :: D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
-genUsageParser (D.Usage xs) = do
-  P.choice $ xs <#> \x -> Tuple x <$> genBranchParser x
-  <* eof
+genUsageParser (D.Usage xs) = genBranchesParser xs <* eof
+
+-- Fold over a list of parsers, applying each in turn onto the result of the
+-- previous, keeping both errors and results.
+collect :: forall s m a. (Monad m)
+    => List (P.ParserT s m a)
+    -> P.ParserT s m (List (Either P.ParseError a))
+collect xs = foldl step (pure mempty) xs
+  where
+    step :: forall s m a. (Monad m)
+          => P.ParserT s m (List (Either P.ParseError a))
+          -> P.ParserT s m a
+          -> P.ParserT s m (List (Either P.ParseError a))
+    step acc p = do
+      a <- acc
+      b <- P.ParserT $ \s -> P.unParserT p s >>= \o ->
+            case o.result of
+              Left e ->
+                return {
+                  input: o.input
+                , result: Right (Left e)
+                , consumed: o.consumed
+                , position: o.position }
+              Right a ->
+                return {
+                  input: o.input
+                , result: Right (Right a)
+                , consumed: o.consumed
+                , position: o.position }
+      return $ a ++ singleton b
+
+-- | Generate a parser that selects the best branch it parses and
+-- | fails if no branch was parsed.
+genBranchesParser :: List D.Branch
+                  -> Parser (Tuple D.Branch (List ValueMapping))
+genBranchesParser xs = do
+  results <- collect $ xs <#> \x ->
+              rmapScoreResult (Tuple x) <$> do
+                genBranchParser x
+
+  -- if there's just nothing but 0-scores, result in an ambiguity
+  -- error, since there is no way we can know which branch the user
+  -- wanted to complete. (XXX: or should all branches complete?)
+
+  (Tuple zeros as) <- return $
+    mpartition ((== 0) <<< _.score <<< unScoredResult)
+             $ mrights results
+
+  maybe'
+    (\_ ->
+      maybe'
+        (\_ -> if (length xs == 1)
+          then return $ _.result $ unScoredResult $ LU.head zeros
+          else P.fail "ambigious match"
+        )
+        (\e -> do
+          (P.ParseError err) <- return e
+          P.ParserT $ \_ -> pure { input: Nil
+                                  , result: Left $ P.ParseError err
+                                  , consumed: true
+                                  , position: err.position
+                                  }
+        )
+        (head $ mlefts results)
+    )
+    (return <<< _.result <<< unScoredResult)
+    (maximum as)
 
 -- | Generate a parser for a single usage branch
-genBranchParser :: D.Branch -> Parser (List (Tuple D.Argument D.Value))
+genBranchParser :: D.Branch -> Parser (ScoredResult (List ValueMapping))
 genBranchParser (D.Branch xs) = do
   either
     (\_   -> P.fail "Failed to generate parser")
     (\acc -> case acc of
-      Free p       -> p
-      Pending p xs -> do
-        a  <- p
-        as <- genExhaustiveParser xs
-        return (a ++ as))
-    (foldM step (Free $ pure empty) xs)
+              Free p       -> p
+              Pending p xs -> do
+                r  <- p
+                rs <- genExhaustiveParser xs
+                return $ r ++ rs
+    )
+    (foldM step (Free $ pure mempty) xs)
   where
 
     -- Given a list of arguments, try parse them all in any order.
     -- The only requirement is that all input is consumed in the end.
     genExhaustiveParser :: List D.Argument
-                        -> Parser (List (Tuple D.Argument D.Value))
-    genExhaustiveParser Nil = pure empty
+                        -> Parser (ScoredResult (List ValueMapping))
+    genExhaustiveParser Nil = return mempty
     genExhaustiveParser ps  = do
       draw ps (length ps)
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
         -- apply `draw` until the parser fails, with a modified `ps`.
-        draw :: List D.Argument
-             -> Int
-             -> Parser (List (Tuple D.Argument D.Value))
+        draw :: List D.Argument -- ^ the arguments to parse
+             -> Int             -- ^ the number of options left to parse
+             -> Parser (ScoredResult (List ValueMapping))
 
         draw pss@(Cons p ps') n | n >= 0 = (do
-          xs <- genParser p
+          r <- unScoredResult <$> genParser p
 
           -- verify the arguments for parsed set of options
           -- when an option takes anything but a bool value, i.e. it is not
-          -- a switch, an explicit argument *must* be provided.
-          let ys = fst <$> filter
+          -- a flag, an explicit argument *must* be provided.
+          let ys = fst <$> flip filter r.result
                     (\(Tuple a v) -> (D.takesArgument a)
                                   && (not $ D.isFlag a)
                                   && (D.isBoolValue v))
-                      xs
-          if (length ys > 0)
-            then P.fail $ "Missing required arguments for "
-                        ++ intercalate ", " (D.prettyPrintArg <$> ys)
-            else return unit
 
-          xss <- if D.isRepeatable p
-                      then draw pss (length pss)
-                      else draw (ps') (length ps')
-          return $ xs ++ xss
+          if (length ys == 0)
+            then return unit
+            else P.fail $ "Missing required arguments for "
+                        ++ intercalate ", " (D.prettyPrintArg <$> ys)
+
+          r' <- unScoredResult <$> do
+                  if D.isRepeatable p
+                        then draw pss (length pss)
+                        else draw ps' (length ps')
+
+          return $ ScoredResult r ++ ScoredResult r'
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
 
         draw ps' n | (length ps' > 0) && (n < 0) = do
@@ -278,20 +381,26 @@ genBranchParser (D.Branch xs) = do
             then P.fail $
               "Missing required options: "
                 ++ intercalate ", " (D.prettyPrintArg <$> missing)
-            else return empty
+            else return mempty
 
-        draw _ _ = return empty
+        draw _ _ = return mempty
+
+    step :: Acc (ScoredResult (List ValueMapping))
+         -> D.Argument
+         -> Either P.ParseError (Acc (ScoredResult (List ValueMapping)))
 
     -- Options always transition to the `Pending state`
-    step (Free p) x@(D.Option _) = Right $ Pending p (singleton x)
+    step (Free p) x@(D.Option _)
+      = return $ Pending p (singleton x)
+
     step (Free p) x@(D.Group _ bs _) | isFree x
-      = Right $ Pending p (singleton x)
+      = return $ Pending p (singleton x)
 
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
-      a  <- p
-      as <- genParser x
-      return $ a ++ as
+      r  <- p
+      rs <- genParser x
+      return $ r ++ rs
 
     -- Options always keep accumulating
     step (Pending p xs) x@(D.Option _) = Right $ Pending p (x:xs)
@@ -299,29 +408,30 @@ genBranchParser (D.Branch xs) = do
     -- Any non-options always leaves the pending state
     step (Pending p xs) y = Right $
       Free do
-        a   <- p
-        as  <- genExhaustiveParser xs
-        ass <- genParser y
-        return (a ++ as ++ ass)
+        r   <- p
+        rs  <- genExhaustiveParser xs
+        rss <- genParser y
+        return $ r ++ rs ++ rss
 
     -- Parser generator for a single `Argument`
-    genParser :: D.Argument -> Parser (List (Tuple D.Argument D.Value))
+    genParser :: D.Argument
+              -> Parser (ScoredResult (List ValueMapping))
 
     -- Generate a parser for a `Command` argument
     genParser x@(D.Command n) = (do
-      singleton <<< Tuple x <$> do
+      scoreFromList <<< singleton <<< Tuple x <$> do
         command n
       ) P.<?> "command: " ++ (show $ D.prettyPrintArg x)
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) = (do
-      singleton <<< Tuple x <$> do
+      scoreFromList <<< singleton <<< Tuple x <$> do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
       ) P.<?> "end of arguments: \"--\""
 
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) = (do
-      singleton <<< Tuple x <$> do
+      scoreFromList <<< singleton <<< Tuple x <$> do
         -- stdin always succeeds, as it is not actually an argument on argv.
         -- XXX: Should docopt check `process.stdin.isTTY` at this stage, or
         --      even at all?
@@ -330,36 +440,40 @@ genBranchParser (D.Branch xs) = do
 
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional n r) = (do
-      if r then (some go) else (singleton <$> go)
-      ) P.<?> "positional argument: " ++ (show $ D.prettyPrintArg x)
-      where go = Tuple x <$> (positional n)
+      scoreFromList <$> do
+        if r then (some go) else (singleton <$> go)
+        ) P.<?> "positional argument: " ++ (show $ D.prettyPrintArg x)
+        where go = Tuple x <$> (positional n)
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option (O.Option o)) = (do
-      if o.repeatable then (some go) else (singleton <$> go)
-      ) P.<?> "option: " ++ (show $ D.prettyPrintArg x)
-      where
-        go = do
-          P.choice $ P.try <$> [
-            Tuple x <$> (mkLoptParser o.name o.arg)
-          , Tuple x <$> (mkSoptParser o.flag o.arg)
-          ]
+      scoreFromList <$> do
+        if o.repeatable then (some go) else (singleton <$> go)
+        ) P.<?> "option: " ++ (show $ D.prettyPrintArg x)
+        where
+          go = do
+            P.choice $ P.try <$> [
+              Tuple x <$> (mkLoptParser o.name o.arg)
+            , Tuple x <$> (mkSoptParser o.flag o.arg)
+            ]
 
-        mkLoptParser (Just n) a = longOption n a
-        mkLoptParser Nothing _  = P.fail "no long name"
+          mkLoptParser (Just n) a = longOption n a
+          mkLoptParser Nothing _  = P.fail "no long name"
 
-        mkSoptParser (Just f) a = shortOption f a
-        mkSoptParser Nothing _  = P.fail "no flag"
+          mkSoptParser (Just f) a = shortOption f a
+          mkSoptParser Nothing _  = P.fail "no flag"
 
-    -- Generate a parser for a argument `Group`
+    -- Generate a parser for an argument `Group`
+    -- The total score a group is the sum of all scores inside of it.
     genParser x@(D.Group optional bs repeated) = do
-      concat <$>
-        let mod    = if optional then P.option empty else \p -> p
-            parser = if repeated then many go else singleton <$> go
-         in mod parser
+      vs <- concat <$>
+          let mod    = if optional then P.try >>> P.option mempty else \p -> p
+              parser = if repeated then many go else singleton <$> go
+          in mod parser
+      return $ scoreFromList vs
       where go = if length bs > 0
-                    then P.choice $ P.try <<< genBranchParser <$> bs
-                    else return empty
+                    then snd <$> genBranchesParser bs
+                    else return mempty
 
     isFree :: D.Argument -> Boolean
     isFree (D.Option _)     = true

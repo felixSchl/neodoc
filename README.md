@@ -95,9 +95,7 @@ The project can roughly be broken up into 4 distinct areas of work:
 1. Generate a parser from the Specification
 1. Lex and parse the user input
     1. Lex and parse the user input
-    1. **Transform into a usable form**
-
-<sub>\*Highlighted items are yet-to-be-done.</sub>
+    1. Transform into a usable form
 
 ### Dev Notes ###
 

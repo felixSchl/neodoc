@@ -35,13 +35,16 @@ import Language.Docopt.Env      as Env
 import Language.Docopt.Trans    as T
 import Test.Support.Docopt      as D
 
-data Test = Test (Array Argument) (Array Case)
+data Test = Test (List (Array Argument)) (Array Case)
 data Case = Case (Array String)
                  (Array (Tuple String String))
                  (Either String (Map Argument Value))
 
 test :: Array Argument -> Array Case -> Test
-test = Test
+test a = Test (singleton a)
+
+test' :: Array (Array Argument) -> Array Case -> Test
+test' as = Test (toList as)
 
 pass :: Array String -> (Array (Tuple Argument Value)) -> Case
 pass i o = Case i [] (Right $ Map.fromList $ toList o)
@@ -131,7 +134,7 @@ parserGenSpec = \_ -> describe "The generator" do
             D.opt 'i' "input" (D.oa_ "FILE")
           ]]
         ]
-        [ fail [] "Missing required options: (-i, --input=FILE)"
+        [ fail [] "Missing required options: -i, --input=FILE"
         , pass
             [ "-i", "bar" ]
             [ D.opt 'i' "input" (D.oa_ "FILE") :> (D.str "bar") ]
@@ -142,7 +145,7 @@ parserGenSpec = \_ -> describe "The generator" do
             D.opt 'i' "input" (D.oa_ "FILE")
           ]]
         ]
-        [ fail [] "Missing required options: (-i, --input=FILE)"
+        [ fail [] "Missing required options: -i, --input=FILE"
         , pass
             [ "-i", "bar" ]
             [ D.opt 'i' "input" (D.oa_ "FILE") :> (D.str "bar") ]
@@ -156,7 +159,7 @@ parserGenSpec = \_ -> describe "The generator" do
         ]
         [ fail []
           $ "Missing required options: "
-              ++ "-o, --output=FILE, (-i, --input=FILE)"
+              ++ "-i, --input=FILE"
 
         , fail [ "-i", "bar" ]
           $ "Missing required options: -o, --output=FILE"
@@ -181,9 +184,7 @@ parserGenSpec = \_ -> describe "The generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Missing required options: "
-              ++ "-o, --output=FILE, "
-              ++ "((-i, --input=FILE) -r, --redirect=FILE)"
+          $ "Missing required options: -i, --input=FILE"
 
         , fail [ "-i", "bar", "-r", "bar" ]
             "Missing required options: -o, --output=FILE"
@@ -233,6 +234,32 @@ parserGenSpec = \_ -> describe "The generator" do
             []
             [ "FOO" :> "BAR" ]
             [  D.optE 'o' "out" (D.oa "FOO" (D.str "ADLER")) "FOO" :> D.str "BAR" ]
+        ]
+
+    , test'
+        [ [ D.sopt_ 'a' ], [ D.sopt_ 'b' ] ]
+        [ pass
+            [ "-a" ]
+            [ D.sopt_ 'a' :> D.bool true ]
+        , pass
+            [ "-b" ]
+            [ D.sopt_ 'b' :> D.bool true ]
+        , fail
+            []
+            "ambigious match"
+        ]
+
+    , test'
+        [ [ D.co "a" ], [ D.co "b" ] ]
+        [ pass
+            [ "a" ]
+            [ D.co "a" :> D.bool true ]
+        , pass
+            [ "b" ]
+            [ D.co "b" :> D.bool true ]
+        , fail
+            []
+            "Expected command: \"a\""
         ]
 
     , test
@@ -323,8 +350,8 @@ parserGenSpec = \_ -> describe "The generator" do
         [ fail [ "goo" ] "Expected command: \"foo\"" ]
   ]
 
-  for_ testCases \(Test branch kases) -> do
-    describe (prettyPrintBranch $ D.br branch) do
+  for_ testCases \(Test bs kases) -> do
+    describe (intercalate " | " $ prettyPrintBranch <<< D.br <$> bs) do
       for_ kases \(Case input env expected) ->
             let msg = either
                   (\e -> "Should fail with \"" ++ e ++ "\"")
@@ -332,7 +359,7 @@ parserGenSpec = \_ -> describe "The generator" do
                   expected
             in it (intercalate " " input ++ " -> " ++ msg) do
                   vliftEff do
-                    validate branch
+                    validate bs
                              input
                              (Env.fromFoldable env)
                              expected
@@ -347,7 +374,7 @@ parserGenSpec = \_ -> describe "The generator" do
         Map.toList m <#> \(Tuple arg val) ->
           p arg ++ " => " ++ prettyPrintValue val
 
-      validate :: forall eff.  Array Argument
+      validate :: forall eff.  List (Array Argument)
                             -> Array String
                             -> Env
                             -> Either String (Map Argument Value)
@@ -357,7 +384,7 @@ parserGenSpec = \_ -> describe "The generator" do
                 <$> runParser
                       env
                       argv
-                      (genParser $ singleton $ Usage $ singleton $ D.br args)
+                      (genParser $ singleton $ Usage $ D.br <$> args)
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->
