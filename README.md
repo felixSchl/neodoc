@@ -99,26 +99,6 @@ The project can roughly be broken up into 4 distinct areas of work:
 
 ### Dev Notes ###
 
-#### Reading options from the environment ####
-
-> Options should fall back to environment variables, declared via the "env"
-> tag in the option's description.
-
-Todo:
-
-* [ ] Write tests
-
-Problems:
-
-* If an option specifies itself as `[env: FOOBAR]`, does this mean it may be
-  omitted from the input entirely? This means changes to the parser -> The
-  parser needs to be aware of the environment.
-  * Alternatively, we could opaquely change the option's `[default: ...]` to
-    the environment's value during solving. This would retain all semantics in
-    the parser. The downside is that it is semantically awkward since we are
-    changing the specification based on the environment, rather than the parse
-    result. **(this is currenlty implemented)**
-
 #### Reading options from config files ####
 
 > Options should fall back values read from file.
