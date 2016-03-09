@@ -467,7 +467,7 @@ genBranchParser (D.Branch xs) = do
     -- The total score a group is the sum of all scores inside of it.
     genParser x@(D.Group optional bs repeated) = do
       vs <- concat <$>
-          let mod    = if optional then P.option empty else \p -> p
+          let mod    = if optional then P.try >>> P.option mempty else \p -> p
               parser = if repeated then many go else singleton <$> go
           in mod parser
       return $ scoreFromList vs
