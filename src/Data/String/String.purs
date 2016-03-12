@@ -4,7 +4,7 @@ module Data.String.Ext (
 
 import Prelude
 import Data.String as Str
+import Data.Function (on)
 
 (^=) :: String -> String -> Boolean
-(^=) a b = Str.toUpper a == Str.toUpper b
-
+(^=) = eq `on` Str.toUpper
