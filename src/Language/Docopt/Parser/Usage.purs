@@ -16,17 +16,17 @@ import Control.Apply ((*>), (<*))
 import Data.Foldable (intercalate)
 import Data.List (List(..), many, some, (:), toList, concat, singleton
                   , modifyAt, length)
-import qualified Text.Parsing.Parser             as P
-import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Pos         as P
-import qualified Text.Parsing.Parser.String      as P
-import qualified Data.List as L
+import Text.Parsing.Parser             as P
+import Text.Parsing.Parser.Combinators as P
+import Text.Parsing.Parser.Pos         as P
+import Text.Parsing.Parser.String      as P
+import Data.List as L
 import Data.String (fromChar)
-import qualified Data.String as Str
+import Data.String as Str
 import Data.Either (Either(..))
 import Data.Tuple (Tuple(..))
 import Data.Maybe (Maybe(..), maybe)
-import qualified Data.Array as A
+import Data.Array as A
 import Control.Bind ((=<<))
 
 import Language.Docopt.Parser.Base

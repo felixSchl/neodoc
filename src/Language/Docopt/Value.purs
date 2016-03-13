@@ -13,24 +13,28 @@ data Value
   = StringValue String
   | BoolValue   Boolean
   | ArrayValue  (Array Value)
+  | NumberValue Number
 
 derive instance genericValue :: Generic Value
 
 instance showValue :: Show Value where
   show (StringValue s) = "StringValue " ++ s
-  show (BoolValue b)   = "BoolValue "   ++ (show b)
+  show (BoolValue b)   = "BoolValue "   ++ show b
   show (ArrayValue xs) = "ArrayValue "  ++ show (show <$> xs)
+  show (NumberValue x) = "NumberValue " ++ show x
 
 instance eqValue :: Eq Value where
   eq (StringValue s) (StringValue s') = (s == s')
   eq (BoolValue b)   (BoolValue b')   = (b == b')
   eq (ArrayValue xs) (ArrayValue xs') = (xs == xs')
+  eq (NumberValue x) (NumberValue x') = (x == x')
   eq _               _                = false
 
 isSameValueType :: Value -> Value -> Boolean
 isSameValueType (StringValue _) (StringValue _) = true
 isSameValueType (BoolValue _)   (BoolValue _)   = true
 isSameValueType (ArrayValue _)  (ArrayValue _)  = true
+isSameValueType (NumberValue _) (NumberValue _) = true
 isSameValueType _               _               = false
 
 isBoolValue :: Value -> Boolean

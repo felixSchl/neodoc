@@ -239,9 +239,9 @@ parseToken = P.choice
     ]
     where
       floatLiteral = do
-        x <- fromCharArray <$> (A.some num)
+        x <- fromCharArray <$> (A.some digit)
         P.char '.'
-        xs <- fromCharArray <$> (A.some num)
+        xs <- fromCharArray <$> (A.some digit)
 
         -- there is no "safe" version yet, afaik
         let n = readFloat $ x ++ "." ++ xs
@@ -250,7 +250,7 @@ parseToken = P.choice
            else pure n
 
       intLiteral = do
-        x <- fromCharArray <$> (A.some num)
+        x <- fromCharArray <$> (A.some digit)
         case (I.fromString x) of
           Just n  -> return n
           Nothing -> P.fail "Could not parse integer"

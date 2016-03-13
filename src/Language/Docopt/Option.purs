@@ -112,7 +112,7 @@ prettyPrintOption (Option o)
   where
     short   = maybe "" (\f -> "-" ++ (fromChar f)) o.flag
     long    = maybe "" (const ", ") (o.flag *> o.name)
-              ++ maybe "" ("--" ++ _) o.name
+              ++ maybe "" ("--" ++) o.name
     rep     = if o.repeatable then "..." else ""
     arg'    = flip (maybe "") o.arg \(Argument { name }) -> "="  ++ name
     default = flip (maybe "") o.arg \(Argument { default }) ->

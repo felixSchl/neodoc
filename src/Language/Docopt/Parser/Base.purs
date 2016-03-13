@@ -65,8 +65,8 @@ lower = P.satisfy \c -> c == toLower c
 upper :: P.Parser String Char
 upper = P.satisfy \c -> c == toUpper c
 
-num :: P.Parser String Char
-num = regex "[0-9]"
+digit :: P.Parser String Char
+digit = regex "[0-9]"
 
 alpha :: P.Parser String Char
 alpha = regex "[a-zA-Z]"
@@ -84,7 +84,7 @@ upperAlphaNum :: P.Parser String Char
 upperAlphaNum = regex "[0-9A-Z]"
 
 alphaNum :: P.Parser String Char
-alphaNum = alpha <|> num
+alphaNum = alpha <|> digit
 
 space :: P.Parser String Char
 space = P.char ' '
