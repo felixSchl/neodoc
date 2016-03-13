@@ -173,7 +173,11 @@ genDocoptSpec = do
                     out
                 Right r -> do
                   either
-                    (throwException <<< error <<< show)
+                    (\_ -> do
+                      throwException $ error $
+                        "Unexpected output: \n"
+                          ++ prettyPrintOut (pure $ Map.toList r)
+                    )
                     (\r' ->
                       let r'' = Map.toList r
                        in if (r'' /= r')
