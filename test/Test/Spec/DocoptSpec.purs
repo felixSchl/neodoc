@@ -1,9 +1,11 @@
-module Test.Spec.DocoptSpec (docoptSpec) where
+module Test.Spec.DocoptSpec (genDocoptSpec) where
 
 import Prelude
 import Debug.Trace
 import Global (readFloat, readInt)
 import Control.Monad.Eff (Eff())
+import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Aff (Aff(), liftEff')
 import Control.Monad.Trans (lift)
 import Data.List (List(..), toList, concat, last, init)
 import Text.Parsing.Parser as P
@@ -11,10 +13,14 @@ import Data.Traversable (traverse)
 import Data.Bifunctor (lmap)
 import Data.StrMap as StrMap
 import Data.StrMap (StrMap())
+import Data.Map (Map(..))
+import Data.Map as Map
 import Data.Tuple (Tuple(..))
-import Data.Either (Either(..))
-import Data.Foldable (foldl)
+import Data.Either (Either(..), either)
+import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
+import Data.Foldable (foldl, for_, intercalate)
 import Text.Wrap (dedent)
+import Control.Monad.Aff (launchAff)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
@@ -42,45 +48,54 @@ import Node.FS (FS)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync as FS
 import Data.Identity
-import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.Plus (empty)
 import Data.Array as A
 
+newtype Test = Test {
+  doc   :: String
+, kases :: Array Kase
+}
+
+newtype Kase = Kase {
+  argv :: List String
+, out  :: Either String (List (Tuple String D.Value))
+}
+
 parseUniversalDocoptTests :: forall eff
-  . Eff (fs :: FS, err :: EXCEPTION | eff) Unit
+  . Eff (fs :: FS, err :: EXCEPTION | eff) (List Test)
 parseUniversalDocoptTests = do
   f <- FS.readTextFile UTF8 "testcases.docopt"
-  runEitherEff do
-    P.runParser f parser
-  return unit
+  runEitherEff $ P.runParser f do
+    many kase <* P.eof
 
   where
-    parser = do
-      many kase
-      P.eof
-
-    comment = do
-      P.char '#'
-      P.manyTill (P.anyChar) (P.char '\n')
-
-    skipComments = do
-      many comment
-      pure unit
+    comment = P.char '#' *> P.manyTill P.anyChar (P.char '\n')
+    skipComments = void $ many comment
 
     kase = do
       P.skipSpaces *> skipComments *>  P.skipSpaces
       u  <- usage
-      as <- many application
-      pure unit
-      -- traceShowA $ "Usage: " ++ (show u) ++ " - Cases: " ++ show as
+      as <- A.many application
+      return $ Test {
+        doc: u
+      , kases: as <#> \(Tuple i o) -> Kase {
+          argv: i
+        , out:  o
+        }
+      }
 
     application = do
       P.skipSpaces *> skipComments *>  P.skipSpaces
       P.string "$ prog"
-      input <- fromCharArray <<< fromList <$> do
-                P.manyTill P.anyChar $ P.string "\n"
+      P.skipSpaces
+      input <- flip P.sepBy (P.char ' ') do
+        many (P.char ' ')
+        fromCharArray <$> do
+          -- Note: Terminate on '{'. This is hacky and pragmatic,
+          -- but it doesn't have to be any more than that...
+          A.some $ P.noneOf [ ' ', '{', '\n', '"' ]
       P.skipSpaces *> skipComments *>  P.skipSpaces
       output <- P.choice $ P.try <$>
         [ Right <$> do
@@ -90,18 +105,14 @@ parseUniversalDocoptTests = do
                 key <- P.between (P.char '"') (P.char '"') do
                         fromCharArray <$> do
                           A.many $ P.noneOf [ '"' ]
-                P.skipSpaces
-                P.char ':'
-                P.skipSpaces
-                value
-                return key
+                P.skipSpaces *> P.char ':' <* P.skipSpaces
+                Tuple key <$> value
           , P.string "\"user-error\""
               *> many (P.char ' ')
               *> P.optional comment
               *> return (Left "user-error")
         ]
       P.skipSpaces *> skipComments *>  P.skipSpaces
-      traceShowA $ "input: " ++ show input ++ " / output: " ++ show output
       return $ Tuple input output
 
       where
@@ -124,12 +135,12 @@ parseUniversalDocoptTests = do
         , P.string "null" *> return (D.StringValue "null")
 
         , D.NumberValue <$> do
-            xs  <- fromCharArray <$> A.many digit
+            xs  <- fromCharArray <$> A.some digit
             P.choice [
               readFloat <$> do
                 xss <- do
                   P.char '.'
-                  fromCharArray <$> A.many digit
+                  fromCharArray <$> A.some digit
                 return $ xs ++ "." ++ xss
             , return $ readInt 10 xs
             ]
@@ -141,28 +152,39 @@ parseUniversalDocoptTests = do
       fromCharArray <<< fromList <$> do
         P.manyTill P.anyChar $ P.string "\"\"\"\n"
 
+-- Somehow, purescript needs this:
+_liftEff :: forall e a. Eff e a -> Aff e a
+_liftEff = liftEff
 
-docoptSpec = \_ ->
-  describe "Docopt" do
-    it "..." do
-      vliftEff do
+genDocoptSpec = do
+  tests <- _liftEff parseUniversalDocoptTests
+  return $ \_ -> describe "Docopt" do
+    for_ tests \(Test { doc, kases }) -> do
+      describe (doc ++ "\n") do
+        for_ kases \(Kase { argv, out }) -> do
+          describe (intercalate " " argv) do
+            it ("\n" ++ prettyPrintOut out) do
+              let result = runDocopt StrMap.empty (dedent doc) (fromList argv)
+              vliftEff $ case result of
+                Left e ->
+                  either
+                    (const $ pure unit)
+                    (const $ throwException $ error $ show e)
+                    out
+                Right r -> do
+                  either
+                    (throwException <<< error <<< show)
+                    (\r' ->
+                      let r'' = Map.toList r
+                       in if (r'' /= r')
+                        then throwException $ error $
+                          "Unexpected output:\n"
+                            ++ prettyPrintOut (pure r'')
+                        else return unit)
+                    out
 
-        parseUniversalDocoptTests
-
-        let env = StrMap.fromFoldable [
-                    Tuple "FOO_OUTPUT" "BAR"
-                  ]
-        runEitherEff do
-          output <- runDocopt env
-            """
-            Usage:
-            """
-            [ "push"
-            -- , "-o", "~/foo/bar" (provide from env)
-            , "-hhttp://localhost:5000"
-            , "x"
-            , "x", "y"
-            , "--", "0", "1", "3"
-            ]
-          traceA (prettyPrintMap output show D.prettyPrintValue)
-          return unit
+  where
+    prettyPrintOut :: Either String (List (Tuple String D.Value)) -> String
+    prettyPrintOut (Left err) = "fail with " ++ show err
+    prettyPrintOut (Right xs)
+      = intercalate "\n" $ xs <#> \(Tuple k v) -> k ++ " => " ++ show v

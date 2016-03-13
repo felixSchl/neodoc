@@ -99,8 +99,17 @@ solveBranch as ds = Branch <$> go as
                                                 --      able to indicate this!
                             }
           where
-            convertArg (Just (DE.Argument arg)) = return $ O.Argument arg
-            convertArg _                        = Nothing
+            convertArg (Just (DE.Argument arg))
+              = return $ O.Argument arg
+            -- For options that have been expanded through a reference, make
+            -- options that are flags optional, by setting their default value
+            -- to "false".
+            convertArg _
+              = return $ O.Argument {
+                  name: ""
+                , default: pure (BoolValue false)
+                }
+
         convert _ = Nothing
 
     solveArgs (U.Option (UO.LOpt o)) y = do

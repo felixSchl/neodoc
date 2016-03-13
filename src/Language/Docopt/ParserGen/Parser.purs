@@ -373,7 +373,9 @@ genBranchParser (D.Branch xs) = do
           env <- lift ask
           let missing = filter (\o -> not $ D.isRepeatable  o
                                          || D.hasDefault    o
-                                         || D.isFlag        o
+                                      -- XXX: The original docopt disagrees w/
+                                      --      the following:
+                                      -- || D.isFlag        o
                                          || D.hasEnvBacking o env
                                )
                                $ reverse ps'
