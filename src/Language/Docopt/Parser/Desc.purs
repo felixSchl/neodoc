@@ -213,6 +213,10 @@ descParser =
 
       where
 
+        -- XXX: This parser needs to be extended to parse adjacent 'name'
+        --      tokens as potential arguments:
+        --      `-p PATH`, `-p, --path PATH`, `-p PATH, --path PATH`.
+
         start :: L.TokenParser Option
         start = do
           P.choice $ P.try <$> [
