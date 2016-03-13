@@ -172,6 +172,7 @@ solveBranch as ds = Branch <$> go as
                                     , env:        x.env
                                     , repeatable: o.repeatable
                                     }
+              coerce' _ = Nothing
         coerce _ = Nothing
 
     solveArgs (U.OptionStack (UO.SOpt o)) y = do
