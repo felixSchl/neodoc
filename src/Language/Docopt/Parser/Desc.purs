@@ -16,7 +16,7 @@ import qualified Text.Parsing.Parser.Pos as P
 import qualified Text.Parsing.Parser.String as P
 import Data.Foldable (intercalate)
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), maybe, isJust)
+import Data.Maybe (Maybe(..), maybe, maybe', isJust)
 import Data.Generic
 import Data.String (toLower, fromChar)
 import qualified Data.Array as A
@@ -213,10 +213,6 @@ descParser =
 
       where
 
-        -- XXX: This parser needs to be extended to parse adjacent 'name'
-        --      tokens as potential arguments:
-        --      `-p PATH`, `-p, --path PATH`, `-p PATH, --path PATH`.
-
         start :: L.TokenParser Option
         start = do
           P.choice $ P.try <$> [
@@ -232,14 +228,26 @@ descParser =
         short :: L.TokenParser Option
         short = do
           opt <- sopt
+
+          arg <- maybe'
+                  (\_ -> do P.optionMaybe (L.shoutName <|> L.angleName))
+                  (return <<< Just)
+                  opt.arg
+
           return $ Option { name: Flag opt.flag
-                          , arg:  flip argument Nothing <$> opt.arg
+                          , arg:  flip argument Nothing <$> arg
                           , env:  Nothing
                           }
 
         long :: L.TokenParser Option
         long = do
           opt <- lopt
+
+          arg <- maybe'
+                  (\_ -> do P.optionMaybe (L.shoutName <|> L.angleName))
+                  (return <<< Just)
+                  opt.arg
+
           return $ Option { name: Long opt.name
                           , arg:  flip argument Nothing <$>  opt.arg
                           , env:  Nothing
