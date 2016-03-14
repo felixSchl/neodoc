@@ -23,4 +23,4 @@ main = launchAff do
     solverSpec      unit
     parserGenSpec   unit
     transSpec       unit
-    -- docoptSpec      unit
+    docoptSpec      unit
