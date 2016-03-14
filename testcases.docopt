@@ -127,30 +127,29 @@ $ prog --path=home
 {"--path": "home"}
 
 
-# r"""usage: prog [options]
-# 
-# options:
-#     -a        Add
-#     -r        Remote
-#     -m <msg>  Message
-# 
-# """
-# $ prog -a -r -m Hello
-# {"-a": true,
-#  "-r": true,
-#  "-m": "Hello"}
-# 
-# $ prog -armyourass
-# {"-a": true,
-#  "-r": true,
-#  "-m": "yourass"}
-# 
-# $ prog -a -r
-# {"-a": true,
-#  "-r": true,
-#  "-m": null}
-# 
-# 
+r"""usage: prog [options]
+
+options:
+    -a        Add
+    -r        Remote
+    -m <msg>  Message
+
+"""
+$ prog -a -r -m Hello
+{"-a": true,
+ "-m": "Hello",
+ "-r": true}
+
+$ prog -armyourass
+{"-a": true,
+ "-m": "yourass",
+ "-r": true}
+
+$ prog -a -r
+{"-a": true,
+ "-r": true}
+
+
 # r"""Usage: prog [options]
 # 
 # Options: --version

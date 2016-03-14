@@ -89,26 +89,25 @@ solveBranch as ds = Branch <$> go as
       return $ Unconsumed (catMaybes $ convert <$> ds)
 
       where
+        -- | Expand `[options]` into optional groups.
+        -- | XXX: These groups may have to be required later, once we have a
+        -- |      `[required]` tag.
         convert (DE.OptionDesc (DE.Option y)) =
-          return $ Option
-                 $ O.Option { flag:       DE.getFlag y.name
+          return
+            $ Group
+                true
+                (singleton $ Branch $ singleton $ Option $
+                  (O.Option { flag:       DE.getFlag y.name
                             , name:       DE.getName y.name
                             , arg:        convertArg y.arg
                             , env:        y.env
-                            , repeatable: false -- XXX: desc options must be
-                                                --      able to indicate this!
-                            }
+                            , repeatable: false
+                            }))
+                false -- XXX: desc options must be
+                      --      able to indicate this!
           where
-            convertArg (Just (DE.Argument arg))
-              = return $ O.Argument arg
-            -- For options that have been expanded through a reference, make
-            -- options that are flags optional, by setting their default value
-            -- to "false".
-            convertArg _
-              = return $ O.Argument {
-                  name: ""
-                , default: pure (BoolValue false)
-                }
+            convertArg (Just (DE.Argument arg)) = return $ O.Argument arg
+            convertArg _ = Nothing
 
         convert _ = Nothing
 
