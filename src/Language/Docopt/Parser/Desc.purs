@@ -249,7 +249,7 @@ descParser =
                   opt.arg
 
           return $ Option { name: Long opt.name
-                          , arg:  flip argument Nothing <$>  opt.arg
+                          , arg:  flip argument Nothing <$> arg
                           , env:  Nothing
                           }
 
