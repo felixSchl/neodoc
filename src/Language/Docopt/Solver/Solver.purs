@@ -79,7 +79,7 @@ solveBranch as ds = Branch <$> go as
         flip (Group o) r <$> do
           flip solveBranch ds `traverse` bs
 
-    -- | Resolve the refernce by expanding into real
+    -- | Resolve the reference by expanding into real
     -- | options, as derived from the descriptions.
     -- |
     -- | XXX: Currently `r` is unused as all descriptions are in a flat list.

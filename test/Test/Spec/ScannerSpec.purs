@@ -32,10 +32,13 @@ scannerSpec = \_ ->
             Advanced Options: qux
             """
       vliftEff do
-        assert $ docopt.usage == "foo\n"
+                              -- "Usage: foo\n"
+        assert $ docopt.usage == "       foo\n"
         assert $ length docopt.options == 2
-        assert $ fromJust (docopt.options !! 0) == " bar\n"
-        assert $ fromJust (docopt.options !! 1) == " qux\n"
+                                                -- "Options: bar\n"
+        assert $ fromJust (docopt.options !! 0) == "         bar\n"
+                                                -- "Advanced Options: qux\n"
+        assert $ fromJust (docopt.options !! 1) == "                  qux\n"
 
     it "should scan sections with new line after colon" do
       let docopt = fromRight $ Scanner.scan $
@@ -49,10 +52,15 @@ scannerSpec = \_ ->
               qux
             """
       vliftEff do
-        assert $ docopt.usage == "foo\n"
+                               -- Usage:
+        assert $ docopt.usage == "      \n  foo\n"
         assert $ length docopt.options == 2
-        assert $ fromJust (docopt.options !! 0) == "\n  bar\n"
-        assert $ fromJust (docopt.options !! 1) == "\n  qux\n"
+        assert $ fromJust (docopt.options !! 0)
+            --  Options:
+            == "        \n  bar\n"
+        assert $ fromJust (docopt.options !! 1)
+            --  Advanced Options:
+            == "                 \n  qux\n"
 
     it "should fail w/o a usage section" do
       let result = Scanner.scan $

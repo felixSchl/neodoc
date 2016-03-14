@@ -1,191 +1,184 @@
-r"""Usage: prog
-
-"""
-$ prog
-{}
-
-$ prog --xxx
-"user-error"
+# r"""Usage: prog
+# 
+# """
+# $ prog
+# {}
+# 
+# $ prog --xxx
+# "user-error"
+# 
+# 
+# r"""Usage: prog [options]
+# 
+# Options: -a  All.
+# 
+# """
+# $ prog
+# {"-a": false}
+# 
+# $ prog -a
+# {"-a": true}
+# 
+# $ prog -x
+# "user-error"
+# 
+# 
+# r"""Usage: prog [options]
+# 
+# Options: --all  All.
+# 
+# """
+# $ prog
+# {"--all": false}
+# 
+# $ prog --all
+# {"--all": true}
+# 
+# $ prog --xxx
+# "user-error"
+# 
+# 
+# r"""Usage: prog [options]
+# 
+# Options: -v, --verbose  Verbose.
+# 
+# """
+# $ prog --verbose
+# {"--verbose": true, "-v": true}
+# 
+# $ prog -v
+# {"--verbose": true, "-v": true}
+# 
+# 
+# r"""Usage: prog [options]
+# 
+# Options: -p PATH
+# 
+# """
+# $ prog -p home/
+# {"-p": "home/"}
+# 
+# $ prog -phome/
+# {"-p": "home/"}
+# 
+# $ prog -p
+# "user-error"
+# 
+# 
+# r"""Usage: prog [options]
+# 
+# Options: --path <path>
+# 
+# """
+# $ prog --path home/
+# {"--path": "home/"}
+# 
+# $ prog --path=home/
+# {"--path": "home/"}
+# 
+# $ prog --path
+# "user-error"
+# 
+# 
+# r"""Usage: prog [options]
+# 
+# Options: -p PATH, --path=<path>  Path to files.
+# 
+# """
+# $ prog -proot
+# {"--path": "root", "-p": "root"}
+# 
+# 
+# r"""Usage: prog [options]
+# 
+# Options:    -p --path PATH  Path to files.
+# 
+# """
+# $ prog -p root
+# {"--path": "root", "-p": "root"}
+# 
+# $ prog --path root
+# {"--path": "root", "-p": "root"}
+# 
+# 
+# r"""Usage: prog [options]
+# 
+# Options:
+#  -p PATH  Path to files [default: ./]
+# 
+# """
+# $ prog
+# {"-p": "./"}
+# 
+# $ prog -phome
+# {"-p": "home"}
+# 
+# 
+# r"""UsAgE: prog [options]
+# 
+# OpTiOnS: --path=<files>  Path to files
+#                 [dEfAuLt: /root]
+# 
+# """
+# $ prog
+# {"--path": "/root"}
+# 
+# $ prog --path=home
+# {"--path": "home"}
+# 
+# 
+# r"""usage: prog [options]
+# 
+# options:
+#     -a        Add
+#     -r        Remote
+#     -m <msg>  Message
+# 
+# """
+# $ prog -a -r -m Hello
+# {"-a": true,
+#  "-m": "Hello",
+#  "-r": true}
+# 
+# $ prog -armyourass
+# {"-a": true,
+#  "-m": "yourass",
+#  "-r": true}
+# 
+# $ prog -a -r
+# {"-a": true,
+#  "-r": true}
 
 
 r"""Usage: prog [options]
 
-Options: -a  All.
+Options: --version
+         --verbose
 
 """
-$ prog
-{"-a": false}
+$ prog --version
+{"--version": true,
+ "--verbose": false}
 
-$ prog -a
-{"-a": true}
-
-$ prog -x
-"user-error"
-
-
-r"""Usage: prog [options]
-
-Options: --all  All.
-
-"""
-$ prog
-{"--all": false}
-
-$ prog --all
-{"--all": true}
-
-$ prog --xxx
-"user-error"
-
-
-r"""Usage: prog [options]
-
-Options: -v, --verbose  Verbose.
-
-"""
 $ prog --verbose
-{"--verbose": true, "-v": true}
-
-$ prog -v
-{"--verbose": true, "-v": true}
+{"--version": false,
+ "--verbose": true}
 
 
-r"""Usage: prog [options]
-
-Options: -p PATH
-
-"""
-$ prog -p home/
-{"-p": "home/"}
-
-$ prog -phome/
-{"-p": "home/"}
-
-$ prog -p
-"user-error"
-
-
-r"""Usage: prog [options]
-
-Options: --path <path>
-
-"""
-$ prog --path home/
-{"--path": "home/"}
-
-$ prog --path=home/
-{"--path": "home/"}
-
-$ prog --path
-"user-error"
-
-
-r"""Usage: prog [options]
-
-Options: -p PATH, --path=<path>  Path to files.
-
-"""
-$ prog -proot
-{"--path": "root", "-p": "root"}
-
-
-r"""Usage: prog [options]
-
-Options:    -p --path PATH  Path to files.
-
-"""
-$ prog -p root
-{"--path": "root", "-p": "root"}
-
-$ prog --path root
-{"--path": "root", "-p": "root"}
-
-
-r"""Usage: prog [options]
-
-Options:
- -p PATH  Path to files [default: ./]
-
-"""
-$ prog
-{"-p": "./"}
-
-$ prog -phome
-{"-p": "home"}
-
-
-r"""UsAgE: prog [options]
-
-OpTiOnS: --path=<files>  Path to files
-                [dEfAuLt: /root]
-
-"""
-$ prog
-{"--path": "/root"}
-
-$ prog --path=home
-{"--path": "home"}
-
-
-r"""usage: prog [options]
+r"""usage: prog [-a -r -m <msg>]
 
 options:
-    -a        Add
-    -r        Remote
-    -m <msg>  Message
+ -a        Add
+ -r        Remote
+ -m <msg>  Message
 
 """
-$ prog -a -r -m Hello
-{"-a": true,
- "-m": "Hello",
- "-r": true}
-
 $ prog -armyourass
 {"-a": true,
  "-m": "yourass",
  "-r": true}
 
-$ prog -a -r
-{"-a": true,
- "-r": true}
 
-
-# r"""Usage: prog [options]
-# 
-# Options: --version
-#          --verbose
-# 
-# """
-# $ prog --version
-# {"--version": true,
-#  "--verbose": false}
-# 
-# $ prog --verbose
-# {"--version": false,
-#  "--verbose": true}
-# 
-# $ prog --ver
-# "user-error"
-# 
-# $ prog --verb
-# {"--version": false,
-#  "--verbose": true}
-# 
-# 
-# r"""usage: prog [-a -r -m <msg>]
-# 
-# options:
-#  -a        Add
-#  -r        Remote
-#  -m <msg>  Message
-# 
-# """
-# $ prog -armyourass
-# {"-a": true,
-#  "-r": true,
-#  "-m": "yourass"}
-# 
-# 
 # r"""usage: prog [-armmsg]
 # 
 # options: -a        Add

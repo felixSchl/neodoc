@@ -39,6 +39,7 @@ runDocopt env docopt argv = do
   doc <- toScanErr  $ Scanner.scan $ dedent docopt
   us  <- toParseErr $ Usage.run doc.usage
   ds  <- toParseErr $ concat <$> Desc.run `traverse` doc.options
+  traceShowA ds
   prg <- toSolveErr $ Solver.solve us ds
   vs  <- toParseErr $ G.runParser env argv (G.genParser prg)
   return $ T.byName $ uncurry (T.reduce env) vs
