@@ -189,7 +189,9 @@ solverSpec = \_ ->
             [ DE.opt (DE.fname 'f' "file")
                      (Just $ DE.arg "FILE" (Just "foo"))
             ]
-            [ out [ [ D.opt 'f' "file" (D.oa "FILE" $ StringValue "foo") ] ] ]
+            [ out [ [ D.gro false [ [
+                D.opt 'f' "file" (D.oa "FILE" $ StringValue "foo")
+            ] ] ] ] ]
         ]
     ]) runtest
 

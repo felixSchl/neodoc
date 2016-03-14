@@ -18,9 +18,9 @@ main = launchAff do
   docoptSpec <- genDocoptSpec
   liftEff $ run [consoleReporter] do
     scannerSpec     unit
-    -- usageParserSpec unit
-    -- descParserSpec  unit
-    -- solverSpec      unit
-    -- parserGenSpec   unit
-    -- transSpec       unit
+    usageParserSpec unit
+    descParserSpec  unit
+    solverSpec      unit
+    parserGenSpec   unit
+    transSpec       unit
     -- docoptSpec      unit
