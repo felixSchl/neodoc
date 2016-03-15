@@ -24,6 +24,7 @@ import Control.Plus (empty)
 import Control.Alt ((<|>))
 import Data.Monoid (mempty)
 import Control.Monad.Error.Class (throwError)
+import Data.String (fromCharArray)
 import Data.Array as A
 import Data.String as Str
 import Data.StrMap as StrMap
@@ -118,7 +119,7 @@ solveBranch as ds = Branch <$> go as
       -- possibly with an error?
       let x = O.runOption $ flip maybe' id
                 (\_ -> O.Option $ O.empty { name       = pure o.name
-                                          , arg        = toArg o.arg
+                                          , arg        = convertArg o.arg
                                           , repeatable = o.repeatable
                                           })
                 (head $ catMaybes $ coerce <$> ds)
@@ -174,77 +175,130 @@ solveBranch as ds = Branch <$> go as
               coerce' _ = Nothing
         coerce _ = Nothing
 
-    solveArgs (U.OptionStack (UO.SOpt o)) y = do
+    solveArgs (U.OptionStack (UO.SOpt o)) d = do
 
-      -- Figure out trailing flag, in order to couple it with an adjacent
-      -- option where needed.
-      (Tuple xs x) <- do
-          let fs = toList o.stack
-              t  = case last fs of
-                    Just f  -> Tuple (o.flag:(fromJust $ init fs)) f
-                    Nothing -> Tuple Nil o.flag
-          Tuple
-            <$> (match false `traverse` (fst t))
-            <*> (O.runOption <$> do match true (snd t))
-
-      -- Validate the argument matches
-      if (argMatches o.arg x.arg)
-        then return unit
-        else throwError $ DescriptionError $ ArgumentMismatchError {
-                option: O.Option x
-              , description: {
-                  arg: x.arg <#> O.runArgument >>> _.name
-                }
-              }
-
-      -- Look ahead if any of the following arguments should be consumed.
-      -- Return either `Nothing` to signify that nothing should be consumed
-      -- or a value signifieng that it should be consumed, and the
-      -- `isRepeated` should be inherited.
-      let mr = do
-            guard (not x.repeatable)
-            arg' <- O.runArgument <$> x.arg
-            case y of
-                Just (U.Positional n r) | n == arg'.name -> return r
-                Just (U.Command n)      | n == arg'.name -> return false
-                _                                        -> Nothing
-
-      return $ (maybe Unconsumed (const Consumed) mr)
-             $ (Option <$> xs)
-                ++ (singleton $ Option $ O.Option $ x {
-                      repeatable = maybe (x.repeatable) id mr
-                    })
+      fromSubsumption <|> fromAdjacentArg
 
       where
-        match :: Boolean -> Char -> Either SolveError O.Option
-        match isTrailing f = return $
-          flip maybe' id
-                (\_ -> O.Option $ O.empty { flag = pure f
-                                          , arg = toArg o.arg
-                                          , repeatable = o.repeatable
-                                          })
+        -- | Subsumption method:
+        -- | (Only applies for options w/o explicit arg)
+        -- |
+        -- | Concatenate the option stack into a string,
+        -- | then do a substring check for each possible description.
+        -- |
+        -- | "armmsg"
+        -- |    ~~~~
+        -- |    ^^
+        -- |    |`- the flag matches - case SENSITIVE
+        -- |    `-- the arg  matches - case INSENSITIVE
+        -- |
+        -- | Should this check, yield a match, slice the matched
+        -- | string off the stack and return the remainder option
+        -- | stack (if any).
+        -- |
+        -- | The remaining options, must - in turn - be solved, too.
+        -- | However, this solve is simpler as the option is proven
+        -- | not to accept an argument at all.
+
+        fromSubsumption = do
+          Left SolveFoo
+
+        -- | Last flag method:
+        -- |
+        -- | Find the last char in the option stack, look it up
+        -- | in the descriptions and when it was found to have an
+        -- | argument, that matches the adjacent argument, consume
+        -- | that argument and produce a list of remaining short
+        -- | options.
+        -- |
+        -- | "armmsg ARG"
+        -- |       ~ ~~~
+        -- |       ^  ^
+        -- |       |  `-- only consumed if description found and
+        -- |       |      has matching argument.
+        -- |       `----- look for a description of `-g``
+        -- |
+        -- | The remaining options, must - in turn - be solved, too.
+        -- | However, this solve is simpler as the option is proven
+        -- | not to accept an argument at all.
+
+        fromAdjacentArg = do
+          -- (flag, ...flags) -> (...flags, flag)
+          (Tuple fs f) <- do
+            return case A.last (o.stack) of
+              Just f  -> Tuple (o.flag A.: (fromJust $ A.init o.stack)) f
+              Nothing -> Tuple [] o.flag
+
+          -- look the trailing option up in the descriptions
+          -- and combine it into the most complete option we
+          -- can know about at this point.
+          c  <- O.runOption <$> matchDesc true f
+          cs <- matchDesc false `traverse` fs
+
+          -- Look ahead if any of the following arguments should be consumed.
+          -- Return either `Nothing` to signify that nothing should be consumed
+          -- or a value signifieng that it should be consumed, and the
+          -- `isRepeated` should be inherited.
+          let mr = do
+                guard $ not c.repeatable
+                arg' <- O.runArgument <$> c.arg
+                case d of
+                    Just (U.Positional n r) | n == arg'.name -> return r
+                    Just (U.Command n)      | n == arg'.name -> return false
+                    _                                        -> Nothing
+
+          return $ (maybe Unconsumed (const Consumed) mr)
+                 $ (Option <$>
+                       toList cs
+                    ++ (singleton $ O.Option $ c {
+                          repeatable = maybe c.repeatable id mr
+                        })
+                  )
+
+        matchDesc :: Boolean -> Char -> Either SolveError O.Option
+        matchDesc isTrailing f = return $
+          maybe' (\_ -> O.Option
+                          $ O.empty {
+                              flag = pure f
+                            , arg = if isTrailing
+                                        then convertArg o.arg
+                                        else Nothing
+                            , repeatable = o.repeatable
+                            }
+                )
+                id
                 (head $ catMaybes $ coerce f isTrailing <$> ds)
 
         coerce :: Char -> Boolean -> Desc -> Maybe O.Option
-        coerce f isTrailing (DE.OptionDesc (DE.Option y))
-          = coerce' y
+        coerce f isTrailing (DE.OptionDesc (DE.Option d))
+          = coerce' d
             where
               coerce' { name = DE.Flag f' }
-                | (f == f') && (isTrailing || isNothing y.arg)
-                = return $ O.Option { flag:       pure f
-                                    , name:       Nothing
-                                    , arg:        resolveOptArg o.arg y.arg
-                                    , env:        y.env
-                                    , repeatable: o.repeatable
-                                    }
+                | (f == f') && (isTrailing || isNothing d.arg)
+                = do
+                    let arg = if isTrailing
+                                then resolveOptArg o.arg d.arg
+                                else Nothing
+
+                    -- XXX: GUARD NAME HERE
+                    if isTrailing && isJust arg
+
+                    return $ O.Option { flag:       pure f
+                                      , name:       Nothing
+                                      , arg:        arg
+                                      , env:        d.env
+                                      , repeatable: o.repeatable
+                                      }
               coerce' { name = DE.Full f' n' }
-                | (f == f') && (isTrailing || isNothing y.arg)
-                = return $ O.Option { flag:       pure f'
-                                    , name:       pure n'
-                                    , arg:        resolveOptArg o.arg y.arg
-                                    , env:        y.env
-                                    , repeatable: o.repeatable
-                                  }
+                | (f == f') && (isTrailing || isNothing d.arg)
+                = do
+                    -- XXX: REPEAT FROM ABOVE
+                    return $ O.Option { flag:       pure f'
+                                      , name:       pure n'
+                                      , arg:        arg
+                                      , env:        d.env
+                                      , repeatable: o.repeatable
+                                      }
               coerce' _ = Nothing
         coerce _ _ _ = Nothing
 
@@ -268,8 +322,8 @@ solveBranch as ds = Branch <$> go as
                             }
     resolveOptArg _ _ = Nothing
 
-    toArg:: Maybe String -> Maybe O.Argument
-    toArg a = do
+    convertArg :: Maybe String -> Maybe O.Argument
+    convertArg a = do
       an <- a
       return $ O.Argument { name: an
                           , default: Nothing }

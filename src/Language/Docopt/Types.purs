@@ -31,6 +31,7 @@ data DescriptionError
 
 data SolveError
   = DescriptionError DescriptionError
+  | SolveFoo
 
 data DocoptError
   = DocoptScanError   P.ParseError
