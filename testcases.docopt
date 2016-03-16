@@ -229,6 +229,56 @@ $ prog -mHello
 $ prog -m
 "user-error"
 
+r"""usage: prog [-arm=msg]
+
+options: -a        Add
+         -r        Remote
+         -m <msg>  Message
+
+"""
+$ prog -a -r -m Hello
+{"-a": true,
+ "-m": "Hello",
+ "-r": true}
+
+$ prog -ar -m Hello
+{"-a": true,
+ "-m": "Hello",
+ "-r": true}
+
+$ prog -arm Hello
+{"-a": true,
+ "-m": "Hello",
+ "-r": true}
+
+$ prog -armHello
+{"-a": true,
+ "-m": "Hello",
+ "-r": true}
+
+$ prog -arm=Hello
+{"-a": true,
+ "-m": "Hello",
+ "-r": true}
+
+$ prog -m=Hello
+{"-a": false,
+ "-m": "Hello",
+ "-r": false}
+
+$ prog -m Hello
+{"-a": false,
+ "-m": "Hello",
+ "-r": false}
+
+$ prog -mHello
+{"-a": false,
+ "-m": "Hello",
+ "-r": false}
+
+$ prog -m
+"user-error"
+
 # r"""usage: prog -a -b
 # 
 # options:

@@ -23,28 +23,16 @@ import qualified Language.Docopt.Option as O
 
 import qualified Text.Parsing.Parser as P
 
-data DescriptionError
-  = ArgumentMismatchError {
-      option :: O.Option
-    , description :: { arg :: Maybe String }
-    }
-
-data SolveError
-  = DescriptionError DescriptionError
-  | SolveFoo
+newtype SolveError = SolveError String
 
 data DocoptError
   = DocoptScanError   P.ParseError
   | DocoptParseError  P.ParseError
   | DocoptSolveError  SolveError
 
-derive instance genericSolveError       :: Generic SolveError
-derive instance genericDescriptionError :: Generic DescriptionError
+derive instance genericSolveError :: Generic SolveError
 
 instance showSolveError :: Show SolveError where
-  show = gShow
-
-instance showDescriptionError :: Show DescriptionError where
   show = gShow
 
 instance showDocoptError :: Show DocoptError where

@@ -6,6 +6,8 @@
 -- | Thoughts:
 -- |    * It appears there is never a reason to fail hard. It would be nice if
 -- |      we could produce warnings, however -> Write monad?
+-- |    * Options match their description as good as they can, AND based on the
+-- |      name of the argument. Should this be the case?
 
 module Language.Docopt.Solver where
 
@@ -48,6 +50,9 @@ data Result = Consumed (List Argument) | Unconsumed (List Argument)
 runResult :: Result -> List Argument
 runResult (Consumed   xs) = xs
 runResult (Unconsumed xs) = xs
+
+fail :: forall a. String -> Either SolveError a
+fail = Left <<< SolveError
 
 solveBranch :: U.Branch                 -- ^ the usage branch
             -> List Desc                -- ^ the option descriptions
@@ -113,7 +118,7 @@ solveBranch as ds = Branch <$> go as
 
         convert _ = Nothing
 
-    solveArgs (U.Option (UO.LOpt o)) y = do
+    solveArgs (U.Option (opt@(UO.LOpt o))) y = do
 
       -- XXX: Is `head` the right thing to do here? What if there are more
       -- matches? That would indicate ambigiutiy and needs to be treated,
@@ -124,16 +129,6 @@ solveBranch as ds = Branch <$> go as
                                           , repeatable = o.repeatable
                                           })
                 (head $ catMaybes $ coerce <$> ds)
-
-      -- Validate the argument matches
-      if (argMatches o.arg x.arg)
-        then return unit
-        else throwError $ DescriptionError $ ArgumentMismatchError {
-                option: O.Option x
-              , description: {
-                  arg: x.arg <#> O.runArgument >>> _.name
-                }
-              }
 
       -- Look ahead if any of the following arguments should be consumed.
       -- Return either `Nothing` to signify that nothing should be consumed
@@ -159,26 +154,33 @@ solveBranch as ds = Branch <$> go as
             where
               coerce' { name = DE.Long n' }
                 | n' ^= o.name
-                = return $ O.Option { name:       pure o.name
-                                    , flag:       Nothing
-                                    , arg:        resolveOptArg o.arg x.arg
-                                    , env:        x.env
-                                    , repeatable: o.repeatable
-                                    }
+                = do
+                    arg <- either (const Nothing)
+                                  return
+                                  (resolveOptArg o.arg x.arg)
+                    return $ O.Option { name:       pure o.name
+                                      , flag:       Nothing
+                                      , arg:        arg
+                                      , env:        x.env
+                                      , repeatable: o.repeatable
+                                      }
               coerce' { name = DE.Full f' n' }
                 | n' ^= o.name
-                = return $ O.Option { name:       pure o.name
-                                    , flag:       pure f'
-                                    , arg:        resolveOptArg o.arg x.arg
-                                    , env:        x.env
-                                    , repeatable: o.repeatable
-                                    }
+                = do
+                    arg <- either (const Nothing)
+                                  return
+                                  (resolveOptArg o.arg x.arg)
+                    return $ O.Option { name:       pure o.name
+                                      , flag:       pure f'
+                                      , arg:        arg
+                                      , env:        x.env
+                                      , repeatable: o.repeatable
+                                      }
               coerce' _ = Nothing
         coerce _ = Nothing
 
-    solveArgs (U.OptionStack (UO.SOpt o)) d = do
-
-      fromSubsumption <|> fromAdjacentArg
+    solveArgs (U.OptionStack (opt@(UO.SOpt o))) adj = fromSubsumption
+                                                  <|> fromAdjacentArgOrDefault
 
       where
         -- | Subsumption method:
@@ -204,16 +206,18 @@ solveBranch as ds = Branch <$> go as
         fromSubsumption :: Either SolveError Result
         fromSubsumption = do
 
-          -- XXX: Change the type or use a proper error.
+          -- XXX: Well, this error should not be thrown, but rather,
+          --      we should just not come to this code-path if this is
+          --      the case. It would be an awkward user-facing error.
           if isJust o.arg
-            then Left SolveFoo
+            then fail $ "Option stacks with explicit argument binding "
+                     ++ "may not be subsumed."
             else pure unit
 
           let fs  = fromCharArray $ o.flag A.: o.stack
 
-          -- XXX: Change the type or use a proper error.
-          maybe (Left SolveFoo)
-                (Right)
+          maybe (fail "No description subsumed option")
+                return
                 -- XXX: Purescript is not lazy, so this is too expensive.
                 --      We can just stop at the first `Just` value.
                 (head $ catMaybes $ subsume fs <$> ds)
@@ -256,14 +260,16 @@ solveBranch as ds = Branch <$> go as
 
             subsume _ _ = Nothing
 
-        -- | Last flag method:
+        -- | Last flag method (w/ fallback):
         -- |
         -- | Find the last char in the option stack, look it up
         -- | in the descriptions and when it was found to have an
-        -- | argument, that matches the adjacent argument, consume
-        -- | that argument and produce a list of remaining short
-        -- | options.
+        -- | argument, that matches the adjacent argument (or it's
+        -- | explicit binding), consume that argument and produce
+        -- | a list of remaining short options.
         -- |
+        -- | "armmsg=ARG"
+        -- | OR:
         -- | "armmsg ARG"
         -- |       ~ ~~~
         -- |       ^  ^
@@ -275,7 +281,8 @@ solveBranch as ds = Branch <$> go as
         -- | However, this solve is simpler as the option is proven
         -- | not to accept an argument at all.
 
-        fromAdjacentArg = do
+        fromAdjacentArgOrDefault :: Either SolveError Result
+        fromAdjacentArgOrDefault = do
 
           -- (flag, ...flags) -> (...flags, flag)
           (Tuple fs f) <- do
@@ -287,27 +294,33 @@ solveBranch as ds = Branch <$> go as
           -- and combine it into the most complete option we
           -- can know about at this point.
           c  <- O.runOption <$> matchDesc true f
-          cs <- matchDesc false `traverse` fs
+          cs <- (Option <$>) <$> (matchDesc false `traverse` fs)
 
-          -- Look ahead if any of the following arguments should be consumed.
-          -- Return either `Nothing` to signify that nothing should be consumed
-          -- or a value signifieng that it should be consumed, and the
-          -- `isRepeated` should be inherited.
-          let mr = do
-                guard $ not c.repeatable
-                arg' <- O.runArgument <$> c.arg
-                case d of
-                    Just (U.Positional n r) | n == arg'.name -> return r
-                    Just (U.Command n)      | n == arg'.name -> return false
-                    _                                        -> Nothing
+          case o.arg of
+            (Just an) -> do
+              return
+                $ Unconsumed
+                  $ (toList cs)
+                    ++ (singleton $ Option $ O.Option c)
+            _ ->
+              -- Look ahead if any of the following arguments should be consumed.
+              -- Return either `Nothing` to signify that nothing should be consumed
+              -- or a value signifieng that it should be consumed, and the
+              -- `isRepeated` should be inherited.
+              let mr = do
+                    guard $ not c.repeatable
+                    arg' <- O.runArgument <$> c.arg
+                    case adj of
+                        Just (U.Positional n r) | n ^= arg'.name -> return r
+                        Just (U.Command n)      | n ^= arg'.name -> return false
+                        _                                        -> Nothing
+               in return $ (maybe Unconsumed (const Consumed) mr)
+                    $ (toList cs)
+                      ++ (singleton
+                          $ Option
+                            $ O.Option
+                              $ c { repeatable = maybe c.repeatable id mr })
 
-          return $ (maybe Unconsumed (const Consumed) mr)
-                 $ (Option <$>
-                       toList cs
-                    ++ (singleton $ O.Option $ c {
-                          repeatable = maybe c.repeatable id mr
-                        })
-                  )
 
         -- | Match a given flag with an option description.
         -- | `isTrailing` indicates if this flag is the last flag
@@ -316,12 +329,13 @@ solveBranch as ds = Branch <$> go as
         matchDesc :: Boolean -> Char -> Either SolveError O.Option
         matchDesc isTrailing f = return $
           maybe' (\_ -> O.Option
-                          $ O.empty {
-                              flag = pure f
-                            , arg = if isTrailing
+                          $ { flag: pure f
+                            , name: Nothing
+                            , env:  Nothing
+                            , arg:  if isTrailing
                                         then convertArg o.arg
                                         else Nothing
-                            , repeatable = o.repeatable
+                            , repeatable: o.repeatable
                             }
                 )
                 id
@@ -337,11 +351,11 @@ solveBranch as ds = Branch <$> go as
               coerce' { name = DE.Flag f' }
                 | (f == f') && (isTrailing || isNothing d.arg)
                 = do
-                    let arg = if isTrailing
-                                then resolveOptArg o.arg d.arg
-                                else Nothing
-
-                    -- XXX: GUARD ARG NAME HERE (!!!)
+                    arg <- if isTrailing
+                                then either (const Nothing)
+                                            return
+                                            (resolveOptArg o.arg d.arg)
+                                else return Nothing
 
                     return $ O.Option { flag:       pure f
                                       , name:       Nothing
@@ -352,11 +366,11 @@ solveBranch as ds = Branch <$> go as
               coerce' { name = DE.Full f' n' }
                 | (f == f') && (isTrailing || isNothing d.arg)
                 = do
-                    let arg = if isTrailing
-                                then resolveOptArg o.arg d.arg
-                                else Nothing
-
-                    -- XXX: GUARD ARG NAME HERE (!!!)
+                    arg <- if isTrailing
+                                then either (const Nothing)
+                                            return
+                                            (resolveOptArg o.arg d.arg)
+                                else return Nothing
 
                     return $ O.Option { flag:       pure f'
                                       , name:       pure n'
@@ -371,39 +385,27 @@ solveBranch as ds = Branch <$> go as
     -- | description, returning the most complete argument known.
     resolveOptArg :: Maybe String
                   -> Maybe DE.Argument
-                  -> Maybe O.Argument
+                  -> Either SolveError (Maybe O.Argument)
 
     resolveOptArg (Just n) Nothing = do
-      return $ O.Argument { name: n
-                          , default: Nothing }
-    resolveOptArg Nothing (Just (DE.Argument a))
-      = return $ O.Argument { name: a.name
-                            , default: a.default
-                            }
+      return <<< pure $ O.Argument { name: n, default: Nothing }
+
+    resolveOptArg Nothing (Just (DE.Argument a)) = do
+      return <<< pure $ O.Argument { name: a.name, default: a.default }
+
     -- XXX: Do we need to guard that `an == a.name` here?
-    resolveOptArg (Just an) (Just (DE.Argument a))
-      = return $ O.Argument { name: a.name
-                            , default: a.default
-                            }
-    resolveOptArg _ _ = Nothing
+    resolveOptArg (Just an) (Just (DE.Argument a)) = do
+      if an ^= a.name
+         then return <<< pure $ O.Argument { name: a.name, default: a.default }
+         else fail $ "Arguments mismatch: " ++ an ++ " != " ++ a.name
+
+    resolveOptArg _ _ = return Nothing
 
     convertArg :: Maybe String -> Maybe O.Argument
     convertArg a = do
       an <- a
       return $ O.Argument { name: an
                           , default: Nothing }
-
-    argMatches :: Maybe String
-               -> Maybe O.Argument
-               -> Boolean
-    argMatches a a'
-      =  (isNothing a)
-      || (isNothing a && isNothing a')
-      || (maybe false id do
-          an <- a
-          (O.Argument { name: an' }) <- a'
-          return (an ^= an')
-        )
 
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
 solveUsage (U.Usage _ bs) ds = Usage <$> do traverse (flip solveBranch ds) bs
