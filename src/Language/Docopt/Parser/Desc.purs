@@ -10,24 +10,24 @@ import Control.MonadPlus (guard)
 import Control.Monad.Trans (lift)
 import Data.List (List(..), some, (:), toList, length
                  , singleton, many, head, catMaybes, filter)
-import qualified Text.Parsing.Parser as P
-import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Pos as P
-import qualified Text.Parsing.Parser.String as P
+import Text.Parsing.Parser as P
+import Text.Parsing.Parser.Combinators as P
+import Text.Parsing.Parser.Pos as P
+import Text.Parsing.Parser.String as P
 import Data.Foldable (intercalate)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe, maybe', isJust)
 import Data.Generic
 import Data.String (toLower, fromChar)
-import qualified Data.Array as A
-import qualified Data.String as Str
+import Data.Array as A
+import Data.String as Str
 
 import Language.Docopt.Value
 import Language.Docopt.Parser.Base
 import Language.Docopt.Parser.Common
 import Language.Docopt.Parser.State
 import Language.Docopt.Parser.Lexer (lex)
-import qualified Language.Docopt.Parser.Lexer as L
+import Language.Docopt.Parser.Lexer as L
 
 data Desc = OptionDesc Option
           | CommandDesc

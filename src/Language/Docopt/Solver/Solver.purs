@@ -11,26 +11,27 @@ module Language.Docopt.Solver where
 
 import Prelude
 import Debug.Trace
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..), isJust, maybe, maybe', isNothing)
 import Data.List (List(..), filter, head, foldM, concat, (:), singleton
                 , catMaybes, toList, last, init, length)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
-import Data.Foldable (foldl)
+import Data.Foldable (foldl, intercalate)
 import Control.MonadPlus (guard)
 import Control.Plus (empty)
 import Control.Alt ((<|>))
 import Data.Monoid (mempty)
 import Control.Monad.Error.Class (throwError)
-import Data.String (fromCharArray)
+import Data.String (fromCharArray, fromChar, toUpper, charAt, toCharArray)
 import Data.Array as A
-import Data.String as Str
+import Data.String as S
+import Data.String.Unsafe as US
 import Data.StrMap as StrMap
 import Data.StrMap (StrMap())
 
-import Data.String.Ext ((^=))
+import Data.String.Ext ((^=), endsWith)
 import Language.Docopt.Errors
 import Language.Docopt.Argument
 import Language.Docopt.Usage
@@ -200,8 +201,60 @@ solveBranch as ds = Branch <$> go as
         -- | However, this solve is simpler as the option is proven
         -- | not to accept an argument at all.
 
+        fromSubsumption :: Either SolveError Result
         fromSubsumption = do
-          Left SolveFoo
+
+          -- XXX: Change the type or use a proper error.
+          if isJust o.arg
+            then Left SolveFoo
+            else pure unit
+
+          let fs  = fromCharArray $ o.flag A.: o.stack
+
+          -- XXX: Change the type or use a proper error.
+          maybe (Left SolveFoo)
+                (Right)
+                -- XXX: Purescript is not lazy, so this is too expensive.
+                --      We can just stop at the first `Just` value.
+                (head $ catMaybes $ subsume fs <$> ds)
+
+          where
+            subsume :: String -> Desc -> Maybe Result
+            subsume fs (DE.OptionDesc (DE.Option d)) = do
+              f <- DE.getFlag d.name
+              a <- DE.runArgument <$> d.arg
+
+              -- the haystack needs to be modified, such that the
+              -- the last (length a.name) characters are uppercased
+              -- and hence compared case INSENSITIVELY.
+              let needle = toUpper $ fromChar f ++ a.name
+                  haystack = toUpper fs
+
+              (Tuple fs o) <- if endsWith needle haystack
+                then
+                  let ix = S.length haystack - S.length needle
+                   in if US.charAt ix fs == f
+                        then return
+                          $ Tuple (toCharArray (S.take (S.length fs - S.length a.name - 1) fs))
+                                  (O.Option {
+                                    flag:       pure f
+                                  , name:       DE.getName d.name
+                                  , arg:        pure $ O.Argument a
+                                  , env:        d.env
+                                  , repeatable: o.repeatable
+                                  })
+                    else Nothing
+                else Nothing
+
+              cs <- either (const Nothing)
+                           (pure <<< id)
+                           (matchDesc false `traverse` fs)
+
+              return $ Unconsumed
+                     $ (Option <$> toList cs) ++ (singleton $ Option o)
+
+
+            subsume _ _ = Nothing
 
         -- | Last flag method:
         -- |
@@ -223,6 +276,7 @@ solveBranch as ds = Branch <$> go as
         -- | not to accept an argument at all.
 
         fromAdjacentArg = do
+
           -- (flag, ...flags) -> (...flags, flag)
           (Tuple fs f) <- do
             return case A.last (o.stack) of
@@ -255,6 +309,10 @@ solveBranch as ds = Branch <$> go as
                         })
                   )
 
+        -- | Match a given flag with an option description.
+        -- | `isTrailing` indicates if this flag is the last flag
+        -- | in it's stack of flags.
+
         matchDesc :: Boolean -> Char -> Either SolveError O.Option
         matchDesc isTrailing f = return $
           maybe' (\_ -> O.Option
@@ -269,6 +327,9 @@ solveBranch as ds = Branch <$> go as
                 id
                 (head $ catMaybes $ coerce f isTrailing <$> ds)
 
+        -- | Coerce a given flag into a Docopt Option, given an
+        -- | option description.
+
         coerce :: Char -> Boolean -> Desc -> Maybe O.Option
         coerce f isTrailing (DE.OptionDesc (DE.Option d))
           = coerce' d
@@ -280,8 +341,7 @@ solveBranch as ds = Branch <$> go as
                                 then resolveOptArg o.arg d.arg
                                 else Nothing
 
-                    -- XXX: GUARD NAME HERE
-                    if isTrailing && isJust arg
+                    -- XXX: GUARD ARG NAME HERE (!!!)
 
                     return $ O.Option { flag:       pure f
                                       , name:       Nothing
@@ -292,7 +352,12 @@ solveBranch as ds = Branch <$> go as
               coerce' { name = DE.Full f' n' }
                 | (f == f') && (isTrailing || isNothing d.arg)
                 = do
-                    -- XXX: REPEAT FROM ABOVE
+                    let arg = if isTrailing
+                                then resolveOptArg o.arg d.arg
+                                else Nothing
+
+                    -- XXX: GUARD ARG NAME HERE (!!!)
+
                     return $ O.Option { flag:       pure f'
                                       , name:       pure n'
                                       , arg:        arg

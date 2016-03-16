@@ -179,19 +179,19 @@ $ prog -armyourass
  "-r": true}
 
 
-# r"""usage: prog [-armmsg]
-# 
-# options: -a        Add
-#          -r        Remote
-#          -m <msg>  Message
-# 
-# """
-# $ prog -a -r -m Hello
-# {"-a": true,
-#  "-r": true,
-#  "-m": "Hello"}
-# 
-# 
+r"""usage: prog [-armmsg]
+
+options: -a        Add
+         -r        Remote
+         -m <msg>  Message
+
+"""
+$ prog -a -r -m Hello
+{"-a": true,
+ "-m": "Hello",
+ "-r": true}
+
+
 # r"""usage: prog -a -b
 # 
 # options:
