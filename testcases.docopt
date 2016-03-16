@@ -279,45 +279,57 @@ $ prog -mHello
 $ prog -m
 "user-error"
 
-# r"""usage: prog -a -b
-# 
-# options:
-#  -a
-#  -b
-# 
-# """
-# $ prog -a -b
-# {"-a": true, "-b": true}
-# 
-# $ prog -b -a
-# {"-a": true, "-b": true}
-# 
-# $ prog -a
-# "user-error"
-# 
-# $ prog
-# "user-error"
-# 
-# 
-# r"""usage: prog (-a -b)
-# 
-# options: -a
-#          -b
-# 
-# """
-# $ prog -a -b
-# {"-a": true, "-b": true}
-# 
-# $ prog -b -a
-# {"-a": true, "-b": true}
-# 
-# $ prog -a
-# "user-error"
-# 
-# $ prog
-# "user-error"
-# 
-# 
+r"""usage: prog -a -b
+
+options:
+ -a
+ -b
+
+"""
+$ prog -a -b
+{"-a": true, "-b": true}
+
+$ prog -b -a
+{"-a": true, "-b": true}
+
+$ prog -ab
+{"-a": true, "-b": true}
+
+$ prog -ba
+{"-a": true, "-b": true}
+
+$ prog -a
+{"-a": true, "-b": false}
+
+$ prog
+{"-a": false, "-b": false}
+
+
+r"""usage: prog (-a -b)
+
+options: -a
+         -b
+
+"""
+$ prog -a -b
+{"-a": true, "-b": true}
+
+$ prog -b -a
+{"-a": true, "-b": true}
+
+$ prog -ab
+{"-a": true, "-b": true}
+
+$ prog -ba
+{"-a": true, "-b": true}
+
+$ prog -a
+{"-a": true, "-b": false}
+
+$ prog
+{"-a": false, "-b": false}
+
+
 # r"""usage: prog [-a] -b
 # 
 # options: -a

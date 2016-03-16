@@ -13,6 +13,8 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 
 ## Project goals ##
 
+> Overview of the short- and longterm goals of this project
+
 * Provide a declarative way to author command lines. Rather than deriving the
   help text from some DSL, derive it from a human readable, prose-like EDSL,
   located e.g. in the project's README. **This guarantees documentation and
@@ -24,11 +26,28 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * A solid interface for use in **regular javascript**. Purescript should merely
   be an implementation detail.
 * **Solid test coverage**
-* Sensible compatibility with original docopt, except:
-    * No abbreviations: `--ver` does not match `--verbose`. [This has been called
-      out as a mis-feature in the original implementation.](https://github.com/docopt/docopt/issues/104)
-    * Option aliases (flag and long option) will both yield values if only
-      one was provided.
+* Sensible compatibility with original docopt.
+
+## Deviations from the original
+
+> This implementation tries to be compatible where sensible, but does cut ties
+> when it comes down to it. The universal docopt test suite has been adjusted
+> accordingly.
+
+* **Error reporting:** Let the user of your utility know why his input was
+  rejected.
+* **No built-in `--help` or `--version`** (yet / not planned)
+* **No abbreviations:**
+  `--ver` does not match `--verbose`.
+  <sub>[(mis-feature in the original
+  implementation)](https://github.com/docopt/docopt/issues/104)</sub>
+* **Alias matches:** If `--verbose` yields a value, so will `-v` <sub>(given
+  that's the assigned alias.)</sub>
+* **Flags are optional**, always. There's no reason to force the user to
+  explicitely pass an option that takes no argument. The absence of the flag
+  speaks - the flag will be set to `false`. This is also the case for flags
+  inside required groups. E.g.: The group `(-a -b)` will match inputs `-a -b`,
+  `-ab`, `-ba`, `-b -a`, `-b`, `-a` and the empty input.
 
 ## Project status ##
 
