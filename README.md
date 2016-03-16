@@ -24,6 +24,11 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * A solid interface for use in **regular javascript**. Purescript should merely
   be an implementation detail.
 * **Solid test coverage**
+* Sensible compatibility with original docopt, except:
+    * No abbreviations: `--ver` does not match `--verbose`. [This has been called
+      out as a mis-feature in the original implementation.](https://github.com/docopt/docopt/issues/104)
+    * Option aliases (flag and long option) will both yield values if only
+      one was provided.
 
 ## Project status ##
 
