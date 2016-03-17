@@ -11,11 +11,11 @@ import Test.Spec.DescParserSpec (descParserSpec)
 import Test.Spec.ParserGenSpec (parserGenSpec)
 import Test.Spec.TransSpec (transSpec)
 import Test.Spec.SolverSpec (solverSpec)
-import Test.Spec.DocoptSpec (genDocoptSpec)
+import Test.Spec.CompatSpec (genCompatSpec)
 import Control.Monad.Eff.Class (liftEff)
 
 main = launchAff do
-  docoptSpec <- genDocoptSpec
+  compatSpec <- genCompatSpec
   liftEff $ run [consoleReporter] do
     scannerSpec     unit
     usageParserSpec unit
@@ -23,4 +23,4 @@ main = launchAff do
     solverSpec      unit
     parserGenSpec   unit
     transSpec       unit
-    docoptSpec      unit
+    compatSpec      unit

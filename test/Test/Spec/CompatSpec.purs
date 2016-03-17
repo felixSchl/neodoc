@@ -1,4 +1,4 @@
-module Test.Spec.DocoptSpec (genDocoptSpec) where
+module Test.Spec.CompatSpec (genCompatSpec) where
 
 import Prelude
 import Debug.Trace
@@ -156,7 +156,7 @@ parseUniversalDocoptTests = do
 _liftEff :: forall e a. Eff e a -> Aff e a
 _liftEff = liftEff
 
-genDocoptSpec = do
+genCompatSpec = do
   tests <- _liftEff parseUniversalDocoptTests
   return $ \_ -> describe "Docopt" do
     for_ tests \(Test { doc, kases }) -> do
