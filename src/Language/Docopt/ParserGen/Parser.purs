@@ -279,14 +279,9 @@ genBranchesParser xs = P.ParserT \(s@(P.PState { input: i, position: pos })) -> 
     (\_ ->
       maybe'
         (\_ ->
-          -- XXX: The following needs review. The idea is that if there
-          --      was not a single match with a score above 0, but there
-          --      is exactly a single match with a score of 0, just use it.
-          if length xs == 1
-            then
-              let h = LU.head zs
-               in h { result = Right <<< _.result <<< unScoredResult $ h.result }
-            else P.parseFailed i pos "Ambigious match"
+          -- XXX: The following needs review. Is this safe? correct?
+          let h = LU.head zs
+            in h { result = Right <<< _.result <<< unScoredResult $ h.result }
         )
         (\e -> e { result = Left e.result })
         (head $ mlefts rs)
