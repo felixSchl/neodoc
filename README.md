@@ -70,7 +70,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
     * [x] `-` (stdin)
     * [x] `[options]`
 
-Known issues to work through:
+
 
 ### Wishlist ###
 
