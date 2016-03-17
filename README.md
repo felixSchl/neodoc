@@ -51,6 +51,11 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 
 ## Project status ##
 
+### Overview ###
+
+> Overview of the discrete chunks of work that have been done and are yet to be
+> done.
+
 * [x] Scan the docopt text for usage sections and 0 or more description sections
 * [x] Lex and parse usage sections
 * [x] Lex and parse description sections
@@ -59,8 +64,6 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * [x] Lex and parse user input on the CLI
 * [x] Transform the parsed args into something more useful
 * [ ] Provide seamless interface to be called from JS
-* [ ] Provide typescript typings
-* [ ] Fix all warnings
 * [x] Read arguments from env vars
 * [x] Implement special arguments
     * [x] `--` (end of args) not yet implemented
@@ -69,17 +72,17 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 
 Known issues to work through:
 
-* [x] ~~Options that were not provided through argv but that have defaults, are
-      currently not present in the output~~
-* [x] ~~Options that have a default value and are provided through argv without an
-      argument should produce an error if the argument type is not a boolean
-      (toggle)~~
+### Wishlist ###
 
-Further, the wishlist looks somewhat like this:
+> A list of things that are desired, but are not a target for the initial
+> release.
 
+* Fix all purescript warnings
+* Provide typescript typings
+* Read options from config file
+* Read options from prompt (Add a `[prompt]` tag)
 * Put the "source" of a parsed option's value into the output, e.g. "env",
   "default", "user"
-* Read options from config file
 * Make commands first class citizens, enabling easy subcommands, inheriting
   options and all that.
 * Allow for `--foo[=<bar>]` syntax (git style).
