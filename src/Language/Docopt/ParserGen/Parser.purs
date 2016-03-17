@@ -13,6 +13,7 @@ module Language.Docopt.ParserGen.Parser (
 import Prelude
 import Control.Plus (class Plus, empty)
 import Debug.Trace
+import Data.Identity (Identity(), runIdentity)
 import Control.Monad.State (State(), evalState)
 import Control.Apply ((*>), (<*))
 import Data.Function (on)
@@ -23,7 +24,7 @@ import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
 import Control.Alt ((<|>))
 import Data.Traversable (class Traversable, traverse, for)
 import Control.Lazy (defer)
-import Data.Foldable (class Foldable, maximum, foldl, intercalate, for_, all)
+import Data.Foldable (class Foldable, maximum, maximumBy, foldl, intercalate, for_, all)
 import Data.String (fromCharArray, stripPrefix)
 import Data.Bifunctor (class Bifunctor, rmap)
 import Data.List as L
@@ -35,7 +36,7 @@ import Data.Monoid (Monoid)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Monoid (mempty)
 import Data.Map (Map())
-import Control.Monad.Reader (Reader(), ask)
+import Control.Monad.Reader (Reader(), ask, runReader)
 import Data.Map as Map
 import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
@@ -250,71 +251,64 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 genUsageParser :: D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
 genUsageParser (D.Usage xs) = genBranchesParser xs <* eof
 
--- Fold over a list of parsers, applying each in turn onto the result of the
--- previous, keeping both errors and results.
-collect :: forall s m a. (Monad m)
-    => List (P.ParserT s m a)
-    -> P.ParserT s m (List (Either P.ParseError a))
-collect xs = foldl step (pure mempty) xs
-  where
-    step :: forall s m a. (Monad m)
-          => P.ParserT s m (List (Either P.ParseError a))
-          -> P.ParserT s m a
-          -> P.ParserT s m (List (Either P.ParseError a))
-    step acc p = do
-      a <- acc
-      b <- P.ParserT $ \s -> P.unParserT p s >>= \o ->
-            case o.result of
-              Left e ->
-                return {
-                  input: o.input
-                , result: Right (Left e)
-                , consumed: o.consumed
-                , position: o.position }
-              Right a ->
-                return {
-                  input: o.input
-                , result: Right (Right a)
-                , consumed: o.consumed
-                , position: o.position }
-      return $ a ++ singleton b
+-- | Fold over a list of parsers, applying each in turn onto the result of the
+-- | previous, keeping both errors and results. Each application of a branches
+-- | parser must set out from the same parser state.
 
 -- | Generate a parser that selects the best branch it parses and
 -- | fails if no branch was parsed.
+
 genBranchesParser :: List D.Branch
                   -> Parser (Tuple D.Branch (List ValueMapping))
-genBranchesParser xs = do
-  results <- collect $ xs <#> \x ->
-              rmapScoreResult (Tuple x) <$> do
-                genBranchParser x
+genBranchesParser xs = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
+  env :: D.Env <- ask
+  let ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> genBranchParser x
+      rs = runReader (collect s ps) env
 
-  -- if there's just nothing but 0-scores, result in an ambiguity
-  -- error, since there is no way we can know which branch the user
-  -- wanted to complete. (XXX: or should all branches complete?)
+  -- Weed out successful parses that have a zero-scores, from successful
+  -- parses that have a non-zero score. Zero-scores are treated as errors
+  -- due to ambiguity if no none-zero score was attained. Should there be
+  -- only a single zero-score, however, it can walk away the victor.
+  -- XXX: Should the ambiguity rules be extended for any score? I.e. if
+  --      there's a total tie across all scores.
+  (Tuple zs as) <- return $
+    mpartition ((== 0) <<< _.score <<< unScoredResult <<< _.result)
+             $ mrights rs
 
-  (Tuple zeros as) <- return $
-    mpartition ((== 0) <<< _.score <<< unScoredResult)
-             $ mrights results
-
-  maybe'
+  return $ maybe'
     (\_ ->
       maybe'
-        (\_ -> if (length xs == 1)
-          then return $ _.result $ unScoredResult $ LU.head zeros
-          else P.fail "ambigious match"
+        (\_ ->
+          -- XXX: The following needs review. The idea is that if there
+          --      was not a single match with a score above 0, but there
+          --      is exactly a single match with a score of 0, just use it.
+          if length xs == 1
+            then
+              let h = LU.head zs
+               in h { result = Right <<< _.result <<< unScoredResult $ h.result }
+            else P.parseFailed i pos "Ambigious match"
         )
-        (\e -> do
-          (P.ParseError err) <- return e
-          P.ParserT $ \_ -> pure { input: Nil
-                                  , result: Left $ P.ParseError err
-                                  , consumed: true
-                                  , position: err.position
-                                  }
-        )
-        (head $ mlefts results)
+        (\e -> e { result = Left e.result })
+        (head $ mlefts rs)
     )
-    (return <<< _.result <<< unScoredResult)
-    (maximum as)
+    (\r -> r { result = Right <<< _.result <<< unScoredResult $ r.result })
+    (maximumBy (compare `on` _.result) as)
+  where
+    collect s ps = ps `flip traverse` \p -> P.unParserT p s >>= \o ->
+                    return $ either
+                      (\e -> Left  { input:    o.input
+                                   , consumed: o.consumed
+                                   , position: o.position
+                                   , result:   e
+                                   })
+                      (\r -> Right { input:    o.input
+                                   , consumed: o.consumed
+                                   , position: o.position
+                                   , result:   r
+                                   })
+                      o.result
+
+
 
 -- | Generate a parser for a single usage branch
 genBranchParser :: D.Branch -> Parser (ScoredResult (List ValueMapping))

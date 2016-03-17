@@ -262,7 +262,7 @@ parserGenSpec = \_ -> describe "The generator" do
             [ D.sopt_ 'b' :> D.bool true ]
         , fail
             []
-            "ambigious match"
+            "Ambigious match"
         ]
 
     , test'
@@ -273,6 +273,12 @@ parserGenSpec = \_ -> describe "The generator" do
         , pass
             [ "b" ]
             [ D.co "b" :> D.bool true ]
+        , fail
+            [ "a", "b" ]
+            "Trailing input: \"b\""
+        , fail
+            [ "b", "a" ]
+            "Trailing input: \"a\""
         , fail
             []
             "Expected command: \"a\""
@@ -414,7 +420,12 @@ parserGenSpec = \_ -> describe "The generator" do
               expected
           Right r -> do
             either
-              (throwException <<< error <<< show)
+              (\e ->
+                throwException $ error $
+                  "Missing expected exception:\n"
+                    ++ show e
+                    ++ "\n\ninstead received output:\n"
+                    ++ prettyPrintOut r)
               (\r' ->
                 if (r /= r')
                   then throwException $ error $
