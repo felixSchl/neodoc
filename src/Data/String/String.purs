@@ -1,5 +1,5 @@
 module Data.String.Ext (
-    (^=)
+    (^=), (^/=)
   , endsWith
   ) where
 
@@ -11,6 +11,9 @@ import Data.Function
 
 (^=) :: String -> String -> Boolean
 (^=) = eq `on` Str.toUpper
+
+(^/=) :: String -> String -> Boolean
+(^/=) a b = not (a ^= b)
 
 endsWith :: String -> String -> Boolean
 endsWith needle haystack = maybe false id do
