@@ -12,6 +12,7 @@ import Test.Spec.ParserGenSpec (parserGenSpec)
 import Test.Spec.TransSpec (transSpec)
 import Test.Spec.SolverSpec (solverSpec)
 import Test.Spec.CompatSpec (genCompatSpec)
+import Test.Spec.DocoptSpec (docoptSpec)
 import Control.Monad.Eff.Class (liftEff)
 
 main = launchAff do
@@ -24,3 +25,4 @@ main = launchAff do
     parserGenSpec   unit
     transSpec       unit
     compatSpec      unit
+    docoptSpec      unit

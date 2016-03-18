@@ -27,10 +27,12 @@
     "purescript-monadplus-partial": "~0.2.2"
   },
   "resolutions": {
-    "purescript-transformers": "^0.7.1",
-    "purescript-strings": "^0.7.0"
+    "purescript-transformers": "~0.8.1",
+    "purescript-strings": "^0.7.0",
+    "purescript-aff": "0.11.1"
   },
   "devDependencies": {
-    "purescript-spec": "~0.7.1"
+    "purescript-spec": "~0.7.1",
+    "purescript-node-fs-aff": "~0.5.0"
   }
 }
