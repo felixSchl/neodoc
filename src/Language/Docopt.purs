@@ -66,7 +66,7 @@ applyDocopt :: G.Parser G.Result -- ^ the generated parser
             -> Either D.DocoptError (Map String D.Value)
 applyDocopt p prg env argv = do
   vs <- toParseErr $ G.runParser env argv p
-  return $ T.byName $ uncurry (T.reduce env) vs
+  return $ T.byName $ uncurry (T.reduce prg env) vs
 
 -- |
 -- | Parse the docopt source, derive a parser and then

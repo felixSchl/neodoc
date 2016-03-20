@@ -256,13 +256,16 @@ parserGenSpec = \_ -> describe "The generator" do
         [ [ D.sopt_ 'a' ], [ D.sopt_ 'b' ] ]
         [ pass
             [ "-a" ]
-            [ D.sopt_ 'a' :> D.bool true ]
+            [ D.sopt_ 'a' :> D.bool true
+            , D.sopt_ 'b' :> D.bool false ]
         , pass
             [ "-b" ]
-            [ D.sopt_ 'b' :> D.bool true ]
-        , fail
+            [ D.sopt_ 'a' :> D.bool false
+            , D.sopt_ 'b' :> D.bool true ]
+        , pass
             []
-            "Ambigious match"
+            [ D.sopt_ 'a' :> D.bool false
+            , D.sopt_ 'b' :> D.bool false ]
         ]
 
     , test'
@@ -402,11 +405,12 @@ parserGenSpec = \_ -> describe "The generator" do
                             -> Either String (Map Argument Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate args argv env expected = do
-        let result = uncurry (T.reduce env)
+        let prg = singleton $ Usage $ D.br <$> args
+            result = uncurry (T.reduce prg env)
                 <$> runParser
                       env
                       argv
-                      (genParser $ singleton $ Usage $ D.br <$> args)
+                      (genParser prg)
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->

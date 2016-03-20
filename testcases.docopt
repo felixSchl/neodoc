@@ -541,8 +541,8 @@ $ prog 10
 
 $ prog
 {"<name>": [], "NAME": []}
-
-
+#
+#
 # r"""usage: prog [NAME...]"""
 # $ prog 10 20
 # {"NAME": ["10", "20"]}

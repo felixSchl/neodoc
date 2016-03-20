@@ -1,6 +1,7 @@
 module Language.Docopt.Usage (
     Program ()
   , Usage (..)
+  , runUsage
   , prettyPrintUsage
   ) where
 
@@ -12,6 +13,9 @@ import Language.Docopt.Argument
 
 type Program = List Usage
 newtype Usage = Usage (List Branch)
+
+runUsage :: Usage -> List Branch
+runUsage (Usage x) = x
 
 instance showUsage :: Show Usage where
   show (Usage xs) = "Usage " ++ show (show <$> xs)

@@ -20,6 +20,7 @@ import Data.String as Str
 import Data.Tuple (Tuple(..), fst)
 import Control.MonadPlus (guard)
 import Language.Docopt.Env (Env())
+import Language.Docopt.Usage    as D
 import Language.Docopt.Errors   as D
 import Language.Docopt.Env      as D
 import Language.Docopt.Value    as D
@@ -72,16 +73,21 @@ byName m
 --      * Their argument name           -> ?
 --      * Their argument default value  -> ?
 --
-reduce :: D.Env                  -- ^ the environment
+reduce :: List D.Usage           -- ^ the program specification
+       -> D.Env                  -- ^ the environment
        -> D.Branch               -- ^ the matched specification
        -> List ValueMapping      -- ^ the parse result
        -> Map D.Argument D.Value -- ^ the output set of (arg => val)
-reduce env b m =
+reduce us env b m =
   let unrolled = flatten b
       unified  = lmap unify <$> m
+      prg      = concat
+                  $ ((unify <$>) <<< D.runBranch)
+                    <$> (concat $ (flatten <$>) <<< D.runUsage <$> us)
    in toValMap unified
-    # applyEnvVals unrolled
-    # applyDefVals unrolled
+    # applyEnvVals    unrolled
+    # applyDefVals    unrolled
+    # applyDefVals    (D.Branch prg)
 
   where
 
@@ -90,10 +96,11 @@ reduce env b m =
     flatten (D.Branch bs) = D.Branch $ foldl (\a b -> a ++ expand b) mempty bs
       where
         expand :: D.Argument -> List D.Argument
-        expand (D.Group _ xs _) = concat
-                                $ concat
-                                $ xs <#> D.runBranch >>> (expand <$>)
-        expand x                = singleton x
+        expand (D.Group _ xs r)
+          = concat $ concat
+            $ xs <#> D.runBranch
+                      >>> ((expand <<< (flip D.setRepeatable r)) <$>)
+        expand x = singleton x
 
     -- Find the lowest comment denominator between two arguments
     unify :: D.Argument -> D.Argument
@@ -170,11 +177,12 @@ reduce env b m =
         step :: Map D.Argument D.Value
              -> D.Argument
              -> Map D.Argument D.Value
-        step m d = maybe m (`Map.unionWith resolve` m)
-                           (Map.singleton d <$> toDefVal d)
+        step m d =
+          let defaults = Map.singleton d <$> toDefVal d
+           in maybe m (m `Map.unionWith resolve`) defaults
 
         resolve :: D.Value -> D.Value -> D.Value
-        resolve _ v = v -- choose existing value, not default
+        resolve v _ = v -- choose existing value, not default
 
         toDefVal :: D.Argument -> Maybe D.Value
 
