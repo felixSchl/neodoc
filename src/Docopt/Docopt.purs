@@ -55,11 +55,17 @@ defaultOptions = {
   argv: Nothing
 }
 
+-- |
+-- | Run docopt on the given docopt text.
+-- |
 run :: forall e . Options -> String -> Eff DocoptEff Unit
 run o d = do
   Process.argv
   pure unit
 
+-- |
+-- | Extract the docopt text from a README, then run it.
+-- |
 fromREADME :: forall e . Options -> FilePath -> Aff DocoptEff Unit
 fromREADME o f = do
   c <- readTextFile UTF8 f
@@ -81,5 +87,9 @@ fromREADME o f = do
           P.char '\n'
           P.string "```"
 
+-- |
+-- | Extract the docopt text from a README, then run it
+-- | with the default options.
+-- |
 fromREADME_ :: forall e . FilePath -> Aff DocoptEff Unit
 fromREADME_ = fromREADME defaultOptions
