@@ -459,8 +459,18 @@ genBranchParser (D.Branch xs) = do
               parser = if repeated then many go else singleton <$> go
           in mod parser
       return $ scoreFromList vs
-      where go = if length bs > 0
-                    then snd <$> genBranchesParser bs
+      where
+        go =
+          -- If the group is repeatable, make each element repeatable.
+          -- This is because groups do not produce keys themselves and only
+          -- yield values, hence i.o for groups to be useful, this expansion
+          -- needs to take place.
+          let bs' = if not repeated
+                      then bs
+                      else (D.Branch <<< ((flip D.setRepeatable true) <$>)
+                                     <<< D.runBranch) <$> bs
+          in if length bs' > 0
+                    then snd <$> genBranchesParser bs'
                     else return mempty
 
     isFree :: D.Argument -> Boolean
