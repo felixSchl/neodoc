@@ -60,7 +60,6 @@ import Language.Docopt.ParserGen.Token
 import Language.Docopt.ParserGen.ValueMapping
 import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
-type ValueMapping = Tuple D.Argument D.Value
 type Parser a = P.ParserT (List Token) (Reader D.Env) a
 
 newtype ScoredResult a = ScoredResult { score :: Int, result :: a }
