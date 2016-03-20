@@ -23,7 +23,7 @@ import Text.Wrap (dedent)
 import Control.Monad.Aff (launchAff)
 
 import Test.Assert (assert)
-import Test.Spec (describe, it)
+import Test.Spec (Spec(), describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Data.String (fromCharArray)
@@ -156,6 +156,9 @@ parseUniversalDocoptTests = do
 _liftEff :: forall e a. Eff e a -> Aff e a
 _liftEff = liftEff
 
+type CompatEff e = (fs :: FS, err :: EXCEPTION | e)
+
+genCompatSpec :: forall e. Aff (CompatEff e) (Unit -> Spec (CompatEff e) Unit)
 genCompatSpec = do
   tests <- _liftEff parseUniversalDocoptTests
   return $ \_ -> describe "Docopt compatibility" do
