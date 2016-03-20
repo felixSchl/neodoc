@@ -399,69 +399,74 @@ $ prog -b
 {"-a": false, "-b": true}
 
 
-# r"""usage: prog [ -a | -b ]
-# 
-# options: -a
-#          -b
-# 
-# """
-# $ prog -a -b
-# "user-error"
-# 
-# $ prog
-# {"-a": false, "-b": false}
-# 
-# $ prog -a
-# {"-a": true, "-b": false}
-# 
-# $ prog -b
-# {"-a": false, "-b": true}
-# 
-# 
-# r"""usage: prog <arg>"""
-# $ prog 10
-# {"<arg>": "10"}
-# 
-# $ prog 10 20
-# "user-error"
-# 
-# $ prog
-# "user-error"
-# 
-# 
-# r"""usage: prog [<arg>]"""
-# $ prog 10
-# {"<arg>": "10"}
-# 
-# $ prog 10 20
-# "user-error"
-# 
-# $ prog
-# {"<arg>": null}
-# 
-# 
-# r"""usage: prog <kind> <name> <type>"""
-# $ prog 10 20 40
-# {"<kind>": "10", "<name>": "20", "<type>": "40"}
-# 
-# $ prog 10 20
-# "user-error"
-# 
-# $ prog
-# "user-error"
-# 
-# 
-# r"""usage: prog <kind> [<name> <type>]"""
-# $ prog 10 20 40
-# {"<kind>": "10", "<name>": "20", "<type>": "40"}
-# 
-# $ prog 10 20
-# {"<kind>": "10", "<name>": "20", "<type>": null}
-# 
-# $ prog
-# "user-error"
-# 
-# 
+r"""usage: prog [ -a | -b ]
+
+options: -a
+         -b
+
+"""
+$ prog -a -b
+"user-error"
+
+$ prog
+{"-a": false, "-b": false}
+
+$ prog -a
+{"-a": true, "-b": false}
+
+$ prog -b
+{"-a": false, "-b": true}
+
+
+r"""usage: prog <arg>"""
+$ prog 10
+{"<arg>": "10",
+ "ARG": "10"}
+
+$ prog 10 20
+"user-error"
+
+$ prog
+"user-error"
+
+
+r"""usage: prog [<arg>]"""
+$ prog 10
+{"<arg>": "10",
+ "ARG": "10"}
+
+$ prog 10 20
+"user-error"
+
+$ prog
+{}
+
+
+r"""usage: prog <kind> <name> <type>"""
+$ prog 10 20 40
+{"<kind>": "10", "<name>": "20", "<type>": "40",
+ "KIND": "10", "NAME": "20", "TYPE": "40"}
+
+$ prog 10 20
+"user-error"
+
+$ prog
+"user-error"
+
+
+r"""usage: prog <kind> [<name> <type>]"""
+$ prog 10 20 40
+{"<kind>": "10", "<name>": "20", "<type>": "40",
+ "KIND": "10", "NAME": "20", "TYPE": "40"}
+
+$ prog 10 20
+{"<kind>": "10", "<name>": "20",
+"user-error"
+
+$ prog
+"user-error"
+
+
 # r"""usage: prog [<kind> | <name> <type>]"""
 # $ prog 10 20 40
 # "user-error"

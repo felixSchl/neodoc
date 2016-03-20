@@ -48,6 +48,22 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
   speaks - the flag will be set to `false`. This is also the case for flags
   inside required groups. E.g.: The group `(-a -b)` will match inputs `-a -b`,
   `-ab`, `-ba`, `-b -a`, `-b`, `-a` and the empty input.
+* **All arguments in a group are always required**, regardless of whether or not
+  the group itself is required or not, i.e.:
+  ```sh
+  Usage: prog [<name> <type>]
+  ```
+  will fail `prog foo`, but pass `prog foo bar`. The rational being that this is
+  more general, since if the opposite behaviour (any match) was desired, it
+  could be expressed as such:
+  ```sh
+  Usage: prog [[<name>] [<type>]]
+  ```
+  **note:** this rule excludes flags/switches and options that have default
+  values (or other fallback values).
+* **There is no `null`** in the resulting value map. `null` simply means not
+  matched - so the key is omitted from the resulting value map. <sub>(this is
+  still under consideration)</sub>
 
 ## Project status ##
 
@@ -97,16 +113,14 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 
 ## Contributing ##
 
-**Contributions are highly encouraged and welcome** &mdash; I really want to see
-this project finished so I can use it :smile:
+**Contributions are highly encouraged and welcome**
 
 ```sh
-$ bower install
-$ pulp test
+npm i && bower i && npm run test
 ```
 
-During development, `pulp --watch test` (or `pulp -w test`) is extremely useful
-to get immediate feedback.
+Purescript is a devDependency, so no need to bring your own. Also, during
+development, `npm run watch` is extremely useful to get immediate feedback.
 
 ### Implementation ###
 
