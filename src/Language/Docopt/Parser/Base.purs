@@ -22,6 +22,7 @@ import Data.Maybe hiding (maybe)
 import Data.Either
 import Debug.Trace
 import Data.Tuple (Tuple(..))
+import Control.MonadPlus (guard)
 
 debug :: forall a m. (Show a, Monad m) => a -> m Unit
 debug x = traceShow x $ const $ pure unit
@@ -30,6 +31,11 @@ debug x = traceShow x $ const $ pure unit
 getPosition :: forall a m. (Monad m) => P.ParserT a m P.Position
 getPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
   return { input: s, result: Right pos, consumed: false, position: pos }
+
+sof :: forall a m. (Monad m) => P.ParserT a m Unit
+sof = do
+  P.Position { column, line } <- getPosition
+  guard $ column == 1 && line == 1
 
 -- | Return the current parser column
 getCol :: forall a m. (Monad m) => P.ParserT a m Int
