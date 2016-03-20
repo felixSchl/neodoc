@@ -17,16 +17,25 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff (Eff())
 import Node.FS (FS())
 import Control.Monad.Eff.Exception (EXCEPTION())
-import Control.Monad.Eff.Console(log, CONSOLE())
+import Control.Monad.Eff.Console (CONSOLE())
 import Node.Process (PROCESS())
 import Node.Process as Process
 import Control.Bind((=<<))
 
 import Docopt (fromREADME_)
 
-main = do
-  fromREADME_ "./test/Test/Spec/fixtures/README.md"
+import Debug.Trace
+import Node.Encoding (Encoding(..))
+import Node.FS.Aff (readTextFile)
 
+main = run [consoleReporter] do
+  docoptSpec unit
+
+-- main = launchAff do
+--   c <- readTextFile UTF8 "./test/Test/Spec/fixtures/README.md"
+--   traceShowA c
+
+  -- fromREADME_ "./test/Test/Spec/fixtures/README.md"
 
 -- main = launchAff do
 -- --   compatSpec <- genCompatSpec

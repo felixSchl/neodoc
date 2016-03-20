@@ -158,13 +158,13 @@ _liftEff = liftEff
 
 genCompatSpec = do
   tests <- _liftEff parseUniversalDocoptTests
-  return $ \_ -> describe "Docopt" do
+  return $ \_ -> describe "Docopt compatibility" do
     for_ tests \(Test { doc, kases }) -> do
       describe (doc ++ "\n") do
         for_ kases \(Kase { argv, out }) -> do
           describe (intercalate " " argv) do
             it ("\n" ++ prettyPrintOut out) do
-              let result = runDocopt StrMap.empty (dedent doc) (fromList argv)
+              let result = runDocopt (dedent doc) StrMap.empty (fromList argv)
               vliftEff $ case result of
                 Left e ->
                   either

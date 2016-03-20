@@ -1,5 +1,14 @@
+-- |
+-- | Docopt surface.
+-- |
+-- | The pure part of docopt, all functions are invariant.
+-- |
+
 module Language.Docopt (
-  runDocopt
+    runDocopt
+  , parseDocopt
+  , applyDocopt
+  , module D
   ) where
 
 import Prelude
@@ -31,17 +40,41 @@ import Language.Docopt.Solver       as Solver
 import Language.Docopt.Parser.Usage as Usage
 import Language.Docopt.Parser.Desc  as Desc
 
-runDocopt :: StrMap String -- ^ The environment
-          -> String        -- ^ The docopt text
-          -> Array String  -- ^ The user input
-          -> Either D.DocoptError (Map String D.Value)
-runDocopt env docopt argv = do
+-- |
+-- | Parse the docopt text and produce a parser
+-- | that can be applied to user input.
+-- |
+parseDocopt :: String  -- ^ The docopt text
+            -> Either D.DocoptError (G.Parser G.Result)
+parseDocopt docopt = do
   doc <- toScanErr  $ Scanner.scan $ dedent docopt
   us  <- toParseErr $ Usage.run doc.usage
   ds  <- toParseErr $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr $ Solver.solve us ds
-  vs  <- toParseErr $ G.runParser env argv (G.genParser prg)
+  return (G.genParser prg)
+
+-- |
+-- | Apply the generated docopt parser to user input.
+-- |
+applyDocopt :: G.Parser G.Result -- ^ the generated parser
+            -> StrMap String     -- ^ the environment
+            -> Array String      -- ^ ARGV
+            -> Either D.DocoptError (Map String D.Value)
+applyDocopt p env argv = do
+  vs <- toParseErr $ G.runParser env argv p
   return $ T.byName $ uncurry (T.reduce env) vs
+
+-- |
+-- | Parse the docopt source, derive a parser and then
+-- | apply it to user input.
+-- |
+runDocopt :: String        -- ^ The docopt text
+          -> StrMap String -- ^ The environment
+          -> Array String  -- ^ ARGV
+          -> Either D.DocoptError (Map String D.Value)
+runDocopt docopt env argv = do
+  p <- parseDocopt docopt
+  applyDocopt p env argv
 
 toScanErr :: forall a. Either P.ParseError a -> Either D.DocoptError a
 toScanErr  = lmap D.DocoptScanError

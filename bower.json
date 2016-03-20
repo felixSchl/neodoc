@@ -28,10 +28,5 @@
     "purescript-node-process": "~0.4.1",
     "purescript-spec": "~0.7.2",
     "purescript-node-fs-aff": "~0.5.0"
-  },
-  "resolutions": {
-    "purescript-strings": "^0.7.0",
-    "purescript-transformers": "~0.8.4",
-    "purescript-aff": ">= 0.13.1 < 0.17.0"
   }
 }

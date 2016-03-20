@@ -3,6 +3,7 @@ module Language.Docopt.ParserGen (
   , genParser
   , runParser
   , Result ()
+  , module G
   ) where
 
 import Prelude
