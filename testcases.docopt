@@ -541,30 +541,30 @@ $ prog 10
 
 $ prog
 {"<name>": [], "NAME": []}
-#
-#
-# r"""usage: prog [NAME...]"""
-# $ prog 10 20
-# {"NAME": ["10", "20"]}
-# 
-# $ prog 10
-# {"NAME": ["10"]}
-# 
-# $ prog
-# {"NAME": []}
-# 
-# 
-# r"""usage: prog [NAME [NAME ...]]"""
-# $ prog 10 20
-# {"NAME": ["10", "20"]}
-# 
-# $ prog 10
-# {"NAME": ["10"]}
-# 
-# $ prog
-# {"NAME": []}
-# 
-# 
+
+
+r"""usage: prog [NAME...]"""
+$ prog 10 20
+{"<name>": ["10", "20"], "NAME": ["10", "20"]}
+
+$ prog 10
+{"<name>": ["10"], "NAME": ["10"]}
+
+$ prog
+{"<name>": [], "NAME": []}
+
+
+r"""usage: prog [NAME [NAME ...]]"""
+$ prog 10 20
+{"<name>": ["10", "20"], "NAME": ["10", "20"]}
+
+$ prog 10
+{"<name>": ["10"], "NAME": ["10"]}
+
+$ prog
+{"<name>": [], "NAME": []}
+
+
 # r"""usage: prog (NAME | --foo NAME)
 # 
 # options: --foo

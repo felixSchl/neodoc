@@ -99,7 +99,7 @@ reduce us env b m =
         expand (D.Group _ xs r)
           = concat $ concat
             $ xs <#> D.runBranch
-                      >>> ((expand <<< (flip D.setRepeatable r)) <$>)
+                      >>> ((expand >>> ((flip D.setRepeatable r) <$>)) <$>)
         expand x = singleton x
 
     -- Find the lowest comment denominator between two arguments
