@@ -73,7 +73,7 @@ byName m
 --      * Their argument default value  -> ?
 --
 reduce :: D.Env                  -- ^ the environment
-       -> D.Branch               -- ^ the specification
+       -> D.Branch               -- ^ the matched specification
        -> List ValueMapping      -- ^ the parse result
        -> Map D.Argument D.Value -- ^ the output set of (arg => val)
 reduce env b m =

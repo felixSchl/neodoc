@@ -8,6 +8,7 @@ module Language.Docopt.Argument (
   , prettyPrintArg
   , runBranch
   , isRepeatable
+  , setRepeatable
   , hasDefault
   , getEnvKey
   , hasEnvBacking
@@ -103,6 +104,11 @@ isRepeatable :: Argument -> Boolean
 isRepeatable (Option o)       = O.isRepeatable o
 isRepeatable (Positional _ r) = r
 isRepeatable _                = false
+
+setRepeatable :: Argument -> Boolean -> Argument
+setRepeatable (Option (O.Option o)) r = Option $ O.Option $ o { repeatable = r }
+setRepeatable (Positional n _)      r = (Positional n r)
+setRepeatable x                     _ = x
 
 hasDefault :: Argument -> Boolean
 hasDefault (Option o) = O.hasDefault o

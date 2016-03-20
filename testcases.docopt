@@ -460,40 +460,44 @@ $ prog 10 20 40
  "KIND": "10", "NAME": "20", "TYPE": "40"}
 
 $ prog 10 20
-{"<kind>": "10", "<name>": "20",
+# Original: {"<kind>": "10", "<name>": "20"}
 "user-error"
 
 $ prog
 "user-error"
 
 
-# r"""usage: prog [<kind> | <name> <type>]"""
-# $ prog 10 20 40
-# "user-error"
-# 
-# $ prog 20 40
-# {"<kind>": null, "<name>": "20", "<type>": "40"}
-# 
-# $ prog
-# {"<kind>": null, "<name>": null, "<type>": null}
-# 
-# 
-# r"""usage: prog (<kind> --all | <name>)
-# 
-# options:
-#  --all
-# 
-# """
-# $ prog 10 --all
-# {"<kind>": "10", "--all": true, "<name>": null}
-# 
-# $ prog 10
-# {"<kind>": null, "--all": false, "<name>": "10"}
-# 
-# $ prog
-# "user-error"
-# 
-# 
+r"""usage: prog [<kind> | <name> <type>]"""
+$ prog 10 20 40
+"user-error"
+
+$ prog 20 40
+{"<name>": "20", "<type>": "40",
+ "NAME": "20", "TYPE": "40"}
+
+$ prog
+{}
+
+
+r"""usage: prog (<kind> --all | <name>)
+
+options:
+ --all
+
+"""
+$ prog 10 --all
+{"--all": true, "<kind>": "10",
+ "KIND": "10"}
+
+$ prog 10
+{"--all": false, "<name>": "10", "NAME": "10"}
+
+$ prog
+"user-error"
+
+
+# XXX: NOT SUPPORTED RIGHT NOW:
+#
 # r"""usage: prog [<name> <name>]"""
 # $ prog 10 20
 # {"<name>": ["10", "20"]}
@@ -514,30 +518,31 @@ $ prog
 # 
 # $ prog
 # {"<name>": []}
-# 
-# 
-# r"""usage: prog NAME..."""
-# $ prog 10 20
-# {"NAME": ["10", "20"]}
-# 
-# $ prog 10
-# {"NAME": ["10"]}
-# 
-# $ prog
-# "user-error"
-# 
-# 
-# r"""usage: prog [NAME]..."""
-# $ prog 10 20
-# {"NAME": ["10", "20"]}
-# 
-# $ prog 10
-# {"NAME": ["10"]}
-# 
-# $ prog
-# {"NAME": []}
-# 
-# 
+
+
+r"""usage: prog NAME..."""
+$ prog 10 20
+{"<name>": ["10", "20"],
+ "NAME": ["10", "20"]}
+
+$ prog 10
+{"<name>": ["10"],
+ "NAME": ["10"]}
+
+$ prog
+"user-error"
+
+r"""usage: prog [NAME]..."""
+$ prog 10 20
+{"<name>": ["10", "20"], "NAME": ["10", "20"]}
+
+$ prog 10
+{"<name>": ["10"], "NAME": ["10"]}
+
+$ prog
+{"<name>": [], "NAME": []}
+
+
 # r"""usage: prog [NAME...]"""
 # $ prog 10 20
 # {"NAME": ["10", "20"]}

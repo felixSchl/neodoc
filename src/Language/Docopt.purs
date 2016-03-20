@@ -13,6 +13,7 @@ module Language.Docopt (
 
 import Prelude
 import Debug.Trace
+import Data.Tuple (Tuple(..))
 import Data.Either (either, Either(..))
 import Data.Maybe (maybe, Maybe(..))
 import Data.List (toList, List(..), concat)
@@ -30,6 +31,7 @@ import Data.Traversable (traverse)
 import Text.Parsing.Parser as P
 import Text.Wrap (dedent)
 
+import Language.Docopt.Usage     as D
 import Language.Docopt.Errors    as D
 import Language.Docopt.Value     as D
 import Language.Docopt.ParserGen as G
@@ -45,22 +47,24 @@ import Language.Docopt.Parser.Desc  as Desc
 -- | that can be applied to user input.
 -- |
 parseDocopt :: String  -- ^ The docopt text
-            -> Either D.DocoptError (G.Parser G.Result)
+            -> Either D.DocoptError (Tuple (List D.Usage)
+                                           (G.Parser G.Result))
 parseDocopt docopt = do
   doc <- toScanErr  $ Scanner.scan $ dedent docopt
   us  <- toParseErr $ Usage.run doc.usage
   ds  <- toParseErr $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr $ Solver.solve us ds
-  return (G.genParser prg)
+  return $ Tuple prg (G.genParser prg)
 
 -- |
 -- | Apply the generated docopt parser to user input.
 -- |
 applyDocopt :: G.Parser G.Result -- ^ the generated parser
+            -> List D.Usage      -- ^ the program specification
             -> StrMap String     -- ^ the environment
             -> Array String      -- ^ ARGV
             -> Either D.DocoptError (Map String D.Value)
-applyDocopt p env argv = do
+applyDocopt p prg env argv = do
   vs <- toParseErr $ G.runParser env argv p
   return $ T.byName $ uncurry (T.reduce env) vs
 
@@ -73,8 +77,8 @@ runDocopt :: String        -- ^ The docopt text
           -> Array String  -- ^ ARGV
           -> Either D.DocoptError (Map String D.Value)
 runDocopt docopt env argv = do
-  p <- parseDocopt docopt
-  applyDocopt p env argv
+  (Tuple prg p) <- parseDocopt docopt
+  applyDocopt p prg env argv
 
 toScanErr :: forall a. Either P.ParseError a -> Either D.DocoptError a
 toScanErr  = lmap D.DocoptScanError
