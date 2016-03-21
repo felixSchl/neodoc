@@ -66,6 +66,11 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * **There is no `null`** in the resulting value map. `null` simply means not
   matched - so the key is omitted from the resulting value map. <sub>(this is
   still under consideration)</sub>
+* **Environment variables**. Options can fall back to environment variables,
+  if they are not explicitely defined. The order of evaluation is:
+    1. User input (per `process.argv`)
+    1. Environment variables (per `[env: ...]` tag)
+    1. Option defaults (per `[default: ...]` tag)
 
 ## Project status ##
 
