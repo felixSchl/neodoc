@@ -19,6 +19,7 @@ import Data.Map as Map
 import Data.String as Str
 import Data.Tuple (Tuple(..), fst)
 import Control.MonadPlus (guard)
+import Data.Function (on)
 import Language.Docopt.Env (Env())
 import Language.Docopt.Usage    as D
 import Language.Docopt.Errors   as D
@@ -28,14 +29,47 @@ import Language.Docopt.Argument as D
 import Language.Docopt.Option   as O
 import Language.Docopt.Env      as Env
 import Data.String.Ext ((^=))
-import Data.List (List(..), toList, concat, singleton)
+import Data.List (List(..), toList, concat, singleton, groupBy, catMaybes)
 import Data.List as L
 import Language.Docopt.ParserGen.ValueMapping
 
--- Transform the map of (Argument, Value) mappings to a map of (String, Value),
--- where the String is the name of the option and it's aliases.
--- This means that Arguments that resolve to the same name/alias must be
--- somehow resolved.
+-- | Derive a key from an argument.
+-- | This key is what the user will use to check the value of
+-- | a mathed argument.
+toKeys :: D.Argument -> Array String
+toKeys (D.Command n)      = [n]
+toKeys (D.Positional n _) = [ "<" ++ Str.toLower n ++ ">"
+                            , Str.toUpper n
+                            ]
+toKeys (D.Group _ _ _)    = []
+toKeys (D.EOA)            = ["--"]
+toKeys (D.Stdin)          = ["-"]
+toKeys (D.Option (O.Option o))
+                          = []
+                          ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) o.flag
+                          ++ maybe [] (\s -> [ "--" ++ s ]) o.name
+
+-- | Combine two arguments into one.
+combine :: D.Argument -> D.Argument -> D.Argument
+combine (D.Positional n r) (D.Positional n' r') | n ^= n'
+  = D.Positional n (r || r')
+combine (D.Option (O.Option o)) (D.Option (O.Option o'))
+  |    (o.name == o'.name)
+    && (o.flag == o'.flag)
+    && ((isNothing o.arg && isNothing o'.arg) || isJust do
+          (O.Argument { name: an  }) <- o.arg
+          (O.Argument { name: an' }) <- o'.arg
+          guard (an ^= an')
+        )
+  = D.Option $ O.Option $ o {
+      repeatable = o.repeatable || o'.repeatable
+    }
+combine a _ = a
+
+-- | Transform the map of (Argument, Value) mappings to a map of (String, Value),
+-- | where the String is the name of the option and it's aliases.
+-- | This means that Arguments that resolve to the same name/alias must be
+-- | somehow resolved.
 byName :: Map D.Argument D.Value -> Map String D.Value
 byName m
   = foldl (Map.unionWith resolve)
@@ -43,20 +77,6 @@ byName m
           (L.concat $ Map.toList m <#> \(Tuple k v) ->
             toList $ toKeys k <#> \k' -> Map.singleton k' v)
   where
-
-    toKeys :: D.Argument -> Array String
-    toKeys (D.Command n)      = [n]
-    toKeys (D.Positional n _) = [ "<" ++ Str.toLower n ++ ">"
-                                , Str.toUpper n
-                                ]
-    toKeys (D.Group _ _ _)    = []
-    toKeys (D.EOA)            = ["--"]
-    toKeys (D.Stdin)          = ["-"]
-    toKeys (D.Option (O.Option o))
-                              = []
-                              ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) o.flag
-                              ++ maybe [] (\s -> [ "--" ++ s ]) o.name
-
     -- This *should* be safe, since all confusion should have been
     -- lifted by the `reduce` function. This function cannot be implemented
     -- other than selecting one of the values verbatim, because it's lacking
@@ -64,34 +84,32 @@ byName m
     resolve :: D.Value -> D.Value -> D.Value
     resolve _ v' = v'
 
--- Reduce the list of (Argument, Value) mappings down to a Set.
--- This means that duplicate Arguments must somehow be resolved.
---
--- XXX: How to solve the following issues:
---
---  * Two options differ in:
---      * Their argument name           -> ?
---      * Their argument default value  -> ?
---
+-- | Reduce the list of (Argument, Value) mappings down to a Set.
+-- | This means that duplicate Arguments must somehow be resolved.
+-- |
+-- | XXX: How to solve the following issues:
+-- |
+-- |  * Two options differ in:
+-- |      * Their argument name           -> ?
+-- |      * Their argument default value  -> ?
+-- |
 reduce :: List D.Usage           -- ^ the program specification
        -> D.Env                  -- ^ the environment
        -> D.Branch               -- ^ the matched specification
        -> List ValueMapping      -- ^ the parse result
        -> Map D.Argument D.Value -- ^ the output set of (arg => val)
-reduce us env b m =
-  let unrolled = flatten b
-      unified  = lmap unify <$> m
-      prg      = concat
-                  $ ((unify <$>) <<< D.runBranch)
-                    <$> (concat $ (flatten <$>) <<< D.runUsage <$> us)
-   in toValMap unified
-    # applyEnvVals    unrolled
-    # applyDefVals    unrolled
-    # applyDefVals    (D.Branch prg)
+reduce us env _ vs =
+  let prg = D.Branch $ unify' $ concat
+              $ (D.runBranch)
+                <$> (concat $ (flatten <$>) <<< D.runUsage <$> us)
+      uni = lmap (\v -> foldl combine v (D.runBranch prg)) <$> vs
+   in toValMap uni
+    # applyEnvVals prg
+    # applyDefVals prg
 
   where
 
-    -- Remove all groups from the branch, by concatenation
+    -- | Remove all groups from the branch, by concatenation
     flatten :: D.Branch -> D.Branch
     flatten (D.Branch bs) = D.Branch $ foldl (\a b -> a ++ expand b) mempty bs
       where
@@ -99,28 +117,16 @@ reduce us env b m =
         expand (D.Group _ xs r)
           = concat $ concat
             $ xs <#> D.runBranch
-                      >>> ((expand >>> ((flip D.setRepeatable r) <$>)) <$>)
+                      >>> ((expand >>> ((flip D.setRepeatableOr r) <$>)) <$>)
         expand x = singleton x
 
-    -- Find the lowest comment denominator between two arguments
-    unify :: D.Argument -> D.Argument
-    unify a = foldl step a (fst <$> m)
-      where
-        step :: D.Argument -> D.Argument -> D.Argument
-        step (D.Positional n r) (D.Positional n' r') | n ^= n'
-          = D.Positional n (r || r')
-        step (D.Option (O.Option o)) (D.Option (O.Option o'))
-          |    (o.name == o'.name)
-            && (o.flag == o'.flag)
-            && ((isNothing o.arg && isNothing o'.arg) || isJust do
-                  (O.Argument { name: an  }) <- o.arg
-                  (O.Argument { name: an' }) <- o'.arg
-                  guard (an ^= an')
-                )
-          = D.Option $ O.Option $ o {
-              repeatable = o.repeatable || o'.repeatable
-            }
-        step a _ = a
+    unify' :: List D.Argument -> List D.Argument
+    unify' xs =
+      let ys = groupBy (eq `on` toKeys) xs
+       in catMaybes $ ys <#> \y ->
+            case y of
+                Cons z zs -> Just $ foldl combine z zs
+                Nil       -> Nothing
 
     toValMap :: List (Tuple D.Argument D.Value) -> Map D.Argument D.Value
     toValMap vs = foldl step Map.empty (prepare <$> vs)

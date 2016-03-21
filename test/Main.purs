@@ -38,11 +38,11 @@ main :: Eff ( err     :: EXCEPTION
 main = launchAff do
   compatSpec <- genCompatSpec
   liftEff $ run [consoleReporter] do
-    scannerSpec     unit
-    usageParserSpec unit
-    descParserSpec  unit
-    solverSpec      unit
-    parserGenSpec   unit
-    transSpec       unit
+    -- scannerSpec     unit
+    -- usageParserSpec unit
+    -- descParserSpec  unit
+    -- solverSpec      unit
+    -- parserGenSpec   unit
+    -- transSpec       unit
     compatSpec      unit
-    docoptSpec      unit
+    -- docoptSpec      unit
