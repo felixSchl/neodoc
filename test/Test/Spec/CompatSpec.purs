@@ -130,10 +130,6 @@ parseUniversalDocoptTests = do
               P.skipSpaces
               flip P.sepBy (P.skipSpaces *> P.char ',' *> P.skipSpaces) do
                 value
-
-          -- XXX: THIS IS WRONG (represent 'null'):
-        , P.string "null" *> return (D.StringValue "null")
-
         , D.NumberValue <$> do
             xs  <- fromCharArray <$> A.some digit
             P.choice [
