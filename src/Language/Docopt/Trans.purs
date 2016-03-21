@@ -51,19 +51,12 @@ toKeys (D.Option (O.Option o))
 
 -- | Combine two arguments into one.
 combine :: D.Argument -> D.Argument -> D.Argument
-combine (D.Positional n r) (D.Positional n' r') | n ^= n'
+combine (x@(D.Positional n r)) (y@(D.Positional n' r'))
+  | (eq `on` toKeys) x y
   = D.Positional n (r || r')
-combine (D.Option (O.Option o)) (D.Option (O.Option o'))
-  |    (o.name == o'.name)
-    && (o.flag == o'.flag)
-    && ((isNothing o.arg && isNothing o'.arg) || isJust do
-          (O.Argument { name: an  }) <- o.arg
-          (O.Argument { name: an' }) <- o'.arg
-          guard (an ^= an')
-        )
-  = D.Option $ O.Option $ o {
-      repeatable = o.repeatable || o'.repeatable
-    }
+combine (x@(D.Option (O.Option o))) (y@(D.Option (O.Option o')))
+  | (eq `on` toKeys) x y
+  = D.Option $ O.Option $ o { repeatable = o.repeatable || o'.repeatable }
 combine a _ = a
 
 -- | Transform the map of (Argument, Value) mappings to a map of (String, Value),
