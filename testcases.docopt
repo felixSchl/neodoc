@@ -565,21 +565,21 @@ $ prog
 {"<name>": [], "NAME": []}
 
 
-# r"""usage: prog (NAME | --foo NAME)
-# 
-# options: --foo
-# 
-# """
-# $ prog 10
-# {"NAME": "10", "--foo": false}
-# 
-# $ prog --foo 10
-# {"NAME": "10", "--foo": true}
-# 
-# $ prog --foo=10
-# "user-error"
-# 
-# 
+r"""usage: prog (NAME | --foo NAME)
+
+options: --foo
+
+"""
+$ prog 10
+{"--foo": false, "<name>": "10", "NAME": "10"}
+
+$ prog --foo 10
+{"--foo": true, "<name>": "10", "NAME": "10"}
+
+$ prog --foo=10
+"user-error"
+
+
 # r"""usage: prog (NAME | --foo) [--bar | NAME]
 # 
 # options: --foo
