@@ -20,8 +20,9 @@ import Data.Foldable (foldl)
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Control.Monad.Reader (runReader)
-import Text.Parsing.Parser     as P
-import Text.Parsing.Parser.Pos as P
+import Text.Parsing.Parser             as P
+import Text.Parsing.Parser.Pos         as P
+import Text.Parsing.Parser.Combinators as P
 
 import Language.Docopt.Value    as D
 import Language.Docopt.Errors   as D
@@ -38,7 +39,7 @@ type Result = Tuple D.Branch (List G.ValueMapping)
 -- | Generate a parser for a given program specification.
 genParser :: D.Program       -- ^ the program to generate a parser for
           -> G.Parser Result -- ^ the generated parser
-genParser us = foldl (<|>) empty (G.genUsageParser <$> us)
+genParser us = foldl (<|>) empty (P.try <<< G.genUsageParser <$> us)
 
 -- | Run a parser against user input.
 runParser :: D.Env                      -- ^ the user input
