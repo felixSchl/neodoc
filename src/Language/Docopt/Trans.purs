@@ -40,6 +40,7 @@ instance showKey :: Show Key where
     maybe "" (\c -> fromChar c ++ ", ") o.flag
       ++ maybe "" id o.name
   show (Key { arg: (D.Positional n _) }) = n
+  show (Key { arg: (D.Command n) }) = n
   show _ = "invalid" -- XXX
 
 instance ordKey :: Ord Key where
@@ -53,6 +54,8 @@ instance eqKey :: Eq Key where
       go (D.Option (O.Option { flag=f,  name=n  }))
          (D.Option (O.Option { flag=f', name=n' }))
          = (f == f') && (n == n')
+      go (D.Command n) (D.Command n')
+         = n == n'
       go a b = a == b
 
 key :: D.Argument -> Key
@@ -102,7 +105,6 @@ reduce us env _ vs =
     applyValues vm as = Map.fromFoldableWith resolveArg
       $ catMaybes
       $ as <#> \a -> Tuple (key a) <$> (getValue vm a <|> getFallback a)
-
 
     resolveArg :: D.Value -> D.Value -> D.Value
     resolveArg v v' = D.ArrayValue $ valIntoArray v' ++ valIntoArray v
@@ -174,6 +176,8 @@ reduce us env _ vs =
     getDefaultValue (D.Positional _ r)
       = if r then return $ D.ArrayValue []
              else Nothing
+    getDefaultValue (D.Command _)
+      = return $ D.BoolValue false
     getDefaultValue (D.EOA) = Just $ D.ArrayValue []
     getDefaultValue _ = Nothing
 
