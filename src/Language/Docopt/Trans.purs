@@ -85,9 +85,16 @@ reduce :: List D.Usage       -- ^ the program specification
        -> D.Branch           -- ^ the matched specification
        -> List ValueMapping  -- ^ the parse result
        -> Map String D.Value -- ^ the output set of (arg => val)
-reduce us env _ vs =
+reduce us env b vs =
   let vm = Map.fromFoldableWith resolveArg $ lmap key <$> (prepare <$> vs)
-      m  = reduceUsages us # applyValues vm
+    -- XXX: The following creation of a list of usages is looking funny because
+    --      originally this implementation would collect values across all
+    --      usage patterns (`us`). However, the new implementation only
+    --      considers the branch the user actually matched. Potentially, both
+    --      approaches could be combined? The problem with going cross-usage is
+    --      that arguments present in multiple usage patterns would falsy be
+    --      identified as repeating.
+      m  = reduceUsages (singleton $ D.Usage (singleton b)) # applyValues vm
     in expandMap m
   where
 
