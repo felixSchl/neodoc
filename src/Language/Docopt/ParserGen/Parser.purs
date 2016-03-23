@@ -469,7 +469,7 @@ genBranchParser (D.Branch xs) = do
           if score == 0
               then return $ singleton (snd result)
               else do
-                xs <- goR
+                xs <- goR <|> pure Nil
                 return $ (snd result) : xs
 
         go :: Parser (List ValueMapping)
