@@ -913,78 +913,91 @@ $ prog --a
 # """
 # $ prog
 # {"<a>": null, "<b>": null}
-# 
-# #
-# # Option's argument should not capture default value from usage pattern
-# #
-# 
-# r"""usage: prog [--file=<f>]"""
-# $ prog
-# {"--file": null}
-# 
-# r"""usage: prog [--file=<f>]
-# 
-# options: --file <a>
-# 
-# """
-# $ prog
-# {"--file": null}
-# 
-# r"""Usage: prog [-a <host:port>]
-# 
-# Options: -a, --address <host:port>  TCP address [default: localhost:6283].
-# 
-# """
-# $ prog
-# {"--address": "localhost:6283"}
-# 
-# #
-# # If option with argument could be repeated,
-# # its arguments should be accumulated into a list
-# #
-# 
-# r"""usage: prog --long=<arg> ..."""
-# 
-# $ prog --long one
-# {"--long": ["one"]}
-# 
-# $ prog --long one --long two
-# {"--long": ["one", "two"]}
-# 
-# #
-# # Test multiple elements repeated at once
-# #
+#
+#
+# Option's argument should not capture default value from usage pattern
+#
+
+r"""usage: prog [--file=<f>]"""
+$ prog
+{}
+
+r"""usage: prog [--file=<f>]
+
+options: --file <a>
+
+"""
+$ prog
+{}
+
+r"""
+Usage: prog [-a <host:port>]
+
+Options: -a, --address <host:port>  TCP address [default: localhost:6283].
+
+"""
+
+# Note: This implementation will also complete the alias.
+# Original: {"--address": "localhost:6283"}
+$ prog
+{"--address": "localhost:6283",
+ "-a": "localhost:6283"}
+
+#
+# If option with argument could be repeated,
+# its arguments should be accumulated into a list
+#
+
+r"""usage: prog --long=<arg> ..."""
+
+$ prog --long one
+{"--long": ["one"]}
+
+$ prog --long one --long two
+{"--long": ["one", "two"]}
+
+#
+# Test multiple elements repeated at once
+#
 # 
 # r"""usage: prog (go <direction> --speed=<km/h>)..."""
 # $ prog  go left --speed=5  go right --speed=9
-# {"go": 2, "<direction>": ["left", "right"], "--speed": ["5", "9"]}
-# 
-# #
-# # Required options should work with option shortcut
-# #
-# 
-# r"""usage: prog [options] -a
-# 
-# options: -a
-# 
-# """
-# $ prog -a
-# {"-a": true}
-# 
-# #
-# # If option could be repeated its defaults should be split into a list
-# #
-# 
-# r"""usage: prog [-o <o>]...
-# 
-# options: -o <o>  [default: x]
-# 
-# """
-# $ prog -o this -o that
-# {"-o": ["this", "that"]}
-# 
-# $ prog
-# {"-o": ["x"]}
+# {"go": 2,
+#  "<direction>": ["left", "right"],
+#  "--speed": ["5", "9"]
+#  }
+#
+#
+# Required options should work with option shortcut
+#
+# XXX: This test currently passes and requires further
+#      consideration. Should the option descriptions
+#      merge with the input? Currently they simply
+#      expand in-place during solving, causing `-a -a`
+#      to expand into an array.
+
+r"""usage: prog [options] -a
+
+options: -a
+
+"""
+$ prog -a
+{"-a": true}
+
+#
+# If option could be repeated its defaults should be split into a list
+#
+
+r"""usage: prog [-o <o>]...
+
+options: -o <o>  [default: x]
+
+"""
+$ prog -o this -o that
+{"-o": ["this", "that"]}
+
+$ prog
+{"-o": ["x"]}
 
 r"""usage: prog [-o <o>]...
 
