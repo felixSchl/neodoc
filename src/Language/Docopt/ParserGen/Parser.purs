@@ -248,7 +248,10 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 
 -- | Generate a parser for a single program usage.
 genUsageParser :: D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
-genUsageParser (D.Usage xs) = genBranchesParser xs <* eof
+genUsageParser (D.Usage xs) = do
+  r <- _.result <<< unScoredResult <$> genBranchesParser xs
+  eof
+  return r
 
 -- | Fold over a list of parsers, applying each in turn onto the result of the
 -- | previous, keeping both errors and results. Each application of a branches
@@ -258,7 +261,7 @@ genUsageParser (D.Usage xs) = genBranchesParser xs <* eof
 -- | fails if no branch was parsed.
 
 genBranchesParser :: List D.Branch
-                  -> Parser (Tuple D.Branch (List ValueMapping))
+                  -> Parser (ScoredResult (Tuple D.Branch (List ValueMapping)))
 genBranchesParser xs = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
   env :: D.Env <- ask
   let ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> genBranchParser x
@@ -280,12 +283,12 @@ genBranchesParser xs = P.ParserT \(s@(P.PState { input: i, position: pos })) -> 
         (\_ ->
           -- XXX: The following needs review. Is this safe? correct?
           let h = LU.head zs
-            in h { result = Right <<< _.result <<< unScoredResult $ h.result }
+           in h { result = Right h.result }
         )
         (\e -> e { result = Left e.result })
         (head $ mlefts rs)
     )
-    (\r -> r { result = Right <<< _.result <<< unScoredResult $ r.result })
+    (\r -> r { result = Right r.result })
     (maximumBy (compare `on` _.result) as)
   where
     collect s ps = ps `flip traverse` \p -> P.unParserT p s >>= \o ->
@@ -456,22 +459,25 @@ genBranchParser (D.Branch xs) = do
     genParser x@(D.Group optional bs repeated) = do
       vs <- concat <$>
           let mod    = if optional then P.try >>> P.option mempty else \p -> p
-              parser = if repeated then many go else singleton <$> go
+              parser = if repeated then goR else singleton <$> go
           in mod parser
       return $ scoreFromList vs
       where
-        go =
-          -- If the group is repeatable, make each element repeatable.
-          -- This is because groups do not produce keys themselves and only
-          -- yield values, hence i.o for groups to be useful, this expansion
-          -- needs to take place.
-          let bs' = if not repeated
-                      then bs
-                      else (D.Branch <<< ((flip D.setRepeatable true) <$>)
-                                     <<< D.runBranch) <$> bs
-          in if length bs' > 0
-                    then snd <$> genBranchesParser bs'
-                    else return mempty
+        goR :: Parser (List (List ValueMapping))
+        goR = do
+          {score, result} <- unScoredResult <$> genBranchesParser bs
+          if score == 0
+              then return $ singleton (snd result)
+              else do
+                xs <- goR
+                return $ (snd result) : xs
+
+        go :: Parser (List ValueMapping)
+        go = if length bs == 0
+                  then return mempty
+                  else do
+                    snd <<< _.result <<<  unScoredResult
+                      <$> genBranchesParser bs
 
     isFree :: D.Argument -> Boolean
     isFree (D.Option _)     = true
