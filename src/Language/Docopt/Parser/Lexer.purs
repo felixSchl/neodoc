@@ -274,7 +274,7 @@ parseToken = P.choice
     name <- fromCharArray <$> do
       A.some $ P.choice [
         identLetter
-      , P.oneOf [ '-', '|', ':', '[', ']', '(', ')' ]
+      , P.oneOf [ '-', '|', ':', '[', ']', '(', ')', ' ' ]
       ]
     P.char '>'
     pure name
