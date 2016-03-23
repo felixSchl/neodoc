@@ -8,7 +8,7 @@ import Control.Apply ((*>), (<*))
 import Control.Monad.State (get)
 import Control.MonadPlus (guard)
 import Control.Monad.Trans (lift)
-import Data.List (List(..), some, (:), toList, length
+import Data.List (List(..), some, (:), toList, length, fromList
                  , singleton, many, head, catMaybes, filter)
 import Text.Parsing.Parser as P
 import Text.Parsing.Parser.Combinators as P
@@ -18,7 +18,7 @@ import Data.Foldable (intercalate)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe, maybe', isJust)
 import Data.Generic
-import Data.String (toLower, fromChar)
+import Data.String (toLower, fromChar, fromCharArray)
 import Data.Array as A
 import Data.String as Str
 
@@ -207,7 +207,25 @@ descParser =
             , arg = do
                 (Argument arg) <- opt.arg
                 return $ Argument $ arg {
-                  default = StringValue <$> default
+                  default = do
+                    d <- default
+                    either (const Nothing) Just do
+                      P.runParser d do
+                        xs <- flip P.sepBy1 (some $ P.char ' ') do
+                          fromCharArray <<< fromList <$> do
+                            P.choice $ P.try <$> [
+                              P.between (P.char '"')
+                                        (P.char '"')
+                                        (many $ P.noneOf ['"'])
+                            , P.between (P.char '\'')
+                                        (P.char '\'')
+                                        (many $ P.noneOf ['\''])
+                            , many $ P.noneOf [' ']
+                            ]
+
+                        return $ case xs of
+                          Cons x Nil -> StringValue x
+                          xs         -> ArrayValue $ StringValue <$> fromList xs
                 }
             }
 
