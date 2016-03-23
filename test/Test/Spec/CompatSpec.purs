@@ -107,10 +107,10 @@ parseUniversalDocoptTests = do
                           A.many $ P.noneOf [ '"' ]
                 P.skipSpaces *> P.char ':' <* P.skipSpaces
                 Tuple key <$> value
-          , P.string "\"user-error\""
-              *> many (P.char ' ')
-              *> P.optional comment
-              *> return (Left "user-error")
+        , P.string "\"user-error\""
+            *> many (P.char ' ')
+            *> P.optional comment
+            *> return (Left "user-error")
         ]
       P.skipSpaces *> skipComments *>  P.skipSpaces
       return $ Tuple input output
