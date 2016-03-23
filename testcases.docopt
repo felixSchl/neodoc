@@ -496,29 +496,30 @@ $ prog
 "user-error"
 
 
-# XXX: NOT SUPPORTED RIGHT NOW:
+# XXX: Currently unsupported
+# This requires changes to the usage parser to mark adjacent
+# positionals as repeating
 #
 # r"""usage: prog [<name> <name>]"""
 # $ prog 10 20
-# {"<name>": ["10", "20"]}
-# 
+# {"<name>": ["10", "20"], "NAME": ["10", "20"]}
+#
 # $ prog 10
-# {"<name>": ["10"]}
-# 
+# {"<name>": ["10"], "NAME": ["10"]}
+#
 # $ prog
-# {"<name>": []}
-# 
-# 
+# {"<name>": [], "NAME": []}
+#
+#
 # r"""usage: prog [(<name> <name>)]"""
 # $ prog 10 20
-# {"<name>": ["10", "20"]}
-# 
+# {"<name>": ["10", "20"], "NAME": ["10", "20"]}
+#
 # $ prog 10
 # "user-error"
-# 
-# $ prog
-# {"<name>": []}
 
+$ prog
+{"<name>": []}
 
 r"""usage: prog NAME..."""
 $ prog 10 20
@@ -565,37 +566,36 @@ $ prog
 {"<name>": [], "NAME": []}
 
 
-# r"""usage: prog (NAME | --foo NAME)
-# 
-# options: --foo
-# 
-# """
-# $ prog 10
-# {"NAME": "10", "--foo": false}
-# 
-# $ prog --foo 10
-# {"NAME": "10", "--foo": true}
-# 
-# $ prog --foo=10
-# "user-error"
-# 
-# 
-# r"""usage: prog (NAME | --foo) [--bar | NAME]
-# 
-# options: --foo
-# options: --bar
-# 
-# """
-# $ prog 10
-# {"NAME": ["10"], "--foo": false, "--bar": false}
-# 
-# $ prog 10 20
-# {"NAME": ["10", "20"], "--foo": false, "--bar": false}
-# 
-# $ prog --foo --bar
-# {"NAME": [], "--foo": true, "--bar": true}
-# 
-# 
+r"""usage: prog (NAME | --foo NAME)
+
+options: --foo
+
+"""
+$ prog 10
+{"--foo": false, "<name>": "10", "NAME": "10"}
+
+#$ prog --foo 10
+#{"--foo": true, "<name>": "10", "NAME": "10"}
+#
+#$ prog --foo=10
+#"user-error"
+
+r"""usage: prog (NAME | --foo) [--bar | NAME]
+
+options: --foo
+options: --bar
+
+"""
+$ prog 10
+{"--bar": false, "--foo": false, "<name>": ["10"], "NAME": ["10"]}
+
+#$ prog 10 20
+#{"--bar": false, "--foo": false, "<name>": ["10", "20"], "NAME": ["10", "20"]}
+#
+#$ prog --foo --bar
+#{"--bar": true, "--foo": true, "<name>": [], "NAME": []}
+#
+#
 # r"""Naval Fate.
 # 
 # Usage:

@@ -9,6 +9,7 @@ module Language.Docopt.Argument (
   , runBranch
   , isRepeatable
   , setRepeatable
+  , setRepeatableOr
   , hasDefault
   , getEnvKey
   , hasEnvBacking
@@ -109,6 +110,12 @@ setRepeatable :: Argument -> Boolean -> Argument
 setRepeatable (Option (O.Option o)) r = Option $ O.Option $ o { repeatable = r }
 setRepeatable (Positional n _)      r = (Positional n r)
 setRepeatable x                     _ = x
+
+setRepeatableOr :: Argument -> Boolean -> Argument
+setRepeatableOr (Option (O.Option o)) r
+  = Option $ O.Option $ o { repeatable = o.repeatable || r }
+setRepeatableOr (Positional n r) r' = (Positional n (r || r'))
+setRepeatableOr x _ = x
 
 hasDefault :: Argument -> Boolean
 hasDefault (Option o) = O.hasDefault o
