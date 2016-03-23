@@ -60,11 +60,13 @@ docoptScanner = do
     usageSection :: P.Parser String String
     usageSection = "usage section" <??> do
       label <- sectionLabel
-      guard $ (toLower label) == "usage"
+
+      (guard $ endsWith "usage" $ toLower label)
+        <?> "section label ending in \"usage\". E.g.: \"Program Usage:\""
+
       fromCharArray <<< fromList <$> do
         P.manyTill P.anyChar
                     ((void $ P.lookAhead optionSection) <|> P.eof)
-
 
     optionSection :: P.Parser String String
     optionSection = "option section" <??> do
