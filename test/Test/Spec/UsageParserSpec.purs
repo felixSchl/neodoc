@@ -49,7 +49,7 @@ usageParserSpec = \_ ->
     it "should parse commands" do
       vliftEff do
         usage <- runEitherEff do
-          toks <- Lexer.lex "foo bar"
+          toks <- Lexer.lexUsage "foo bar"
           U.parse toks
         assertEqual 1 (length usage)
         (U.Usage _ u) <- runMaybeEff $ usage !! 0
@@ -183,7 +183,7 @@ usageParserSpec = \_ ->
                     foo (bar qux)
               NOT PART OF SECTION
               """
-          toks <- Lexer.lex docopt.usage
+          toks <- Lexer.lexUsage docopt.usage
           U.parse toks
         assertEqual 2 (length usage)
 
@@ -233,7 +233,7 @@ usageParserSpec = \_ ->
                 ++ intercalate "\n" (U.prettyPrintUsage <$> expected'))  do
               vliftEff do
                 usages <- runEitherEff do
-                  Lexer.lex input >>= U.parse
+                  Lexer.lexUsage input >>= U.parse
                 flip assertEqual
                   (U.prettyPrintUsage <$> usages)
                   (U.prettyPrintUsage <$> expected')
@@ -242,7 +242,7 @@ usageParserSpec = \_ ->
             vliftEff do
               assertThrows (const true) do
                 runEitherEff do
-                  toks  <- Lexer.lex input
+                  toks  <- Lexer.lexUsage input
                   usage <- U.parse toks
                   debug usage
 
@@ -260,7 +260,7 @@ usageParserSpec = \_ ->
                 it (input ++ " -> " ++ U.prettyPrintArg expected)  do
                   vliftEff do
                     usage <- runEitherEff do
-                      Lexer.lex input >>= U.parse
+                      Lexer.lexUsage input >>= U.parse
 
                     -- There should only be one top-level mutex group
                     assertEqual 1 (length usage)
@@ -274,6 +274,6 @@ usageParserSpec = \_ ->
                 vliftEff do
                   assertThrows (const true) do
                     runEitherEff do
-                      toks  <- Lexer.lex input
+                      toks  <- Lexer.lexUsage input
                       usage <- U.parse toks
                       debug usage

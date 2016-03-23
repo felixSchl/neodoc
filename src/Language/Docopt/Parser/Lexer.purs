@@ -29,8 +29,24 @@ import Data.Int
 import Data.Int as I
 import Global (isNaN, readFloat)
 
-lex :: String -> Either P.ParseError (List PositionedToken)
-lex = flip P.runParser parseTokens
+data Mode = Usage | Descriptions
+
+isDescMode :: Mode -> Boolean
+isDescMode Descriptions = true
+isDescMode _ = false
+
+isUsageMode :: Mode -> Boolean
+isUsageMode Usage = true
+isUsageMode _ = false
+
+lex :: Mode -> String -> Either P.ParseError (List PositionedToken)
+lex m = flip P.runParser (parseTokens m)
+
+lexDescs :: String -> Either P.ParseError (List PositionedToken)
+lexDescs = lex Descriptions
+
+lexUsage :: String -> Either P.ParseError (List PositionedToken)
+lexUsage = lex Usage
 
 data NumberLiteral = FloatLiteral Number | IntLiteral Int
 
@@ -134,45 +150,47 @@ instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
     (show tok) ++ " at " ++ (show pos)
 
-parseTokens :: P.Parser String (L.List PositionedToken)
-parseTokens = do
+parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
+parseTokens m = do
   P.skipSpaces
-  L.many parsePositionedToken
+  L.many $ parsePositionedToken m
   <* P.eof
 
-parsePositionedToken :: P.Parser String PositionedToken
-parsePositionedToken = P.try $ do
+parsePositionedToken :: Mode -> P.Parser String PositionedToken
+parsePositionedToken m = P.try $ do
   pos <- getPosition
-  tok <- parseToken
+  tok <- parseToken m
   return $ PositionedToken { sourcePos: pos, token: tok }
 
-parseToken :: P.Parser String Token
-parseToken = P.choice
-  [ P.try $ P.char   '('   *> pure LParen
-  , P.try $ P.char   ')'   *> pure RParen
-  , P.try $ tag
-  , P.try $ reference
-  , P.try $ P.char   '['   *> pure LSquare
-  , P.try $ P.char   ']'   *> pure RSquare
-  , P.try $ P.char   '|'   *> pure VBar
-  , P.try $ P.char   ':'   *> pure Colon
-  , P.try $ P.char   ','   *> pure Comma
-  , P.try $ longOption
-  , P.try $ shortOption
-  , P.try $ AngleName <$> angleName
-  , P.try $ P.char   '<'   *> pure LAngle
-  , P.try $ P.char   '>'   *> pure RAngle
-  , P.try $ P.string "--"  *> pure DoubleDash
-  , P.try $ P.char   '-'   *> pure Dash
-  , P.try $ P.char   '='   *> pure Equal
-  , P.try $ P.string "..." *> pure TripleDot
-  , P.try $ numberLiteral
-  , P.try $ stringLiteral
-  , P.try $ ShoutName <$> (shoutName <* P.notFollowedBy alpha)
-  , P.try $ Name      <$> (name      <* P.notFollowedBy alpha)
-  , P.try $ Word      <$> (word      <* space)
-  , P.try $ Garbage   <$> P.anyChar
-  ]
+parseToken :: Mode -> P.Parser String Token
+parseToken m = P.choice (P.try <$> A.concat [
+    [ P.char   '('   *> pure LParen
+    , P.char   ')'   *> pure RParen
+    ]
+  , if isDescMode m then [ tag ] else []
+  , [ reference
+    , P.char   '['   *> pure LSquare
+    , P.char   ']'   *> pure RSquare
+    , P.char   '|'   *> pure VBar
+    , P.char   ':'   *> pure Colon
+    , P.char   ','   *> pure Comma
+    , longOption
+    , shortOption
+    , AngleName <$> angleName
+    , P.char   '<'   *> pure LAngle
+    , P.char   '>'   *> pure RAngle
+    , P.string "--"  *> pure DoubleDash
+    , P.char   '-'   *> pure Dash
+    , P.char   '='   *> pure Equal
+    , P.string "..." *> pure TripleDot
+    , numberLiteral
+    , stringLiteral
+    , ShoutName <$> (shoutName <* P.notFollowedBy alpha)
+    , Name      <$> (name      <* P.notFollowedBy alpha)
+    , Word      <$> (word      <* space)
+    , Garbage   <$> P.anyChar
+    ]
+  ])
   <* P.skipSpaces
 
  where
@@ -274,7 +292,9 @@ parseToken = P.choice
     name <- fromCharArray <$> do
       A.some $ P.choice [
         identLetter
-      , P.oneOf [ '-', '|', ':', '[', ']', '(', ')', ' ' ]
+        -- XXX: how to make this more generic?
+        --      `noneOf [ '>' ]` seems to overflow the stack
+      , P.oneOf [ '-', '|', ':', '[', ']', '(', ')', ' ', '/' ]
       ]
     P.char '>'
     pure name

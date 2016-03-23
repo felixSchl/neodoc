@@ -76,7 +76,7 @@ usageParser = do
           moreIndented *> L.doubleDash
           return $ Just EOA
       , (do
-          L.eof <|> (P.lookAhead $ lessIndented)
+          L.eof <|> (P.lookAhead $ lessIndented <|> sameIndent)
           return Nothing
         )
         -- XXX: We could show the last token that failed to be consumed, here
@@ -165,4 +165,4 @@ parse :: (List L.PositionedToken) -> Either P.ParseError (List Usage)
 parse = flip L.runTokenParser usageParser
 
 run :: String -> Either P.ParseError (List Usage)
-run x = parse =<< L.lex x
+run x = parse =<< L.lexUsage x

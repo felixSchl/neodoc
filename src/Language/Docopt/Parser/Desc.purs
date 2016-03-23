@@ -26,7 +26,7 @@ import Language.Docopt.Value
 import Language.Docopt.Parser.Base
 import Language.Docopt.Parser.Common
 import Language.Docopt.Parser.State
-import Language.Docopt.Parser.Lexer (lex)
+import Language.Docopt.Parser.Lexer (lexDescs)
 import Language.Docopt.Parser.Lexer as L
 
 data Desc = OptionDesc Option
@@ -148,7 +148,7 @@ argument name default = Argument { name:    name
                                  }
 
 run :: String -> Either P.ParseError (List Desc)
-run x = lex x >>= parse
+run x = lexDescs x >>= parse
 
 parse :: (List L.PositionedToken) -> Either P.ParseError (List Desc)
 parse = flip L.runTokenParser descParser

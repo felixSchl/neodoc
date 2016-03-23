@@ -142,7 +142,7 @@ descParserSpec = \_ ->
                 (\out -> "should succeed with:\n" ++
                   (intercalate "\n" $ Desc.prettyPrintDesc <$> out))
                 output)) do
-        vliftEff $ evaltest (Desc.parse =<< Lexer.lex input) output
+        vliftEff $ evaltest (Desc.parse =<< Lexer.lexDescs input) output
 
     evaltest (Left (P.ParseError { message: msg })) (Left msg')
       = if msg == msg'
