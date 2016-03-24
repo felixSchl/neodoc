@@ -134,6 +134,12 @@ positional n = token go P.<?> "positional argument " ++ show n
     go (Lit v) = Just (D.StringValue v)
     go _       = Nothing
 
+dash :: Parser D.Value
+dash = token go P.<?> "stdin flag"
+  where
+    go (Lit v) | v == "-" = Just (D.BoolValue true)
+    go _                  = Nothing
+
 type HasConsumedArg = Boolean
 data OptParse = OptParse D.Value (Maybe Token) HasConsumedArg
 
@@ -423,9 +429,7 @@ genBranchParser (D.Branch xs) = do
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) = (do
       scoreFromList <<< singleton <<< Tuple x <$> do
-        -- stdin always succeeds, as it is not actually an argument on argv.
-        -- XXX: Should docopt check `process.stdin.isTTY` at this stage, or
-        --      even at all?
+        dash
         return (D.BoolValue true)
       ) P.<?> "stdin: \"-\""
 

@@ -108,7 +108,7 @@ reduce us env b vs =
         $ Map.toList m
             <#> \(Tuple (Key { arg: a }) v) ->
                     let v' =
-                        if D.isFlag a
+                        if D.isFlag a || D.isCommand a
                           then case v of
                             D.ArrayValue xs ->
                               D.IntValue (A.length $ flip A.filter xs \x ->
@@ -195,8 +195,8 @@ reduce us env b vs =
     getDefaultValue (D.Positional _ r)
       = if r then return $ D.ArrayValue []
              else Nothing
-    getDefaultValue (D.Command _)
-      = return $ D.BoolValue false
+    getDefaultValue (D.Command _) = return $ D.BoolValue false
+    getDefaultValue (D.Stdin) = return $ D.BoolValue false
     getDefaultValue (D.EOA) = Just $ D.ArrayValue []
     getDefaultValue _ = Nothing
 

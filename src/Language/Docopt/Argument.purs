@@ -16,6 +16,7 @@ module Language.Docopt.Argument (
   , takesArgument
   , isOption
   , isFlag
+  , isCommand
   , opt',   opt,   optR,   opt_,   optR_
   , lopt',  lopt,  loptR,  lopt_,  loptR_
   , sopt',  sopt,  soptR,  sopt_,  soptR_
@@ -135,6 +136,10 @@ hasEnvBacking p env = maybe false id $ flip Env.member env <$> getEnvKey p
 isFlag :: Argument -> Boolean
 isFlag (Option o) = O.isFlag o
 isFlag _          = false
+
+isCommand :: Argument -> Boolean
+isCommand (Command _) = true
+isCommand _           = false
 
 isOption :: Argument -> Boolean
 isOption (Option _) = true
