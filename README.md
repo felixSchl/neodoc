@@ -16,8 +16,8 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 > Overview of the short- and longterm goals of this project
 
 * Provide a declarative way to author command lines. Rather than deriving the
-  help text from some DSL, derive it from a human readable, prose-like EDSL,
-  located e.g. in the project's README. **This guarantees documentation and
+  help text from some EDSL, derive the CLI from a human readable, prose-like help
+  text, located e.g. in the project's README. **This guarantees documentation and
   implementation never diverge, because they simply can't.**
 * Provide **very good error reporting** for users of the CLI and at least decent
   error reporting for developers authoring the docopt text.
