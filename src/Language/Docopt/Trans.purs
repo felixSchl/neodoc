@@ -116,7 +116,7 @@ reduce us env b vs =
                                       D.BoolValue b | b -> true
                                       _ -> false
                               )
-                            _               -> D.BoolValue true
+                            _ -> v
                           else v
                      in flip Tuple v' <$> (toList $ toKeys a)
 
