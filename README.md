@@ -71,6 +71,13 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
     1. User input (per `process.argv`)
     1. Environment variables (per `[env: ...]` tag)
     1. Option defaults (per `[default: ...]` tag)
+* Program usage lines can span multiple lines:
+  ```sh
+  Usage: prog
+         prog <a> <b>
+         prog --input-file --output-file
+              --mute
+  ```
 
 ## Project status ##
 
