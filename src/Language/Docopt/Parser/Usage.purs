@@ -64,13 +64,16 @@ usageParser = do
   markIndent' startCol $ do
     Cons
     <$> (usageLine name)
-    <*> many do program *> usageLine name
+    <*> many do
+          P.try do
+            program
+            usageLine name
 
   where
 
     usageLine :: String -> L.TokenParser Usage
     usageLine name = Usage name <$> do
-      xs  <- (many $ moreIndented *> elem) `P.sepBy1` L.vbar
+      xs <- (many $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
       eoa <- P.choice [
         P.try $ do
           moreIndented *> L.doubleDash
