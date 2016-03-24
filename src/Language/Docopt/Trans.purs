@@ -103,10 +103,22 @@ reduce us env b vs =
     prepare k = k
 
     expandMap :: Map Key D.Value -> Map String D.Value
-    expandMap m = Map.fromFoldable $ concat
-                    $ Map.toList m
-                        <#> \(Tuple (Key { arg: a }) v) ->
-                                flip Tuple v <$> (toList $ toKeys a)
+    expandMap m =
+      Map.fromFoldable $ concat
+        $ Map.toList m
+            <#> \(Tuple (Key { arg: a }) v) ->
+                    let v' =
+                        if D.isFlag a
+                          then case v of
+                            D.ArrayValue xs ->
+                              D.IntValue (A.length $ flip A.filter xs \x ->
+                                case x of
+                                      D.BoolValue b | b -> true
+                                      _ -> false
+                              )
+                            _               -> D.BoolValue true
+                          else v
+                     in flip Tuple v' <$> (toList $ toKeys a)
 
     applyValues :: Map Key D.Value -> List D.Argument -> Map Key D.Value
     applyValues vm as = Map.fromFoldableWith resolveArg

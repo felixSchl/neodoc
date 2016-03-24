@@ -21,6 +21,7 @@ import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
 import Data.Foldable (foldl, for_, intercalate)
 import Text.Wrap (dedent)
 import Control.Monad.Aff (launchAff)
+import Data.Maybe.Unsafe (fromJust)
 
 import Test.Assert (assert)
 import Test.Spec (Spec(), describe, it)
@@ -52,6 +53,7 @@ import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.Plus (empty)
 import Data.Array as A
+import Data.Int as Int
 
 newtype Test = Test {
   doc   :: String
@@ -130,15 +132,15 @@ parseUniversalDocoptTests = do
               P.skipSpaces
               flip P.sepBy (P.skipSpaces *> P.char ',' *> P.skipSpaces) do
                 value
-        , D.NumberValue <$> do
-            xs  <- fromCharArray <$> A.some digit
+        , do
+            xs <- fromCharArray <$> A.some digit
             P.choice [
-              readFloat <$> do
+              D.FloatValue <<< readFloat <$> do
                 xss <- do
                   P.char '.'
                   fromCharArray <$> A.some digit
                 return $ xs ++ "." ++ xss
-            , return $ readInt 10 xs
+            , return $ D.IntValue $ fromJust $ Int.fromString xs
             ]
         ]
 
