@@ -25,7 +25,7 @@ type IsRepeatable = Boolean
 type IsOptional = Boolean
 type Branch = List Argument
 data Argument
-  = Command     String
+  = Command     String IsRepeatable
   | Positional  String IsRepeatable
   | Option      O.LOpt
   | OptionStack O.SOpt
@@ -38,8 +38,8 @@ instance showArgument :: Show Argument where
   show (EOA)            = "--"
   show (Stdin)          = "-"
   show (Reference r)    = "Reference " ++ r
-  show (Command n)      = "Command " ++ n
-  show (Positional n b) = "Positional " ++ n ++ " " ++ show b
+  show (Command n r)    = "Command " ++ n ++ show r
+  show (Positional n r) = "Positional " ++ n ++ " " ++ show r
   show (Option o)       = "Option " ++ show o
   show (OptionStack o)  = "OptionStack " ++ show o
   show (Group n b o)    = "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
@@ -47,7 +47,7 @@ instance showArgument :: Show Argument where
 instance eqArgument :: Eq Argument where
   eq (Stdin)          (Stdin)            = true
   eq (EOA)            (EOA)              = true
-  eq (Command s)      (Command s')       = (s == s')
+  eq (Command s r)    (Command s' r')    = (s == s') && (r == r')
   eq (Positional s r) (Positional s' r') = (s == s') && (r == r')
   eq (Option o)       (Option o')        = o == o'
   eq (Group b xs r)   (Group b' xs' r')  = (b == b') && (xs == xs') && (r == r')
@@ -59,7 +59,8 @@ prettyPrintBranch :: Branch -> String
 prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
 
 prettyPrintArg :: Argument -> String
-prettyPrintArg (Command n) = n
+prettyPrintArg (Command n r)
+  = n ++ if r then "..." else ""
 prettyPrintArg (Positional n r)
   = n ++ if r then "..." else ""
 prettyPrintArg (Option o) = O.prettyPrintLOpt o
@@ -112,7 +113,7 @@ stdin = Stdin
 
 -- short hand to create a command node
 co :: String -> Argument
-co = Command
+co n = Command n false
 
 -- short hand to create a positional node
 po :: String -> Argument

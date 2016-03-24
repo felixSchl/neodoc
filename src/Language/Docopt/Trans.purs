@@ -40,7 +40,7 @@ instance showKey :: Show Key where
     maybe "" (\c -> fromChar c ++ ", ") o.flag
       ++ maybe "" id o.name
   show (Key { arg: (D.Positional n _) }) = n
-  show (Key { arg: (D.Command n) }) = n
+  show (Key { arg: (D.Command n _) }) = n
   show _ = "invalid" -- XXX
 
 instance ordKey :: Ord Key where
@@ -54,7 +54,7 @@ instance eqKey :: Eq Key where
       go (D.Option (O.Option { flag=f,  name=n  }))
          (D.Option (O.Option { flag=f', name=n' }))
          = (f == f') && (n == n')
-      go (D.Command n) (D.Command n')
+      go (D.Command n _) (D.Command n' _)
          = n == n'
       go a b = a == b
 
@@ -116,6 +116,10 @@ reduce us env b vs =
                                       D.BoolValue b | b -> true
                                       _ -> false
                               )
+                            D.BoolValue b ->
+                              if D.isRepeatable a
+                                 then if b then D.IntValue 1 else D.IntValue 0
+                                 else v
                             _ -> v
                           else v
                      in flip Tuple v' <$> (toList $ toKeys a)
@@ -195,7 +199,9 @@ reduce us env b vs =
     getDefaultValue (D.Positional _ r)
       = if r then return $ D.ArrayValue []
              else Nothing
-    getDefaultValue (D.Command _) = return $ D.BoolValue false
+    getDefaultValue (D.Command _ r)
+      = if r then return $ D.ArrayValue [ D.BoolValue false ]
+             else return $ D.BoolValue false
     getDefaultValue (D.Stdin) = return $ D.BoolValue false
     getDefaultValue (D.EOA) = Just $ D.ArrayValue []
     getDefaultValue _ = Nothing
@@ -204,7 +210,7 @@ reduce us env b vs =
 -- | This key is what the user will use to check the value of
 -- | a mathed argument.
 toKeys :: D.Argument -> Array String
-toKeys (D.Command n)      = [n]
+toKeys (D.Command n _)    = [n]
 toKeys (D.Positional n _) = [ "<" ++ Str.toLower n ++ ">"
                             , Str.toUpper n
                             ]

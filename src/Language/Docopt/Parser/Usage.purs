@@ -130,10 +130,9 @@ usageParser = do
       <*> repetition
 
     command :: L.TokenParser Argument
-    command = do
-      cmd <- Command <$> L.name
-      P.notFollowedBy L.tripleDot -- Commands may not repeat!
-      pure cmd
+    command = Command
+      <$> L.name
+      <*> repetition
 
     group :: L.TokenParser Argument
     group = defer \_ -> P.choice

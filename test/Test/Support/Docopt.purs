@@ -9,7 +9,7 @@ import qualified Language.Docopt.Option as O
 
 -- short hand to create a Command
 co :: String -> Argument
-co = Command
+co n = Command n false
 
 -- short hand to create a Positional argument
 po :: String -> Argument

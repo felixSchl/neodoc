@@ -78,7 +78,7 @@ solveBranch as ds = Branch <$> go as
 
     solveArgs (U.EOA) _ = Unconsumed <<< singleton <$> return (EOA)
     solveArgs (U.Stdin) _ = Unconsumed <<< singleton <$> return (Stdin)
-    solveArgs (U.Command s) _ = Unconsumed <<< singleton <$> return (Command s)
+    solveArgs (U.Command s r) _ = Unconsumed <<< singleton <$> return (Command s r)
     solveArgs (U.Positional s r) _ = Unconsumed <<< singleton <$> return (Positional s r)
 
     solveArgs (U.Group o bs r) _
@@ -139,7 +139,7 @@ solveBranch as ds = Branch <$> go as
             arg' <- O.runArgument <$> x.arg
             case y of
               Just (U.Positional n r) | n == arg'.name -> return r
-              Just (U.Command n)      | n == arg'.name -> return false
+              Just (U.Command n r)    | n == arg'.name -> return r
               _                                        -> Nothing
 
       return $ (maybe Unconsumed (const Consumed) mr)
@@ -312,7 +312,7 @@ solveBranch as ds = Branch <$> go as
                     arg' <- O.runArgument <$> c.arg
                     case adj of
                         Just (U.Positional n r) | n ^= arg'.name -> return r
-                        Just (U.Command n)      | n ^= arg'.name -> return false
+                        Just (U.Command n r)    | n ^= arg'.name -> return r
                         _                                        -> Nothing
                in return $ (maybe Unconsumed (const Consumed) mr)
                     $ (toList cs)

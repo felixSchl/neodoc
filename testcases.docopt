@@ -772,29 +772,27 @@ $ prog go
 {"go": true}
 
 
-# XXX: For these tests to pass properly, commands must get a "repeated" flag.
-#
 # Note: Deviation: [go go] means both `go` are required!
 # Original:
 # r"""usage: prog [go go]"""
-# r"""usage: prog [go [go]]"""
-# $ prog
-# {"go": 0}
-#
-# $ prog go
-# {"go": 1}
-#
-# $ prog go go
-# {"go": 2}
-#
-# $ prog go go go
-# "user-error"
-#
-# r"""usage: prog go..."""
-# $ prog go go go go go
-# {"go": 5}
-#
-#
+r"""usage: prog [go [go]]"""
+$ prog
+{"go": 0}
+
+$ prog go
+{"go": 1}
+
+$ prog go go
+{"go": 2}
+
+$ prog go go go
+"user-error"
+
+r"""usage: prog go..."""
+$ prog go go go go go
+{"go": 5}
+
+
 # [options] does not include options from usage-pattern
 #
 # XXX: These tests do not pass yet. Not sure how to resolve.

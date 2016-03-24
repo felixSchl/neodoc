@@ -415,10 +415,11 @@ genBranchParser (D.Branch xs) = do
               -> Parser (ScoredResult (List ValueMapping))
 
     -- Generate a parser for a `Command` argument
-    genParser x@(D.Command n) = (do
-      scoreFromList <<< singleton <<< Tuple x <$> do
-        command n
+    genParser x@(D.Command n r) = (do
+      scoreFromList <$> do
+        if r then (some go) else (singleton <$> go)
       ) P.<?> "command: " ++ (show $ D.prettyPrintArg x)
+        where go = Tuple x <$> (command n)
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) = (do

@@ -54,7 +54,7 @@ usageParserSpec = \_ ->
         assertEqual 1 (length usage)
         (U.Usage _ u) <- runMaybeEff $ usage !! 0
         g <- runMaybeEff $ u !! 0
-        flip assertEqual g (Cons (U.Command "bar") Nil)
+        flip assertEqual g (Cons (U.Command "bar" false) Nil)
 
     -- Test positionals in various formats.
     -- Each entry is run for both singular and repeated version.
