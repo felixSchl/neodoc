@@ -58,19 +58,16 @@ usageParser :: L.TokenParser (List Usage)
 usageParser = do
 
   -- Calculate and mark the original program indentation.
-  -- XXX: This needs an update to check if the parser moved onto a new line
-  --      after consuming the "program". This happens when the program takes
-  --      no input and causes all sorts of trouble.
+  P.Position { column: startCol } <- L.nextTokPos
   name <- program
-  col' <- getCol
-  let startCol = col' - (Str.length name) - 1
-  markIndent' startCol $ do
-    Cons
-    <$> (usageLine name)
-    <*> many do
-          P.try do
-            program
-            usageLine name
+  markLine do
+    markIndent' startCol $ do
+      Cons
+      <$> (usageLine name)
+      <*> many do
+            P.try do
+              program
+              usageLine name
 
   where
 

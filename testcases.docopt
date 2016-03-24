@@ -758,164 +758,181 @@ $ prog -vvvv
 "user-error"
 
 
-# r"""usage: prog [--ver --ver]"""
-# $ prog --ver --ver
-# {"--ver": 2}
-# 
-# 
-# #
-# # Counting commands
-# #
-# 
-# r"""usage: prog [go]"""
-# $ prog go
-# {"go": true}
-# 
-# 
+r"""usage: prog [--ver --ver]"""
+$ prog --ver --ver
+{"--ver": 2}
+
+
+#
+# Counting commands
+#
+
+r"""usage: prog [go]"""
+$ prog go
+{"go": true}
+
+
+# XXX: For these tests to pass properly, commands must get a "repeated" flag.
+#
+# Note: Deviation: [go go] means both `go` are required!
+# Original:
 # r"""usage: prog [go go]"""
+# r"""usage: prog [go [go]]"""
 # $ prog
 # {"go": 0}
-# 
+#
 # $ prog go
 # {"go": 1}
-# 
+#
 # $ prog go go
 # {"go": 2}
-# 
+#
 # $ prog go go go
 # "user-error"
-# 
+#
 # r"""usage: prog go..."""
 # $ prog go go go go go
 # {"go": 5}
-# 
-# #
-# # [options] does not include options from usage-pattern
-# #
-# r"""usage: prog [options] [-a]
-# 
-# options: -a
-#          -b
-# """
-# $ prog -a
-# {"-a": true, "-b": false}
-# 
-# $ prog -aa
-# "user-error"
-# 
-# #
-# # Test [options] shourtcut
-# #
-# 
-# r"""Usage: prog [options] A
-# Options:
-#     -q  Be quiet
-#     -v  Be verbose.
-# 
-# """
-# $ prog arg
-# {"A": "arg", "-v": false, "-q": false}
-# 
-# $ prog -v arg
-# {"A": "arg", "-v": true, "-q": false}
-# 
-# $ prog -q arg
-# {"A": "arg", "-v": false, "-q": true}
-# 
-# #
-# # Test single dash
-# #
-# 
-# r"""usage: prog [-]"""
-# 
-# $ prog -
-# {"-": true}
-# 
-# $ prog
-# {"-": false}
-# 
-# #
-# # If argument is repeated, its value should always be a list
-# #
-# 
-# r"""usage: prog [NAME [NAME ...]]"""
-# 
-# $ prog a b
-# {"NAME": ["a", "b"]}
-# 
-# $ prog
-# {"NAME": []}
-# 
-# #
-# # Option's argument defaults to null/None
-# #
-# 
-# r"""usage: prog [options]
-# options:
-#  -a        Add
-#  -m <msg>  Message
-# 
-# """
-# $ prog -a
-# {"-m": null, "-a": true}
-# 
-# #
-# # Test options without description
-# #
-# 
-# r"""usage: prog --hello"""
-# $ prog --hello
-# {"--hello": true}
-# 
-# r"""usage: prog [--hello=<world>]"""
-# $ prog
-# {"--hello": null}
-# 
-# $ prog --hello wrld
-# {"--hello": "wrld"}
-# 
-# r"""usage: prog [-o]"""
-# $ prog
-# {"-o": false}
-# 
-# $ prog -o
-# {"-o": true}
-# 
-# r"""usage: prog [-opr]"""
-# $ prog -op
-# {"-o": true, "-p": true, "-r": false}
-# 
-# r"""usage: git [-v | --verbose]"""
-# $ prog -v
-# {"-v": true, "--verbose": false}
-# 
-# r"""usage: git remote [-v | --verbose]"""
-# $ prog remote -v
-# {"remote": true, "-v": true, "--verbose": false}
-# 
-# #
-# # Test empty usage pattern
-# #
-# 
-# r"""usage: prog"""
-# $ prog
-# {}
-# 
-# r"""usage: prog
-#            prog <a> <b>
-# """
-# $ prog 1 2
-# {"<a>": "1", "<b>": "2"}
-# 
-# $ prog
-# {"<a>": null, "<b>": null}
-# 
-# r"""usage: prog <a> <b>
-#            prog
-# """
-# $ prog
-# {"<a>": null, "<b>": null}
 #
+#
+# [options] does not include options from usage-pattern
+#
+# XXX: These tests do not pass yet. Not sure how to resolve.
+#
+r"""usage: prog [options] [-a]
+
+options: -a
+         -b
+"""
+$ prog -a
+{"-a": true, "-b": false}
+
+$ prog -aa
+"user-error"
+
+#
+# Test [options] shourtcut
+#
+
+r"""Usage: prog [options] A
+Options:
+    -q  Be quiet
+    -v  Be verbose.
+
+"""
+$ prog arg
+{"-q": false, "-v": false, "<a>": "arg", "A": "arg"}
+
+$ prog -v arg
+{"-q": false, "-v": true, "<a>": "arg", "A": "arg"}
+
+$ prog -q arg
+{"-q": true, "-v": false, "<a>": "arg", "A": "arg"}
+
+#
+# Test single dash
+#
+
+r"""usage: prog [-]"""
+
+$ prog -
+{"-": true}
+
+$ prog
+{"-": false}
+
+#
+# If argument is repeated, its value should always be a list
+#
+
+r"""usage: prog [NAME [NAME ...]]"""
+
+$ prog a b
+{"<name>": ["a", "b"], "NAME": ["a", "b"]}
+
+$ prog
+{"<name>": [], "NAME": []}
+
+#
+# Option's argument defaults to null/None
+#
+# Note: Deviation: Currently, these values are omitted entirely.
+#       XXX: ...this could be revisited
+#
+
+r"""usage: prog [options]
+options:
+ -a        Add
+ -m <msg>  Message
+
+"""
+$ prog -a
+{"-a": true}
+
+#
+# Test options without description
+#
+
+r"""usage: prog --hello"""
+$ prog --hello
+{"--hello": true}
+
+r"""usage: prog [--hello=<world>]"""
+# Original { "--hello": null }
+$ prog
+{}
+
+$ prog --hello wrld
+{"--hello": "wrld"}
+
+r"""usage: prog [-o]"""
+$ prog
+{"-o": false}
+
+$ prog -o
+{"-o": true}
+
+r"""usage: prog [-opr]"""
+$ prog -op
+{"-o": true, "-p": true, "-r": false}
+
+r"""usage: git [-v | --verbose]"""
+$ prog -v
+{"--verbose": false, "-v": true}
+
+r"""usage: git remote [-v | --verbose]"""
+$ prog remote -v
+{"--verbose": false, "-v": true, "remote": true}
+
+#
+# Test empty usage pattern
+#
+
+r"""
+usage: prog
+"""
+$ prog
+{}
+
+r"""
+usage: prog
+       prog <a> <b>
+"""
+$ prog 1 2
+{"<a>": "1", "<b>": "2", "A": "1", "B": "2"}
+
+# Original: {"<a>": null, "<b>": null}
+$ prog
+{}
+
+r"""
+usage: prog <a> <b>
+       prog
+"""
+# Original: {"<a>": null, "<b>": null}
+$ prog
+{}
+
 #
 # Option's argument should not capture default value from usage pattern
 #

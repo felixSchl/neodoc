@@ -529,6 +529,17 @@ shoutName = token go P.<?> "NAME"
     go (ShoutName n) = Just n
     go _             = Nothing
 
+-- | Return the next token's position w/o consuming anything
+nextTokPos :: TokenParser P.Position
+nextTokPos = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+  return $ case toks of
+    Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
+      { consumed: false
+      , input: toks
+      , result: Right ppos
+      , position: pos }
+    _ -> P.parseFailed toks pos "expected token, met EOF"
+
 runTokenParser :: forall a.
                   (List PositionedToken)
                 -> TokenParser a
