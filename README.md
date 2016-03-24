@@ -52,15 +52,19 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
   `-ab`, `-ba`, `-b -a`, `-b`, `-a` and the empty input.
 * **All arguments in a group are always required**. This is regardless of
   whether or not the group itself is required or not, i.e.:
+
   ```sh
   Usage: prog [<name> <type>]
   ```
+  
   will fail `prog foo`, but pass `prog foo bar`. The rational being that this is
   more general, since if the opposite behaviour (any match) was desired, it
   could be expressed as such:
+  
   ```sh
   Usage: prog [[<name>] [<type>]]
   ```
+  
   **note:** this rule excludes flags/switches and options that have default
   values (or other fallback values).
 * **There is no `null`** in the resulting value map. `null` simply means not
@@ -72,6 +76,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
     1. Environment variables (per `[env: ...]` tag)
     1. Option defaults (per `[default: ...]` tag)
 * Program usage lines can span multiple lines:
+  
   ```sh
   Usage: prog
          prog <a> <b>
@@ -139,7 +144,7 @@ in contributing a feature, contact me at felixschlitter@gmail.com and we can
 the ball rolling &mdash; There's plenty to do. To get up and running, run:
 
 ```sh
-npm i && bower i && npm run test
+npm i && bower i && npm test
 ```
 
 NB: Purescript is declared a devDependency in package.json, so no need to bring
