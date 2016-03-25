@@ -19,7 +19,9 @@ import Data.Tuple (Tuple(..), uncurry)
 import Data.Foldable (foldl)
 import Control.Alt ((<|>))
 import Control.Plus (empty)
-import Control.Monad.Reader (runReader)
+import Control.Monad.Reader (Reader(), ask, runReader)
+import Control.Monad.Reader.Trans (ReaderT(), runReaderT)
+import Control.Monad.State (State(), runState, evalState, execState)
 import Text.Parsing.Parser             as P
 import Text.Parsing.Parser.Pos         as P
 import Text.Parsing.Parser.Combinators as P
@@ -39,7 +41,7 @@ type Result = Tuple D.Branch (List G.ValueMapping)
 -- | Generate a parser for a given program specification.
 genParser :: D.Program       -- ^ the program to generate a parser for
           -> G.Parser Result -- ^ the generated parser
-genParser us = foldl (<|>) empty (P.try <<< G.genUsageParser <$> us)
+genParser us = G.genUsageParser us
 
 -- | Run a parser against user input.
 runParser :: D.Env                      -- ^ the user input
@@ -48,7 +50,7 @@ runParser :: D.Env                      -- ^ the user input
           -> Either P.ParseError Result -- ^ the parsed output
 runParser env argv p = do
   toks <- G.lex (toList argv)
-  runReader (runParser toks p) env
+  evalState (runReaderT (runParser toks p) env) 0
   where runParser i = P.runParserT (P.PState { input: i
                                              , position: P.initialPos
                                              })

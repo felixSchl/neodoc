@@ -746,7 +746,7 @@ This one is probably most readable user-friednly variant.
 
 """
 $ prog
-{"-v": 0}
+{}
 
 $ prog -v
 {"-v": 1}
@@ -1163,3 +1163,33 @@ $ prog --baz --egg
  "--egg": true,
  "--foo": false,
  "--spam": false}
+
+#
+# README example usage
+#
+
+r"""
+Naval Fate.
+
+Usage:
+  naval_fate ship new <name>...
+  naval_fate ship <name> move <x> <y> --speed=<kn>
+  naval_fate ship shoot <x> <y>
+  naval_fate mine (set|remove) <x> <y> [--moored|--drifting]
+  naval_fate -h | --help
+  naval_fate --version
+
+Options:
+  -h --help     Show this screen.
+  --version     Show version.
+  --speed=<kn>  Speed in knots [default: 10].
+  --moored      Moored (anchored) mine.
+  --drifting    Drifting mine.
+"""
+
+# $ prog ship new foo bar baz
+$ prog ship foo move 10 10 --speed
+{"<name>": ["foo", "bar", "baz"],
+ "NAME": ["foo", "bar", "baz"],
+ "new": true,
+ "ship": true}

@@ -14,7 +14,6 @@ import Prelude
 import Control.Plus (class Plus, empty)
 import Debug.Trace
 import Data.Identity (Identity(), runIdentity)
-import Control.Monad.State (State(), evalState)
 import Control.Apply ((*>), (<*))
 import Data.Function (on)
 import Data.Either (Either(..), either)
@@ -37,6 +36,9 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Data.Monoid (mempty)
 import Data.Map (Map())
 import Control.Monad.Reader (Reader(), ask, runReader)
+import Control.Monad.Reader.Trans (ReaderT(), runReaderT)
+import Control.Monad.State (State(), runState, evalState, execState)
+import Control.Monad.State as State
 import Data.Map as Map
 import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
@@ -60,7 +62,13 @@ import Language.Docopt.ParserGen.Token
 import Language.Docopt.ParserGen.ValueMapping
 import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
-type Parser a = P.ParserT (List Token) (Reader D.Env) a
+-- |
+-- | Unfortunately, the State Monad is needed because we try matching all
+-- | program branches and must select the best fit.
+-- |
+type Parser a = P.ParserT (List Token)
+                          (ReaderT D.Env (State Int))
+                          a
 
 newtype ScoredResult a = ScoredResult { score :: Int, result :: a }
 
@@ -253,61 +261,49 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
             ++ (intercalate ", " $ prettyPrintToken <$> s)
 
 -- | Generate a parser for a single program usage.
-genUsageParser :: D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
-genUsageParser (D.Usage xs) = do
-  r <- _.result <<< unScoredResult <$> genBranchesParser xs
-  eof
-  return r
-
--- | Fold over a list of parsers, applying each in turn onto the result of the
--- | previous, keeping both errors and results. Each application of a branches
--- | parser must set out from the same parser state.
+genUsageParser :: List D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
+genUsageParser xs = do
+  _.result <<< unScoredResult
+    <$> genBranchesParser (concat $ D.runUsage <$> xs)
+                          true
 
 -- | Generate a parser that selects the best branch it parses and
 -- | fails if no branch was parsed.
 
-genBranchesParser :: List D.Branch
+genBranchesParser :: List D.Branch -- ^ The branches to test
+                  -> Boolean       -- ^ Expect EOF after each branch
                   -> Parser (ScoredResult (Tuple D.Branch (List ValueMapping)))
-genBranchesParser xs = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
+genBranchesParser xs term = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
   env :: D.Env <- ask
-  let ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> genBranchParser x
-      rs = runReader (collect s ps) env
-
-  -- Weed out successful parses that have a zero-scores, from successful
-  -- parses that have a non-zero score. Zero-scores are treated as errors
-  -- due to ambiguity if no none-zero score was attained. Should there be
-  -- only a single zero-score, however, it can walk away the victor.
-  -- XXX: Should the ambiguity rules be extended for any score? I.e. if
-  --      there's a total tie across all scores.
-  (Tuple zs as) <- return $
-    mpartition ((== 0) <<< _.score <<< unScoredResult <<< _.result)
-             $ mrights rs
+  let ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> do
+                          genBranchParser x
+                          <* if term then eof else return unit
+      rs = evalState (runReaderT (collect s ps) env) 0
 
   return $ maybe'
     (\_ ->
       maybe'
-        (\_ ->
-          -- XXX: The following needs review. Is this safe? correct?
-          let h = LU.head zs
-           in h { result = Right h.result }
-        )
-        (\e -> e { result = Left e.result })
-        (head $ mlefts rs)
+        (\_ -> P.parseFailed Nil P.initialPos
+                "The impossible happened. Failure without error")
+        (\e -> e { result = Left e.result.error })
+        (maximumBy (compare `on` (_.depth <<< _.result)) $ mlefts rs)
     )
-    (\r -> r { result = Right r.result })
-    (maximumBy (compare `on` _.result) as)
+    (\r -> r { result = Right r.result.value })
+    (maximumBy (compare `on` (_.depth <<< _.result)) $ mrights rs)
+
   where
-    collect s ps = ps `flip traverse` \p -> P.unParserT p s >>= \o ->
+    collect s ps = ps `flip traverse` \p -> P.unParserT p s >>= \o -> do
+                    depth :: Int <- lift State.get
                     return $ either
                       (\e -> Left  { input:    o.input
                                    , consumed: o.consumed
                                    , position: o.position
-                                   , result:   e
+                                   , result:   { error: e, depth: depth }
                                    })
                       (\r -> Right { input:    o.input
                                    , consumed: o.consumed
                                    , position: o.position
-                                   , result:   r
+                                   , result:   { value: r, depth: depth }
                                    })
                       o.result
 
@@ -316,6 +312,7 @@ genBranchesParser xs = P.ParserT \(s@(P.PState { input: i, position: pos })) -> 
 -- | Generate a parser for a single usage branch
 genBranchParser :: D.Branch -> Parser (ScoredResult (List ValueMapping))
 genBranchParser (D.Branch xs) = do
+  lift (State.put 0) -- reset the depth counter
   either
     (\_   -> P.fail "Failed to generate parser")
     (\acc -> case acc of
@@ -418,6 +415,7 @@ genBranchParser (D.Branch xs) = do
     genParser x@(D.Command n r) = (do
       scoreFromList <$> do
         if r then (some go) else (singleton <$> go)
+      <* lift (State.modify (1+))
       ) P.<?> "command: " ++ (show $ D.prettyPrintArg x)
         where go = Tuple x <$> (command n)
 
@@ -425,6 +423,7 @@ genBranchParser (D.Branch xs) = do
     genParser x@(D.EOA) = (do
       scoreFromList <<< singleton <<< Tuple x <$> do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
+      <* lift (State.modify (1+))
       ) P.<?> "end of arguments: \"--\""
 
     -- Generate a parser for a `Stdin` argument
@@ -432,20 +431,23 @@ genBranchParser (D.Branch xs) = do
       scoreFromList <<< singleton <<< Tuple x <$> do
         dash
         return (D.BoolValue true)
+      <* lift (State.modify (1+))
       ) P.<?> "stdin: \"-\""
 
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional n r) = (do
       scoreFromList <$> do
         if r then (some go) else (singleton <$> go)
-        ) P.<?> "positional argument: " ++ (show $ D.prettyPrintArg x)
+      <* lift (State.modify (1+))
+      ) P.<?> "positional argument: " ++ (show $ D.prettyPrintArg x)
         where go = Tuple x <$> (positional n)
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option (O.Option o)) = (do
       scoreFromList <$> do
         if o.repeatable then (some go) else (singleton <$> go)
-        ) P.<?> "option: " ++ (show $ D.prettyPrintArg x)
+      <* lift (State.modify (1+))
+      ) P.<?> "option: " ++ (show $ D.prettyPrintArg x)
         where
           go = do
             P.choice $ P.try <$> [
@@ -470,7 +472,7 @@ genBranchParser (D.Branch xs) = do
       where
         goR :: Parser (List (List ValueMapping))
         goR = do
-          {score, result} <- unScoredResult <$> genBranchesParser bs
+          {score, result} <- unScoredResult <$> genBranchesParser bs false
           if score == 0
               then return $ singleton (snd result)
               else do
@@ -482,7 +484,7 @@ genBranchParser (D.Branch xs) = do
                   then return mempty
                   else do
                     snd <<< _.result <<<  unScoredResult
-                      <$> genBranchesParser bs
+                      <$> genBranchesParser bs false
 
     isFree :: D.Argument -> Boolean
     isFree (D.Option _)     = true
