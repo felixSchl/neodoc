@@ -1,15 +1,79 @@
-# Docopt #
+# Neodoc #
 
-> [WIP] JS/Purescript implementation of docopt, available on npm.
+> :warning: This project is nearing completion. It is not yet on npm, and
+> some of the information in this README may therefore be ahead of it's time.
 
 [![Build Status](https://travis-ci.org/felixSchl/docopt.svg?branch=development)](https://travis-ci.org/felixSchl/docopt)
 
-This is a fairly ambitious implementation of docopt _plus more_. The idea of
-docopt is great, but the language is still rather informal. It's a fine balance
-walk between keeping the docopt text fairly prose, but structured enough to
-extract meaningful information.
+This is a revised implementation of the [docopt language](#docopt-orig) for
+node.  Contrary to the original implementation, it supports **error reporting**,
+both for users and developers, as well reading values from **environment
+variables** with many more [features planned](#roadmap) for the near future.
 
-_For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
+## Table of contents ##
+
+* [Installation](#installation)
+* [Usage](#usage)
+* [Project goals](#project-goals)
+    * [Deviations from original](#deviations-from-the-original)
+* [Project status](#project-status)
+    * [Beta target](#beta-target)
+    * [Post Beta Roadmap](#post-beta-roadmap)
+    * [Wishlist](#wishlist)
+* [Contributing](#contributing)
+    * [Implementation overview](#implementation-overview)
+
+## Installation ##
+
+```sh
+npm install --save neodoc
+```
+
+## Usage ##
+
+> Basic usage example. For more detail on what docopt can do, have a look at
+> `testcases.docopt` in the repo.
+
+1. Given this node.js program:
+    ```javascript
+    #!/usr/bin/env node
+
+    import neodoc from 'neodoc';
+    const argv = neodoc(`
+      Naval Fate.
+
+      Usage:
+        naval_fate ship new <name>...
+        naval_fate ship <name> move <x> <y> [--speed=<kn>]
+        naval_fate ship shoot <x> <y>
+        naval_fate mine (set|remove) <x> <y> [--moored|--drifting]
+        naval_fate -h | --help
+        naval_fate --version
+
+      Options:
+        -h --help     Show this screen.
+        --version     Show version.
+        --speed=<kn>  Speed in knots [default: 10].
+        --moored      Moored (anchored) mine.
+        --drifting    Drifting mine.
+    `);
+
+    console.log(argv);
+    ```
+    <sub>file: prog</sub>
+
+2. We can provide various input:
+
+    ```bash
+    $ prog ship new foo bar baz
+    {'<name>': ['foo', 'bar', 'baz'],
+     'NAME': ['foo', 'bar', 'baz'],
+     'new': true,
+     'ship': true}
+
+    $ prog ship foo move 10 10 --speed
+    Missing required arguments for --speed=kn [default: 10]
+    ```
 
 ## Project goals ##
 
@@ -28,7 +92,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * **Solid test coverage**
 * Sensible compatibility with original docopt.
 
-## Deviations from the original
+### Deviations from the original ###
 
 > This implementation tries to be compatible where sensible, but does cut ties
 > when it comes down to it. The universal docopt test suite has been adjusted
@@ -84,12 +148,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 
 ## Project status ##
 
-### Overview ###
-
-> Overview of the discrete chunks of work that have been done and are yet to be
-> done.
-
-#### Beta status ####
+### Beta Target ####
 
 > The work to be done to release a usable product with some known caveats.
 > This release will serve as way to collect feedback and plan improvements for
@@ -111,7 +170,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
     * [x] `-` (stdin)
     * [x] `[options]`
 
-#### Roadmap ####
+### Post-Beta Roadmap ####
 
 > Overview of where docopt is headed, ordered (somewhat) by estimated priority.
 
@@ -122,6 +181,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
   * [ ] Implement `--version`. If matched, print the npm package version.
 * [ ] Read options from config file
 * [ ] Allow for `--foo[=<bar>]` syntax (git style).
+* [ ] Add type validation via tags, e.g.: `[type: string]`
 * [ ] Allow flag negation sintax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
 
 ### Wishlist ###
@@ -129,6 +189,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 > A list of things that are desired, but have not found a place on the roadmap.
 
 * Fix all purescript warnings
+* Custom validations (see `[type: ...]` tag)
 * Provide typescript typings
 * Read options from config file
 * Read options from prompt (Add a `[prompt]` tag)
@@ -165,7 +226,7 @@ immediate feedback.
 
 ---
 
-### Implementation ###
+### Implementation overview ###
 
 > A quick overview of the implementation for potential contributors
 
