@@ -589,11 +589,11 @@ options: --foo
 $ prog 10
 {"--foo": false, "<name>": "10", "NAME": "10"}
 
-#$ prog --foo 10
-#{"--foo": true, "<name>": "10", "NAME": "10"}
-#
-#$ prog --foo=10
-#"user-error"
+$ prog --foo 10
+{"--foo": true, "<name>": "10", "NAME": "10"}
+
+$ prog --foo=10
+"user-error"
 
 r"""usage: prog (NAME | --foo) [--bar | NAME]
 
@@ -973,21 +973,23 @@ $ prog --long one
 $ prog --long one --long two
 {"--long": ["one", "two"]}
 
+
 #
 # Test multiple elements repeated at once
 #
-# 
-# r"""usage: prog (go <direction> --speed=<km/h>)..."""
-# $ prog  go left --speed=5  go right --speed=9
-# {"go": 2,
-#  "<direction>": ["left", "right"],
-#  "--speed": ["5", "9"]
-#  }
-#
-#
+
+r"""usage: prog (go <direction> --speed=<km/h>)..."""
+
+$ prog  go left --speed=5  go right --speed=9
+{"--speed": ["5", "9"],
+ "<direction>": ["left", "right"],
+ "DIRECTION": ["left", "right"],
+ "go": 2}
+
+
 # Required options should work with option shortcut
 #
-# XXX: This test currently passes and requires further
+# XXX: This test currently fails and requires further
 #      consideration. Should the option descriptions
 #      merge with the input? Currently they simply
 #      expand in-place during solving, causing `-a -a`
