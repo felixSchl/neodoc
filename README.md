@@ -36,8 +36,6 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 
 * **Better Error reporting.** Let the user of your utility know why his input
   was rejected.
-* **No built-in `--help` or `--version`** <sub>(at least not yet / not
-  planned)</sub>
 * **No abbreviations:**
   `--ver` does not match `--verbose`.
   <sub>[(mis-feature in the original
@@ -91,6 +89,12 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 > Overview of the discrete chunks of work that have been done and are yet to be
 > done.
 
+#### Beta status ####
+
+> The work to be done to release a usable product with some known caveats.
+> This release will serve as way to collect feedback and plan improvements for
+> subsequent releases based on the feedback.
+
 * [x] Scan the docopt text for usage sections and 0 or more description sections
 * [x] Lex and parse usage sections
 * [x] Lex and parse description sections
@@ -98,7 +102,7 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
 * [x] Generate parser from the solved program specification
 * [x] Lex and parse user input on the CLI
 * [x] Transform the parsed args into something more useful
-* [ ] Run against docopt test-suite
+* [x] Run against docopt test-suite <sub>99% done</sub>
 * [ ] Provide developer and user error reporting
 * [ ] Provide seamless interface to be called from JS
 * [x] Read arguments from env vars
@@ -107,12 +111,22 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
     * [x] `-` (stdin)
     * [x] `[options]`
 
+#### Roadmap ####
 
+> Overview of where docopt is headed, ordered (somewhat) by estimated priority.
+
+* [ ] Implement `--help` and `--version`. The developer will be able to specify
+  the option that will trigger the `--help` and `--version` convenience
+  functions, with fallbacks to `--help` and `--version`.
+  * [ ] Implement `--help`. If matched, print the docopt text.
+  * [ ] Implement `--version`. If matched, print the npm package version.
+* [ ] Read options from config file
+* [ ] Allow for `--foo[=<bar>]` syntax (git style).
+* [ ] Allow flag negation sintax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
 
 ### Wishlist ###
 
-> A list of things that are desired, but are not a target for the initial
-> release.
+> A list of things that are desired, but have not found a place on the roadmap.
 
 * Fix all purescript warnings
 * Provide typescript typings
@@ -123,10 +137,8 @@ _For those unfamiliar with docopt, [refer to the original first][docopt-orig]._
   "default", "user"
 * Consider  `+o` syntax: `-o, --option` and it's negation: `--no-option` or
   `+o`.
-* Hook up `--help` to display help, maybe (or user-configured?)
 * Make commands first class citizens, enabling easy subcommands, inheriting
   options and all that.
-* Allow for `--foo[=<bar>]` syntax (git style).
 * Provide warnings. This would mean a largish refactor to use either a custom
   monad, or the Writer monad, stacked on top of the Either monad.
 * Allow boolean negation. Let `--foo` be an option of type boolean, implicitly
