@@ -1187,9 +1187,12 @@ Options:
   --drifting    Drifting mine.
 """
 
-# $ prog ship new foo bar baz
-$ prog ship foo move 10 10 --speed
+$ prog ship new foo bar baz
 {"<name>": ["foo", "bar", "baz"],
  "NAME": ["foo", "bar", "baz"],
  "new": true,
  "ship": true}
+
+$ prog ship foo move 10 10 --speed
+{}
+# "user-error"
