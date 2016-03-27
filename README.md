@@ -5,9 +5,9 @@
 
 [![Build Status](https://travis-ci.org/felixSchl/docopt.svg?branch=development)](https://travis-ci.org/felixSchl/docopt)
 
-This is a revised implementation of the [docopt language](#docopt-orig) for
+This is a revised implementation of the [docopt language][docopt-orig] for
 node.  It features **error reporting**, both for users and developers, as well
-reading values from **environment variables** with many more [features planned](#roadmap)
+reading values from **environment variables** with many more [features planned](#post-beta-roadmap)
 for the near future.
 
 ## Table of contents ##
