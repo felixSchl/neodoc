@@ -50,3 +50,4 @@ oa_ n = O.Argument { name: n
 array = ArrayValue
 str   = StringValue
 bool  = BoolValue
+int   = IntValue
