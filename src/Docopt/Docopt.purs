@@ -78,11 +78,10 @@ defaultOptions = {
 run :: forall e
      . Options
     -> String
-    -> Eff (DocoptEff e) (Either D.DocoptError (StrMap D.Value))
+    -> Eff (DocoptEff e) (Either String (StrMap D.Value))
 run o d = do
   argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
   env  <- maybe Process.getEnv              (return <<< id) o.env
-  -- XXX: Print error here, if any
   return $ runDocopt d env argv
 
 -- |
@@ -91,7 +90,7 @@ run o d = do
 fromREADME :: forall e
            . Options
           -> FilePath
-          -> Aff (DocoptEff e) (Either D.DocoptError (StrMap D.Value))
+          -> Aff (DocoptEff e) (Either String (StrMap D.Value))
 fromREADME o f = do
   c <- readTextFile UTF8 f
   d <- either (throwError <<< error <<< show)
@@ -117,5 +116,5 @@ fromREADME o f = do
 -- |
 fromREADME_ :: forall e
              . FilePath
-            -> Aff (DocoptEff e) (Either D.DocoptError (StrMap D.Value))
+            -> Aff (DocoptEff e) (Either String (StrMap D.Value))
 fromREADME_ = fromREADME defaultOptions

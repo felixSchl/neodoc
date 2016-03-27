@@ -47,13 +47,13 @@ import Language.Docopt.Parser.Desc  as Desc
 -- | that can be applied to user input.
 -- |
 parseDocopt :: String  -- ^ The docopt text
-            -> Either D.DocoptError (Tuple (List D.Usage)
-                                           (G.Parser G.Result))
+            -> Either String (Tuple (List D.Usage)
+                                    (G.Parser G.Result))
 parseDocopt docopt = do
-  doc <- toScanErr  $ Scanner.scan $ dedent docopt
-  us  <- toParseErr $ Usage.run doc.usage
-  ds  <- toParseErr $ concat <$> Desc.run `traverse` doc.options
-  prg <- toSolveErr $ Solver.solve us ds
+  doc <- toScanErr       $ Scanner.scan $ dedent docopt
+  us  <- toUsageParseErr $ Usage.run doc.usage
+  ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
+  prg <- toSolveErr      $ Solver.solve us ds
   return $ Tuple prg (G.genParser prg)
 
 -- |
@@ -63,9 +63,9 @@ applyDocopt :: G.Parser G.Result -- ^ the generated parser
             -> List D.Usage      -- ^ the program specification
             -> StrMap String     -- ^ the environment
             -> Array String      -- ^ ARGV
-            -> Either D.DocoptError (StrMap D.Value)
+            -> Either String (StrMap D.Value)
 applyDocopt p prg env argv = do
-  vs <- toParseErr $ G.runParser env argv p
+  vs <- toUserParseErr $ G.runParser env argv p
   return $ uncurry (T.reduce prg env) vs
 
 -- |
@@ -75,16 +75,22 @@ applyDocopt p prg env argv = do
 runDocopt :: String        -- ^ The docopt text
           -> StrMap String -- ^ The environment
           -> Array String  -- ^ ARGV
-          -> Either D.DocoptError (StrMap D.Value)
+          -> Either String (StrMap D.Value)
 runDocopt docopt env argv = do
   (Tuple prg p) <- parseDocopt docopt
   applyDocopt p prg env argv
 
-toScanErr :: forall a. Either P.ParseError a -> Either D.DocoptError a
-toScanErr  = lmap D.DocoptScanError
+toScanErr :: forall a. Either P.ParseError a -> Either String a
+toScanErr  = lmap (D.prettyPrintDocoptError <<< D.DocoptScanError)
 
-toParseErr :: forall a. Either P.ParseError a -> Either D.DocoptError a
-toParseErr = lmap D.DocoptParseError
+toUsageParseErr :: forall a. Either P.ParseError a -> Either String a
+toUsageParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptUsageParseError)
 
-toSolveErr :: forall a. Either D.SolveError a -> Either D.DocoptError a
-toSolveErr = lmap D.DocoptSolveError
+toDescParseErr :: forall a. Either P.ParseError a -> Either String a
+toDescParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptDescParseError)
+
+toUserParseErr :: forall a. Either P.ParseError a -> Either String a
+toUserParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptUserParseError)
+
+toSolveErr :: forall a. Either D.SolveError a -> Either String a
+toSolveErr = lmap (D.prettyPrintDocoptError <<< D.DocoptSolveError)
