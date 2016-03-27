@@ -762,7 +762,6 @@ r"""usage: prog [--ver --ver]"""
 $ prog --ver --ver
 {"--ver": 2}
 
-
 #
 # Counting commands
 #
@@ -1194,5 +1193,29 @@ $ prog ship new foo bar baz
  "ship": true}
 
 $ prog ship foo move 10 10 --speed
-{}
-# "user-error"
+"user-error"
+
+#
+# Passing arguments to options
+#
+
+r"""Usage: prog --foo"""
+
+$ prog --foo=bar
+"user-error"
+
+r"""Usage: prog -f"""
+
+$ prog -f=bar
+"user-error"
+
+r"""
+Usage: prog --foo
+Options: -f, --foo
+"""
+
+$ prog -f=bar
+"user-error"
+
+$ prog --foo=bar
+"user-error"

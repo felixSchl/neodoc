@@ -17,7 +17,7 @@ import Data.Identity (Identity(), runIdentity)
 import Control.Apply ((*>), (<*))
 import Data.Function (on)
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), isJust, maybe, maybe')
+import Data.Maybe (Maybe(..), isJust, isNothing, maybe, maybe')
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
                  , head, many, tail, fromList, filter, reverse, concat, catMaybes)
 import Control.Alt ((<|>))
@@ -179,11 +179,11 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
   where
-    takesArg = isJust a
+    isFlag = isNothing a
 
     -- case 1:
     -- The name is an exact match
-    go (LOpt n' v) atok | takesArg && (n' == n)
+    go (LOpt n' v) atok | (not isFlag) && (n' == n)
       = case v of
           Just s ->
             return $ OptParse (D.StringValue s) Nothing false
@@ -193,13 +193,15 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     -- case 2:
     -- The name is an exact match and takes no argument
-    go (LOpt n' _) _ | (not takesArg) && (n' == n)
-      = return $ OptParse (D.BoolValue true) Nothing false
+    go (LOpt n' v) _ | isFlag && (n' == n)
+      = case v of
+             Just _  -> Left "Option takes no argument"
+             Nothing -> return $ OptParse (D.BoolValue true) Nothing false
 
     -- case 3:
     -- The name is a substring of the input and no explicit argument has been
     -- provdided.
-    go (LOpt n' Nothing) atok | takesArg
+    go (LOpt n' Nothing) atok | not isFlag
       = case stripPrefix n n' of
           Just s -> return $ OptParse (D.StringValue s) Nothing false
           _      -> Left "Invalid substring"
@@ -231,12 +233,12 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
   where
-    takesArg = isJust a
+    isFlag = isNothing a
 
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
     -- argument may have been passed.
-    go (SOpt f' xs v) atok | (f' == f) && takesArg && (A.length xs == 0)
+    go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.length xs == 0)
       = case v of
           Just val -> return $ OptParse (D.StringValue val) Nothing false
           _  -> return case atok of
@@ -248,7 +250,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 2:
     -- The leading flag matches, there are stacked options, no explicit
     -- argument has been passed and the option takes an argument.
-    go (SOpt f' xs v) _ | (f' == f) && takesArg && (A.length xs > 0)
+    go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (A.length xs > 0)
       = do
         let a = fromCharArray xs ++ maybe "" id v
         return $ OptParse (D.StringValue a)
@@ -258,7 +260,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 3:
     -- The leading flag matches, there are stacked options, the option takes
     -- no argument and an explicit argument has not been provided.
-    go (SOpt f' xs v) _ | (f' == f) && (not takesArg) && (A.length xs > 0)
+    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.length xs > 0)
       = return $ OptParse (D.BoolValue true)
                           (Just $ SOpt (AU.head xs) (AU.tail xs) v)
                           false
@@ -266,10 +268,12 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 4:
     -- The leading flag matches, there are no stacked options and the option
     -- takes no argument - total consumption!
-    go (SOpt f' xs _) _ | (f' == f) && (not takesArg) && (A.length xs == 0)
-      = return $ OptParse (D.BoolValue true)
-                          Nothing
-                          false
+    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.length xs == 0)
+      = case v of
+              Just _  -> Left "Option takes no argument"
+              Nothing -> return $ OptParse (D.BoolValue true)
+                                            Nothing
+                                            false
 
     go a b = Left $ "Invalid token " ++ show a ++ " (input: " ++ show b ++ ")"
 
