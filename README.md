@@ -66,13 +66,32 @@ npm install --save neodoc
 
     ```bash
     $ prog ship new foo bar baz
-    {'<name>': ['foo', 'bar', 'baz'],
-     'NAME': ['foo', 'bar', 'baz'],
-     'new': true,
-     'ship': true}
+      {'<name>': ['foo', 'bar', 'baz'],
+       'NAME': ['foo', 'bar', 'baz'],
+       'new': true,
+       'ship': true}
 
     $ prog ship foo move 10 10 --speed
-    Missing required arguments for --speed=kn [default: 10]
+      Naval Fate.
+
+      Usage:
+        naval_fate ship new <name>...
+        naval_fate ship <name> move <x> <y> [--speed=<kn>]
+        naval_fate ship shoot <x> <y>
+        naval_fate mine (set|remove) <x> <y> [--moored|--drifting]
+        naval_fate -h | --help
+        naval_fate --version
+
+      Options:
+        -h --help     Show this screen.
+        --version     Show version.
+        --speed=<kn>  Speed in knots [default: 10].
+        --moored      Moored (anchored) mine.
+        --drifting    Drifting mine.
+
+      Trailing input: --speed:
+      > ship foo move 10 10 --speed
+                            ^^^^^^^
     ```
 
 ## Project goals ##
