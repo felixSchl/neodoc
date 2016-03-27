@@ -370,11 +370,11 @@ genBranchParser (D.Branch xs) = do
                                          || D.isFlag        o
                                          || D.hasEnvBacking o env
                                )
-                               $ reverse ps'
+                               $ ps'
           if (length missing > 0)
             then P.fail $
               "Missing required options: "
-                ++ intercalate ", " (D.prettyPrintArg <$> missing)
+                ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
             else return mempty
 
         draw _ _ = return mempty

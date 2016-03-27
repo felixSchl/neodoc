@@ -143,7 +143,7 @@ parserGenSpec = \_ -> describe "The generator" do
     , test
         [ D.grr false [[ D.opt 'i' "input" (D.oa_ "FILE") ]]
         ]
-        [ fail [] "Missing required options: -i, --input=FILE"
+        [ fail [] "Missing required options: -i|--input=FILE"
         , pass
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -153,7 +153,7 @@ parserGenSpec = \_ -> describe "The generator" do
     , test
         [ D.grr false [[ D.opt 'i' "input" (D.oa_ "FILE") ]]
         ]
-        [ fail [] "Missing required options: -i, --input=FILE"
+        [ fail [] "Missing required options: -i|--input=FILE"
         , pass
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -165,10 +165,10 @@ parserGenSpec = \_ -> describe "The generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Missing required options: -i, --input=FILE"
+          $ "Missing required options: -i|--input=FILE, -o|--output=FILE"
 
         , fail [ "-i", "bar" ]
-          $ "Missing required options: -o, --output=FILE"
+          $ "Missing required options: -o|--output=FILE"
 
         , pass [ "-i", "bar", "-o", "bar" ]
             [ "--input"  :> D.str "bar"
@@ -194,10 +194,10 @@ parserGenSpec = \_ -> describe "The generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Missing required options: -i, --input=FILE"
+          $ "Missing required options: -i|--input=FILE -r|--redirect=FILE, -o|--output=FILE"
 
         , fail [ "-i", "bar", "-r", "bar" ]
-            "Missing required options: -o, --output=FILE"
+            "Missing required options: -o|--output=FILE"
 
         , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
             [ "--input"    :> D.str "bar"
@@ -234,7 +234,7 @@ parserGenSpec = \_ -> describe "The generator" do
           ]]
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
-        [ fail [] "Missing required options: -i, --input=FILE"
+        [ fail [] "Missing required options: -i|--input=FILE"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
         , pass [ "-i", "bar", "x", "-o", "bar" ]
@@ -246,7 +246,7 @@ parserGenSpec = \_ -> describe "The generator" do
             , "-o"       :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail [ "-o", "bar", "x", "-i", "bar" ]
-            "Missing required options: -i, --input=FILE"
+            "Missing required options: -i|--input=FILE"
         ]
 
     , test
@@ -413,7 +413,10 @@ parserGenSpec = \_ -> describe "The generator" do
                   (\e -> "Should fail with \"" ++ e ++ "\"")
                   prettyPrintOut
                   expected
-            in it (intercalate " " input ++ " -> " ++ msg) do
+                premsg = if A.length input > 0
+                            then intercalate " " input
+                            else "(no input)"
+            in it (premsg ++ " -> " ++ msg) do
                   vliftEff do
                     validate bs
                              input

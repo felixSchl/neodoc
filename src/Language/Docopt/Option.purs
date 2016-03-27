@@ -12,6 +12,7 @@ module Language.Docopt.Option (
   , isFlag
   , takesArgument
   , prettyPrintOption
+  , prettyPrintOptionNaked
   , empty
   , opt',   opt,   opt_,   optR,   optR_
   , lopt',  lopt,  lopt_,  loptR,  loptR_
@@ -119,6 +120,16 @@ prettyPrintOption (Option o)
                 flip (maybe "") default \v->
                   " [default: " ++ (prettyPrintValue v) ++  "]"
     env = flip (maybe "") o.env \k -> " [env: " ++ k ++ "]"
+
+prettyPrintOptionNaked :: Option -> String
+prettyPrintOptionNaked (Option o)
+  = short ++ long ++ arg' ++ rep
+  where
+    short   = maybe "" (\f -> "-" ++ (fromChar f)) o.flag
+    long    = maybe "" (const "|") (o.flag *> o.name)
+              ++ maybe "" ("--" ++) o.name
+    rep     = if o.repeatable then "..." else ""
+    arg'    = flip (maybe "") o.arg \(Argument { name }) -> "="  ++ name
 
 --------------------------------------------------------------------------------
 -- Short hand option creation

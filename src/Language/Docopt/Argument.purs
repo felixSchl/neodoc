@@ -6,6 +6,7 @@ module Language.Docopt.Argument (
   , IsRepeatable ()
   , prettyPrintBranch
   , prettyPrintArg
+  , prettyPrintArgNaked
   , runBranch
   , isRepeatable
   , setRepeatable
@@ -100,6 +101,20 @@ prettyPrintArg (Group o bs r)      = open ++ inner ++ close ++ repetition
     open       = if o then "[" else "("
     close      = if o then "]" else ")"
     inner      = intercalate " | " (prettyPrintBranch <$> bs)
+    repetition = if r then "..." else ""
+
+prettyPrintBranchNaked :: Branch -> String
+prettyPrintBranchNaked (Branch xs) = intercalate " " (prettyPrintArgNaked <$> xs)
+
+prettyPrintArgNaked :: Argument -> String
+prettyPrintArgNaked (Stdin)             = "-"
+prettyPrintArgNaked (EOA)               = "-- ARGS..."
+prettyPrintArgNaked (Command name r)    = name ++ (if r then "..." else "")
+prettyPrintArgNaked (Positional name r) = name ++ (if r then "..." else "")
+prettyPrintArgNaked (Option o)          = O.prettyPrintOptionNaked o
+prettyPrintArgNaked (Group o bs r)      = inner ++ repetition
+  where
+    inner      = intercalate " | " (prettyPrintBranchNaked <$> bs)
     repetition = if r then "..." else ""
 
 isRepeatable :: Argument -> Boolean
