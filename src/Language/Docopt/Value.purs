@@ -59,5 +59,6 @@ isFloatValue _              = false
 
 prettyPrintValue :: Value -> String
 prettyPrintValue (StringValue s) = s
-prettyPrintValue (BoolValue b)   = show b
+prettyPrintValue (BoolValue   b) = show b
 prettyPrintValue (ArrayValue xs) = show $ prettyPrintValue <$> xs
+prettyPrintValue (IntValue    i) = show i
