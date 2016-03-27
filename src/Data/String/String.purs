@@ -1,6 +1,7 @@
 module Data.String.Ext (
     (^=), (^/=)
   , endsWith
+  , startsWith
   ) where
 
 import Prelude
@@ -14,6 +15,11 @@ import Data.Function
 
 (^/=) :: String -> String -> Boolean
 (^/=) a b = not (a ^= b)
+
+startsWith :: String -> String -> Boolean
+startsWith needle haystack = maybe false id do
+  ix <- Str.indexOf needle haystack
+  return $ ix == 0
 
 endsWith :: String -> String -> Boolean
 endsWith needle haystack = maybe false id do

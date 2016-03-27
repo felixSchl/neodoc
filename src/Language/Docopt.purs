@@ -65,7 +65,7 @@ applyDocopt :: G.Parser G.Result -- ^ the generated parser
             -> Array String      -- ^ ARGV
             -> Either String (StrMap D.Value)
 applyDocopt p prg env argv = do
-  vs <- toUserParseErr $ G.runParser env argv p
+  vs <- toUserParseErr argv $ G.runParser env argv p
   return $ uncurry (T.reduce prg env) vs
 
 -- |
@@ -89,8 +89,8 @@ toUsageParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptUsageParseError)
 toDescParseErr :: forall a. Either P.ParseError a -> Either String a
 toDescParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptDescParseError)
 
-toUserParseErr :: forall a. Either P.ParseError a -> Either String a
-toUserParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptUserParseError)
+toUserParseErr :: forall a. Array String -> Either P.ParseError a -> Either String a
+toUserParseErr argv = lmap (D.prettyPrintDocoptError <<< D.DocoptUserParseError argv)
 
 toSolveErr :: forall a. Either D.SolveError a -> Either String a
 toSolveErr = lmap (D.prettyPrintDocoptError <<< D.DocoptSolveError)

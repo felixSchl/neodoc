@@ -1,6 +1,8 @@
 module Language.Docopt.ParserGen.Token (
     Token (..)
+  , PositionedToken (..)
   , prettyPrintToken
+  , unPositionedToken
   ) where
 
 import Prelude
@@ -11,7 +13,8 @@ import Data.List (List(..))
 import Data.String (fromCharArray)
 import Data.Tuple (Tuple())
 import qualified Data.Array as A
-import qualified Text.Parsing.Parser as P
+import qualified Text.Parsing.Parser     as P
+import qualified Text.Parsing.Parser.Pos as P
 
 import qualified Language.Docopt.Errors   as D
 import qualified Language.Docopt.Value    as D
@@ -40,3 +43,19 @@ prettyPrintToken (LOpt n a) = "--" ++ n ++ arg
   where arg = maybe "" ("=" ++) a
 prettyPrintToken (SOpt n s a) = "-"  ++ (fromCharArray (A.cons n s)) ++ arg
   where arg = maybe "" ("=" ++) a
+
+data PositionedToken = PositionedToken
+  { sourcePos :: P.Position
+  , token     :: Token
+  }
+
+unPositionedToken :: PositionedToken -> { sourcePos :: P.Position
+                                        , token     :: Token
+                                        }
+unPositionedToken (PositionedToken t) = t
+
+instance showPositionedToken :: Show PositionedToken where
+  show (PositionedToken { sourcePos=pos, token=tok }) =
+    (show tok) ++ " at " ++ (show pos)
+
+

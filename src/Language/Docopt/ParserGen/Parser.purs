@@ -66,7 +66,7 @@ import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 -- | Unfortunately, the State Monad is needed because we try matching all
 -- | program branches and must select the best fit.
 -- |
-type Parser a = P.ParserT (List Token)
+type Parser a = P.ParserT (List PositionedToken)
                           (ReaderT D.Env (State Int))
                           a
 
@@ -105,20 +105,23 @@ rmapScoreResult f (ScoredResult (x@{ result })) = ScoredResult $ x { result = f 
 
 -- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> Parser a
-token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+token test = P.ParserT $ \(P.PState { input: toks, position: ppos }) ->
   return $ case toks of
-    Cons tok xs ->
+    Cons (PositionedToken { token: tok }) xs ->
       case test tok of
         Just a ->
-          let nextpos = pos -- neglect pos (for now)
+          let nextpos =
+              case xs of
+                Cons (PositionedToken { sourcePos: npos }) _ -> npos
+                Nil -> ppos
           in
             { consumed: true
-            , input:    xs
-            , result:   Right a
+            , input: xs
+            , result: Right a
             , position: nextpos }
         -- XXX: Fix this error message, it makes no sense!
-        Nothing -> P.parseFailed toks pos "a better error message!"
-    _ -> P.parseFailed toks pos "expected token, met EOF"
+        Nothing -> P.parseFailed toks ppos "a better error message!"
+    _ -> P.parseFailed toks ppos "expected token, met EOF"
 
 data Acc a
   = Free (Parser a)
@@ -154,15 +157,24 @@ data OptParse = OptParse D.Value (Maybe Token) HasConsumedArg
 longOption :: O.Name -> (Maybe O.Argument) -> Parser D.Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
-    Cons tok xs ->
-      case go tok (head xs) of
-        Left e -> P.parseFailed toks pos e
+    Cons (PositionedToken { token: tok, sourcePos: npos }) xs ->
+      case go tok (_.token <<< unPositionedToken <$> head xs) of
+        Left e -> P.parseFailed toks npos e
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
-          , input:    (maybe empty singleton newtok) ++
-                      (if hasConsumedArg then (LU.tail xs) else xs)
+          , input:    let pushed = maybe empty
+                                         (\v -> singleton $ PositionedToken {
+                                                  token: v
+                                                , sourcePos: pos
+                                                }
+                                          )
+                                          newtok
+                          rest   = if hasConsumedArg then LU.tail xs else xs
+                       in pushed ++ rest
           , result:   Right v
-          , position: pos -- ignore pos (for now)
+          , position: maybe pos
+                            (_.sourcePos <<< unPositionedToken)
+                            (head xs)
           }
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
@@ -197,15 +209,24 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 shortOption :: Char -> (Maybe O.Argument) -> Parser D.Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
-    Cons tok xs ->
-      case go tok (head xs) of
+    Cons (PositionedToken { token: tok }) xs ->
+      case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks pos e
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
-          , input:    (maybe empty singleton newtok) ++
-                      (if hasConsumedArg then (LU.tail xs) else xs)
+          , input:    let pushed = maybe empty
+                                         (\v -> singleton $ PositionedToken {
+                                                  token: v
+                                                , sourcePos: pos
+                                                }
+                                          )
+                                          newtok
+                          rest   = if hasConsumedArg then LU.tail xs else xs
+                       in pushed ++ rest
           , result:   Right v
-          , position: pos -- ignore pos
+          , position: maybe pos
+                            (_.sourcePos <<< unPositionedToken)
+                            (head xs)
           }
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
@@ -258,7 +279,8 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
     Nil -> { consumed: false, input: s, result: Right unit, position: pos }
     _   -> P.parseFailed s pos $
               "Trailing input: "
-            ++ (intercalate ", " $ prettyPrintToken <$> s)
+            ++ (intercalate ", "
+                  $ prettyPrintToken <<< _.token <<< unPositionedToken <$> s)
 
 -- | Generate a parser for a single program usage.
 genUsageParser :: List D.Usage -> Parser (Tuple D.Branch (List ValueMapping))

@@ -5,7 +5,9 @@
 -- |
 -- | ===
 
-module Language.Docopt.ParserGen.Lexer (lex) where
+module Language.Docopt.ParserGen.Lexer (
+  lex
+  ) where
 
 import Prelude
 import Debug.Trace
@@ -15,10 +17,10 @@ import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
 import Data.String (fromCharArray)
 import Data.List (List(..), foldM, many, singleton)
-import qualified Text.Parsing.Parser as P
+import qualified Text.Parsing.Parser             as P
 import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Pos as P
-import qualified Text.Parsing.Parser.String as P
+import qualified Text.Parsing.Parser.Pos         as P
+import qualified Text.Parsing.Parser.String      as P
 import qualified Data.Array as A
 import Control.Plus (empty)
 import Control.Bind ((=<<))
@@ -79,18 +81,31 @@ parseToken = do
     lit = Lit <<< fromCharArray <$> do
       A.many P.anyChar
 
+parsePositionedToken :: P.Parser String PositionedToken
+parsePositionedToken = P.try $ do
+  pos <- getPosition
+  tok <- parseToken
+  return $ PositionedToken { sourcePos: pos, token: tok }
+
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
 -- | item individually.
-lex :: (List String) -> Either P.ParseError (List Token)
-lex xs = step xs
+lex :: (List String) -> Either P.ParseError (List PositionedToken)
+lex xs = go xs 1
   where
-    step Nil = return Nil
-    step (Cons x xs) = do
+    go Nil _ = return Nil
+    go (Cons x xs) n = do
       tok <- P.runParser x parseToken
       case tok of
         (EOA _) -> do
-          -- XXX: Each `x` in `xs` should be properly parsed into a `Value`
-          return $ singleton $ EOA (D.StringValue <$> xs)
+          -- return $ singleton $ EOA (D.StringValue <$> xs)
+          return $ singleton $ PositionedToken {
+            token:     EOA (D.StringValue <$> xs)
+          , sourcePos: P.Position { line: 1, column: n }
+          }
         _ -> do
-          toks <- step xs
-          return $ singleton tok ++ toks
+          toks <- go xs (n + 1)
+          return
+            $ singleton (PositionedToken {
+                          token:     tok
+                        , sourcePos: P.Position { line: 1, column: n }
+                        }) ++ toks
