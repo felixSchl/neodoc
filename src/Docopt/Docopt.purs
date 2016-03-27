@@ -35,6 +35,9 @@ import Control.Alt ((<|>))
 import Control.Apply ((*>))
 import Control.Monad.Eff.Console (log, CONSOLE)
 import Data.Map (Map())
+import Data.StrMap (StrMap())
+import Data.Array (drop)
+import Data.Array as A
 
 import Text.Parsing.Parser             as P
 import Text.Parsing.Parser.Combinators as P
@@ -75,10 +78,10 @@ defaultOptions = {
 run :: forall e
      . Options
     -> String
-    -> Eff (DocoptEff e) (Either D.DocoptError (Map String D.Value))
+    -> Eff (DocoptEff e) (Either D.DocoptError (StrMap D.Value))
 run o d = do
-  argv <- maybe Process.argv   (return <<< id) o.argv
-  env  <- maybe Process.getEnv (return <<< id) o.env
+  argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
+  env  <- maybe Process.getEnv              (return <<< id) o.env
   -- XXX: Print error here, if any
   return $ runDocopt d env argv
 
@@ -88,7 +91,7 @@ run o d = do
 fromREADME :: forall e
            . Options
           -> FilePath
-          -> Aff (DocoptEff e) (Either D.DocoptError (Map String D.Value))
+          -> Aff (DocoptEff e) (Either D.DocoptError (StrMap D.Value))
 fromREADME o f = do
   c <- readTextFile UTF8 f
   d <- either (throwError <<< error <<< show)
@@ -114,5 +117,5 @@ fromREADME o f = do
 -- |
 fromREADME_ :: forall e
              . FilePath
-            -> Aff (DocoptEff e) (Either D.DocoptError (Map String D.Value))
+            -> Aff (DocoptEff e) (Either D.DocoptError (StrMap D.Value))
 fromREADME_ = fromREADME defaultOptions

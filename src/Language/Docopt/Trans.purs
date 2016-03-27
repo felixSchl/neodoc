@@ -84,7 +84,7 @@ reduce :: List D.Usage       -- ^ the program specification
        -> D.Env              -- ^ the environment
        -> D.Branch           -- ^ the matched specification
        -> List ValueMapping  -- ^ the parse result
-       -> Map String D.Value -- ^ the output set of (arg => val)
+       -> StrMap D.Value     -- ^ the output set of (arg => val)
 reduce us env b vs =
   let vm = Map.fromFoldableWith resolveArg $ lmap key <$> (prepare <$> vs)
     -- XXX: The following creation of a list of usages is looking funny because
@@ -102,9 +102,9 @@ reduce us env b vs =
     prepare (Tuple a v) | D.isRepeatable a = Tuple a (D.ArrayValue $ valIntoArray v)
     prepare k = k
 
-    expandMap :: Map Key D.Value -> Map String D.Value
+    expandMap :: Map Key D.Value -> StrMap D.Value
     expandMap m =
-      Map.fromFoldable $ concat
+      StrMap.fromFoldable $ concat
         $ Map.toList m
             <#> \(Tuple (Key { arg: a }) v) ->
                     let v' =

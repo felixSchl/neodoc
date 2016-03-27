@@ -172,19 +172,19 @@ genCompatSpec = do
                     (const $ pure unit)
                     (const $ throwException $ error $ show e)
                     out
-                Right r -> do
+                Right output -> do
                   either
                     (\_ -> do
                       throwException $ error $
                         "Unexpected output: \n"
-                          ++ prettyPrintOut (pure $ Map.toList r)
+                          ++ prettyPrintOut (pure $ StrMap.toList output)
                     )
-                    (\r' ->
-                      let r'' = Map.toList r
-                       in if (r'' /= r')
+                    (\expected ->
+                      let actual = StrMap.toList output
+                       in if (StrMap.fromFoldable expected /= output)
                         then throwException $ error $
                           "Unexpected output:\n"
-                            ++ prettyPrintOut (pure r'')
+                            ++ prettyPrintOut (pure actual)
                         else return unit)
                     out
 

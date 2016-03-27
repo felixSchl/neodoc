@@ -63,7 +63,7 @@ applyDocopt :: G.Parser G.Result -- ^ the generated parser
             -> List D.Usage      -- ^ the program specification
             -> StrMap String     -- ^ the environment
             -> Array String      -- ^ ARGV
-            -> Either D.DocoptError (Map String D.Value)
+            -> Either D.DocoptError (StrMap D.Value)
 applyDocopt p prg env argv = do
   vs <- toParseErr $ G.runParser env argv p
   return $ uncurry (T.reduce prg env) vs
@@ -75,7 +75,7 @@ applyDocopt p prg env argv = do
 runDocopt :: String        -- ^ The docopt text
           -> StrMap String -- ^ The environment
           -> Array String  -- ^ ARGV
-          -> Either D.DocoptError (Map String D.Value)
+          -> Either D.DocoptError (StrMap D.Value)
 runDocopt docopt env argv = do
   (Tuple prg p) <- parseDocopt docopt
   applyDocopt p prg env argv
