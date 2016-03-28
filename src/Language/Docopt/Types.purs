@@ -13,6 +13,7 @@ import Data.String.Ext (startsWith)
 import Control.Apply ((*>))
 import Data.Generic
 import Data.Array as A
+import Text.Wrap (dedent)
 import qualified Data.String as Str
 
 import Language.Docopt.Value
@@ -62,17 +63,31 @@ unParseError :: forall r. P.ParseError -> { message :: String
                                           , position :: P.Position }
 unParseError (P.ParseError e) = e
 
+developerErrorMessage :: String
+developerErrorMessage = dedent """
+  This is likely an error with the program itself and not your fault.
+  Please raise this with the program's author.
+"""
+
 prettyPrintDocoptError :: DocoptError -> String
 prettyPrintDocoptError (DocoptScanError err) =
   "Failed to disect docopt text. " ++ (unParseError err).message
+  ++ "\n"
+  ++ developerErrorMessage
 prettyPrintDocoptError (DocoptUsageParseError err) =
   "Failed to parse the formal usage specification. "
   ++ (unParseError err).message
+  ++ "\n"
+  ++ developerErrorMessage
 prettyPrintDocoptError (DocoptDescParseError err) =
   "Failed to parse the option descriptions. "
   ++ (unParseError err).message
+  ++ "\n"
+  ++ developerErrorMessage
 prettyPrintDocoptError (DocoptSolveError err) =
   "Incoherent specification. " ++ show err
+  ++ "\n"
+  ++ developerErrorMessage
 prettyPrintDocoptError
   (DocoptUserParseError
     argv
