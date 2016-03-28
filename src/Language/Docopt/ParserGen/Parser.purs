@@ -206,7 +206,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
           Just s -> return $ OptParse (D.StringValue s) Nothing false
           _      -> Left "Invalid substring"
 
-    go _ _ = Left "Invalid token"
+    go a b = Left $ "Invalid token" ++ show a ++ " (input: " ++ show b ++ ")"
 
 shortOption :: Char -> (Maybe O.Argument) -> Parser D.Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
@@ -275,7 +275,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                                             Nothing
                                             false
 
-    go a b = Left $ "Invalid token " ++ show a ++ " (input: " ++ show b ++ ")"
+    go a b = Left $ "Invalid token" ++ show a ++ " (input: " ++ show b ++ ")"
 
 eof :: Parser Unit
 eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
@@ -332,8 +332,6 @@ genBranchesParser xs term = P.ParserT \(s@(P.PState { input: i, position: pos })
                                    , result:   { value: r, depth: depth }
                                    })
                       o.result
-
-
 
 -- | Generate a parser for a single usage branch
 genBranchParser :: D.Branch -> Parser (ScoredResult (List ValueMapping))
@@ -473,19 +471,33 @@ genBranchParser (D.Branch xs) = do
       scoreFromList <$> do
         if o.repeatable then (some go) else (singleton <$> go)
       <* lift (State.modify (1+))
-      ) P.<?> "option: " ++ (show $ D.prettyPrintArg x)
+      )
         where
           go = do
-            P.choice $ P.try <$> [
-              Tuple x <$> (mkLoptParser o.name o.arg)
-            , Tuple x <$> (mkSoptParser o.flag o.arg)
-            ]
+            -- Perform a pre-cursory test in order to capture relevant error
+            -- messags which would otherwise be overriden (e.g. a meaningful
+            -- error message when trying to match a LOpt against a LOpt would
+            -- be overridden by a meaningless try to match a SOpt against a
+            -- a LOpt).
+            isLopt <- P.option false (P.lookAhead $ P.try $ token isAnyLopt)
+            isSopt <- P.option false (P.lookAhead $ P.try $ token isAnySopt)
+            if isLopt
+               then P.try $ Tuple x <$> mkLoptParser o.name o.arg
+               else if isSopt
+                then P.try $ Tuple x <$> mkSoptParser o.flag o.arg
+                else P.fail "long or short option"
+
+          isAnyLopt (LOpt _ _) = return true
+          isAnyLopt _          = return false
+
+          isAnySopt (SOpt _ _ _) = return true
+          isAnySopt _            = return false
 
           mkLoptParser (Just n) a = longOption n a
-          mkLoptParser Nothing _  = P.fail "no long name"
+          mkLoptParser Nothing _  = P.fail "long name"
 
           mkSoptParser (Just f) a = shortOption f a
-          mkSoptParser Nothing _  = P.fail "no flag"
+          mkSoptParser Nothing _  = P.fail "flag"
 
     -- Generate a parser for an argument `Group`
     -- The total score a group is the sum of all scores inside of it.

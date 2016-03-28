@@ -88,6 +88,6 @@ prettyPrintDocoptError
                                     ) then '^' else  ' '
         text = intercalate " " argv
      in if A.length argv > 0
-           then message ++ ":\n> " ++ text ++ "\n  " ++ squiggles
+           then message ++ ":\n$ " ++ text ++ "\n  " ++ squiggles
            else message
 
