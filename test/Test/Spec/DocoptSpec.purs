@@ -18,11 +18,6 @@ infixl 9 concatPaths as </>
 
 fixtures = "./test/Test/Spec/fixtures/"
 
-docoptSpec :: forall e. Unit -> Spec ( fs      :: FS
-                                     , process :: PROCESS
-                                     , err     :: EXCEPTION
-                                     | e
-                                     ) Unit
 docoptSpec = \_ -> do
   describe "Docopt" do
     it "should work..." do

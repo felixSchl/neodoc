@@ -10,6 +10,9 @@ module Docopt (
   , defaultOptions
   , fromREADME
   , fromREADME_
+  , DocoptEff ()
+  , Options (..)
+  , Argv ()
   ) where
 
 import Prelude
@@ -51,6 +54,7 @@ import Language.Docopt.Env (Env())
 type Argv = Array String
 type DocoptEff e = ( process :: PROCESS
                    , err     :: EXCEPTION
+                   , console :: CONSOLE
                    , fs      :: FS
                    | e
                    )
