@@ -31,7 +31,7 @@ npm install --save neodoc
 
 ## Usage ##
 
-> Basic usage example. For more detail on what docopt can do, have a look at
+> Basic usage example. For more detail on what neodoc can do, have a look at
 > `testcases.docopt` in the repo.
 
 1. Given this node.js program:
@@ -121,8 +121,7 @@ npm install --save neodoc
   was rejected.
 * **No abbreviations:**
   `--ver` does not match `--verbose`.
-  <sub>[(mis-feature in the original
-  implementation)](https://github.com/docopt/docopt/issues/104)</sub>
+  <sub>[(mis-feature in the original implementation)](https://github.com/docopt/docopt/issues/104)</sub>
 * **Alias matches.** If `--verbose` yields a value, so will `-v` <sub>(given
   that's the assigned alias)</sub>. Likewise, `FOO` yields value `<foo>` as
   well as `FOO`, and `<foo>` yields `FOO` and `<foo>`.
