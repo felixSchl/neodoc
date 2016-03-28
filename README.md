@@ -136,15 +136,15 @@ npm install --save neodoc
   ```sh
   Usage: prog [<name> <type>]
   ```
-  
+
   will fail `prog foo`, but pass `prog foo bar`. The rational being that this is
   more general, since if the opposite behaviour (any match) was desired, it
   could be expressed as such:
-  
+
   ```sh
   Usage: prog [[<name>] [<type>]]
   ```
-  
+
   **note:** this rule excludes flags/switches and options that have default
   values (or other fallback values).
 * **There is no `null`** in the resulting value map. `null` simply means not
