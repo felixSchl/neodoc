@@ -6,10 +6,7 @@
 -- | curried/uncurried as needed.
 -- |
 
-module Docopt.FFI (
-    run
-  , defaultOptions
-  ) where
+module Docopt.FFI (run) where
 
 import Prelude
 import Debug.Trace
@@ -25,6 +22,7 @@ import Control.Bind ((=<<))
 import Control.Alt ((<|>))
 import Data.Foreign       as F
 import Data.Foreign.Index as F
+import Data.Foreign.Class as F
 
 import Unsafe.Coerce (unsafeCoerce)
 import Control.Monad.Eff.Exception (throwException, error)
@@ -49,26 +47,22 @@ _run :: forall e
      -> Foreign
      -> Eff (Docopt.DocoptEff e) (StrMap RawValue)
 _run docopt opts = do
-  result <- flip Docopt.run docopt $ either (const defaultOptions)
-                                            id
-                                            (readForeignOpts opts)
 
-  either onError
-          (return <<< (rawValue <$>))
-          result
+  let o = either (const Docopt.defaultOptions) id (readForeignOpts opts)
+  result <- Docopt.run o docopt
+  either onError (return <<< (rawValue <$>)) result
+
   where
+    toMaybe e = either (const Nothing) (return <<< id) e
+
     readForeignOpts o =
-      let argv = either (const Nothing)
-                        (return <<< id)
-                        (F.unsafeFromForeign =<< F.prop "argv" opts)
-          env  = either (const Nothing)
-                        (return <<< id)
-                        (F.unsafeFromForeign =<< F.prop "env" opts)
-       in return { argv: argv, env:  env }
+      -- XXX: The `unsafeCoerce` should probably go..., but there is currently
+      --      no `IsForeign` instance for `StrMap String`.
+      let env  = (unsafeCoerce <$> (toMaybe $ F.prop "env" o)) :: Maybe (StrMap String)
+          argv = (unsafeCoerce <$> (toMaybe $ F.readProp "argv" o)) :: Maybe (Array String)
+       in return { argv: argv, env: env }
 
     onError e = do
       Console.log $ dedent docopt
       Console.log e
       Process.exit 1
-
-defaultOptions = Docopt.defaultOptions
