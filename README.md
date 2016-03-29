@@ -180,7 +180,7 @@ npm install --save neodoc
 * [x] Lex and parse user input on the CLI
 * [x] Transform the parsed args into something more useful
 * [x] Run against docopt test-suite <sub>99% done</sub>
-* [ ] Provide developer and user error reporting
+* [x] Provide developer and user error reporting
 * [ ] Provide seamless interface to be called from JS
 * [x] Read arguments from env vars
 * [x] Implement special arguments
