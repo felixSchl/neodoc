@@ -200,6 +200,7 @@ npm install --save neodoc
 * [ ] Read options from config file
 * [ ] Allow for `--foo[=<bar>]` syntax (git style).
 * [ ] Add type validation via tags, e.g.: `[type: string]`
+* [ ] Auto-infer types when not specified (e.g. numbers, strings, booleans)
 * [ ] Allow flag negation sintax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
 
 ### Wishlist ###
