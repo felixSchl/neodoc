@@ -65,6 +65,9 @@ usageParser = do
       Cons
       <$> (usageLine name)
       <*> many do
+            P.optional $ P.try do
+              L.name >>= guard <<< (_ == "or")
+              L.colon
             P.try do
               program
               usageLine name
