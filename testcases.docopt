@@ -420,8 +420,8 @@ $ prog -b
 
 r"""usage: prog <arg>"""
 $ prog 10
-{"<arg>": "10",
- "ARG": "10"}
+{"<arg>": 10,
+ "ARG": 10}
 
 $ prog 10 20
 "user-error"
@@ -432,8 +432,8 @@ $ prog
 
 r"""usage: prog [<arg>]"""
 $ prog 10
-{"<arg>": "10",
- "ARG": "10"}
+{"<arg>": 10,
+ "ARG": 10}
 
 $ prog 10 20
 "user-error"
@@ -444,8 +444,8 @@ $ prog
 
 r"""usage: prog <kind> <name> <type>"""
 $ prog 10 20 40
-{"<kind>": "10", "<name>": "20", "<type>": "40",
- "KIND": "10", "NAME": "20", "TYPE": "40"}
+{"<kind>": 10, "<name>": 20, "<type>": 40,
+ "KIND": 10, "NAME": 20, "TYPE": 40}
 
 $ prog 10 20
 "user-error"
@@ -456,11 +456,11 @@ $ prog
 
 r"""usage: prog <kind> [<name> <type>]"""
 $ prog 10 20 40
-{"<kind>": "10", "<name>": "20", "<type>": "40",
- "KIND": "10", "NAME": "20", "TYPE": "40"}
+{"<kind>": 10, "<name>": 20, "<type>": 40,
+ "KIND": 10, "NAME": 20, "TYPE": 40}
 
 $ prog 10 20
-# Original: {"<kind>": "10", "<name>": "20"}
+# Original: {"<kind>": 10, "<name>": 20}
 "user-error"
 
 $ prog
@@ -472,8 +472,8 @@ $ prog 10 20 40
 "user-error"
 
 $ prog 20 40
-{"<name>": "20", "<type>": "40",
- "NAME": "20", "TYPE": "40"}
+{"<name>": 20, "<type>": 40,
+ "NAME": 20, "TYPE": 40}
 
 $ prog
 {}
@@ -486,11 +486,11 @@ options:
 
 """
 $ prog 10 --all
-{"--all": true, "<kind>": "10",
- "KIND": "10"}
+{"--all": true, "<kind>": 10,
+ "KIND": 10}
 
 $ prog 10
-{"--all": false, "<name>": "10", "NAME": "10"}
+{"--all": false, "<name>": 10, "NAME": 10}
 
 $ prog
 "user-error"
@@ -498,7 +498,7 @@ $ prog
 
 r"""usage: prog [<name> <name>]"""
 $ prog 10 20
-{"<name>": ["10", "20"], "NAME": ["10", "20"]}
+{"<name>": [10, 20], "NAME": [10, 20]}
 
 # Note: This is a deviation. The spec above says that
 #       it wants exactly *two* occurences of `<name>`.
@@ -506,7 +506,7 @@ $ prog 10 20
 #       See the added test below for how to do it in
 #       this implementation.
 # Original:
-# {"<name>": ["10"], "NAME": ["10"]}
+# {"<name>": [10], "NAME": [10]}
 $ prog 10
 "user-error"
 
@@ -517,10 +517,10 @@ $ prog
 # (See note above)
 r"""usage: prog [<name> [<name>]]"""
 $ prog 10 20
-{"<name>": ["10", "20"], "NAME": ["10", "20"]}
+{"<name>": [10, 20], "NAME": [10, 20]}
 
 $ prog 10
-{"<name>": ["10"], "NAME": ["10"]}
+{"<name>": [10], "NAME": [10]}
 
 $ prog
 {"<name>": [], "NAME": []}
@@ -528,7 +528,7 @@ $ prog
 
 r"""usage: prog [(<name> <name>)]"""
 $ prog 10 20
-{"<name>": ["10", "20"], "NAME": ["10", "20"]}
+{"<name>": [10, 20], "NAME": [10, 20]}
 
 $ prog 10
 "user-error"
@@ -538,22 +538,22 @@ $ prog
 
 r"""usage: prog NAME..."""
 $ prog 10 20
-{"<name>": ["10", "20"],
- "NAME": ["10", "20"]}
+{"<name>": [10, 20],
+ "NAME": [10, 20]}
 
 $ prog 10
-{"<name>": ["10"],
- "NAME": ["10"]}
+{"<name>": [10],
+ "NAME": [10]}
 
 $ prog
 "user-error"
 
 r"""usage: prog [NAME]..."""
 $ prog 10 20
-{"<name>": ["10", "20"], "NAME": ["10", "20"]}
+{"<name>": [10, 20], "NAME": [10, 20]}
 
 $ prog 10
-{"<name>": ["10"], "NAME": ["10"]}
+{"<name>": [10], "NAME": [10]}
 
 $ prog
 {"<name>": [], "NAME": []}
@@ -561,10 +561,10 @@ $ prog
 
 r"""usage: prog [NAME...]"""
 $ prog 10 20
-{"<name>": ["10", "20"], "NAME": ["10", "20"]}
+{"<name>": [10, 20], "NAME": [10, 20]}
 
 $ prog 10
-{"<name>": ["10"], "NAME": ["10"]}
+{"<name>": [10], "NAME": [10]}
 
 $ prog
 {"<name>": [], "NAME": []}
@@ -572,10 +572,10 @@ $ prog
 
 r"""usage: prog [NAME [NAME ...]]"""
 $ prog 10 20
-{"<name>": ["10", "20"], "NAME": ["10", "20"]}
+{"<name>": [10, 20], "NAME": [10, 20]}
 
 $ prog 10
-{"<name>": ["10"], "NAME": ["10"]}
+{"<name>": [10], "NAME": [10]}
 
 $ prog
 {"<name>": [], "NAME": []}
@@ -587,10 +587,10 @@ options: --foo
 
 """
 $ prog 10
-{"--foo": false, "<name>": "10", "NAME": "10"}
+{"--foo": false, "<name>": 10, "NAME": 10}
 
 $ prog --foo 10
-{"--foo": true, "<name>": "10", "NAME": "10"}
+{"--foo": true, "<name>": 10, "NAME": 10}
 
 $ prog --foo=10
 "user-error"
@@ -602,10 +602,10 @@ options: --bar
 
 """
 $ prog 10
-{"--bar": false, "--foo": false, "<name>": ["10"], "NAME": ["10"]}
+{"--bar": false, "--foo": false, "<name>": [10], "NAME": [10]}
 
 $ prog 10 20
-{"--bar": false, "--foo": false, "<name>": ["10", "20"], "NAME": ["10", "20"]}
+{"--bar": false, "--foo": false, "<name>": [10, 20], "NAME": [10, 20]}
 
 $ prog --foo --bar
 {"--bar": true, "--foo": true, "<name>": [], "NAME": []}
@@ -641,11 +641,11 @@ Options:
 # {"--drifting": false,
 #  "--help": false,
 #  "--moored": false,
-#  "--speed": "20",
+#  "--speed": 20,
 #  "--version": false,
 #  "<name>": ["Guardian"],
-#  "<x>": "150",
-#  "<y>": "300",
+#  "<x>": 150,
+#  "<y>": 300,
 #  "mine": false,
 #  "move": true,
 #  "new": false,
@@ -655,13 +655,13 @@ Options:
 #  "shoot": false}
 
 $ prog ship Guardian move 150 300 --speed=20
-{"--speed": "20",
+{"--speed": 20,
  "<name>": "Guardian",
- "<x>": "150",
- "<y>": "300",
+ "<x>": 150,
+ "<y>": 300,
  "NAME": "Guardian",
- "X": "150",
- "Y": "300",
+ "X": 150,
+ "Y": 300,
  "move": true,
  "ship": true}
 
@@ -916,7 +916,7 @@ usage: prog
        prog <a> <b>
 """
 $ prog 1 2
-{"<a>": "1", "<b>": "2", "A": "1", "B": "2"}
+{"<a>": 1, "<b>": 2, "A": 1, "B": 2}
 
 # Original: {"<a>": null, "<b>": null}
 $ prog
@@ -980,7 +980,7 @@ $ prog --long one --long two
 r"""usage: prog (go <direction> --speed=<km/h>)..."""
 
 $ prog  go left --speed=5  go right --speed=9
-{"--speed": ["5", "9"],
+{"--speed": [5, 9],
  "<direction>": ["left", "right"],
  "DIRECTION": ["left", "right"],
  "go": 2}
@@ -1058,7 +1058,7 @@ $ prog -pHOME
 
 r"""Usage: foo (--xx=x|--yy=y)..."""
 $ prog --xx=1 --yy=2
-{"--xx": ["1"], "--yy": ["2"]}
+{"--xx": [1], "--yy": [2]}
 
 #
 # POSIXly correct tokenization
@@ -1088,9 +1088,9 @@ options: --loglevel=N
 
 """
 # Original:
-# {"--loglevel": "5", "fail": true, "good": false}
+# {"--loglevel": 5, "fail": true, "good": false}
 $ prog fail --loglevel 5
-{"--loglevel": "5", "fail": true}
+{"--loglevel": 5, "fail": true}
 
 #
 # Usage-section syntax
@@ -1219,3 +1219,19 @@ $ prog -f=bar
 
 $ prog --foo=bar
 "user-error"
+
+r"""
+Usage: prog [-p] [-d]
+   or: prog syncdb [-p] [-d]
+
+common options:
+    -p, --port=<n>
+        [default: 5000]
+
+    -d, --database=<protocol[://[user[:password]@]host[:port][/database]]>
+        [default: memory]
+"""
+
+$ prog syncdb
+{"syncdb": true, "-p": 5000, "--port": 5000,
+ "--database": "memory", "-d": "memory"}

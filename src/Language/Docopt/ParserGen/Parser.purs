@@ -57,6 +57,7 @@ import Language.Docopt.Argument as D
 import Language.Docopt.Usage    as D
 import Language.Docopt.Env      as D
 import Language.Docopt.Option   as O
+import Language.Docopt.Value    as Value
 
 import Language.Docopt.ParserGen.Token
 import Language.Docopt.ParserGen.ValueMapping
@@ -142,7 +143,7 @@ command n = token go P.<?> "command " ++ show n
 positional :: String -> Parser D.Value
 positional n = token go P.<?> "positional argument " ++ show n
   where
-    go (Lit v) = Just (D.StringValue v)
+    go (Lit v) = Just (Value.read v)
     go _       = Nothing
 
 dash :: Parser D.Value
@@ -186,9 +187,9 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     go (LOpt n' v) atok | (not isFlag) && (n' == n)
       = case v of
           Just s ->
-            return $ OptParse (D.StringValue s) Nothing false
+            return $ OptParse (Value.read s) Nothing false
           _  -> return case atok of
-            Just (Lit s) -> OptParse (D.StringValue s)  Nothing true
+            Just (Lit s) -> OptParse (Value.read s)  Nothing true
             _            -> OptParse (D.BoolValue true) Nothing false
 
     -- case 2:
@@ -203,7 +204,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- provdided.
     go (LOpt n' Nothing) atok | not isFlag
       = case stripPrefix n n' of
-          Just s -> return $ OptParse (D.StringValue s) Nothing false
+          Just s -> return $ OptParse (Value.read s) Nothing false
           _      -> Left "Invalid substring"
 
     go a b = Left $ "Invalid token" ++ show a ++ " (input: " ++ show b ++ ")"
@@ -242,7 +243,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
       = case v of
           Just val -> return $ OptParse (D.StringValue val) Nothing false
           _  -> return case atok of
-            Just (Lit s) -> OptParse (D.StringValue s) Nothing true
+            Just (Lit s) -> OptParse (Value.read s) Nothing true
             _ -> OptParse (D.BoolValue true)
                           Nothing
                           false
@@ -253,7 +254,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (A.length xs > 0)
       = do
         let a = fromCharArray xs ++ maybe "" id v
-        return $ OptParse (D.StringValue a)
+        return $ OptParse (Value.read a)
                           Nothing
                           false
 

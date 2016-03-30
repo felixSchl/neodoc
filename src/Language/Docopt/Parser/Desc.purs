@@ -28,6 +28,7 @@ import Language.Docopt.Parser.Common
 import Language.Docopt.Parser.State
 import Language.Docopt.Parser.Lexer (lexDescs)
 import Language.Docopt.Parser.Lexer as L
+import Language.Docopt.Value as Value
 
 data Desc = OptionDesc Option
           | CommandDesc
@@ -70,8 +71,8 @@ isDefaultTag :: Content -> Boolean
 isDefaultTag (Default _) = true
 isDefaultTag _           = false
 
-getDefaultValue :: Content -> Maybe String
-getDefaultValue (Default v) = Just v
+getDefaultValue :: Content -> Maybe Value
+getDefaultValue (Default v) = either (const Nothing) Just (Value.parse v)
 getDefaultValue _           = Nothing
 
 isEnvTag :: Content -> Boolean
@@ -207,25 +208,7 @@ descParser =
             , arg = do
                 (Argument arg) <- opt.arg
                 return $ Argument $ arg {
-                  default = do
-                    d <- default
-                    either (const Nothing) Just do
-                      P.runParser d do
-                        xs <- flip P.sepBy1 (some $ P.char ' ') do
-                          fromCharArray <<< fromList <$> do
-                            P.choice $ P.try <$> [
-                              P.between (P.char '"')
-                                        (P.char '"')
-                                        (many $ P.noneOf ['"'])
-                            , P.between (P.char '\'')
-                                        (P.char '\'')
-                                        (many $ P.noneOf ['\''])
-                            , many $ P.noneOf [' ']
-                            ]
-
-                        return $ case xs of
-                          Cons x Nil -> StringValue x
-                          xs         -> ArrayValue $ StringValue <$> fromList xs
+                  default = default
                 }
             }
 
