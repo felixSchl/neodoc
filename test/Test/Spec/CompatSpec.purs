@@ -170,7 +170,7 @@ genCompatSpec = do
                 Left e ->
                   either
                     (const $ pure unit)
-                    (const $ throwException $ error $ show e)
+                    (const $ throwException $ error $ e)
                     out
                 Right output -> do
                   either
