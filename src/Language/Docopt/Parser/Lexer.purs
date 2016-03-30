@@ -292,9 +292,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     name <- fromCharArray <$> do
       A.some $ P.choice [
         identLetter
-        -- XXX: how to make this more generic?
-        --      `noneOf [ '>' ]` seems to overflow the stack
-      , P.oneOf [ '-', '|', ':', '[', ']', '(', ')', ' ', '/' ]
+      , P.try $ P.noneOf [ '>' ]
       ]
     P.char '>'
     pure name
