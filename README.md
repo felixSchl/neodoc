@@ -1,27 +1,51 @@
-# Neodoc #
-
 > :warning: This project is nearing completion. It is not yet on npm, and
-> some of the information in this README may therefore be ahead of it's time.
+> a last few wrinkles are being ironed out. **It will arrive shortly.**
 
-[![Build Status](https://travis-ci.org/felixSchl/docopt.svg?branch=development)](https://travis-ci.org/felixSchl/docopt)
+<div align="center">
+    <h1>
+        <strong><sub>&lt;</sub> neodoc <sub>&gt;</sub></strong>
+    </h1>
+    <em><sub>Beautiful command lines for you and me</sub></em>
+</div>
 
-This is a revised implementation of the [docopt language][docopt-orig] for
-node.  It features **error reporting**, both for users and developers, as well
-reading values from **environment variables** with many more [features planned](#post-beta-roadmap)
-for the near future.
+<br/>
 
-## Table of contents ##
+<p align="center">
+  <a href="https://travis-ci.org/felixSchl/docopt">
+    <img src="https://travis-ci.org/felixSchl/docopt.svg?branch=development?style=flat-square"
+         alt="Build Status">
+  </a>
+<br/>
 
-* [Installation](#installation)
-* [Usage](#usage)
-* [Project goals](#project-goals)
-    * [Deviations from original](#deviations-from-the-original)
-* [Project status](#project-status)
-    * [Beta target](#beta-target)
-    * [Post Beta Roadmap](#post-beta-roadmap)
-    * [Wishlist](#wishlist)
-* [Contributing](#contributing)
-    * [Implementation overview](#implementation-overview)
+<p align="center">
+    <b><a href="#about">About</a></b>
+  | <b><a href="#installation">Installation</a></b>
+  | <b><a href="#usage">Usage</a></b>
+  | <b><a href="#project-goals">Goals</a></b>
+  | <b><a href="#project-status">Status</a></b>
+  | <b><a href="#contributing">Contributing</a></b>
+  | <b><a href="#license">License</a></b>
+</p>
+
+<br/>
+
+## About
+
+<strong>&lt;neodoc&gt;</strong> is a revised implementation of the [docopt
+language][docopt-orig] for node. In brief, it offers a unique way to author
+command lines by writing the command line's help text first and then deriving
+a matching parser of it to apply against user input. The advantages are
+numerous:
+
+* Documentation and implementation are always in sync
+* Great discoverability for the user
+* Provokes thinking about the user first
+* No parsing code - _the docopt text **is** the code_
+
+This implementation features **error reporting**, both for users and developers,
+reading values from **environment variables**, type coercion and much more. For
+an (in-)comprehensive comparison to the original, click
+[here](#deviations-from-the-original).
 
 ## Installation ##
 
@@ -60,18 +84,17 @@ npm install --save neodoc
 
     console.log(argv);
     ```
-    <sub>file: prog</sub>
 
 2. We can provide various input:
 
     ```bash
-    $ prog ship new foo bar baz
+    $ ./prog ship new foo bar baz
       {'<name>': ['foo', 'bar', 'baz'],
        'NAME': ['foo', 'bar', 'baz'],
        'new': true,
        'ship': true}
 
-    $ prog ship foo move 10 10 --speed
+    $ ./prog ship foo move 10 10 --speed
       Naval Fate.
 
       Usage:
@@ -192,6 +215,7 @@ npm install --save neodoc
 
 > Overview of where docopt is headed, ordered (somewhat) by estimated priority.
 
+* [ ] Implement optional option arguments: `-a [foo]`.
 * [ ] Implement `--help` and `--version`. The developer will be able to specify
   the option that will trigger the `--help` and `--version` convenience
   functions, with fallbacks to `--help` and `--version`.
@@ -242,6 +266,11 @@ npm i && bower i && npm test
 NB: Purescript is declared a devDependency in package.json, so no need to bring
 your own. Also, during development, `npm run watch` is extremely useful to get
 immediate feedback.
+
+## License ##
+
+<strong>&lt;neodoc&gt;</strong> is released under the **MIT LICENSE**.
+See file `LICENSE` for a more detailed description of it's terms.
 
 ---
 
