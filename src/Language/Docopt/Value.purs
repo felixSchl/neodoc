@@ -9,16 +9,21 @@ module Language.Docopt.Value (
   ) where
 
 import Prelude
+import Unsafe.Coerce (unsafeCoerce)
+import Debug.Trace
 import Data.Generic
 import Data.Either (Either(), either)
 import Data.Int as Int
-import Data.List (fromList, many)
+import Data.List (List(..), fromList, many, some)
 import Data.Maybe (fromMaybe)
+import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
 import Text.Parsing.Parser             as P
 import Text.Parsing.Parser.Combinators as P
 import Text.Parsing.Parser.String      as P
+import Data.Array as A
 import Data.String (fromCharArray)
+import Data.String as Str
 import Global (isNaN, readFloat)
 
 data Value
@@ -78,19 +83,42 @@ prettyPrintValue (IntValue    i) = show i
 read :: String -> Value
 read s = either (const $ StringValue s) id (parse s)
 
+-- | Parse a string into a value
+-- | Values can be command *AND* space separated:
+-- |
+-- | a  b  c -> [ a, b, c ]
+-- | a, b, c -> [ a, b, c ]
+-- | a  b, c -> [ a, b, c ]
+-- | a, b  c -> [ a, b, c ]
+-- |
 parse :: String -> Either P.ParseError Value
-parse s = P.runParser s $ P.choice [ bool
-                                   , number
-                                   , quoted
-                                   , return (StringValue s)
-                                   ]
-  where
+parse s = P.runParser s $ do
+  vs <- P.sepBy1 inner $ P.choice [
+    P.try $ many white *> (P.char ',') *> many white
+  , some $ white
+  ]
 
-    number = let n = readFloat s
-              in if isNaN n then P.fail "NaN"
-                            else return
-                                    $ fromMaybe (FloatValue n)
-                                                (IntValue <$> Int.fromNumber n)
+  return $ case vs of
+        Cons x Nil -> x
+        _          -> ArrayValue (fromList vs)
+
+  where
+    white = P.char ' ' <|> P.char '\n'
+
+    inner =do
+      P.try value <|> do StringValue <$> do
+                                  fromCharArray <<< fromList <$> do
+                                    many $ P.try (P.noneOf [',', ' ', '\n'])
+
+    value = P.choice $ P.try <$> [ bool, number, quoted ]
+
+    number = do
+      s <- fromCharArray <$> A.some (P.noneOf [',', ' ', '\n'])
+      let n = readFloat s
+      if isNaN n then P.fail "NaN"
+                 else if (Str.contains "." s)
+                        then return (FloatValue n)
+                        else return (IntValue   (unsafeCoerce n))
 
 
     bool = true' <|> false'

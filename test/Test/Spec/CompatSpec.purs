@@ -101,7 +101,8 @@ parseUniversalDocoptTests = do
       P.skipSpaces *> skipComments *>  P.skipSpaces
       output <- P.choice $ P.try <$>
         [ Right <$> do
-            P.between (P.char '{') (P.char '}') do
+            P.between (many space *> P.char '{' *> many space)
+                      (many space *> P.char '}' *> many space) do
               flip P.sepBy (P.char ',') do
                 P.skipSpaces
                 key <- P.between (P.char '"') (P.char '"') do

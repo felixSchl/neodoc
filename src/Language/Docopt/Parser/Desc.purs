@@ -22,7 +22,7 @@ import Data.String (toLower, fromChar, fromCharArray)
 import Data.Array as A
 import Data.String as Str
 
-import Language.Docopt.Value
+import Language.Docopt.Value hiding (parse, read)
 import Language.Docopt.Parser.Base
 import Language.Docopt.Parser.Common
 import Language.Docopt.Parser.State
