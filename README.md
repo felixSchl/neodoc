@@ -1,6 +1,3 @@
-> :warning: This project is nearing completion. It is not yet on npm, and
-> a last few wrinkles are being ironed out. **It will arrive shortly.**
-
 <div align="center">
     <h1>
         <strong><sub>&lt;</sub> neodoc <sub>&gt;</sub></strong>
@@ -202,7 +199,7 @@ npm install --save neodoc
 * [x] Transform the parsed args into something more useful
 * [x] Run against docopt test-suite <sub>99% done</sub>
 * [x] Provide developer and user error reporting
-* [ ] Provide seamless interface to be called from JS
+* [x] Provide seamless interface to be called from JS
 * [x] Read arguments from env vars
 * [x] Implement special arguments
     * [x] `--` (end of args) not yet implemented
