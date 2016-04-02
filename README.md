@@ -257,7 +257,7 @@ npm install --save neodoc
 **Contributions are highly encouraged and welcome**.
 Bug fixes and clean ups need not much coordination, but if you're interested
 in contributing a feature, contact me at felixschlitter@gmail.com and we can
-the ball rolling &mdash; There's plenty to do. To get up and running, run:
+get the ball rolling &mdash; There's plenty to do. To get up and running, run:
 
 ```sh
 npm i && bower i && npm test
