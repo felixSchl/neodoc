@@ -21,6 +21,7 @@ import Data.Generic
 import Data.String (toLower, fromChar, fromCharArray)
 import Data.Array as A
 import Data.String as Str
+import Data.String.Ext ((^=))
 
 import Language.Docopt.Value hiding (parse, read)
 import Language.Docopt.Parser.Base
@@ -278,7 +279,9 @@ descParser =
                 }
 
               where
-                combineArg (Just a) (Just b) | (a == b) = return (pure a)
+                combineArg (a@(Just (Argument { name: n  })))
+                              (Just (Argument { name: n' }))
+                          | (n ^= n') = return a
                 combineArg Nothing  (Just b)            = return (pure b)
                 combineArg (Just a) Nothing             = return (pure a)
                 combineArg Nothing Nothing              = return Nothing
