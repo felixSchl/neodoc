@@ -144,9 +144,9 @@ prettyPrintArgument :: Argument -> String
 prettyPrintArgument (Argument { name: n, default: d })
   = n ++ maybe "" (\v -> " [default: " ++ (prettyPrintValue v) ++  "]") d
 
-argument :: String -> Maybe String -> Argument
+argument :: String -> Maybe Value -> Argument
 argument name default = Argument { name:    name
-                                 , default: StringValue <$> default
+                                 , default: default
                                  }
 
 run :: String -> Either P.ParseError (List Desc)

@@ -3,9 +3,10 @@ module Test.Support.Desc where
 import Prelude
 import Data.Maybe (Maybe(..))
 
-import qualified Language.Docopt.Parser.Desc as Desc
+import Language.Docopt.Value
+import Language.Docopt.Parser.Desc as Desc
 
-arg :: String -> Maybe String -> Desc.Argument
+arg :: String -> Maybe Value -> Desc.Argument
 arg = Desc.argument
 
 opt :: Desc.Name -> Maybe Desc.Argument -> Desc.Desc
