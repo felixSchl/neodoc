@@ -274,62 +274,52 @@ parseToken m = P.choice (P.try <$> A.concat [
           Nothing -> P.fail "Could not parse integer"
 
   name :: P.Parser String String
-  name = fromCharArray <$> do
-    A.cons
-      <$> identStart
-      <*> A.many identLetter
+  name = word
+
+  shoutName :: P.Parser String String
+  shoutName = do
+    n <- fromCharArray <$> do
+      A.cons
+        <$> upperAlpha
+        <*> (A.many $ regex "[A-Z_-]")
+    P.notFollowedBy lowerAlpha
+    return n
 
   word :: P.Parser String String
-  word = fromCharArray <$> do
-    (A.some $ P.choice [
-      identLetter
-    , P.oneOf [ '.', '-', '_' ]
-    ])
+  word = do
+    n  <- alphaNum
+    ns <- do
+      A.many $ P.try $ do
+        P.choice $ P.try <$> [
+          identLetter
+        , P.char '.' <* (P.notFollowedBy $ P.string "..")
+        , P.oneOf [ '-', '_' ]
+      ]
+    return $ fromCharArray (n A.: ns)
 
   angleName :: P.Parser String String
   angleName = do
     P.char '<'
-    name <- fromCharArray <$> do
+    n <- fromCharArray <$> do
       A.some $ P.choice [
         identLetter
       , P.try $ P.noneOf [ '>' ]
       ]
     P.char '>'
-    pure name
-
-  shoutName :: P.Parser String String
-  shoutName = do
-    name <- fromCharArray <$> do
-      A.cons
-        <$> upperAlpha
-        <*> (A.many $ regex "[A-Z_-]")
-    P.notFollowedBy lowerAlpha
-    pure name
+    return n
 
   shortOption :: P.Parser String Token
   shortOption = do
     P.char '-'
     x  <- alphaNum
     xs <- A.many alphaNum
-    arg <- P.choice [
-
-      -- Parse <flag>=<value>, i.e.: `-foo=bar`
-      P.try $ Just <$> do
+    arg <- P.choice $ P.try <$> [
+      Just <$> do
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
-        P.choice [
-          P.try angleName
-        , P.try shoutName
-        , P.try name
-        ]
-
-      -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
-    , P.try $ Just <$> angleName
-
-      -- Otherwise assume no argument given. We might be proven wrong at a later
-      -- stage (parsing / solving), but as far as the lexer is concerned, this
-      -- token bears no arguments.
-    , pure Nothing
+        P.choice $ P.try <$> [ angleName, shoutName, name ]
+    , Just <$> angleName
+    , return Nothing
     ]
 
     -- Ensure the argument is correctly bounded
@@ -343,11 +333,12 @@ parseToken m = P.choice (P.try <$> A.concat [
     , P.try $ void $ P.string "..."
     ]
 
-    pure $ SOpt x xs arg
+    return $ SOpt x xs arg
 
   longOption :: P.Parser String Token
   longOption = do
     P.string "--"
+
     name' <- fromCharArray <$> do
       A.cons
         <$> alphaNum
@@ -355,25 +346,14 @@ parseToken m = P.choice (P.try <$> A.concat [
               alphaNum
             , P.oneOf [ '-' ] <* P.lookAhead alphaNum
             ])
-    arg <- P.choice [
 
-      -- Parse <flag>=<value>, i.e.: `--foo=bar`
-      P.try $ Just <$> do
+    arg <- P.choice $ P.try <$> [
+      Just <$> do
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
-        P.choice [
-          P.try angleName
-        , P.try shoutName
-        , P.try name
-        ]
-
-      -- Parse <flag><VALUE>, i.e.: `-foo<bar>`
-    , P.try $ Just <$> angleName
-
-      -- Otherwise assume no argument given. We might be proven wrong at a later
-      -- stage (parsing / solving), but as far as the lexer is concerned, this
-      -- token bears no arguments.
-    , pure Nothing
+        P.choice $ P.try <$> [ angleName, shoutName, name ]
+    , Just <$> angleName
+    , return Nothing
     ]
 
     -- Ensure the argument is correctly bounded
@@ -387,7 +367,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     , P.try $ void $ P.string "..."
     ]
 
-    pure $ LOpt name' arg
+    return $ LOpt name' arg
 
   identStart :: P.Parser String Char
   identStart = alpha

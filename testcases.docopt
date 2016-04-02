@@ -1261,3 +1261,14 @@ $ prog
          true, false, true, false,
          -100, -10.0,
          "True", "True False 10"] }
+
+#
+# Valid program names
+#
+
+r"""
+Usage: prog.js [options]
+"""
+
+$ prog
+{}
