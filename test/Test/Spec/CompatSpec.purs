@@ -36,6 +36,7 @@ import Test.Support.Desc   as Desc
 
 import Language.Docopt (runDocopt)
 import Language.Docopt.Value as D
+import Language.Docopt.Value as Value
 
 import Data.List (List(..), many, some, (:), toList, concat, singleton, length
                 , fromList)
@@ -134,14 +135,15 @@ parseUniversalDocoptTests = do
               flip P.sepBy (P.skipSpaces *> P.char ',' *> P.skipSpaces) do
                 value
         , do
+            si <- P.option 1 (P.char '-' *> return (-1))
             xs <- fromCharArray <$> A.some digit
             P.choice [
-              D.FloatValue <<< readFloat <$> do
+              D.FloatValue <<< ((Int.toNumber si) *) <<< readFloat <$> do
                 xss <- do
                   P.char '.'
                   fromCharArray <$> A.some digit
                 return $ xs ++ "." ++ xss
-            , return $ D.IntValue $ fromJust $ Int.fromString xs
+            , return $ D.IntValue $ si * (fromJust $ Int.fromString xs)
             ]
         ]
 

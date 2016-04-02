@@ -92,17 +92,19 @@ read s = either (const $ StringValue s) id (parse s)
 -- | a, b  c -> [ a, b, c ]
 -- |
 parse :: String -> Either P.ParseError Value
-parse s = P.runParser s $ do
-  vs <- P.sepBy1 inner $ P.choice [
-    P.try $ many white *> (P.char ',') *> many white
-  , some $ white
-  ]
-
-  return $ case vs of
-        Cons x Nil -> x
-        _          -> ArrayValue (fromList vs)
+parse = flip P.runParser values
 
   where
+    values = do
+      vs <- P.sepBy1 inner $ P.choice [
+        P.try $ many white *> (P.char ',') *> many white
+      , some $ white
+      ]
+
+      return $ case vs of
+            Cons x Nil -> x
+            _          -> ArrayValue (fromList vs)
+
     white = P.char ' ' <|> P.char '\n'
 
     inner =do

@@ -1249,9 +1249,12 @@ Usage: prog [options]
 
 Options: -f=<n>  [default: foo , bar qux, "foo bar", 400, true,
                            false, 10.0, 10., 0x10 TRUE, FALSE, True False,
+                           -100, -10.0
                            "True" "True False 10"]
 """
 
 $ prog
 { "-f": ["foo", "bar", "qux", "foo bar", 400, true, false, 10.0, 10.0, 0,
-         true, false, true, false, "True", "True False 10"] }
+         true, false, true, false,
+         -100, -10.0,
+         "True", "True False 10"] }
