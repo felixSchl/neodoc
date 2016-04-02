@@ -17,8 +17,8 @@
     "deps": "bower install",
     "clean": "git stash && git clean -fdX",
     "prerelease": "npm run clean && npm install && npm run deps && npm test",
-    "release": "#npm version",
-    "postrelease": "#git push --tags && npm publish"
+    "release": "npm version",
+    "postrelease": "git push --tags && npm publish"
   },
   "repository": {
     "type": "git",
