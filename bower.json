@@ -26,7 +26,7 @@
     "purescript-maps": "~0.5.7",
     "purescript-monadplus-partial": "~0.2.2",
     "purescript-node-process": "~0.4.1",
-    "purescript-spec": "~0.7.2",
+    "purescript-spec": "f98fd4f62e4a64741be7adc867033ab352451962",
     "purescript-node-fs-aff": "~0.5.0",
     "purescript-unsafe-coerce": "~0.1.0"
   },
