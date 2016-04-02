@@ -293,42 +293,4 @@ Options:
   the associated option / positional arg was parsed, ignoring any failures for
   the time being, then run again with the config file default values).
 
----
-
-
-## Ideas for a future past the initial relase ##
-
-* Write syntax plugin for vim
-* First class commands description sections (and `[options...]`)
-    * Consider the following:
-        ```sh
-        Usage:
-            git branch [options...] [branch-options...]
-            #            ^                ^
-            #            |                |
-            #            |                `- Denotes common options
-            #            |
-            #            `- denotes options specific to `branch` command
-
-        Common Options: # <-- Identify as match for `options` by substring
-          -h, --help  Show this help and exit
-
-        Branch Options: # <-- Identify as match for `branch-options` by substring
-          -D <name>  Delete the branch identified by <name>
-        ```
-    * Or the following (multiple usage):
-        ```sh
-        Usage:
-            git branch
-
-        Git-branch usage: # <-- Identify as match for `branch` by substring
-            git branch [options...] [-D]
-
-        Git-branch options: # <-- Identify as match for `branch` by substring
-            -D <name>  Delete the branch identified by <name>
-        ```
-        This approach is slightly more verbose, but might be easier for
-        normalization for large projects across different files?
-
-
 [docopt-orig]: http://docopt.org
