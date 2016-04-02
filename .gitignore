@@ -7,3 +7,5 @@ output/
 .psci*
 src/.webpack.js
 .pulp-cache
+package
+*.tgz
