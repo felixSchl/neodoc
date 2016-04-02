@@ -61,7 +61,7 @@ npm install --save neodoc
     #!/usr/bin/env node
 
     import neodoc from 'neodoc';
-    const argv = neodoc(`
+    const argv = neodoc.run(`
       Naval Fate.
 
       Usage:
