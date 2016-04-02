@@ -5,10 +5,8 @@
     <h1>
         <strong><sub>&lt;</sub> neodoc <sub>&gt;</sub></strong>
     </h1>
-    <em><sub>Beautiful command lines for you and me</sub></em>
+    <em><sub></sub></em>
 </div>
-
-<br/>
 
 <p align="center">
   <a href="https://travis-ci.org/felixSchl/docopt">
@@ -34,13 +32,13 @@
 <strong>&lt;neodoc&gt;</strong> is a revised implementation of the [docopt
 language][docopt-orig] for node. In brief, it offers a unique way to author
 command lines by writing the command line's help text first and then deriving
-a matching parser of it to apply against user input. The advantages are
-numerous:
+a matching parser from it, which can then be applied to user input. The
+advantages are numerous:
 
 * Documentation and implementation are always in sync
 * Great discoverability for the user
 * Provokes thinking about the user first
-* No parsing code - _the docopt text **is** the code_
+* No awkward, unreadable EDSL
 
 This implementation features **error reporting**, both for users and developers,
 reading values from **environment variables**, type coercion and much more. For
