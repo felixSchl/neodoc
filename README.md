@@ -201,8 +201,7 @@ npm install --save neodoc
   * [ ] Implement `--version`. If matched, print the npm package version.
 * [ ] Read options from config file
 * [ ] Allow for `--foo[=<bar>]` syntax (git style).
-* [ ] Add type validation via tags, e.g.: `[type: string]`
-* [ ] Auto-infer types when not specified (e.g. numbers, strings, booleans)
+* [x] Auto-infer types when not specified (e.g. numbers, strings, booleans)
 * [ ] Allow flag negation sintax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
 
 ### Wishlist ###
@@ -210,7 +209,6 @@ npm install --save neodoc
 > A list of things that are desired, but have not found a place on the roadmap.
 
 * Fix all purescript warnings
-* Custom validations (see `[type: ...]` tag)
 * Provide typescript typings
 * Read options from config file
 * Read options from prompt (Add a `[prompt]` tag)
@@ -223,8 +221,6 @@ npm install --save neodoc
   options and all that.
 * Provide warnings. This would mean a largish refactor to use either a custom
   monad, or the Writer monad, stacked on top of the Either monad.
-* Allow boolean negation. Let `--foo` be an option of type boolean, implicitly
-  allow it's negation `--no-foo`.
 * Refactor `Language.Docopt.ParserGen.Parser.genBranchParser` to use manual
   recursive iteration, rather than a fold, like in `Language.Docopt.Solver`.
 * Rewrite recursive functions to be in tail position, using
