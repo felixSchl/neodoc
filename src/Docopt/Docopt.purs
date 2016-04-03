@@ -37,17 +37,22 @@ import Language.Docopt.Parser.Base (sof)
 import Control.Alt ((<|>))
 import Control.Apply ((*>))
 import Control.Monad.Eff.Console (log, CONSOLE)
+import Control.Monad.Eff.Console as Console
+import Text.Wrap (dedent)
 import Data.Map (Map())
 import Data.StrMap (StrMap())
 import Data.Array (drop)
 import Data.Array as A
+import Data.Bifunctor (lmap)
+import Data.Foldable (intercalate)
+import Data.List.WordsLines (lines, unlines)
 
 import Text.Parsing.Parser             as P
 import Text.Parsing.Parser.Combinators as P
 import Text.Parsing.Parser.Pos         as P
 import Text.Parsing.Parser.String      as P
 
-import Language.Docopt (runDocopt)
+import Language.Docopt (runDocopt, parseDocopt, applyDocopt)
 import Language.Docopt as D
 import Language.Docopt.Env (Env())
 
@@ -86,8 +91,14 @@ run :: forall e
 run o d = do
   argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
   env  <- maybe Process.getEnv              (return <<< id) o.env
-  return $ runDocopt d env argv
+  return $ do
+    { parser, specification, usage } <- parseDocopt d
+    lmap ((help usage) ++) do
+      applyDocopt parser specification env argv
 
+  where help usage = "Usage:\n"
+            ++ (unlines $ ("  " ++) <$> lines (dedent usage))
+            ++ "\n"
 -- |
 -- | Extract the docopt text from a README, then run it.
 -- |

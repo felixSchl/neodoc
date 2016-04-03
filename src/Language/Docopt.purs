@@ -42,19 +42,27 @@ import Language.Docopt.Solver       as Solver
 import Language.Docopt.Parser.Usage as Usage
 import Language.Docopt.Parser.Desc  as Desc
 
+type Docopt = {
+  usage         :: String
+, specification :: List D.Usage
+, parser        :: G.Parser G.Result
+}
+
 -- |
 -- | Parse the docopt text and produce a parser
 -- | that can be applied to user input.
 -- |
 parseDocopt :: String  -- ^ The docopt text
-            -> Either String (Tuple (List D.Usage)
-                                    (G.Parser G.Result))
+            -> Either String Docopt
 parseDocopt docopt = do
   doc <- toScanErr       $ Scanner.scan $ dedent docopt
   us  <- toUsageParseErr $ Usage.run doc.usage
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve us ds
-  return $ Tuple prg (G.genParser prg)
+  return $ { specification: prg
+           , parser:        G.genParser prg
+           , usage:         doc.usage
+           }
 
 -- |
 -- | Apply the generated docopt parser to user input.
@@ -77,8 +85,8 @@ runDocopt :: String        -- ^ The docopt text
           -> Array String  -- ^ ARGV
           -> Either String (StrMap D.Value)
 runDocopt docopt env argv = do
-  (Tuple prg p) <- parseDocopt docopt
-  applyDocopt p prg env argv
+  { specification, parser } <- parseDocopt docopt
+  applyDocopt parser specification env argv
 
 toScanErr :: forall a. Either P.ParseError a -> Either String a
 toScanErr  = lmap (D.prettyPrintDocoptError <<< D.DocoptScanError)

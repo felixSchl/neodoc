@@ -15,6 +15,7 @@ import Docopt as Docopt
 import Data.Foreign
 import Data.Maybe (Maybe(..))
 import Data.Foreign.Class (IsForeign)
+import Data.Bifunctor (rmap)
 import Control.Monad.Eff (Eff())
 import Data.Either (Either(), either)
 import Data.StrMap (StrMap())
@@ -41,28 +42,22 @@ rawValue (StringValue s) = unsafeCoerce s
 rawValue (ArrayValue xs) = unsafeCoerce $ rawValue <$> xs
 
 run = mkFn2 _run
-
 _run :: forall e
       . String
      -> Foreign
      -> Eff (Docopt.DocoptEff e) (StrMap RawValue)
 _run docopt opts = do
-
   let o = either (const Docopt.defaultOptions) id (readForeignOpts opts)
   result <- Docopt.run o docopt
   either onError (return <<< (rawValue <$>)) result
 
   where
     toMaybe e = either (const Nothing) (return <<< id) e
-
     readForeignOpts o =
-      -- XXX: The `unsafeCoerce` should probably go..., but there is currently
-      --      no `IsForeign` instance for `StrMap String`.
-      let env  = (unsafeCoerce <$> (toMaybe $ F.prop "env" o)) :: Maybe (StrMap String)
-          argv = (unsafeCoerce <$> (toMaybe $ F.readProp "argv" o)) :: Maybe (Array String)
-       in return { argv: argv, env: env }
-
+      return {
+        argv: unsafeCoerce <$> (toMaybe $ F.readProp "argv" o)
+      , env:  unsafeCoerce <$> (toMaybe $ F.prop "env" o)
+      }
     onError e = do
-      Console.log $ dedent docopt
       Console.log e
       Process.exit 1

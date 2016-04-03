@@ -28,7 +28,8 @@
     "purescript-node-process": "~0.4.1",
     "purescript-spec": "f98fd4f62e4a64741be7adc867033ab352451962",
     "purescript-node-fs-aff": "~0.5.0",
-    "purescript-unsafe-coerce": "~0.1.0"
+    "purescript-unsafe-coerce": "~0.1.0",
+    "purescript-words-lines": "^0.0.2"
   },
   "resolutions": {
     "purescript-transformers": "~0.8.4",
