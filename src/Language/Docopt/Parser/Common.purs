@@ -111,7 +111,7 @@ lessIndented = checkIndentation (<) P.<?> "less indentation"
 -- current mark
 --
 sameIndent :: TokenParser Unit
-sameIndent = checkIndentation (==) P.<?> "no indentation"
+sameIndent = checkIndentation (==) P.<?> "same indentation"
 
 -- |
 -- Check that the current line matches a predicate

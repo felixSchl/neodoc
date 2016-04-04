@@ -94,15 +94,17 @@ prettyPrintDocoptError
     (P.ParseError { message: message
                   , position: P.Position { column: col } }))
   = let isTrailingError = startsWith "Trailing" message -- XXX: This is brittle
+        isMissingError  = startsWith "Missing" message  -- XXX: This is brittle
         squiggles =
-          intercalate " " $ toList argv `flip mapWithIndex` \a i ->
-                              fromCharArray $ A.replicate (Str.length a) $
-                                if (if isTrailingError
-                                        then (i + 1) >= col
-                                        else (i + 1) == col
-                                    ) then '^' else  ' '
+          if isMissingError then "" else
+            intercalate " " $ toList argv `flip mapWithIndex` \a i ->
+                                fromCharArray $ A.replicate (Str.length a) $
+                                  if (if isTrailingError
+                                          then (i + 1) >= col
+                                          else (i + 1) == col
+                                      ) then '^' else  ' '
         text = intercalate " " argv
      in if A.length argv > 0
-           then message ++ ":\n$ " ++ text ++ "\n  " ++ squiggles
+           then message ++ ":\nInput: " ++ text ++ "\n  " ++ squiggles
            else message
 

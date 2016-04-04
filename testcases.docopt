@@ -746,7 +746,7 @@ This one is probably most readable user-friednly variant.
 
 """
 $ prog
-{}
+{"-v": 0}
 
 $ prog -v
 {"-v": 1}
@@ -812,7 +812,7 @@ $ prog go go go go go
 #
 # Test [options] shourtcut
 #
-
+#
 r"""Usage: prog [options] A
 Options:
     -q  Be quiet
@@ -1272,3 +1272,41 @@ Usage: prog.js [options]
 
 $ prog
 {}
+
+r"""
+Usage: create_ec2.py --profile=PROFILE --name=INSTANCE_NAME --instance-type=INSTANCE_TYPE
+        --key-name=KEY_NAME
+        --ami=AMI_NAME --subnet=SUBNET_NAME
+        --iam-instance-profile=IAM_INSTANCE_PROFILE
+        [--security-group=SECURITY_GROUP]...
+        [--elb=ELB_NAME]...
+        [(--tag-name=STRING --tag-value=VALUE)]...
+NOT PART OF SECTION
+
+Options:
+    -P PROFILE --profile=PROFILE                            profile in which to operate
+    -n NAME --name=NAME                                     element name
+    -T KEY --tag-name=KEY                                   tag name
+    -V VALUE--tag-value=VALUE                               tag value
+    -e ELB_NAME --elb=ELB_NAME                              name of ELB to register an instance with
+    -a AMI_NAME --ami=AMI_NAME                              name of AMI to install an instance with
+    -t TYPE --instance-type=TYPE                            instance type to create instance with
+    -k KEY_NAME --key-name=KEY_NAME                         name of key that grants access to instance
+    -s SUBNET_NAME --subnet=SUBNET_NAME                      subnet name to create instance in
+    -S SG_NAME --security-group=SG_NAME                     security group to set to the instance
+    -p PROFILE_NAME --iam-instance-profile=PROFILE_NAME     IAM instance profile to start instance with
+Not at 
+"""
+
+$ prog -ssubnet-0 -asome-ami -ksome-key --instance-type=t2.micro --name=foo -Psome-profile --iam-instance-profile=some-iam-instance-profile
+{"-P": "some-profile",
+ "--profile": "some-profile",
+ "-a": "some-ami",
+ "--ami": "some-ami",
+ "--iam-instance-profile": "some-iam-instance-profile",
+ "--instance-type": "t2.micro",
+ "-k": "some-key",
+ "--key-name": "some-key",
+ "--name": "foo",
+ "-s": "subnet-0",
+ "--subnet": "subnet-0"}

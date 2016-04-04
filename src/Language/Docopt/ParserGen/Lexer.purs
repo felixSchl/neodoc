@@ -37,7 +37,7 @@ parseToken = do
   P.choice $ P.try <$> [
     sopt <* P.eof
   , lopt <* P.eof
-  , eoa
+  , eoa  <* P.eof
   , lit  <* P.eof
   ]
 
@@ -52,7 +52,7 @@ parseToken = do
     sopt = do
       P.char '-'
       x  <- alphaNum
-      xs <- A.many alphaNum
+      xs <- A.many $ P.noneOf [ ' ', '='  ]
       P.optional do many space *> P.char '=' <* many space
       arg <- P.choice $ P.try <$> [
         return <$> fromCharArray <$> do A.some P.anyChar
@@ -66,7 +66,7 @@ parseToken = do
     lopt = do
       P.string "--"
       xs <- fromCharArray <$> do
-        A.some alphaNum
+        A.some $ P.noneOf [ ' ', '='  ]
       arg <- P.choice $ P.try <$> [
         Just <$> do
           many space *> P.char '=' <* many space
@@ -81,12 +81,6 @@ parseToken = do
     lit = Lit <<< fromCharArray <$> do
       A.many P.anyChar
 
-parsePositionedToken :: P.Parser String PositionedToken
-parsePositionedToken = P.try $ do
-  pos <- getPosition
-  tok <- parseToken
-  return $ PositionedToken { sourcePos: pos, token: tok }
-
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
 -- | item individually.
 lex :: (List String) -> Either P.ParseError (List PositionedToken)
@@ -97,7 +91,6 @@ lex xs = go xs 1
       tok <- P.runParser x parseToken
       case tok of
         (EOA _) -> do
-          -- return $ singleton $ EOA (D.StringValue <$> xs)
           return $ singleton $ PositionedToken {
             token:     EOA (D.StringValue <$> xs)
           , sourcePos: P.Position { line: 1, column: n }

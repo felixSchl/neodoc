@@ -71,16 +71,6 @@ scannerSpec = \_ ->
       vliftEff do
         assert $ isLeft result
 
-    it "should fail if usage section is not the first section" do
-      let result = Scanner.scan $
-          dedent
-            """
-            Options: foo
-            Usage: qux
-            """
-      vliftEff do
-        assert $ isLeft result
-
     it "should fail w/o any sections" do
       let result = Scanner.scan $
           dedent

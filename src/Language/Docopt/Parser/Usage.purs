@@ -38,7 +38,7 @@ import Language.Docopt.Parser.Usage.Usage  as U
 import Language.Docopt.Parser.Lexer        as L
 import Language.Docopt.Parser.Usage.Option as O
 
--- | L.TokenParser to parse the usage section
+-- | TokenParser to parse the usage section
 -- |
 -- | This parser is tricky because it has to solve the following problems:
 -- |    * What is the program name?
@@ -138,9 +138,7 @@ usageParser = do
       <*> repetition
 
     group :: L.TokenParser Argument
-    group = defer \_ -> P.choice
-      [ reqGroup
-      , optGroup ]
+    group = defer \_ -> P.choice [ reqGroup , optGroup ]
 
     optGroup :: L.TokenParser Argument
     optGroup = defer \_ -> Group true
@@ -160,8 +158,8 @@ usageParser = do
 
     repetition :: L.TokenParser Boolean
     repetition = P.choice
-      [ P.try $ indented *> L.tripleDot *> pure true
-      , pure false ]
+      [ P.try $ indented *> L.tripleDot *> return true
+      , return false ]
 
     program :: L.TokenParser String
     program = (L.name <|> L.word) P.<?> "Program Name"

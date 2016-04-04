@@ -178,7 +178,6 @@ descParser =
           , L.anyToken *> pure Text
           ]
 
-
       let defaults = getDefaultValue <$> filter isDefaultTag description
           envs     = getEnvKey       <$> filter isEnvTag     description
 
