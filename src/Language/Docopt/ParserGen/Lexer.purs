@@ -94,6 +94,7 @@ lex xs = go xs 1
           return $ singleton $ PositionedToken {
             token:     EOA (D.StringValue <$> xs)
           , sourcePos: P.Position { line: 1, column: n }
+          , source:    x
           }
         _ -> do
           toks <- go xs (n + 1)
@@ -101,4 +102,5 @@ lex xs = go xs 1
             $ singleton (PositionedToken {
                           token:     tok
                         , sourcePos: P.Position { line: 1, column: n }
+                        , source:    x
                         }) ++ toks

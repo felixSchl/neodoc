@@ -168,7 +168,10 @@ genCompatSpec = do
         for_ kases \(Kase { argv, out }) -> do
           describe (intercalate " " argv) do
             it ("\n" ++ prettyPrintOut out) do
-              let result = runDocopt (dedent doc) StrMap.empty (fromList argv)
+              let result = runDocopt (dedent doc)
+                                     StrMap.empty
+                                     (fromList argv)
+                                     false
               vliftEff $ case result of
                 Left e ->
                   either

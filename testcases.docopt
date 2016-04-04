@@ -1310,3 +1310,14 @@ $ prog -ssubnet-0 -asome-ami -ksome-key --instance-type=t2.micro --name=foo -Pso
  "--name": "foo",
  "-s": "subnet-0",
  "--subnet": "subnet-0"}
+
+r"""
+Usage: create_ec2.py -0
+NOT PART OF SECTION
+
+Options:
+    -0, --foo ARG  Do something [default: 100]
+"""
+
+$ prog
+{"-0": 100, "--foo": 100}

@@ -13,7 +13,7 @@ import Debug.Trace
 import Data.Function
 import Docopt as Docopt
 import Data.Foreign
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Foreign.Class (IsForeign)
 import Data.Bifunctor (rmap)
 import Control.Monad.Eff (Eff())
@@ -55,8 +55,9 @@ _run docopt opts = do
     toMaybe e = either (const Nothing) (return <<< id) e
     readForeignOpts o =
       return {
-        argv: unsafeCoerce <$> (toMaybe $ F.readProp "argv" o)
-      , env:  unsafeCoerce <$> (toMaybe $ F.prop "env" o)
+        argv:         unsafeCoerce <$> (toMaybe $ F.readProp "argv" o)
+      , env:          unsafeCoerce <$> (toMaybe $ F.prop     "env"  o)
+      , optionsFirst: (maybe false id (unsafeCoerce <$> (toMaybe $ F.readProp "optionsFirst" o)))
       }
     onError e = do
       Console.log e

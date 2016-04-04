@@ -1,6 +1,7 @@
 module Language.Docopt.ParserGen.Token (
     Token (..)
   , PositionedToken (..)
+  , getSource
   , prettyPrintToken
   , unPositionedToken
   ) where
@@ -47,12 +48,17 @@ prettyPrintToken (SOpt n s a) = "-"  ++ (fromCharArray (A.cons n s)) ++ arg
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position
   , token     :: Token
+  , source    :: String
   }
 
 unPositionedToken :: PositionedToken -> { sourcePos :: P.Position
                                         , token     :: Token
+                                        , source    :: String
                                         }
 unPositionedToken (PositionedToken t) = t
+
+getSource :: PositionedToken -> String
+getSource = unPositionedToken >>> _.source
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
