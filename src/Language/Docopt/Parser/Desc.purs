@@ -257,7 +257,7 @@ descParser =
                                 name:     a.name
                               , optional: a.optional
                               , default:  Nothing
-                              } -- XXX: IMPLEMENT (SEE ABOVE)
+                              }
                           , env:  Nothing
                           }
 
@@ -283,7 +283,7 @@ descParser =
                                 name:     a.name
                               , optional: a.optional
                               , default:  Nothing
-                              } -- XXX: IMPLEMENT (SEE ABOVE)
+                              }
                           , env:  Nothing
                           }
 
