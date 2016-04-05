@@ -1311,13 +1311,112 @@ $ prog -ssubnet-0 -asome-ami -ksome-key --instance-type=t2.micro --name=foo -Pso
  "-s": "subnet-0",
  "--subnet": "subnet-0"}
 
+#
+# "options-first" enabled
+#
+
 r"""
-Usage: create_ec2.py -0
+Usage: create_ec2.py -0 ARG ARG...
 NOT PART OF SECTION
 
 Options:
     -0, --foo ARG  Do something [default: 100]
 """
 
-$ prog
-{"-0": 100, "--foo": 100}
+$ partial foo -0 bar
+{"-0": 100, "--foo": 100,
+ "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+
+r"""
+Usage: create_ec2.py -0 ARG [ARG]...
+
+Options:
+    -0, --foo ARG  Do something [default: 100]
+"""
+
+$ partial foo -0 bar
+{"-0": 100, "--foo": 100,
+ "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+
+r"""
+Usage: create_ec2.py -0 ARG [ARG...]
+
+Options:
+    -0, --foo ARG  Do something [default: 100]
+"""
+
+$ partial foo -0 bar
+{"-0": 100, "--foo": 100,
+ "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+
+r"""
+Usage: create_ec2.py -0 ARG [ARG...]...
+
+Options:
+    -0, --foo ARG  Do something [default: 100]
+"""
+
+$ partial foo -0 bar
+{"-0": 100, "--foo": 100,
+ "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+
+$ partial foo -0 bar
+{"-0": 100, "--foo": 100,
+ "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+
+r"""
+Usage: create_ec2.py [ARG...]...
+
+"""
+
+$ partial foo bar
+{"ARG": ["foo", "bar"], "<arg>": ["foo", "bar"]}
+
+#
+# "options-first" with [options]
+#
+
+r"""
+Usage: create_ec2.py ARG... [options]
+
+Options:
+    -0  This is a zero
+"""
+
+# XXX: this returns superflous "-0" in the output:
+$ partial foo bar -0
+{"-0": false, "ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
+
+# XXX: this returns superflous "-0" in the output:
+$ partial -0
+{"-0": false, "ARG": ["-0"], "<arg>": ["-0"]}
+
+r"""
+Usage: create_ec2.py [ARG...] [options]
+
+Options:
+    -0  This is a zero
+"""
+#
+## XXX: this returns superflous "-0" in the output:
+#$ partial foo bar -0
+#{"-0": false, "ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
+#
+# XXX: this returns superflous "-0" in the output:
+$ partial -0
+{"-0": false, "ARG": ["-0"], "<arg>": ["-0"]}
+
+
+r"""
+Usage: create_ec2.py ARG... [options]
+
+Options:
+    -0  This is a zero
+"""
+
+$ prog -0
+"user-error"
+
+# XXX: this returns superflous "-0" in the output:
+$ partial -0
+{"-0": false, "ARG": ["-0"], "<arg>": ["-0"]}

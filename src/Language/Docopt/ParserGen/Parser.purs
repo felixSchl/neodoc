@@ -442,6 +442,23 @@ genBranchParser (D.Branch xs) optsFirst = do
         rss <- genParser y
         return $ r ++ rs ++ rss
 
+    -- Terminate the parser at the given argument and collect all subsequent
+    -- values int an array ("options-first")
+    terminate arg = do
+      input <- getInput
+      let rest = Tuple arg <$> do
+                  D.StringValue <<< Token.getSource <$> input
+      P.ParserT \(P.PState { position: pos }) ->
+        return {
+          consumed: true
+        , input:    Nil
+        , result:   return $ ScoredResult {
+                      score: 1
+                    , result: rest
+                    }
+        , position: pos
+        }
+
     -- Parser generator for a single `Argument`
     genParser :: D.Argument
               -> Parser (ScoredResult (List ValueMapping))
@@ -471,21 +488,7 @@ genBranchParser (D.Branch xs) optsFirst = do
 
     genParser x@(D.Positional n r)
       | r && optsFirst
-      = do
-          input <- getInput
-          let rest = Tuple x <$> do
-                      D.StringValue <<< Token.getSource <$> input
-          traceShowA rest
-          P.ParserT \(P.PState { position: pos }) ->
-            return {
-              consumed: true
-            , input:    Nil
-            , result:   return $ ScoredResult {
-                          score: 1
-                        , result: rest
-                        }
-            , position: pos
-            }
+      = terminate x
 
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional n r) = (do
@@ -527,6 +530,17 @@ genBranchParser (D.Branch xs) optsFirst = do
 
           mkSoptParser (Just f) a = shortOption f a
           mkSoptParser Nothing _  = P.fail "flag"
+
+    genParser x@(D.Group optional bs r)
+      | optional && optsFirst && (length bs == 1) &&
+        all (\(D.Branch xs) ->
+          case xs of
+            Cons (D.Positional n r') Nil -> r' || r
+            _                            -> false
+        ) bs
+      = terminate (LU.head (D.runBranch (LU.head bs)))
+
+      where foo = false
 
     -- Generate a parser for an argument `Group`
     -- The total score a group is the sum of all scores inside of it.

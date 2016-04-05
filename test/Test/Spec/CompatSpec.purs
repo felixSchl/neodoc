@@ -21,6 +21,7 @@ import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
 import Data.Foldable (foldl, for_, intercalate)
 import Text.Wrap (dedent)
 import Control.Monad.Aff (launchAff)
+import Data.Maybe (Maybe(..))
 import Data.Maybe.Unsafe (fromJust)
 
 import Test.Assert (assert)
@@ -34,6 +35,7 @@ import Test.Support.Usage  as U
 import Test.Support.Docopt as D
 import Test.Support.Desc   as Desc
 
+import Docopt as Docopt
 import Language.Docopt (runDocopt)
 import Language.Docopt.Value as D
 import Language.Docopt.Value as Value
@@ -62,8 +64,8 @@ newtype Test = Test {
 }
 
 newtype Kase = Kase {
-  argv :: List String
-, out  :: Either String (List (Tuple String D.Value))
+  out     :: Either String (List (Tuple String D.Value))
+, options :: Docopt.Options
 }
 
 parseUniversalDocoptTests :: forall eff
@@ -83,15 +85,15 @@ parseUniversalDocoptTests = do
       as <- A.many application
       return $ Test {
         doc: u
-      , kases: as <#> \(Tuple i o) -> Kase {
-          argv: i
-        , out:  o
-        }
+      , kases: as
       }
 
     application = do
       P.skipSpaces *> skipComments *>  P.skipSpaces
-      P.string "$ prog"
+      optionsFirst <- (P.choice $ P.try <$> [
+        P.string "$ prog"    *> return false
+      , P.string "$ partial" *> return true
+      ]) P.<?> "\"$ prog\" or \"$ partial\""
       P.skipSpaces
       input <- flip P.sepBy (P.char ' ') do
         many (P.char ' ')
@@ -117,7 +119,13 @@ parseUniversalDocoptTests = do
             *> return (Left "user-error")
         ]
       P.skipSpaces *> skipComments *>  P.skipSpaces
-      return $ Tuple input output
+      return $ Kase { out: output
+                    , options: {
+                        argv:         return $ fromList input
+                      , optionsFirst: optionsFirst
+                      , env:          Nothing
+                      }
+                    }
 
       where
         value = P.choice $ P.try <$> [
@@ -165,13 +173,14 @@ genCompatSpec = do
   return $ \_ -> describe "Docopt compatibility" do
     for_ tests \(Test { doc, kases }) -> do
       describe (doc ++ "\n") do
-        for_ kases \(Kase { argv, out }) -> do
+        for_ kases \(Kase { options, out }) -> do
+          let argv = fromJust options.argv
           describe (intercalate " " argv) do
             it ("\n" ++ prettyPrintOut out) do
               let result = runDocopt (dedent doc)
                                      StrMap.empty
-                                     (fromList argv)
-                                     false
+                                     argv
+                                     options.optionsFirst
               vliftEff $ case result of
                 Left e ->
                   either
