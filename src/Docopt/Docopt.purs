@@ -71,14 +71,16 @@ liftEffA = liftEff
 -- | Options for a docopt run
 -- |
 type Options = {
-  argv :: Maybe Argv -- ^ override argv. Defaults to `process.argv`
-, env  :: Maybe Env  -- ^ override env.  Defaults to `process.env`
+  argv         :: Maybe Argv  -- ^ override argv. Defaults to `process.argv`
+, env          :: Maybe Env   -- ^ override env.  Defaults to `process.env`
+, optionsFirst :: Boolean     -- ^ enable "option-first"
 }
 
 defaultOptions :: Options
 defaultOptions = {
-  argv: Nothing
-, env:  Nothing
+  argv:         Nothing
+, env:          Nothing
+, optionsFirst: false
 }
 
 -- |
@@ -92,9 +94,9 @@ run o d = do
   argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
   env  <- maybe Process.getEnv              (return <<< id) o.env
   return $ do
-    { parser, specification, usage } <- parseDocopt d
+    { specification, usage } <- parseDocopt d
     lmap ((help usage) ++) do
-      applyDocopt parser specification env argv
+      applyDocopt specification env argv o.optionsFirst
 
   where help usage = "Usage:\n"
             ++ (unlines $ ("  " ++) <$> lines (dedent usage))

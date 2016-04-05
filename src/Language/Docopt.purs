@@ -45,7 +45,6 @@ import Language.Docopt.Parser.Desc  as Desc
 type Docopt = {
   usage         :: String
 , specification :: List D.Usage
-, parser        :: G.Parser G.Result
 }
 
 -- |
@@ -59,21 +58,18 @@ parseDocopt docopt = do
   us  <- toUsageParseErr $ Usage.run doc.usage
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve us ds
-  return $ { specification: prg
-           , parser:        G.genParser prg
-           , usage:         doc.usage
-           }
+  return $ { specification: prg , usage: doc.usage }
 
 -- |
 -- | Apply the generated docopt parser to user input.
 -- |
-applyDocopt :: G.Parser G.Result -- ^ the generated parser
-            -> List D.Usage      -- ^ the program specification
-            -> StrMap String     -- ^ the environment
-            -> Array String      -- ^ ARGV
+applyDocopt :: List D.Usage      -- ^ The program specification
+            -> StrMap String     -- ^ The environment
+            -> Array String      -- ^ The user input
+            -> Boolean           -- ^ Enable "options-first"
             -> Either String (StrMap D.Value)
-applyDocopt p prg env argv = do
-  vs <- toUserParseErr argv $ G.runParser env argv p
+applyDocopt prg env argv optsFirst = do
+  vs <- toUserParseErr argv $ G.runParser env argv (G.genParser prg optsFirst)
   return $ uncurry (T.reduce prg env) vs
 
 -- |
@@ -82,11 +78,12 @@ applyDocopt p prg env argv = do
 -- |
 runDocopt :: String        -- ^ The docopt text
           -> StrMap String -- ^ The environment
-          -> Array String  -- ^ ARGV
+          -> Array String  -- ^ The user input
+          -> Boolean       -- ^ Enable "options-first"
           -> Either String (StrMap D.Value)
-runDocopt docopt env argv = do
-  { specification, parser } <- parseDocopt docopt
-  applyDocopt parser specification env argv
+runDocopt docopt env argv optsFirst = do
+  { specification } <- parseDocopt docopt
+  applyDocopt specification env argv optsFirst
 
 toScanErr :: forall a. Either P.ParseError a -> Either String a
 toScanErr  = lmap (D.prettyPrintDocoptError <<< D.DocoptScanError)

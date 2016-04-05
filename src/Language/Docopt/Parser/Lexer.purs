@@ -209,7 +209,7 @@ parseToken m = P.choice (P.try <$> A.concat [
         many space
         x <- fromCharArray <<< fromList <$> do
           flip P.manyTill (P.lookAhead $ P.try end) do
-            P.anyChar
+            P.noneOf [']']
         end
         many space
         return x

@@ -40,8 +40,9 @@ type Result = Tuple D.Branch (List G.ValueMapping)
 
 -- | Generate a parser for a given program specification.
 genParser :: D.Program       -- ^ the program to generate a parser for
+          -> Boolean         -- ^ Enable "options-first"
           -> G.Parser Result -- ^ the generated parser
-genParser us = G.genUsageParser us
+genParser us optsFirst = G.genUsageParser us optsFirst
 
 -- | Run a parser against user input.
 runParser :: D.Env                      -- ^ the user input

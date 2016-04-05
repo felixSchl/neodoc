@@ -27,5 +27,4 @@ docoptSpec = \_ -> do
               , env  = Just Env.empty
               })
         $ fixtures </> "README.md"
-      traceShowA v
       pure unit

@@ -60,6 +60,7 @@ import Language.Docopt.Option   as O
 import Language.Docopt.Value    as Value
 
 import Language.Docopt.ParserGen.Token
+import Language.Docopt.ParserGen.Token as Token
 import Language.Docopt.ParserGen.ValueMapping
 import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
 
@@ -158,15 +159,16 @@ data OptParse = OptParse D.Value (Maybe Token) HasConsumedArg
 longOption :: O.Name -> (Maybe O.Argument) -> Parser D.Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
-    Cons (PositionedToken { token: tok, sourcePos: npos }) xs ->
+    Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks npos e
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
           , input:    let pushed = maybe empty
                                          (\v -> singleton $ PositionedToken {
-                                                  token: v
+                                                  token:     v
                                                 , sourcePos: pos
+                                                , source:    s
                                                 }
                                           )
                                           newtok
@@ -212,15 +214,16 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 shortOption :: Char -> (Maybe O.Argument) -> Parser D.Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
-    Cons (PositionedToken { token: tok }) xs ->
+    Cons (PositionedToken { token: tok, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks pos e
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
           , input:    let pushed = maybe empty
                                          (\v -> singleton $ PositionedToken {
-                                                  token: v
+                                                  token:     v
                                                 , sourcePos: pos
+                                                , source:    s
                                                 }
                                           )
                                           newtok
@@ -288,35 +291,40 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
                   $ prettyPrintToken <<< _.token <<< unPositionedToken <$> s)
 
 -- | Generate a parser for a single program usage.
-genUsageParser :: List D.Usage -> Parser (Tuple D.Branch (List ValueMapping))
-genUsageParser xs = do
+genUsageParser :: List D.Usage -- ^ The list of usage specs
+               -> Boolean      -- ^ Enable "options-first"
+               -> Parser (Tuple D.Branch (List ValueMapping))
+genUsageParser xs optsFirst = do
   _.result <<< unScoredResult
     <$> genBranchesParser (concat $ D.runUsage <$> xs)
                           true
+                          optsFirst
+
 
 -- | Generate a parser that selects the best branch it parses and
 -- | fails if no branch was parsed.
 
 genBranchesParser :: List D.Branch -- ^ The branches to test
                   -> Boolean       -- ^ Expect EOF after each branch
+                  -> Boolean       -- ^ Enable "options-first"
                   -> Parser (ScoredResult (Tuple D.Branch (List ValueMapping)))
-genBranchesParser xs term = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
-  env :: D.Env <- ask
-  let ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> do
-                          genBranchParser x
-                          <* if term then eof else return unit
-      rs = evalState (runReaderT (collect s ps) env) 0
-
-  return $ maybe'
-    (\_ ->
-      maybe'
-        (\_ -> P.parseFailed Nil P.initialPos
-                "The impossible happened. Failure without error")
-        (\e -> e { result = Left e.result.error })
-        (maximumBy (compare `on` (_.depth <<< _.result)) $ mlefts rs)
-    )
-    (\r -> r { result = Right r.result.value })
-    (maximumBy (compare `on` (_.depth <<< _.result)) $ mrights rs)
+genBranchesParser xs term optsFirst
+  = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
+    env :: D.Env <- ask
+    let ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> do
+                            genBranchParser x optsFirst
+                            <* if term then eof else return unit
+        rs = evalState (runReaderT (collect s ps) env) 0
+    return $ maybe'
+      (\_ ->
+        maybe'
+          (\_ -> P.parseFailed Nil P.initialPos
+                  "The impossible happened. Failure without error")
+          (\e -> e { result = Left e.result.error })
+          (maximumBy (compare `on` (_.depth <<< _.result)) $ mlefts rs)
+      )
+      (\r -> r { result = Right r.result.value })
+      (maximumBy (compare `on` (_.depth <<< _.result)) $ mrights rs)
 
   where
     collect s ps = ps `flip traverse` \p -> P.unParserT p s >>= \o -> do
@@ -335,8 +343,10 @@ genBranchesParser xs term = P.ParserT \(s@(P.PState { input: i, position: pos })
                       o.result
 
 -- | Generate a parser for a single usage branch
-genBranchParser :: D.Branch -> Parser (ScoredResult (List ValueMapping))
-genBranchParser (D.Branch xs) = do
+genBranchParser :: D.Branch  -- The usage branch
+                -> Boolean   -- ^ Enable "options-first"
+                -> Parser (ScoredResult (List ValueMapping))
+genBranchParser (D.Branch xs) optsFirst = do
   lift (State.put 0) -- reset the depth counter
   either
     (\_   -> P.fail "Failed to generate parser")
@@ -432,6 +442,23 @@ genBranchParser (D.Branch xs) = do
         rss <- genParser y
         return $ r ++ rs ++ rss
 
+    -- Terminate the parser at the given argument and collect all subsequent
+    -- values int an array ("options-first")
+    terminate arg = do
+      input <- getInput
+      let rest = Tuple arg <$> do
+                  D.StringValue <<< Token.getSource <$> input
+      P.ParserT \(P.PState { position: pos }) ->
+        return {
+          consumed: true
+        , input:    Nil
+        , result:   return $ ScoredResult {
+                      score: 1
+                    , result: rest
+                    }
+        , position: pos
+        }
+
     -- Parser generator for a single `Argument`
     genParser :: D.Argument
               -> Parser (ScoredResult (List ValueMapping))
@@ -458,6 +485,10 @@ genBranchParser (D.Branch xs) = do
         return (D.BoolValue true)
       <* lift (State.modify (1+))
       ) P.<?> "stdin: \"-\""
+
+    genParser x@(D.Positional n r)
+      | r && optsFirst
+      = terminate x
 
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional n r) = (do
@@ -500,6 +531,17 @@ genBranchParser (D.Branch xs) = do
           mkSoptParser (Just f) a = shortOption f a
           mkSoptParser Nothing _  = P.fail "flag"
 
+    genParser x@(D.Group optional bs r)
+      | optional && optsFirst && (length bs == 1) &&
+        all (\(D.Branch xs) ->
+          case xs of
+            Cons (D.Positional n r') Nil -> r' || r
+            _                            -> false
+        ) bs
+      = terminate (LU.head (D.runBranch (LU.head bs)))
+
+      where foo = false
+
     -- Generate a parser for an argument `Group`
     -- The total score a group is the sum of all scores inside of it.
     genParser x@(D.Group optional bs repeated) = do
@@ -511,7 +553,7 @@ genBranchParser (D.Branch xs) = do
       where
         goR :: Parser (List (List ValueMapping))
         goR = do
-          {score, result} <- unScoredResult <$> genBranchesParser bs false
+          {score, result} <- unScoredResult <$> genBranchesParser bs false false
           if score == 0
               then return $ singleton (snd result)
               else do
@@ -523,7 +565,7 @@ genBranchParser (D.Branch xs) = do
                   then return mempty
                   else do
                     snd <<< _.result <<<  unScoredResult
-                      <$> genBranchesParser bs false
+                      <$> genBranchesParser bs false false
 
     isFree :: D.Argument -> Boolean
     isFree (D.Option _)     = true

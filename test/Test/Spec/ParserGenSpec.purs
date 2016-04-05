@@ -444,7 +444,7 @@ parserGenSpec = \_ -> describe "The generator" do
                 <$> runParser
                       env
                       argv
-                      (genParser prg)
+                      (genParser prg false)
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->

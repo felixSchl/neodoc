@@ -159,6 +159,10 @@ isCommand :: Argument -> Boolean
 isCommand (Command _ _) = true
 isCommand _             = false
 
+isPositional :: Argument -> Boolean
+isPositional (Positional _ _) = true
+isPositional _                = false
+
 isOption :: Argument -> Boolean
 isOption (Option _) = true
 isOption _          = false
