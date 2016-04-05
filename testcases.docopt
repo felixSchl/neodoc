@@ -1412,11 +1412,12 @@ Usage: create_ec2.py ARG... [options]
 
 Options:
     -0  This is a zero
+    -1  This is a one
 """
 
 $ prog -0
 "user-error"
 
-# XXX: this returns superflous "-0" in the output:
-$ partial -0
-{"-0": false, "ARG": ["-0"], "<arg>": ["-0"]}
+# XXX: this returns superflous "-0" and "-1" in the output:
+$ partial -01
+{"-0": false, "-1": false, "ARG": ["-01"], "<arg>": ["-01"]}
