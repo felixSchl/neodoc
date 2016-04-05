@@ -193,6 +193,8 @@ npm install --save neodoc
 
 > Overview of where docopt is headed, ordered (somewhat) by estimated priority.
 
+* [x] Implement "options-first"
+* [x] Improve scanner speed
 * [ ] Implement optional option arguments: `-a [foo]`.
 * [ ] Implement `--help` and `--version`. The developer will be able to specify
   the option that will trigger the `--help` and `--version` convenience
