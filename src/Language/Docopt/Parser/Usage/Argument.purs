@@ -78,26 +78,26 @@ ref :: String -> Argument
 ref = Reference
 
 -- short hand to create a short option node
-sopt :: Char -> Array Char -> String -> Argument
+sopt :: Char -> Array Char -> O.Argument -> Argument
 sopt f fs a = OptionStack $ O.sopt f fs a
 
 sopt_ :: Char -> Array Char -> Argument
 sopt_ f fs = OptionStack $ O.sopt_ f fs
 
-soptR :: Char -> Array Char -> String -> Argument
+soptR :: Char -> Array Char -> O.Argument -> Argument
 soptR f fs a = OptionStack $ O.soptR f fs a
 
 soptR_ :: Char -> Array Char -> Argument
 soptR_ f fs = OptionStack $ O.soptR_ f fs
 
 -- short hand to create a long option node
-lopt :: String -> String -> Argument
+lopt :: String -> O.Argument -> Argument
 lopt n a = Option $ O.lopt n a
 
 lopt_ :: String -> Argument
 lopt_ n = Option $ O.lopt_ n
 
-loptR :: String -> String -> Argument
+loptR :: String -> O.Argument -> Argument
 loptR n a = Option $ O.loptR n a
 
 loptR_ :: String -> Argument

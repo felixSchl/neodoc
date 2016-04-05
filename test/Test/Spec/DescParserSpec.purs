@@ -58,14 +58,15 @@ descParserSpec = \_ ->
             -f=BAZ, --foo=BAZ
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" Nothing, env: Nothing }
+                , arg:  Just $ Desc.argument "BAZ" false Nothing
+                , env:  Nothing }
             ]
         , pass (dedent
             """
             -f=BAZ, --foo=BAZ [default: 100]
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" (Just (IntValue 100))
+                , arg:  Just $ Desc.argument "BAZ" false (Just (IntValue 100))
                 , env:  Nothing
                 }
             ]
@@ -75,11 +76,11 @@ descParserSpec = \_ ->
             -q=BAZ, --qux=BAZ [default: 200]
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" (Just (IntValue 100))
+                , arg:  Just $ Desc.argument "BAZ" false (Just (IntValue 100))
                 , env:  Nothing
                 }
             , o { name: Desc.Full 'q' "qux"
-                , arg:  Just $ Desc.argument "BAZ" (Just (IntValue 200))
+                , arg:  Just $ Desc.argument "BAZ" false (Just (IntValue 200))
                 , env:  Nothing
                 }
             ]
@@ -93,11 +94,11 @@ descParserSpec = \_ ->
               text [default: 200]
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" (Just (IntValue 100))
+                , arg:  Just $ Desc.argument "BAZ" false (Just (IntValue 100))
                 , env:  Nothing
                 }
             , o { name: Desc.Full 'q' "qux"
-                , arg:  Just $ Desc.argument "QIZ" (Just (IntValue 200))
+                , arg:  Just $ Desc.argument "QIZ" false (Just (IntValue 200))
                 , env:  Nothing
                 }
             ]
@@ -112,7 +113,7 @@ descParserSpec = \_ ->
                                   be parsed.
             """)
             [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ Desc.argument "BAZ" (Just (IntValue 100))
+                , arg:  Just $ Desc.argument "BAZ" false (Just (IntValue 100))
                 , env:  Just "QARK"
                 }
             ]

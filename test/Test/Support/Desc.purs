@@ -6,7 +6,7 @@ import Data.Maybe (Maybe(..))
 import Language.Docopt.Value
 import Language.Docopt.Parser.Desc as Desc
 
-arg :: String -> Maybe Value -> Desc.Argument
+arg :: String -> Boolean -> Maybe Value -> Desc.Argument
 arg = Desc.argument
 
 opt :: Desc.Name -> Maybe Desc.Argument -> Desc.Desc

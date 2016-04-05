@@ -47,13 +47,15 @@ getName (Full _ n) = pure n
 getName _          = Nothing
 
 newtype Argument = Argument {
-  name    :: String
-, default :: Maybe Value
+  name     :: String
+, default  :: Maybe Value
+, optional :: Boolean
 }
 
 runArgument :: Argument -> {
-  name    :: String
-, default :: Maybe Value
+  name     :: String
+, default  :: Maybe Value
+, optional :: Boolean
 }
 runArgument (Argument a) = a
 
@@ -144,10 +146,14 @@ prettyPrintArgument :: Argument -> String
 prettyPrintArgument (Argument { name: n, default: d })
   = n ++ maybe "" (\v -> " [default: " ++ (prettyPrintValue v) ++  "]") d
 
-argument :: String -> Maybe Value -> Argument
-argument name default = Argument { name:    name
-                                 , default: default
-                                 }
+argument :: String
+         -> Boolean
+         -> Maybe Value
+         -> Argument
+argument name optional default = Argument { name:   name
+                                          , default:  default
+                                          , optional: optional
+                                          }
 
 run :: String -> Either P.ParseError (List Desc)
 run x = lexDescs x >>= parse
@@ -230,13 +236,25 @@ descParser =
         short = do
           opt <- sopt
 
-          arg <- maybe'
-                  (\_ -> do P.optionMaybe (L.shoutName <|> L.angleName))
+          -- Grab the adjacent positional-looking argument
+          -- in case the token did not have an explicit
+          -- binding via `=`.
+          arg <- maybe
+                  (P.optionMaybe do
+                    n <- L.shoutName <|> L.angleName
+                    return { name: n, optional: false }
+                  )
                   (return <<< Just)
                   opt.arg
 
           return $ Option { name: Flag opt.flag
-                          , arg:  flip argument Nothing <$> arg
+                          , arg:  Argument <$> do
+                              a <- arg
+                              return {
+                                name:     a.name
+                              , optional: a.optional
+                              , default:  Nothing
+                              } -- XXX: IMPLEMENT (SEE ABOVE)
                           , env:  Nothing
                           }
 
@@ -244,13 +262,25 @@ descParser =
         long = do
           opt <- lopt
 
-          arg <- maybe'
-                  (\_ -> do P.optionMaybe (L.shoutName <|> L.angleName))
+          -- Grab the adjacent positional-looking argument
+          -- in case the token did not have an explicit
+          -- binding via `=`.
+          arg <- maybe
+                  (P.optionMaybe do
+                    n <- L.shoutName <|> L.angleName
+                    return { name: n, optional: false }
+                  )
                   (return <<< Just)
                   opt.arg
 
           return $ Option { name: Long opt.name
-                          , arg:  flip argument Nothing <$> arg
+                          , arg:  Argument <$> do
+                              a <- arg
+                              return {
+                                name:     a.name
+                              , optional: a.optional
+                              , default:  Nothing
+                              } -- XXX: IMPLEMENT (SEE ABOVE)
                           , env:  Nothing
                           }
 
@@ -288,11 +318,15 @@ descParser =
                         "Arguments mismatch: " ++ (show $ prettyPrintArgument a)
                                     ++ " and " ++ (show $ prettyPrintArgument b)
 
-    sopt :: L.TokenParser { flag :: Char, arg :: Maybe String }
+    sopt :: L.TokenParser { flag :: Char, arg :: Maybe { name :: String
+                                                       , optional :: Boolean
+                                                       } }
     sopt = do
       opt <- L.sopt
       (guard $ (A.length opt.stack == 0)) P.<?> "No stacked options"
       return { flag: opt.flag, arg: opt.arg }
 
-    lopt :: L.TokenParser { name :: String, arg :: Maybe String }
+    lopt :: L.TokenParser { name :: String, arg :: Maybe { name :: String
+                                                         , optional :: Boolean
+                                                         } }
     lopt = L.lopt

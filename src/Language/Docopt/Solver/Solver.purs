@@ -383,29 +383,41 @@ solveBranch as ds = Branch <$> go as
 
     -- | Resolve an option's argument name against that given in the
     -- | description, returning the most complete argument known.
-    resolveOptArg :: Maybe String
+    resolveOptArg :: Maybe { name :: String, optional :: Boolean }
                   -> Maybe DE.Argument
                   -> Either SolveError (Maybe O.Argument)
 
-    resolveOptArg (Just n) Nothing = do
-      return <<< pure $ O.Argument { name: n, default: Nothing }
+    resolveOptArg (Just a) Nothing = do
+      return <<< pure $ O.Argument { name: a.name
+                                   , optional: a.optional
+                                   , default: Nothing }
 
-    resolveOptArg Nothing (Just (DE.Argument a)) = do
-      return <<< pure $ O.Argument { name: a.name, default: a.default }
+    resolveOptArg Nothing (Just (DE.Argument de)) = do
+      return <<< pure $ O.Argument { name: de.name
+                                   , optional: de.optional
+                                   , default: de.default }
 
     -- XXX: Do we need to guard that `an == a.name` here?
-    resolveOptArg (Just an) (Just (DE.Argument a)) = do
-      if an ^= a.name
-         then return <<< pure $ O.Argument { name: a.name, default: a.default }
-         else fail $ "Arguments mismatch: " ++ an ++ " != " ++ a.name
+    resolveOptArg (Just a) (Just (DE.Argument de)) = do
+      if a.name ^= de.name
+         then return <<< pure
+          $ O.Argument { name: de.name
+                        -- XXX: Is `||` correct here or should a mismatch
+                        --      generate an error?
+                       , optional: de.optional || a.optional
+                       , default: de.default
+                       }
+         else fail $ "Arguments mismatch: " ++ a.name ++ " != " ++ de.name
 
     resolveOptArg _ _ = return Nothing
 
-    convertArg :: Maybe String -> Maybe O.Argument
-    convertArg a = do
-      an <- a
-      return $ O.Argument { name: an
-                          , default: Nothing }
+    convertArg :: Maybe { name :: String, optional :: Boolean }
+               -> Maybe O.Argument
+    convertArg arg = do
+      a <- arg
+      return $ O.Argument { name:     a.name
+                          , optional: a.optional
+                          , default:  Nothing }
 
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
 solveUsage (U.Usage _ bs) ds = Usage <$> do traverse (flip solveBranch ds) bs

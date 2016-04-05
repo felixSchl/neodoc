@@ -74,7 +74,7 @@ solverSpec = \_ ->
 
     , test ([ u [ [ U.loptR_ "foo" ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "bar" (Just (StringValue "qux")))
+                            (Just $ DE.arg "bar" false (Just (StringValue "qux")))
                 ])
                 ([ out [
                     [ D.optR 'f' "foo" (D.oa "bar" (StringValue "qux")) ]
@@ -83,7 +83,7 @@ solverSpec = \_ ->
 
     , test ([ u [ [ U.loptR_ "foo", U.co "BAR" ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "BAR" (Just (StringValue "qux")))
+                            (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
                 ])
                 ([ out [
                     [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
@@ -94,7 +94,7 @@ solverSpec = \_ ->
 
     , test ([ u [ [ U.lopt_ "foo", U.poR "BAR" ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "BAR" (Just (StringValue "qux")))
+                            (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
                 ])
                 ([ out [
                     [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
@@ -103,7 +103,7 @@ solverSpec = \_ ->
 
     , test ([ u [ [ U.lopt_ "foo", U.po "BAR" ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "BAR" (Just (StringValue "qux")))
+                            (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
                 ])
                 ([ out [
                     [ D.opt 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
@@ -112,7 +112,7 @@ solverSpec = \_ ->
 
     , test ([ u [ [ U.loptR_ "foo", U.poR "BAR" ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "BAR" (Just (StringValue "qux")))
+                            (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
                 ])
                 ([ out [
                     [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
@@ -123,7 +123,7 @@ solverSpec = \_ ->
 
     , test ([ u [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "file")
-                            (Just $ DE.arg "FILE" (Just (StringValue "foo")))
+                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ])
                 ([ out [
                     [ D.soptR_ 'x'
@@ -136,9 +136,9 @@ solverSpec = \_ ->
 
     , test ([ u [ [ U.sopt_ 'f' [], U.poR "FILE" ] ] ])
         [ pass  [ DE.opt (DE.fname 'f' "file")
-                           (Just $ DE.arg "FILE" (Just (StringValue "foo")))
+                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 , DE.opt (DE.fname 'f' "file")
-                           (Just $ DE.arg "FILE" (Just (StringValue "foo")))
+                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ]
                 ([ out [
                     [ D.optR 'f' "file" (D.oa "FILE" (StringValue "foo")) ]
@@ -147,7 +147,7 @@ solverSpec = \_ ->
 
     , test ([ u [ [ U.soptR_ 'f' ['x'] ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "file")
-                            (Just $ DE.arg "FILE" (Just (StringValue "foo")))
+                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ])
                 ([ out [
                     [ D.soptR_ 'f'
@@ -161,7 +161,7 @@ solverSpec = \_ ->
       -- description's argument, rendering it an unfit candidate)
     , test ([ u [ [ U.soptR_ 'f' ['v', 'z', 'x'] ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "file")
-                            (Just $ DE.arg "FILE" (Just (StringValue "foo")))
+                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ])
                 ([ out [
                     [ D.soptR_ 'f'
@@ -173,7 +173,7 @@ solverSpec = \_ ->
         ]
     , test ([ u [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "file")
-                            (Just $ DE.arg "FILE" (Just (StringValue "foo")))
+                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ])
                 ([ out [
                     [ D.soptR_ 'x'
@@ -187,7 +187,7 @@ solverSpec = \_ ->
     , test ([ u [ [ U.Reference "" ] ] ])
         [ pass
             [ DE.opt (DE.fname 'f' "file")
-                     (Just $ DE.arg "FILE" (Just (StringValue "foo")))
+                     (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
             ]
             [ out [ [ D.gro false [ [
                 D.opt 'f' "file" (D.oa "FILE" $ StringValue "foo")

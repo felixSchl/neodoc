@@ -37,6 +37,9 @@ sopt  f fs a r = (if r then U.soptR else U.sopt) f fs a
 lopt_ f r = (if r then U.loptR_ else U.lopt_) f
 lopt  f a r = (if r then U.loptR else U.lopt) f a
 po    n r = (if r then U.poR else U.po) n
+arg'  n o = { name: n, optional: o }
+arg_  n = arg' n true
+arg   n = arg' n false
 
 usageParserSpec = \_ ->
   describe "The usage parser" do
@@ -72,13 +75,13 @@ usageParserSpec = \_ ->
     describe "long options" do
       runSingleArgumentTests
         [ pass "--bar"         $ lopt_ "bar"
-        , pass "--bar = foo"   $ lopt  "bar" "foo"
-        , pass "--bar=<foo>"   $ lopt  "bar" "foo"
-        , pass "--bar=FOO"     $ lopt  "bar" "FOO"
-        , pass "--bar = FOO"   $ lopt  "bar" "FOO"
-        , pass "--bar=fOo"     $ lopt  "bar" "fOo"
-        , pass "--bar = fOo"   $ lopt  "bar" "fOo"
-        , pass "--bar = <foo>" $ lopt  "bar" "foo"
+        , pass "--bar = foo"   $ lopt  "bar" (arg "foo")
+        , pass "--bar=<foo>"   $ lopt  "bar" (arg "foo")
+        , pass "--bar=FOO"     $ lopt  "bar" (arg "FOO")
+        , pass "--bar = FOO"   $ lopt  "bar" (arg "FOO")
+        , pass "--bar=fOo"     $ lopt  "bar" (arg "fOo")
+        , pass "--bar = fOo"   $ lopt  "bar" (arg "fOo")
+        , pass "--bar = <foo>" $ lopt  "bar" (arg "foo")
         , pass "--barFOO"      $ lopt_ "barFOO"
         , fail "--bar="
         , fail "--bar=<>"
@@ -93,18 +96,18 @@ usageParserSpec = \_ ->
         [ pass "-b"          $ sopt_ 'b' []
         , pass "-bFOO"       $ sopt_ 'b' ['F', 'O', 'O']
         , pass "-bFoo"       $ sopt_ 'b' ['F', 'o', 'o']
-        , pass "-b<foo>"     $ sopt  'b' [] "foo"
-        , pass "-b<foo>"     $ sopt  'b' [] "foo"
-        , pass "-b=foo"      $ sopt  'b' [] "foo"
-        , pass "-b=FOO"      $ sopt  'b' [] "FOO"
-        , pass "-b=<foo>"    $ sopt  'b' [] "foo"
+        , pass "-b<foo>"     $ sopt  'b' [] (arg "foo")
+        , pass "-b<foo>"     $ sopt  'b' [] (arg "foo")
+        , pass "-b=foo"      $ sopt  'b' [] (arg "foo")
+        , pass "-b=FOO"      $ sopt  'b' [] (arg "FOO")
+        , pass "-b=<foo>"    $ sopt  'b' [] (arg "foo")
         , pass "-bar"        $ sopt_ 'b' ['a', 'r']
         , pass "-barFOO"     $ sopt_ 'b' ['a', 'r', 'F', 'O', 'O']
-        , pass "-bar<foo>"   $ sopt  'b' ['a', 'r'] "foo"
+        , pass "-bar<foo>"   $ sopt  'b' ['a', 'r'] (arg "foo")
         , pass "-barFoo"     $ sopt_ 'b' ['a', 'r', 'F', 'o', 'o']
-        , pass "-bar=foo"    $ sopt  'b' ['a', 'r'] "foo"
-        , pass "-bar=FOO"    $ sopt  'b' ['a', 'r'] "FOO"
-        , pass "-bar=<foo>"  $ sopt  'b' ['a', 'r'] "foo"
+        , pass "-bar=foo"    $ sopt  'b' ['a', 'r'] (arg "foo")
+        , pass "-bar=FOO"    $ sopt  'b' ['a', 'r'] (arg "FOO")
+        , pass "-bar=<foo>"  $ sopt  'b' ['a', 'r'] (arg "foo")
         , pass "-bAR"        $ sopt_ 'b' ['A', 'R']
         , pass "-bARfoo"     $ sopt_ 'b' ['A', 'R', 'f', 'o', 'o']
         ]

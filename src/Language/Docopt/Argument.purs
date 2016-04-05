@@ -271,4 +271,3 @@ loptE_ n e = Option $ O.loptE_ n e
 
 loptER_ :: O.Name -> String -> Argument
 loptER_ n e = Option $ O.loptER_ n e
-
