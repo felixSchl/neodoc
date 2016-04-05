@@ -341,12 +341,47 @@ parseToken m = P.choice (P.try <$> A.concat [
     P.char '-'
     x  <- alphaNum
     xs <- A.many alphaNum
+
     arg <- P.choice $ P.try <$> [
+
+      -- Case 1: OPTION = ARG
       Just <$> do
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
-        P.choice $ P.try <$> [ angleName, shoutName, name ]
-    , Just <$> angleName
+        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        return { name:     n
+               , optional: false
+               }
+
+      -- Case 2: Option[ = ARG ]
+    , Just <$> do
+        P.char '[' <* many space
+        -- XXX: Drop the spaces?
+        P.optional (many space *> P.char '=' <* many space)
+        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        many space *> P.char ']' <* many space
+        return { name:     n
+               , optional: true
+               }
+
+      -- Case 3: Option[ARG]
+    , Just <$> do
+        -- XXX: Drop the spaces?
+        many space *> P.char '[' <* many space
+        many space *> P.char '=' <* many space
+        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        many space *> P.char ']' <* many space
+        return { name:     n
+               , optional: true
+               }
+
+      -- Case 4: Option<ARG>
+    , Just <$> do
+        n <- angleName
+        return { name:     n
+               , optional: false
+               }
+
     , return Nothing
     ]
 
@@ -361,12 +396,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     , P.try $ void $ P.string "..."
     ]
 
-    return $ SOpt x xs do
-      argname <- arg -- XXX: IMPLEMENT
-      return {
-        name:     argname
-      , optional: false
-      }
+    return $ SOpt x xs arg
 
   longOption :: P.Parser String Token
   longOption = do
@@ -381,11 +411,49 @@ parseToken m = P.choice (P.try <$> A.concat [
             ])
 
     arg <- P.choice $ P.try <$> [
+
+      -- Case 1: OPTION = ARG
       Just <$> do
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
-        P.choice $ P.try <$> [ angleName, shoutName, name ]
-    , Just <$> angleName
+        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        return { name:     n
+               , optional: false
+               }
+
+      -- Case 2: Option[ = ARG ]
+    , Just <$> do
+        P.char '[' <* many space
+        -- XXX: Drop the spaces?
+        P.optional (many space *> P.char '=' <* many space)
+        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        many space *> P.char ']' <* many space
+        return { name:     n
+               , optional: true
+               }
+
+      -- Case 2: Option[ = ARG ]
+    , Just <$> do
+        P.char '[' <* many space
+        -- XXX: Drop the spaces?
+        P.optional (many space *> P.char '=' <* many space)
+        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        many space *> P.char ']' <* many space
+        return { name:     n
+               , optional: true
+               }
+
+      -- Case 3: Option[ARG]
+    , Just <$> do
+        -- XXX: Drop the spaces?
+        many space *> P.char '[' <* many space
+        many space *> P.char '=' <* many space
+        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        many space *> P.char ']' <* many space
+        return { name:     n
+               , optional: true
+               }
+
     , return Nothing
     ]
 
@@ -400,12 +468,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     , P.try $ void $ P.string "..."
     ]
 
-    return $ LOpt name' do
-      argname <- arg -- XXX: IMPLEMENT
-      return {
-        name:     argname
-      , optional: false
-      }
+    return $ LOpt name' arg
 
   identStart :: P.Parser String Char
   identStart = alpha

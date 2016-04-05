@@ -83,10 +83,33 @@ usageParserSpec = \_ ->
         , pass "--bar = fOo"   $ lopt  "bar" (arg "fOo")
         , pass "--bar = <foo>" $ lopt  "bar" (arg "foo")
         , pass "--barFOO"      $ lopt_ "barFOO"
+
+        , pass "--bar[ = foo]"   $ lopt  "bar" (arg "foo")
+        , pass "--bar[=<foo>]"   $ lopt  "bar" (arg "foo")
+        , pass "--bar[=FOO]"     $ lopt  "bar" (arg "FOO")
+        , pass "--bar[ = FOO]"   $ lopt  "bar" (arg "FOO")
+        , pass "--bar[=fOo]"     $ lopt  "bar" (arg "fOo")
+        , pass "--bar[ = fOo]"   $ lopt  "bar" (arg "fOo")
+        , pass "--bar[ = <foo>]" $ lopt  "bar" (arg "foo")
+        , pass "--bar[FOO]"      $ lopt  "bar" (arg "FOO")
+
+        , pass "--bar [ = foo]"   $ lopt  "bar" (arg "foo")
+        , pass "--bar [=<foo>]"   $ lopt  "bar" (arg "foo")
+        , pass "--bar [=FOO]"     $ lopt  "bar" (arg "FOO")
+        , pass "--bar [ = FOO]"   $ lopt  "bar" (arg "FOO")
+        , pass "--bar [=fOo]"     $ lopt  "bar" (arg "fOo")
+        , pass "--bar [ = fOo]"   $ lopt  "bar" (arg "fOo")
+        , pass "--bar [ = <foo>]" $ lopt  "bar" (arg "foo")
+
         , fail "--bar="
         , fail "--bar=<>"
         , fail "--bar=--foo"
         , fail "--bar=-foo"
+
+        , fail "--bar[=]"
+        , fail "--bar[=<>]"
+        , fail "--bar[=--foo]"
+        , fail "--bar[=-foo]"
         ]
 
     -- Test stacked options in various formats.
@@ -101,6 +124,19 @@ usageParserSpec = \_ ->
         , pass "-b=foo"      $ sopt  'b' [] (arg "foo")
         , pass "-b=FOO"      $ sopt  'b' [] (arg "FOO")
         , pass "-b=<foo>"    $ sopt  'b' [] (arg "foo")
+
+        , pass "-b[FOO]"     $ sopt  'b' [] (arg "FOO")
+        , pass "-b[Foo]"     $ sopt  'b' [] (arg "Foo")
+        , pass "-b[<foo>]"   $ sopt  'b' [] (arg "foo")
+        , pass "-b[<foo>]"   $ sopt  'b' [] (arg "foo")
+        , pass "-b[=foo]"    $ sopt  'b' [] (arg "foo")
+        , pass "-b[=FOO]"    $ sopt  'b' [] (arg "FOO")
+        , pass "-b[=<foo>]"  $ sopt  'b' [] (arg "foo")
+
+        , pass "-b [=foo]"    $ sopt  'b' [] (arg "foo")
+        , pass "-b [=FOO]"    $ sopt  'b' [] (arg "FOO")
+        , pass "-b [=<foo>]"  $ sopt  'b' [] (arg "foo")
+
         , pass "-bar"        $ sopt_ 'b' ['a', 'r']
         , pass "-barFOO"     $ sopt_ 'b' ['a', 'r', 'F', 'O', 'O']
         , pass "-bar<foo>"   $ sopt  'b' ['a', 'r'] (arg "foo")
@@ -110,6 +146,14 @@ usageParserSpec = \_ ->
         , pass "-bar=<foo>"  $ sopt  'b' ['a', 'r'] (arg "foo")
         , pass "-bAR"        $ sopt_ 'b' ['A', 'R']
         , pass "-bARfoo"     $ sopt_ 'b' ['A', 'R', 'f', 'o', 'o']
+
+        , pass "-bar[FOO]"    $ sopt 'b' ['a', 'r'] (arg_ "FOO")
+        , pass "-bar[<foo>]"  $ sopt 'b' ['a', 'r'] (arg_ "foo")
+        , pass "-bar[Foo]"    $ sopt 'b' ['a', 'r'] (arg_ "Foo")
+        , pass "-bar[=foo]"   $ sopt 'b' ['a', 'r'] (arg_ "foo")
+        , pass "-bar[=FOO]"   $ sopt 'b' ['a', 'r'] (arg_ "FOO")
+        , pass "-bar[=<foo>]" $ sopt 'b' ['a', 'r'] (arg_ "foo")
+        , pass "-bAR[foo]"    $ sopt 'b' ['A', 'R'] (arg_ "foo")
         ]
 
     -- Test required groups in various formats.

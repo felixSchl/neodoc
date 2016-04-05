@@ -118,9 +118,9 @@ prettyPrintLOpt :: LOpt -> String
 prettyPrintLOpt (LOpt o)
   = "--" ++ o.name
       ++ (maybe "" (\a ->
-            if a.optional then "[" else ""
+            (if a.optional then "[" else ""
               ++ "=" ++ a.name
-              ++ if a.optional then "]" else "") o.arg)
+              ++ if a.optional then "]" else "")) o.arg)
       ++ if o.repeatable then "..." else ""
 
 prettyPrintSOpt :: SOpt -> String
@@ -128,7 +128,7 @@ prettyPrintSOpt (SOpt o)
   = "-" ++ (fromChar o.flag)
       ++ (intercalate "" $ fromChar <$> toList o.stack)
       ++ (maybe "" (\a ->
-            if a.optional then "[" else ""
+            (if a.optional then "[" else "")
               ++ "=" ++ a.name
-              ++ if a.optional then "]" else "") o.arg)
+              ++ (if a.optional then "]" else "")) o.arg)
       ++ if o.repeatable then "..." else ""
