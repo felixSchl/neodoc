@@ -132,19 +132,22 @@ prettyPrintOption (Option opt)
 
       arg = maybe "" id do
         (Argument a) <- opt.arg
-        return $ "=" ++ a.name ++ case a.default of
-                                    Nothing  -> ""
-                                    (Just v) -> " [default: "
-                                                    ++ prettyPrintValue v
-                                                    ++ "]"
+        return $
+          (if a.optional then "[" else "")
+            ++ "=" ++ a.name
+            ++ (if a.optional then "]" else "")
+            ++ (maybe ""
+                      (\v -> "[default: " ++ prettyPrintValue v ++ "]")
+                      a.default)
 
       env = maybe "" id do
         k <- opt.env
         return $ " [env: " ++ k ++ "]"
 
 prettyPrintArgument :: Argument -> String
-prettyPrintArgument (Argument { name: n, default: d })
-  = n ++ maybe "" (\v -> " [default: " ++ (prettyPrintValue v) ++  "]") d
+prettyPrintArgument (Argument { optional: o, name: n, default: d })
+  = (if o then "[" else "") ++ n ++ (if o then "]" else "")
+    ++ maybe "" (\v -> " [default: " ++ (prettyPrintValue v) ++  "]") d
 
 argument :: String
          -> Boolean
