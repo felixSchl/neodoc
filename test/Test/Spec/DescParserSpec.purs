@@ -91,6 +91,12 @@ descParserSpec = \_ ->
                 , arg:  Just $ arg_ "BAZ"
                 , env:  Nothing }
             ]
+          -- XXX: Indecisive here: Should this throw an error instead?
+        , pass ("-f=BAZ, --foo[=BAZ]")
+            [ o { name: Desc.Full 'f' "foo"
+                , arg:  Just $ optarg_ "BAZ"
+                , env:  Nothing }
+            ]
         , pass ("-f=BAZ, --foo=BAZ [default: 100]")
             [ o { name: Desc.Full 'f' "foo"
                 , arg:  Just $ arg "BAZ" (int 100)

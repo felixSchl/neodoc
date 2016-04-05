@@ -311,9 +311,12 @@ descParser =
                 }
 
               where
-                combineArg (a@(Just (Argument { name: n  })))
-                              (Just (Argument { name: n' }))
-                          | (n ^= n') = return a
+                combineArg (Just (Argument a)) (Just (Argument a'))
+                  | (a.name ^= a'.name) = return $ Just
+                      $ Argument { name:     a.name
+                                 , optional: a.optional || a'.optional
+                                 , default:  a.default <|> a'.default
+                                 }
                 combineArg Nothing  (Just b)            = return (pure b)
                 combineArg (Just a) Nothing             = return (pure a)
                 combineArg Nothing Nothing              = return Nothing
