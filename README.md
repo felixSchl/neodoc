@@ -213,6 +213,8 @@ npm install --save neodoc
 * Fix all purescript warnings
 * Provide typescript typings
 * Read options from config file
+* Add ranges support: `-[0-9]` would expand to `-0123456789` (or `-1`, `-2` ...).
+  For a usecase, see [here](https://github.com/rupa/v/blob/master/v#L6)
 * Read options from prompt (Add a `[prompt]` tag)
 * Syntax plugins (vim, ...)
 * Put the "source" of a parsed option's value into the output, e.g. "env",
