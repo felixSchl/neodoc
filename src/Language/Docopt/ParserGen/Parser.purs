@@ -540,8 +540,6 @@ genBranchParser (D.Branch xs) optsFirst = do
         ) bs
       = terminate (LU.head (D.runBranch (LU.head bs)))
 
-      where foo = false
-
     -- Generate a parser for an argument `Group`
     -- The total score a group is the sum of all scores inside of it.
     genParser x@(D.Group optional bs repeated) = do
