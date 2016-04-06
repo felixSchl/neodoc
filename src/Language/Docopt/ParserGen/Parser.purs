@@ -17,7 +17,7 @@ import Data.Identity (Identity(), runIdentity)
 import Control.Apply ((*>), (<*))
 import Data.Function (on)
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), isJust, isNothing, maybe, maybe')
+import Data.Maybe (Maybe(..), isJust, isNothing, maybe, maybe', fromMaybe)
 import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
                  , head, many, tail, fromList, filter, reverse, concat, catMaybes)
 import Control.Alt ((<|>))
@@ -381,7 +381,11 @@ genBranchParser (D.Branch xs) optsFirst = do
           -- when an option takes anything but a bool value, i.e. it is not
           -- a flag, an explicit argument *must* be provided.
           let ys = fst <$> flip filter r.result
-                    (\(Tuple a v) -> (D.takesArgument a)
+                    (\(Tuple a v) -> (fromMaybe false do
+                                        arg <- O.runArgument <$> do
+                                                  D.getArgument a
+                                        return $ not arg.optional
+                                     )
                                   && (not $ D.isFlag a)
                                   && (D.isBoolValue v))
 
@@ -399,18 +403,27 @@ genBranchParser (D.Branch xs) optsFirst = do
         ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
 
         draw ps' n | (length ps' > 0) && (n < 0) = do
-          env <- lift ask
-          let missing = filter (\o -> not $ D.isRepeatable  o
-                                         || D.hasDefault    o
-                                         || D.isFlag        o
-                                         || D.hasEnvBacking o env
-                               )
-                               $ ps'
+          env :: StrMap String <- lift ask
+
+          let missing = filter (not <<< isSkippable env) ps'
           if (length missing > 0)
             then P.fail $
               "Missing required options: "
                 ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
             else return mempty
+
+          where
+            isSkippable env (D.Group o bs _)
+              = o || (all (all (isSkippable env) <<< D.runBranch) bs)
+            isSkippable env o
+              =  (D.isRepeatable  o)
+              || (D.hasDefault    o)
+              || (maybe true id do
+                  arg <- O.runArgument <$> do
+                            D.getArgument o
+                  return arg.optional
+                )
+              || (D.hasEnvBacking o env)
 
         draw _ _ = return mempty
 

@@ -15,6 +15,7 @@ module Language.Docopt.Argument (
   , getEnvKey
   , hasEnvBacking
   , takesArgument
+  , getArgument
   , isOption
   , isFlag
   , isCommand
@@ -143,6 +144,10 @@ hasDefault _          = false
 takesArgument :: Argument -> Boolean
 takesArgument (Option o) = O.takesArgument o
 takesArgument _          = false
+
+getArgument :: Argument -> Maybe O.Argument
+getArgument (Option (O.Option o)) = o.arg
+getArgument _                     = Nothing
 
 getEnvKey :: Argument -> Maybe String
 getEnvKey (Option (O.Option o)) = o.env

@@ -106,7 +106,6 @@ takesArgument _                   = false
 
 isFlag :: Option -> Boolean
 isFlag (Option { arg: Just (Argument { default: Just (BoolValue _)})}) = true
-isFlag (Option { arg: Just (Argument { optional: true })}) = true
 isFlag (Option { arg: Nothing }) = true
 isFlag _ = false
 
@@ -119,9 +118,9 @@ prettyPrintOption (Option o)
               ++ maybe "" ("--" ++) o.name
     rep     = if o.repeatable then "..." else ""
     arg'    = flip (maybe "") o.arg \(Argument { name, optional }) ->
-                if optional then "[" else ""
+                (if optional then "[" else "")
                   ++ "=" ++ name
-                  ++ if optional then "]" else ""
+                  ++ (if optional then "]" else "")
     default = flip (maybe "") o.arg \(Argument { default }) ->
                 flip (maybe "") default \v->
                   " [default: " ++ (prettyPrintValue v) ++  "]"

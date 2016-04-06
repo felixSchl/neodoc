@@ -75,9 +75,7 @@ fail' i e err = Case i e (Left err)
 (:>) = Tuple
 infixr 0 :>
 
-parserGenSpec = \_ -> describe "The generator" do
-  it "refactoring..." do
-    pure unit
+parserGenSpec = \_ -> describe "The parser generator" do
 
   -- Some options that will be used for these tests
   let testCases = [

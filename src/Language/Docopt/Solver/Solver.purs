@@ -192,8 +192,8 @@ solveBranch as ds = Branch <$> go as
         -- | "armmsg"
         -- |    ~~~~
         -- |    ^^
-        -- |    |`- the flag matches - case SENSITIVE
-        -- |    `-- the arg  matches - case INSENSITIVE
+        -- |    |`- the arg  matches - case INSENSITIVE
+        -- |    `-- the flag matches - case SENSITIVE
         -- |
         -- | Should this check, yield a match, slice the matched
         -- | string off the stack and return the remainder option

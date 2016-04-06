@@ -164,9 +164,35 @@ reduce us env b vs =
         expand arg = Map.singleton (key arg) arg
 
         resolveOR :: D.Argument -> D.Argument -> D.Argument
+        resolveOR (D.Option (O.Option o))
+                  (D.Option (O.Option o'))
+            = D.Option (O.Option o {
+                        arg = do
+                          a  <- O.runArgument <$> (o.arg  <|> o'.arg)
+                          a' <- O.runArgument <$> (o'.arg <|> o.arg )
+                          return $ O.Argument {
+                            name:     a.name
+                          , default:  a.default  <|> a'.default
+                          , optional: a.optional || a'.optional
+                          }
+                       , repeatable = o.repeatable || o'.repeatable
+                       })
         resolveOR a b = D.setRepeatable a (D.isRepeatable a || D.isRepeatable b)
 
         resolveLCD :: D.Argument -> D.Argument -> D.Argument
+        resolveLCD (D.Option (O.Option o))
+                  (D.Option (O.Option o'))
+            = D.Option (O.Option o {
+                        arg = do
+                          a  <- O.runArgument <$> (o.arg  <|> o'.arg)
+                          a' <- O.runArgument <$> (o'.arg <|> o.arg )
+                          return $ O.Argument {
+                            name:     a.name
+                          , default:  a.default  <|> a'.default
+                          , optional: a.optional || a'.optional
+                          }
+                       , repeatable = true
+                       })
         resolveLCD a b =  D.setRepeatable a true
 
     getValue :: Map Key D.Value -> D.Argument -> Maybe D.Value
