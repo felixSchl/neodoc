@@ -381,12 +381,11 @@ $ prog
 {"-a": false, "-b": false}
 
 
-r"""usage: prog (-a|-b)
+#
+# Mutually excluse groups
+#
 
-options: -a
-         -b
-
-"""
+r"""usage: prog (-a|-b)"""
 $ prog -a -b
 "user-error"
 
@@ -1470,7 +1469,171 @@ $ prog --foo
 {"--foo": [true]}
 
 $ prog --foo bar
-{"--foo": ["bar"]}
+"user-error" # "bar" will be considered trailing since the first appearance
+             # of '--foo' does not take an argument. XXX: Is this intutive
+             # enough?
+
+$ prog --foo --foo=bar
+{"--foo": [true, "bar"]}
+
+$ prog --foo --foobar
+{"--foo": [true, "bar"]}
+
+$ prog --foo --foo bar
+{"--foo": [true, "bar"]}
 
 $ prog --foo --foo
 {"--foo": [true, true]}
+
+r"""
+Usage: manage.py --foo --foo[=BAR]...
+"""
+
+$ prog
+{}
+
+$ prog --foo
+{"--foo": [true]}
+
+$ prog --foo bar
+"user-error" # "bar" will be considered trailing since the first appearance
+             # of '--foo' does not take an argument. XXX: Is this intutive
+             # enough?
+
+$ prog --foo --foo
+{"--foo": [true, true]}
+
+r"""
+Usage: manage.py --foo (--foo[=BAR]...)
+"""
+
+$ prog
+{}
+
+$ prog --foo
+{"--foo": [true]}
+
+$ prog --foo bar
+"user-error" # "bar" will be considered trailing since the first appearance
+             # of '--foo' does not take an argument. XXX: Is this intutive
+             # enough?
+
+$ prog --foo --foo
+{"--foo": [true, true]}
+
+r"""
+Usage: manage.py [-f...]... [--foo[=BAR]...]...
+
+Options:
+    -f --foo  Blah
+"""
+
+$ prog
+{}
+
+$ prog --foo
+{"--foo": [true], "-f": [true]}
+
+$ prog --foo bar
+"user-error" # "bar" will be considered trailing since the first appearance
+             # of '--foo' does not take an argument. XXX: Is this intutive
+             # enough?
+
+$ prog --foo --foo
+{"--foo": [true, true], "-f": [true, true]}
+
+#
+# Options should be parsed in any order
+#
+
+r"""usage: prog [-a] -b"""
+
+$ prog -a -b
+{"-a": true, "-b": true}
+
+$ prog -b -a
+{"-a": true, "-b": true}
+
+r"""usage: prog -a [-b]"""
+
+$ prog -a -b
+{"-a": true, "-b": true}
+
+$ prog -b -a
+{"-a": true, "-b": true}
+
+r"""usage: prog -a [-b] -c"""
+
+$ prog -a -b -c
+{"-a": true, "-b": true, "-c": true}
+
+$ prog -a -c -b
+{"-a": true, "-b": true, "-c": true}
+
+$ prog -b -a -c
+{"-a": true, "-b": true, "-c": true}
+
+$ prog -b -c -a
+{"-a": true, "-b": true, "-c": true}
+
+$ prog -c -b -a
+{"-a": true, "-b": true, "-c": true}
+
+$ prog -c -a -b
+{"-a": true, "-b": true, "-c": true}
+
+r"""usage: prog -a [-b -d] -c"""
+
+$ prog -a -b -c
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
+$ prog -a -c -b
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
+$ prog -b -a -c
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
+$ prog -b -c -a
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
+$ prog -c -b -a
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
+$ prog -c -a -b
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
+$ prog -d -a -b -c
+{"-a": true, "-b": true, "-c": true, "-d": true}
+
+$ prog -a -d -c -b
+{"-a": true, "-b": true, "-c": true, "-d": true}
+
+$ prog -b -a -d -c
+{"-a": true, "-b": true, "-c": true, "-d": true}
+
+$ prog -b -c -a -d
+{"-a": true, "-b": true, "-c": true, "-d": true}
+
+
+r"""usage: prog [(-a -b)]"""
+
+$ prog -a -b
+{"-a": true, "-b": true}
+
+$ prog -b -a
+{"-a": true, "-b": true}
+
+$ prog -ab
+{"-a": true, "-b": true}
+
+$ prog -ba
+{"-a": true, "-b": true}
+
+$ prog -a
+{"-a": true, "-b": false}
+
+$ prog -b
+{"-a": false, "-b": true}
+
+$ prog
+{"-a": false, "-b": false}

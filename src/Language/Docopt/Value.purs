@@ -79,6 +79,7 @@ prettyPrintValue (StringValue s) = s
 prettyPrintValue (BoolValue   b) = show b
 prettyPrintValue (ArrayValue xs) = show $ prettyPrintValue <$> xs
 prettyPrintValue (IntValue    i) = show i
+prettyPrintValue (FloatValue  f) = show f
 
 read :: String -> Value
 read s = either (const $ StringValue s) id (parse s)

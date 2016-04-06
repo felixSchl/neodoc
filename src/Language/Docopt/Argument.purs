@@ -10,6 +10,7 @@ module Language.Docopt.Argument (
   , runBranch
   , isRepeatable
   , setRepeatable
+  , setRequired
   , setRepeatableOr
   , hasDefault
   , getEnvKey
@@ -136,6 +137,10 @@ setRepeatableOr (Option (O.Option o)) r
 setRepeatableOr (Positional n r) r' = (Positional n (r || r'))
 setRepeatableOr (Command n r) r' = (Command n (r || r'))
 setRepeatableOr x _ = x
+
+setRequired :: Argument -> Boolean -> Argument
+setRequired (Group _ bs r) o = Group (not o) bs r
+setRequired x _ = x
 
 hasDefault :: Argument -> Boolean
 hasDefault (Option o) = O.hasDefault o

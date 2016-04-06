@@ -163,7 +163,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Missing required options: -i|--input=FILE, -o|--output=FILE"
+          $ "Missing required options: -o|--output=FILE, -i|--input=FILE"
 
         , fail [ "-i", "bar" ]
           $ "Missing required options: -o|--output=FILE"
@@ -192,7 +192,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Missing required options: -i|--input=FILE -r|--redirect=FILE, -o|--output=FILE"
+          $ "Missing required options: -i|--input=FILE, -o|--output=FILE, -r|--redirect=FILE"
 
         , fail [ "-i", "bar", "-r", "bar" ]
             "Missing required options: -o|--output=FILE"
