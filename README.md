@@ -1,13 +1,13 @@
 <div align="center">
     <h1>
-        <strong><sub>&lt;</sub> neodoc <sub>&gt;</sub></strong>
+        <strong>&lt;neodoc&gt;</strong>
     </h1>
     <em><sub></sub></em>
 </div>
 
 <p align="center">
-  <a href="https://travis-ci.org/felixSchl/docopt">
-    <img src="https://travis-ci.org/felixSchl/docopt.svg?branch=development?style=flat-square"
+  <a href="https://travis-ci.org/felixSchl/neodoc">
+    <img src="https://travis-ci.org/felixSchl/neodoc.svg?branch=development?style=flat-square"
          alt="Build Status">
   </a>
 <br/>
@@ -32,10 +32,8 @@ command lines by writing the command line's help text first and then deriving
 a matching parser from it, which can then be applied to user input. The
 advantages are numerous:
 
-* Documentation and implementation are always in sync
-* Great discoverability for the user
-* Provokes thinking about the user first
-* No awkward, unreadable EDSL
+* No stagnant documentation - **your help-text is _necessarily_ correct**
+* No awkward, unreadable EDSL - **beautiful, hand-crafted help texts instead**
 
 This implementation features **error reporting**, both for users and developers,
 reading values from **environment variables**, type coercion and much more. For
@@ -119,6 +117,7 @@ npm install --save neodoc
   be an implementation detail.
 * **Solid test coverage**
 * Sensible compatibility with original docopt.
+* **POSIX compatibility**
 
 ### Deviations from the original ###
 
@@ -128,9 +127,8 @@ npm install --save neodoc
 
 * **Better Error reporting.** Let the user of your utility know why his input
   was rejected.
-* **No abbreviations:**
-  `--ver` does not match `--verbose`.
-  <sub>[(mis-feature in the original implementation)](https://github.com/docopt/docopt/issues/104)</sub>
+* **Optional arguments.** Neodoc understands `--foo[=BAR]` (or `-f[=<bar>]`) as
+  an option that can be provided either with or without an argument.
 * **Alias matches.** If `--verbose` yields a value, so will `-v` <sub>(given
   that's the assigned alias)</sub>. Likewise, `FOO` yields value `<foo>` as
   well as `FOO`, and `<foo>` yields `FOO` and `<foo>`.
@@ -141,6 +139,9 @@ npm install --save neodoc
   `-ab`, `-ba`, `-b -a`, `-b`, `-a` and the empty input.
 * **All arguments in a group are always required**. This is regardless of
   whether or not the group itself is required or not, i.e.:
+* **No abbreviations:**
+  `--ver` does not match `--verbose`.
+  <sub>[(mis-feature in the original implementation)](https://github.com/docopt/docopt/issues/104)</sub>
 
   ```sh
   Usage: prog [<name> <type>]
@@ -195,14 +196,18 @@ npm install --save neodoc
 
 * [x] Implement "options-first"
 * [x] Improve scanner speed
-* [ ] Implement optional option arguments: `-a [foo]`.
+* [ ] POSIX compatibility
+* [ ] Improve error messages
+  * [ ] Improve error messages when matching free groups / options (be more
+        specific than "Trailing input")
+* [x] Implement optional option arguments: `-a [=foo]`.
 * [ ] Implement `--help` and `--version`. The developer will be able to specify
   the option that will trigger the `--help` and `--version` convenience
   functions, with fallbacks to `--help` and `--version`.
   * [ ] Implement `--help`. If matched, print the docopt text.
   * [ ] Implement `--version`. If matched, print the npm package version.
 * [ ] Read options from config file
-* [ ] Allow for `--foo[=<bar>]` syntax (git style).
+* [x] Allow for `--foo[=<bar>]` syntax (git style).
 * [x] Auto-infer types when not specified (e.g. numbers, strings, booleans)
 * [ ] Allow flag negation sintax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
 
