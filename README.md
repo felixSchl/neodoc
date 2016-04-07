@@ -128,9 +128,8 @@ npm install --save neodoc
 
 * **Better Error reporting.** Let the user of your utility know why his input
   was rejected.
-* **No abbreviations:**
-  `--ver` does not match `--verbose`.
-  <sub>[(mis-feature in the original implementation)](https://github.com/docopt/docopt/issues/104)</sub>
+* **Optional arguments.** Neodoc understands `--foo[=BAR]` (or `-f[=<bar>]`) as
+  an option that can be provided either with or without an argument.
 * **Alias matches.** If `--verbose` yields a value, so will `-v` <sub>(given
   that's the assigned alias)</sub>. Likewise, `FOO` yields value `<foo>` as
   well as `FOO`, and `<foo>` yields `FOO` and `<foo>`.
@@ -141,6 +140,9 @@ npm install --save neodoc
   `-ab`, `-ba`, `-b -a`, `-b`, `-a` and the empty input.
 * **All arguments in a group are always required**. This is regardless of
   whether or not the group itself is required or not, i.e.:
+* **No abbreviations:**
+  `--ver` does not match `--verbose`.
+  <sub>[(mis-feature in the original implementation)](https://github.com/docopt/docopt/issues/104)</sub>
 
   ```sh
   Usage: prog [<name> <type>]
@@ -195,14 +197,14 @@ npm install --save neodoc
 
 * [x] Implement "options-first"
 * [x] Improve scanner speed
-* [ ] Implement optional option arguments: `-a [foo]`.
+* [x] Implement optional option arguments: `-a [=foo]`.
 * [ ] Implement `--help` and `--version`. The developer will be able to specify
   the option that will trigger the `--help` and `--version` convenience
   functions, with fallbacks to `--help` and `--version`.
   * [ ] Implement `--help`. If matched, print the docopt text.
   * [ ] Implement `--version`. If matched, print the npm package version.
 * [ ] Read options from config file
-* [ ] Allow for `--foo[=<bar>]` syntax (git style).
+* [x] Allow for `--foo[=<bar>]` syntax (git style).
 * [x] Auto-infer types when not specified (e.g. numbers, strings, booleans)
 * [ ] Allow flag negation sintax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
 
