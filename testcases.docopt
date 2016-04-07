@@ -1637,3 +1637,26 @@ $ prog -b
 
 $ prog
 {"-a": false, "-b": false}
+
+r"""usage: prog [(-a[=BAR] -b)]"""
+
+$ prog -a FOO -b
+{"-a": "FOO", "-b": true}
+
+$ prog -b -a FOO
+{"-a": "FOO", "-b": true}
+
+$ prog -ab
+{"-a": "b", "-b": false}
+
+$ prog -ba
+{"-a": true, "-b": true}
+
+$ prog -a
+{"-a": true, "-b": false}
+
+$ prog -b
+{"-b": true}
+
+$ prog
+{"-b": false}
