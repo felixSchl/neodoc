@@ -196,7 +196,16 @@ npm install --save neodoc
 
 * [x] Implement "options-first"
 * [x] Improve scanner speed
-* [ ] POSIX compatibility
+* [ ] [POSIX compatibility][POSIX] (opt-in/out)
+    * [ ] "Options-first" on by default (guideline 9)
+    * [ ] Required option arguments be separate from the option: `-f BAR`
+        * [ ] Update notation in usage syntax (disallow no spaces)
+    * [ ] Optional option arguments be the same argument as the option: `-fBAR`
+        * [ ] Update notation in usage syntax (disallow spaces)
+    * [ ] Denote options in singleton groups: `[-f BAR]` means `[-f=BAR]` (no
+        option description required)
+    * [ ] Allow passing negative numbers as option arguments
+    * [ ] Implement guideline 8 (also see 11)
 * [ ] Improve error messages
   * [ ] Improve error messages when matching free groups / options (be more
         specific than "Trailing input")
@@ -290,3 +299,4 @@ Options:
   the time being, then run again with the config file default values).
 
 [docopt-orig]: http://docopt.org
+[POSIX]: http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html
