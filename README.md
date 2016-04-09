@@ -259,18 +259,11 @@ NB: Purescript is declared a devDependency in package.json, so no need to bring
 your own. Also, during development, `npm run watch` is extremely useful to get
 immediate feedback.
 
-## License ##
-
-<strong>&lt;neodoc&gt;</strong> is released under the **MIT LICENSE**.
-See file `LICENSE` for a more detailed description of it's terms.
-
----
-
 ### Implementation overview ###
 
 > A quick overview of the implementation for potential contributors
 
-The project can roughly be broken up into 4 distinct areas of work:
+The project can roughly be broken up into several distinct areas of work:
 
 1. Scanning the docopt text:
     1. Derive at least 1 usage section
@@ -283,6 +276,13 @@ The project can roughly be broken up into 4 distinct areas of work:
 1. Lex and parse the user input
     1. Lex and parse the user input
     1. Transform into a usable form
+
+## License ##
+
+<strong>&lt;neodoc&gt;</strong> is released under the **MIT LICENSE**.
+See file `LICENSE` for a more detailed description of it's terms.
+
+---
 
 ### Dev Notes ###
 
