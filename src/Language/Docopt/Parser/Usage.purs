@@ -18,6 +18,7 @@ import Data.List (List(..), many, some, (:), toList, concat, singleton
                   , modifyAt, length)
 import Text.Parsing.Parser             as P
 import Text.Parsing.Parser.Combinators as P
+import Text.Parsing.Parser.Combinators ((<?>), (<??>))
 import Text.Parsing.Parser.Pos         as P
 import Text.Parsing.Parser.String      as P
 import Data.List as L
@@ -86,7 +87,7 @@ usageParser = do
           return Nothing
         )
         -- XXX: We could show the last token that failed to be consumed, here
-        P.<?> "start of next usage line or end of usage section"
+        <?> "start of next usage line or end of usage section"
       ]
 
       -- Push the EOA onto the last branch (the most right branch)
@@ -106,7 +107,7 @@ usageParser = do
         , group
         , reference
         , stdin
-        ] P.<?> "Option, Positional, Command, Group or Reference"
+        ] <?> "Option, Positional, Command, Group or Reference"
 
     stdin :: L.TokenParser Argument
     stdin = L.dash *> return Stdin
@@ -162,7 +163,7 @@ usageParser = do
       , return false ]
 
     program :: L.TokenParser String
-    program = (L.name <|> L.word) P.<?> "Program Name"
+    program = "Program Name" <??> L.name
 
 parse :: (List L.PositionedToken) -> Either P.ParseError (List Usage)
 parse = flip L.runTokenParser usageParser

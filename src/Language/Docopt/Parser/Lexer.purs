@@ -65,7 +65,6 @@ data Token
   | Name String
   | ShoutName String
   | AngleName String
-  | Word String
   | Garbage Char
   | DoubleDash
 
@@ -86,7 +85,6 @@ prettyPrintToken (Tag k v)         = "Tag "       ++ k ++ " "  ++ (show v)
 prettyPrintToken (Name      n)     = "Name "      ++ show n
 prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
 prettyPrintToken (AngleName n)     = "AngleName " ++ show n
-prettyPrintToken (Word w)          = "Word "      ++ show w
 prettyPrintToken (LOpt n arg)
   = "--" ++ n
          ++ (fromMaybe "" do
@@ -144,7 +142,6 @@ instance eqToken :: Eq Token where
             ))
   eq (AngleName n)     (AngleName n')     = n == n'
   eq (ShoutName n)     (ShoutName n')     = n == n'
-  eq (Word w)          (Word w')          = w == w'
   eq (Name n)          (Name n')          = n == n'
   eq (Garbage c)       (Garbage c')       = c == c'
   eq _ _                                  = false
@@ -183,11 +180,10 @@ parseToken m = P.choice (P.try <$> A.concat [
     , P.string "--"  *> pure DoubleDash
     , P.char   '-'   *> pure Dash
     , P.string "..." *> pure TripleDot
-    , ShoutName <$> (shoutName <* P.notFollowedBy alpha)
-    , Name      <$> (name      <* P.notFollowedBy alpha)
-    , Word      <$> (word      <* space)
-    , Garbage   <$> P.anyChar
+    , ShoutName <$> shoutName
+    , Name      <$> name
     ]
+  , if isDescMode m then [ Garbage <$> P.anyChar ] else []
   ])
   <* P.skipSpaces
 
@@ -236,9 +232,6 @@ parseToken m = P.choice (P.try <$> A.concat [
         k <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
         return (Tag k Nothing)
 
-  name :: P.Parser String String
-  name = word
-
   shoutName :: P.Parser String String
   shoutName = do
     n <- fromCharArray <$> do
@@ -248,8 +241,8 @@ parseToken m = P.choice (P.try <$> A.concat [
     P.notFollowedBy lowerAlpha
     return n
 
-  word :: P.Parser String String
-  word = do
+  name :: P.Parser String String
+  name = do
     n  <- alphaNum
     ns <- do
       A.many $ P.try $ do
@@ -519,12 +512,6 @@ reference = token go P.<?> "reference"
   where
     go (Reference r) = Just r
     go _             = Nothing
-
-word :: TokenParser String
-word = token go P.<?> "word"
-  where
-    go (Word n) = Just n
-    go _        = Nothing
 
 angleName :: TokenParser String
 angleName = token go P.<?> "<name>"
