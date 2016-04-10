@@ -48,20 +48,15 @@ lexDescs = lex Descriptions
 lexUsage :: String -> Either P.ParseError (List PositionedToken)
 lexUsage = lex Usage
 
-data NumberLiteral = FloatLiteral Number | IntLiteral Int
-
 data Token
   = LParen
   | RParen
   | LSquare
   | RSquare
-  | LAngle
-  | RAngle
   | Dash
   | VBar
   | Colon
   | Comma
-  | Equal
   | TripleDot
   | Reference String
   | LOpt String (Maybe { name :: String, optional :: Boolean })
@@ -71,8 +66,6 @@ data Token
   | ShoutName String
   | AngleName String
   | Word String
-  | StringLiteral String
-  | NumberLiteral NumberLiteral
   | Garbage Char
   | DoubleDash
 
@@ -81,13 +74,10 @@ prettyPrintToken LParen            = show '('
 prettyPrintToken RParen            = show ')'
 prettyPrintToken LSquare           = show '['
 prettyPrintToken RSquare           = show ']'
-prettyPrintToken LAngle            = show '<'
-prettyPrintToken RAngle            = show '>'
 prettyPrintToken Dash              = show '-'
 prettyPrintToken VBar              = show '|'
 prettyPrintToken Colon             = show ':'
 prettyPrintToken Comma             = show ','
-prettyPrintToken Equal             = show '='
 prettyPrintToken TripleDot         = "..."
 prettyPrintToken DoubleDash        = "--"
 prettyPrintToken (Reference r)     = "Reference " ++ show r
@@ -96,8 +86,6 @@ prettyPrintToken (Tag k v)         = "Tag "       ++ k ++ " "  ++ (show v)
 prettyPrintToken (Name      n)     = "Name "      ++ show n
 prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
 prettyPrintToken (AngleName n)     = "AngleName " ++ show n
-prettyPrintToken (StringLiteral s) = "String "    ++ show s
-prettyPrintToken (NumberLiteral n) = "Number "    ++ show n
 prettyPrintToken (Word w)          = "Word "      ++ show w
 prettyPrintToken (LOpt n arg)
   = "--" ++ n
@@ -121,14 +109,6 @@ data PositionedToken = PositionedToken
   , token     :: Token
   }
 
-instance eqNumberLiteral :: Eq NumberLiteral where
-  eq (FloatLiteral n) (FloatLiteral n') = eq n n'
-  eq (IntLiteral n)   (IntLiteral n')   = eq n n'
-
-instance showNumberLiteral :: Show NumberLiteral where
-  show (FloatLiteral n) = show n
-  show (IntLiteral n)   = show n
-
 instance showToken :: Show Token where
   show = show <<< prettyPrintToken
 
@@ -137,13 +117,10 @@ instance eqToken :: Eq Token where
   eq RParen            RParen             = true
   eq LSquare           LSquare            = true
   eq RSquare           RSquare            = true
-  eq LAngle            LAngle             = true
-  eq RAngle            RAngle             = true
   eq VBar              VBar               = true
   eq Colon             Colon              = true
   eq Comma             Comma              = true
   eq Dash              Dash               = true
-  eq Equal             Equal              = true
   eq DoubleDash        DoubleDash         = true
   eq TripleDot         TripleDot          = true
   eq (Reference r)     (Reference r')     = r == r'
@@ -165,13 +142,11 @@ instance eqToken :: Eq Token where
               return $ (a.name == a.name)
                     && (a.optional == a.optional)
             ))
-  eq (StringLiteral s) (StringLiteral s') = s == s'
   eq (AngleName n)     (AngleName n')     = n == n'
   eq (ShoutName n)     (ShoutName n')     = n == n'
   eq (Word w)          (Word w')          = w == w'
   eq (Name n)          (Name n')          = n == n'
   eq (Garbage c)       (Garbage c')       = c == c'
-  eq (NumberLiteral n) (NumberLiteral n') = n == n'
   eq _ _                                  = false
 
 instance showPositionedToken :: Show PositionedToken where
@@ -205,14 +180,9 @@ parseToken m = P.choice (P.try <$> A.concat [
     , longOption
     , shortOption
     , AngleName <$> angleName
-    , P.char   '<'   *> pure LAngle
-    , P.char   '>'   *> pure RAngle
     , P.string "--"  *> pure DoubleDash
     , P.char   '-'   *> pure Dash
-    , P.char   '='   *> pure Equal
     , P.string "..." *> pure TripleDot
-    , numberLiteral
-    , stringLiteral
     , ShoutName <$> (shoutName <* P.notFollowedBy alpha)
     , Name      <$> (name      <* P.notFollowedBy alpha)
     , Word      <$> (word      <* space)
@@ -265,41 +235,6 @@ parseToken m = P.choice (P.try <$> A.concat [
       withoutValue = do
         k <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
         return (Tag k Nothing)
-
-  stringLiteral :: P.Parser String Token
-  stringLiteral = StringLiteral <$> do
-    P.choice [
-      P.between (P.char '\'') (P.char '\'') (p '\'')
-    , P.between (P.char '"')  (P.char '"')  (p '"')
-    ]
-    where
-      p :: Char -> P.Parser String String
-      p c = fromCharArray <$> do
-        A.many $ P.noneOf [c]
-
-  numberLiteral :: P.Parser String Token
-  numberLiteral = NumberLiteral <$> do
-    P.choice [
-      P.try $ FloatLiteral <$> floatLiteral
-    , P.try $ IntLiteral   <$> intLiteral
-    ]
-    where
-      floatLiteral = do
-        x <- fromCharArray <$> (A.some digit)
-        P.char '.'
-        xs <- fromCharArray <$> (A.some digit)
-
-        -- there is no "safe" version yet, afaik
-        let n = readFloat $ x ++ "." ++ xs
-        if isNaN n
-           then P.fail "Could not parse float"
-           else pure n
-
-      intLiteral = do
-        x <- fromCharArray <$> (A.some digit)
-        case (I.fromString x) of
-          Just n  -> return n
-          Nothing -> P.fail "Could not parse integer"
 
   name :: P.Parser String String
   name = word
@@ -524,12 +459,6 @@ lsquare = match LSquare
 rsquare :: TokenParser Unit
 rsquare = match RSquare
 
-langle :: TokenParser Unit
-langle = match LAngle
-
-rangle :: TokenParser Unit
-rangle = match RAngle
-
 dash :: TokenParser Unit
 dash = match Dash
 
@@ -547,9 +476,6 @@ colon = match Colon
 
 tripleDot :: TokenParser Unit
 tripleDot = match TripleDot
-
-equal :: TokenParser Unit
-equal = match Equal
 
 garbage :: TokenParser Unit
 garbage = token go P.<?> "garbage"
