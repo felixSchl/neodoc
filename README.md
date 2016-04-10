@@ -48,58 +48,64 @@ npm install --save neodoc
 
 ## Usage ##
 
-> Basic usage example. For more detail on what neodoc can do, have a look at
-> `testcases.docopt` in the repo.
+### neodoc.run(docopt, opts)
 
-1. Given this node.js program:
-    ```javascript
-    #!/usr/bin/env node
+Parse and apply the given docopt help text. If not options are provided, apply
+it to `process.argv` and `process.env`. The result is a mapping of key -> value,
+where the key is the canonical form of the option and it's alias, if available.
 
-    import neodoc from 'neodoc';
-    const argv = neodoc.run(`
-      Naval Fate.
+Options:
 
-      Usage:
-        naval_fate ship new <name>...
-        naval_fate ship <name> move <x> <y> [--speed=<kn>]
-        naval_fate ship shoot <x> <y>
-        naval_fate mine (set|remove) <x> <y> [--moored|--drifting]
-        naval_fate -h | --help
-        naval_fate --version
+* `opts.env` - Override `process.env`
+* `opts.argv` - Override `process.argv`
+* `opts.optionsFirst` - Parse until the first `command` or `<positional>`
+   argument, then collect the rest into an array, given the help indicates
+   another, repeatable, positional argument, e.g. : `[options] <ommand>
+   [<args>...]`
 
-      Options:
-        -h --help     Show this screen.
-        --version     Show version.
-        --speed=<kn>  Speed in knots [default: 10].
-        --moored      Moored (anchored) mine.
-        --drifting    Drifting mine.
-    `);
+Example:
 
-    console.log(argv);
-    ```
+```javascript
+#!/usr/bin/env node
 
-2. We can provide various input:
+// (!) This is runnable code and mimics git. The git help below is output of
+//     `git --help` with a couple of very minor alterations (couple of
+//      characters) which are also being addressed.
+// (!) Keep in in mind that these strings below could be kept in your README or
+//     manpage SYNOPSIS.
 
-    ```bash
-    $ ./prog ship new foo bar baz
-      {'<name>': ['foo', 'bar', 'baz'],
-       'NAME': ['foo', 'bar', 'baz'],
-       'new': true,
-       'ship': true}
+const neodoc = require('neodoc');
 
-    $ ./prog ship foo move 10 10 --speed
-      Usage:
-        naval_fate ship new <name>...
-        naval_fate ship <name> move <x> <y> [--speed=<kn>]
-        naval_fate ship shoot <x> <y>
-        naval_fate mine (set|remove) <x> <y> [--moored|--drifting]
-        naval_fate -h | --help
-        naval_fate --version
+const args = neodoc.run(`
+usage: git [--version] [--help] [-C=<path>] [-c<name=value>]
+           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
+           [-p|--paginate|--no-pager] [--no-replace-objects] [--bare]
+           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
+           <command> [<args>...]
+`, { optionsFirst: true });
 
-      Trailing input: --speed:
-      > ship foo move 10 10 --speed
-                            ^^^^^^^
-    ```
+if (args['<command>'] === 'remote') {
+    const remoteArgs = neodoc.run(`
+    usage:
+        git remote [-v | --verbose]
+        git remote add [-t=<branch>] [-m=<master>] [-f] [--tags|--no-tags]
+                        [--mirror=<fetch|push>] <name> <url>
+        git remote rename <old> <new>
+        git remote remove <name>
+        git remote set-head <name> (-a | --auto | -d | --delete | <branch>)
+        git remote set-branches [--add] <name> <branch>...
+        git remote set-url [--push] <name> <newurl> [<oldurl>]
+        git remote set-url --add [--push] <name> <newurl>
+        git remote set-url --delete [--push] <name> <url>
+        git remote [-v | --verbose] show [-n] <name>...
+        git remote prune [-n | --dry-run] <name>...
+        git remote [-v | --verbose] update [-p | --prune] [(<group> | <remote>)...]
+    `, { argv: ['remote'].concat(args['<args>']) })
+
+    // ...
+} else { /* ... */ }
+```
+
 
 ## Project goals ##
 
