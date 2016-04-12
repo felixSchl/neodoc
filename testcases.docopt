@@ -1587,19 +1587,37 @@ r"""usage: prog -a [-b -d] -c"""
 $ prog -a -b -c
 {"-a": true, "-b": true, "-c": true, "-d": false}
 
+$ prog -abc
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
 $ prog -a -c -b
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
+$ prog -acb
 {"-a": true, "-b": true, "-c": true, "-d": false}
 
 $ prog -b -a -c
 {"-a": true, "-b": true, "-c": true, "-d": false}
 
+$ prog -bac
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
 $ prog -b -c -a
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
+$ prog -bca
 {"-a": true, "-b": true, "-c": true, "-d": false}
 
 $ prog -c -b -a
 {"-a": true, "-b": true, "-c": true, "-d": false}
 
+$ prog -cba
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
 $ prog -c -a -b
+{"-a": true, "-b": true, "-c": true, "-d": false}
+
+$ prog -cab
 {"-a": true, "-b": true, "-c": true, "-d": false}
 
 $ prog -d -a -b -c
@@ -1660,3 +1678,15 @@ $ prog -b
 
 $ prog
 {"-b": false}
+
+
+r"""usage: prog -a (--foo|--no-foo) -b"""
+
+$ prog -b -a --foo
+{"-a": true, "-b": true, "--foo": true, "--no-foo": false}
+
+$ prog -b --no-foo -a
+{"-a": true, "-b": true, "--foo": false, "--no-foo": true}
+
+$ prog -b --no-foo -a --foo
+"user-error"
