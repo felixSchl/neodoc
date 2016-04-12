@@ -1603,16 +1603,16 @@ $ prog -c -a -b
 {"-a": true, "-b": true, "-c": true, "-d": false}
 
 $ prog -d -a -b -c
-{"-a": true, "-b": true, "-c": true, "-d": true}
+"user-error" # -b and -d must appear together
 
 $ prog -a -d -c -b
-{"-a": true, "-b": true, "-c": true, "-d": true}
+"user-error" # -b and -d must appear together
 
 $ prog -b -a -d -c
-{"-a": true, "-b": true, "-c": true, "-d": true}
+"user-error" # -b and -d must appear together
 
 $ prog -b -c -a -d
-{"-a": true, "-b": true, "-c": true, "-d": true}
+"user-error" # -b and -d must appear together
 
 
 r"""usage: prog [(-a -b)]"""

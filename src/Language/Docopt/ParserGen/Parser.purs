@@ -62,7 +62,10 @@ import Language.Docopt.Value    as Value
 import Language.Docopt.ParserGen.Token
 import Language.Docopt.ParserGen.Token as Token
 import Language.Docopt.ParserGen.ValueMapping
-import Language.Docopt.Parser.Base (alphaNum, space, getInput, debug)
+import Language.Docopt.Parser.Base (alphaNum, space, getInput)
+
+debug :: Boolean
+debug = false
 
 -- |
 -- | Unfortunately, the State Monad is needed because we try matching all
@@ -368,6 +371,12 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                         -> Parser (ScoredResult (List ValueMapping))
     genExhaustiveParser Nil canSkip = return mempty
     genExhaustiveParser ps  canSkip = do
+      if debug
+        then do
+          traceA $ "genExhaustiveParser: "
+                ++ (intercalate " " (D.prettyPrintArg <$> ps))
+                ++ " - canSkip: " ++  show canSkip
+          else return unit
       draw ps (length ps)
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
@@ -377,15 +386,28 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
              -> Parser (ScoredResult (List ValueMapping))
 
         draw pss@(Cons p ps') n | n >= 0 = (do
+          if debug
+            then do
+                i <- getInput
+                traceA $
+                  "draw: (" ++ (D.prettyPrintArg p) ++ ":"
+                            ++ (intercalate ":" (D.prettyPrintArg <$> ps'))
+                            ++  ") - n: " ++ show n
+                            ++ "from input: "
+                            ++ (intercalate " " (prettyPrintToken
+                                                  <<< _.token
+                                                  <<< unPositionedToken <$> i))
+            else return unit
+
           -- Generate the parser for the argument `p`. For groups, temporarily
           -- set the required flag to "true", such that it will fail and we have
           -- a chance to retry as part of the exhaustive parsing mechanism
           r <- unScoredResult <$> (P.try $ genParser (D.setRequired p true)
                                                      (not $ n > 0))
 
-          -- verify the arguments for parsed set of options
-          -- when an option takes anything but a bool value, i.e. it is not
-          -- a flag, an explicit argument *must* be provided.
+          -- verify the arguments for the parsed set of options when an option
+          -- takes anything but a bool value, i.e. it is not a flag, an explicit
+          -- argument *must* be provided.
           let missing = fst <$> flip filter r.result
                     (\(Tuple a v) -> (fromMaybe false do
                                         arg <- O.runArgument <$> do
@@ -400,7 +422,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
             else P.fail $ "Missing required arguments for "
                         ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
 
-          r' <- unScoredResult <$> do
+          r' <- unScoredResult <$> P.try do
                   if D.isRepeatable p
                         then draw pss (length pss)
                         else draw ps' (length ps')
@@ -411,7 +433,15 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
         draw ps' n | (length ps' > 0) && (n < 0) = do
           env :: StrMap String <- lift ask
 
-          let missing = filter (\o -> not $ (canSkip) && isSkippable env o) ps'
+          -- Find flags missing from the input.
+          -- If we are explicitly allowed to skip arguments because of lack of
+          -- input, or we have *at least* one match (i.e. the remainder is less
+          -- than the original), then ignore arguments for which a suitable
+          -- fallback value can be provided.
+          let missing = filter (\o -> not $
+                                  (canSkip || (length ps' < length ps))
+                               && isSkippable env o
+                               ) ps'
 
           if (length missing > 0)
             then P.fail $
@@ -443,12 +473,15 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       = return $ Pending p (singleton x)
 
     -- "Free" groups always transition to the `Pending state`
-    step (Free p) x@(D.Group o (Cons (D.Branch b) Nil) r) | isFree x
-      = let ys = concat $ go o r <$> b
-         in return $ Pending p ys
-      where go o r (D.Group o' (Cons (D.Branch b') Nil) r') =
-              singleton $ D.Group o (singleton $ D.Branch $ concat $ go o' r' <$> b') r
-            go o r x = singleton $ D.Group o (singleton $ D.Branch $ singleton x) r
+    step (Free p) x@(D.Group _ _ _) | isFree x
+      = return $ Pending p (singleton x)
+
+    -- step (Free p) x@(D.Group o (Cons (D.Branch b) Nil) r) | isFree x
+    --   = let ys = concat $ go o r <$> b
+    --      in return $ Pending p ys
+    --   where go o r (D.Group o' (Cons (D.Branch b') Nil) r') =
+    --           singleton $ D.Group o (singleton $ D.Branch $ concat $ go o' r' <$> b') r
+    --         go o r x = singleton $ D.Group o (singleton $ D.Branch $ singleton x) r
 
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
@@ -461,12 +494,15 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       = return $ Pending p (x:xs)
 
     -- "Free" groups always keep accumulating
-    step (Pending p xs) x@(D.Group o (Cons (D.Branch b) Nil) r) | isFree x
-      = let ys = concat $ go o r <$> b
-         in return $ Pending p (ys ++ xs)
-      where go o r (D.Group o' (Cons (D.Branch b') Nil) r') =
-              singleton $ D.Group o (singleton $ D.Branch $ concat $ go o' r' <$> b') r
-            go o r x = singleton $ D.Group o (singleton $ D.Branch $ singleton x) r
+    step (Pending p xs) x@(D.Group _ _ _) | isFree x
+      = return $ Pending p (x:xs)
+
+    -- step (Pending p xs) x@(D.Group o bs r) | isFree x
+      -- = let ys = concat $ go o r <$> b
+      --    in return $ Pending p (ys ++ xs)
+      -- where go o r (D.Group o' bs' r') =
+      --         singleton $ D.Group o (bs' <#> \b' -> D.Branch $ concat $ go o' r' <$> b') r
+      --       go o r x = singleton $ D.Group o (singleton $ D.Branch $ singleton x) r
 
     -- Any non-options always leaves the pending state
     step (Pending p xs) y = Right $
@@ -612,6 +648,6 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                                             (not (isFree x) || canSkip)
 
     isFree :: D.Argument -> Boolean
-    isFree (D.Option _)                                         = true
-    isFree (D.Group _ (Cons (D.Branch b) Nil) _) | all isFree b = true
-    isFree _                                                    = false
+    isFree (D.Option _)                                           = true
+    isFree (D.Group _ bs _) | all (all isFree <<< D.runBranch) bs = true
+    isFree _                                                      = false
