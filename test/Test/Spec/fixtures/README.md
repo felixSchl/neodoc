@@ -1,3 +1,0 @@
-```docopt
-Usage: foo --bar
-```

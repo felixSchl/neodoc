@@ -22,8 +22,6 @@ import Node.Process as Process
 import Control.Bind((=<<))
 import Test.Assert (ASSERT)
 
-import Docopt (fromREADME_)
-
 import Debug.Trace
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)

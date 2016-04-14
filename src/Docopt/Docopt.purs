@@ -8,8 +8,6 @@
 module Docopt (
     run
   , defaultOptions
-  , fromREADME
-  , fromREADME_
   , DocoptEff ()
   , Options (..)
   , Argv ()
@@ -19,21 +17,17 @@ import Prelude
 import Debug.Trace
 import Control.Monad.Aff (Aff(), launchAff, liftEff')
 import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
-import Data.Either (either)
+import Data.Either (Either(..), either)
 import Node.Path (FilePath())
 import Control.Monad.Eff (Eff())
 import Node.FS.Aff (readTextFile)
 import Data.String (fromCharArray)
-import Node.Encoding (Encoding(..))
 import Data.List (fromList)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Either (Either(..))
 import Node.FS (FS())
 import Node.Process (PROCESS())
 import Node.Process as Process
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Error.Class (throwError)
-import Language.Docopt.Parser.Base (sof)
 import Control.Alt ((<|>))
 import Control.Apply ((*>))
 import Control.Monad.Eff.Console (log, CONSOLE)
@@ -101,37 +95,3 @@ run o d = do
   where help usage = "Usage:\n"
             ++ (unlines $ ("  " ++) <$> lines (dedent usage))
             ++ "\n"
--- |
--- | Extract the docopt text from a README, then run it.
--- |
-fromREADME :: forall e
-           . Options
-          -> FilePath
-          -> Aff (DocoptEff e) (Either String (StrMap D.Value))
-fromREADME o f = do
-  c <- readTextFile UTF8 f
-  d <- either (throwError <<< error <<< show)
-              return
-              (P.runParser c parser)
-  liftEffA $ run o d
-
-  where
-    parser :: P.Parser String String
-    parser = do
-      P.manyTill P.anyChar do
-        (sof <|> (void $ P.char '\n'))
-        P.string "```docopt"
-        P.char '\n'
-      fromCharArray <<< fromList <$> do
-        P.manyTill P.anyChar do
-          P.char '\n'
-          P.string "```"
-
--- |
--- | Extract the docopt text from a README, then run it
--- | with the default options.
--- |
-fromREADME_ :: forall e
-             . FilePath
-            -> Aff (DocoptEff e) (Either String (StrMap D.Value))
-fromREADME_ = fromREADME defaultOptions
