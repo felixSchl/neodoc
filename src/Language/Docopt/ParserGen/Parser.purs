@@ -346,7 +346,7 @@ genBranchesParser xs term optsFirst canSkip
                       o.result
 
 -- | Generate a parser for a single usage branch
-genBranchParser :: D.Branch  -- ^ The usage branch
+genBranchParser :: D.Branch  -- ^ The branch to match
                 -> Boolean   -- ^ Enable "options-first"
                 -> Boolean   -- ^ Can we skip input via fallbacks?
                 -> Parser (ScoredResult (List ValueMapping))
