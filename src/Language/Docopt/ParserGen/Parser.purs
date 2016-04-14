@@ -476,13 +476,6 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     step (Free p) x@(D.Group _ _ _) | isFree x
       = return $ Pending p (singleton x)
 
-    -- step (Free p) x@(D.Group o (Cons (D.Branch b) Nil) r) | isFree x
-    --   = let ys = concat $ go o r <$> b
-    --      in return $ Pending p ys
-    --   where go o r (D.Group o' (Cons (D.Branch b') Nil) r') =
-    --           singleton $ D.Group o (singleton $ D.Branch $ concat $ go o' r' <$> b') r
-    --         go o r x = singleton $ D.Group o (singleton $ D.Branch $ singleton x) r
-
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
       r  <- p
@@ -496,13 +489,6 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     -- "Free" groups always keep accumulating
     step (Pending p xs) x@(D.Group _ _ _) | isFree x
       = return $ Pending p (x:xs)
-
-    -- step (Pending p xs) x@(D.Group o bs r) | isFree x
-      -- = let ys = concat $ go o r <$> b
-      --    in return $ Pending p (ys ++ xs)
-      -- where go o r (D.Group o' bs' r') =
-      --         singleton $ D.Group o (bs' <#> \b' -> D.Branch $ concat $ go o' r' <$> b') r
-      --       go o r x = singleton $ D.Group o (singleton $ D.Branch $ singleton x) r
 
     -- Any non-options always leaves the pending state
     step (Pending p xs) y = Right $
