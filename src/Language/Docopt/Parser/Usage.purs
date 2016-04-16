@@ -59,7 +59,7 @@ usageParser :: L.TokenParser (List Usage)
 usageParser = do
 
   -- Calculate and mark the original program indentation.
-  P.Position { column: startCol } <- L.nextTokPos
+  P.Position { column: startCol } <- L.nextTokPos <?> "Program name"
   name <- program
   markLine do
     markIndent' startCol $ do
@@ -77,7 +77,8 @@ usageParser = do
 
     usageLine :: String -> L.TokenParser Usage
     usageLine name = Usage name <$> do
-      xs <- (many $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
+      xs <- "Option, Positional, Command, Group or Reference elements" <??> do
+                  (many $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
       eoa <- P.choice [
         P.try $ do
           moreIndented *> L.doubleDash
@@ -163,7 +164,7 @@ usageParser = do
       , return false ]
 
     program :: L.TokenParser String
-    program = "Program Name" <??> L.name
+    program = "Program name" <??> L.name
 
 parse :: (List L.PositionedToken) -> Either P.ParseError (List Usage)
 parse = flip L.runTokenParser usageParser

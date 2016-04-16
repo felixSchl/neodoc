@@ -153,8 +153,11 @@ instance showPositionedToken :: Show PositionedToken where
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m = do
   P.skipSpaces
-  L.many $ parsePositionedToken m
-  <* P.eof
+  xs <- L.many $ parsePositionedToken m
+  P.eof <|> void do
+    i <- getInput
+    P.fail $ "Unexpected input: " ++ i
+  return xs
 
 parsePositionedToken :: Mode -> P.Parser String PositionedToken
 parsePositionedToken m = P.try $ do
@@ -183,7 +186,9 @@ parseToken m = P.choice (P.try <$> A.concat [
     , ShoutName <$> shoutName
     , Name      <$> name
     ]
-  , if isDescMode m then [ Garbage <$> P.anyChar ] else []
+  , if isDescMode m
+        then [ Garbage <$> P.anyChar ]
+        else []
   ])
   <* P.skipSpaces
 
