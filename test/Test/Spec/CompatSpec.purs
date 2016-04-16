@@ -124,6 +124,7 @@ parseUniversalDocoptTests = do
                         argv:         return $ fromList input
                       , optionsFirst: optionsFirst
                       , env:          Nothing
+                      , dontExit:     true
                       }
                     }
 

@@ -35,6 +35,7 @@ import Control.Monad.Eff.Console as Console
 import Text.Wrap (dedent)
 import Data.Map (Map())
 import Data.StrMap (StrMap())
+import Data.StrMap as StrMap
 import Data.Array (drop)
 import Data.Array as A
 import Data.Bifunctor (lmap)
@@ -46,7 +47,7 @@ import Text.Parsing.Parser.Combinators as P
 import Text.Parsing.Parser.Pos         as P
 import Text.Parsing.Parser.String      as P
 
-import Language.Docopt (runDocopt, parseDocopt, applyDocopt)
+import Language.Docopt (parseDocopt, applyDocopt)
 import Language.Docopt as D
 import Language.Docopt.Env (Env())
 
@@ -68,6 +69,7 @@ type Options = {
   argv         :: Maybe Argv  -- ^ override argv. Defaults to `process.argv`
 , env          :: Maybe Env   -- ^ override env.  Defaults to `process.env`
 , optionsFirst :: Boolean     -- ^ enable "option-first"
+, dontExit     :: Boolean     -- ^ don't exit the process upon failure
 }
 
 defaultOptions :: Options
@@ -75,23 +77,41 @@ defaultOptions = {
   argv:         Nothing
 , env:          Nothing
 , optionsFirst: false
+, dontExit:     false
 }
 
 -- |
 -- | Run docopt on the given docopt text.
 -- |
+-- | This either succeeds with the key/value mappings or fails with a
+-- | descriptive help message.
+-- |
 run :: forall e
-     . Options
-    -> String
-    -> Eff (DocoptEff e) (Either String (StrMap D.Value))
-run o d = do
+     . String
+    -> Options
+    -> Eff (DocoptEff e) (StrMap D.Value)
+run d o = do
   argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
   env  <- maybe Process.getEnv              (return <<< id) o.env
-  return $ do
-    { specification, usage } <- parseDocopt d
-    lmap ((help usage) ++) do
-      applyDocopt specification env argv o.optionsFirst
 
-  where help usage = "Usage:\n"
-            ++ (unlines $ ("  " ++) <$> lines (dedent usage))
-            ++ "\n"
+  Console.log (show o.dontExit)
+
+  either onError return
+         do
+          { specification, usage } <- parseDocopt d
+          lmap ((help usage) ++) do
+            applyDocopt specification env argv o.optionsFirst
+
+  where
+    onError e = do
+      if not o.dontExit
+        then do
+          Console.log e
+          Process.exit 1
+        else
+          throwException $ error $ e
+
+    help usage
+      = "Usage:\n"
+          ++ (unlines $ ("  " ++) <$> lines (dedent usage))
+          ++ "\n"
