@@ -264,7 +264,9 @@ parseToken m = P.choice (P.try <$> A.concat [
     n <- fromCharArray <$> do
       A.some $ P.choice [
         identLetter
-      , P.try $ P.noneOf [ '>' ]
+        -- disallow swallowing new `<`s in order to avoid creating hard to trace
+        -- errors for the user
+      , P.try $ P.noneOf [ '<', '>' ]
       ]
     P.char '>'
     return n
