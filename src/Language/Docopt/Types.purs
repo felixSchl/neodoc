@@ -71,41 +71,27 @@ developerErrorMessage = dedent """
 
 prettyPrintDocoptError :: DocoptError -> String
 prettyPrintDocoptError (DocoptScanError err) =
-  "Failed to disect docopt text. " ++ (unParseError err).message
+  "Failed to disect docopt text:\n"
+  ++ (unParseError err).message
   ++ "\n"
   ++ developerErrorMessage
 prettyPrintDocoptError (DocoptUsageParseError err) =
-  "Failed to parse the formal usage specification. "
+  "Failed to parse the formal usage specification:\n"
   ++ (unParseError err).message
   ++ "\n"
   ++ developerErrorMessage
 prettyPrintDocoptError (DocoptDescParseError err) =
-  "Failed to parse the option descriptions. "
+  "Failed to parse the option descriptions:\n"
   ++ (unParseError err).message
   ++ "\n"
   ++ developerErrorMessage
 prettyPrintDocoptError (DocoptSolveError err) =
-  "Incoherent specification. " ++ show err
+  "Incoherent specification:\n"
+  ++ show err
   ++ "\n"
   ++ developerErrorMessage
 prettyPrintDocoptError
   (DocoptUserParseError
     argv
-    (P.ParseError { message: message
-                  , position: P.Position { column: col } }))
-  = let isTrailingError = startsWith "Trailing" message -- XXX: This is brittle
-        isMissingError  = startsWith "Missing" message  -- XXX: This is brittle
-        squiggles =
-          if isMissingError then "" else
-            intercalate " " $ toList argv `flip mapWithIndex` \a i ->
-                                fromCharArray $ A.replicate (Str.length a) $
-                                  if (if isTrailingError
-                                          then (i + 1) >= col
-                                          else (i + 1) == col
-                                      ) then '^' else  ' '
-        text = intercalate " " argv
-     in if A.length argv > 0
-           then message ++ ":\nInput: " ++ text
-                        ++  "\n       " ++ squiggles
-           else message
-
+    (P.ParseError { message: message }))
+    = message
