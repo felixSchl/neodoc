@@ -24,6 +24,7 @@ import Control.Alt ((<|>))
 import Data.Traversable (class Traversable, traverse, for)
 import Control.Lazy (defer)
 import Data.Foldable (class Foldable, maximum, maximumBy, foldl, intercalate, for_, all)
+import Data.String as String
 import Data.String (fromCharArray, stripPrefix)
 import Data.Bifunctor (class Bifunctor, rmap)
 import Data.List as L
@@ -126,7 +127,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: ppos }) ->
             , position: nextpos }
         -- XXX: Fix this error message, it makes no sense!
         Nothing -> P.parseFailed toks ppos "a better error message!"
-    _ -> P.parseFailed toks ppos "expected token, met EOF"
+    _ -> P.parseFailed toks ppos "Expected token, met EOF"
 
 data Acc a
   = Free (Parser a)
@@ -182,7 +183,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                             (_.sourcePos <<< unPositionedToken)
                             (head xs)
           }
-    _ -> P.parseFailed toks pos "expected token, met EOF"
+    _ -> P.parseFailed toks pos "Expected token, met EOF"
 
   where
     isFlag = isNothing a
@@ -237,7 +238,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                             (_.sourcePos <<< unPositionedToken)
                             (head xs)
           }
-    _ -> P.parseFailed toks pos "expected token, met EOF"
+    _ -> P.parseFailed toks pos "Expected token, met EOF"
 
   where
     isFlag = isNothing a
@@ -323,13 +324,34 @@ genBranchesParser xs term optsFirst canSkip
         maybe'
           (\_ -> P.parseFailed Nil P.initialPos
                   "The impossible happened. Failure without error")
-          (\e -> e { result = Left e.result.error })
+          (\e ->
+            -- of all `mlefts` are zeros, it's an ambigious fail and all
+            -- branches must be presented as an option.
+            if e.result.depth > 0
+              then e { result = Left e.result.error }
+              else
+                let errors = _.error <<< _.result <$> mlefts rs
+                 in e { result = Left $ P.ParseError {
+                        position: _.position $ unParseError (LU.head errors)
+                      , message:
+                          -- Concatenate the error such that it looks like one
+                          -- continuos error. This is borderline brittle because
+                          -- it replaces some text that comes from
+                          -- purescript-parsing.
+                          let m  = _.message $ unParseError (LU.head errors)
+                              ms = LU.tail errors <#> \e ->
+                                    let m = _.message $ unParseError e
+                                     in String.replace "Expected " "" m
+                           in intercalate " or " (m : ms)
+                    } }
+          )
           (maximumBy (compare `on` (_.depth <<< _.result)) $ mlefts rs)
       )
       (\r -> r { result = Right r.result.value })
       (maximumBy (compare `on` (_.depth <<< _.result)) $ mrights rs)
 
   where
+    fixMessage m = m
     collect s ps = ps `flip traverse` \p -> P.unParserT p s >>= \o -> do
                     depth :: Int <- lift State.get
                     return $ either
@@ -637,3 +659,6 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     isFree (D.Option _)                                           = true
     isFree (D.Group _ bs _) | all (all isFree <<< D.runBranch) bs = true
     isFree _                                                      = false
+
+unParseError :: P.ParseError -> { position :: P.Position, message :: String }
+unParseError (P.ParseError e) = e
