@@ -144,10 +144,9 @@ if (args['<command>'] === 'remote') {
   inside required groups. E.g.: The group `(-a -b)` will match inputs `-a -b`,
   `-ab`, `-ba`, `-b -a`, `-b`, `-a` and the empty input.
 * **All arguments in a group are always required**. This is regardless of
-  whether or not the group itself is required or not, i.e.:
-* **No abbreviations:**
-  `--ver` does not match `--verbose`.
-  <sub>[(mis-feature in the original implementation)](https://github.com/docopt/docopt/issues/104)</sub>
+  whether or not the group itself is required or not - once you start matching
+  into the group, elements in the group become required for the match to
+  succeed. Consider:
 
   ```sh
   Usage: prog [<name> <type>]
@@ -163,6 +162,9 @@ if (args['<command>'] === 'remote') {
 
   **note:** this rule excludes flags/switches and options that have default
   values (or other fallback values).
+* **No abbreviations:**
+  `--ver` does not match `--verbose`.
+  <sub>[(mis-feature in the original implementation)](https://github.com/docopt/docopt/issues/104)</sub>
 * **There is no `null`** in the resulting value map. `null` simply means not
   matched - so the key is omitted from the resulting value map. <sub>(this is
   still under consideration)</sub>
