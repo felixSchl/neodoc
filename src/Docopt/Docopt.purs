@@ -94,8 +94,6 @@ run d o = do
   argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
   env  <- maybe Process.getEnv              (return <<< id) o.env
 
-  Console.log (show o.dontExit)
-
   either onError return
          do
           { specification, usage } <- parseDocopt d
