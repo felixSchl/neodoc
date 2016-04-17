@@ -16,6 +16,7 @@ import Data.Foldable (foldl, intercalate)
 import Control.MonadPlus (guard)
 import Control.Plus (empty)
 import Control.Alt ((<|>))
+import Control.Apply((*>))
 import Data.Monoid (mempty)
 import Control.Monad.Error.Class (throwError)
 import Data.String (fromCharArray, fromChar, toUpper, charAt, toCharArray)
@@ -110,43 +111,63 @@ solveBranch as ds = Branch <$> go as
 
         convert _ = Nothing
 
-    solveArgs (lopt@(U.Option (opt@(UO.LOpt o)))) y = do
+    solveArgs (lopt@(U.Option (opt@(UO.LOpt o)))) adjArg = do
 
       -- XXX: Is `head` the right thing to do here? What if there are more
       -- matches? That would indicate ambigiutiy and needs to be treated,
       -- possibly with an error?
-      let x = O.runOption $ flip maybe' id
+      let match = O.runOption $ flip maybe' id
                 (\_ -> O.Option $ O.empty { name       = pure o.name
                                           , arg        = convertArg o.arg
                                           , repeatable = o.repeatable
                                           })
                 (head $ catMaybes $ coerce <$> ds)
 
-      -- Look ahead if any of the following arguments should be consumed.
-      -- Return either `Nothing` to signify that nothing should be consumed
-      -- or a value signifieng that it should be consumed, and the
-      -- `isRepeated` flag should be inherited.
-      let mr = do
-            guard (not o.repeatable)
-            arg' <- O.runArgument <$> x.arg
-            case y of
-              Just (U.Positional n r) ->
-                return $ const r <$> compareArgs n arg'.name
-              Just (U.Command n r) ->
-                return $ const r <$> compareArgs n arg'.name
-              _ -> Nothing
+      -- Check to see if this option has an explicitly bound argument.
+      -- In this case, a check to consume an adjacent arg must not take place.
+      case o.arg of
+        (Just exarg) -> do
 
-      case mr of
+          -- Ensure that in case the option descripton mentions specifies the
+          -- action takes an argument, that argument matches the one explicitly
+          -- assigned. This is for consistency for the user.
+          let out = Unconsumed (singleton $ Option $ O.Option match)
+          maybe (return true)
+                (guardArgs exarg.name <<< _.name)
+                (O.runArgument <$> match.arg)
+          return out
         Nothing -> do
-          return $ Unconsumed (singleton $ Option $ O.Option x)
-        Just er -> do
-          r <- er
-          return $ Consumed (singleton $ Option $ O.Option $ x { repeatable = r })
+
+          -- Look ahead if any of the following arguments should be consumed.
+          -- Return either `Nothing` to signify that nothing should be consumed
+          -- or a value signifieng that it should be consumed, and the
+          -- `isRepeated` flag should be inherited.
+          let mr = do
+                guard (not o.repeatable)
+                matchedArg <- O.runArgument <$> match.arg
+                case adjArg of
+                  Just (U.Positional n r) ->
+                    return $ const r <$> guardArgs n matchedArg.name
+                  Just (U.Command n r) ->
+                    return $ const r <$> guardArgs n matchedArg.name
+                  _ ->
+                    return $ Left $ SolveError
+                      $ "Option-Argument specified in options-section missing"
+                        ++ " --" ++ o.name
+
+          case mr of
+            Nothing -> do
+              return $ Unconsumed (singleton $ Option $ O.Option match)
+            Just er -> do
+              r <- er
+              return $ Consumed (singleton $ Option $ O.Option $ match {
+                                  repeatable = r
+                                })
 
       where
-        compareArgs :: String -> String -> Either SolveError Unit
-        compareArgs n n' | n ^= n' = return unit
-        compareArgs n n' = Left $ SolveError
+        guardArgs :: String -> String -> Either SolveError Boolean
+        guardArgs n n' | n ^= n' = return true
+        guardArgs n n' = Left $ SolveError
           $ "arguments mismatch for option --" ++ o.name ++ ": "
               ++ show n ++ " and " ++ show n'
 
@@ -292,47 +313,61 @@ solveBranch as ds = Branch <$> go as
               Just f  -> Tuple (o.flag A.: (fromJust $ A.init o.stack)) f
               Nothing -> Tuple [] o.flag
 
-          -- look the trailing option up in the descriptions
+          -- Look the trailing option up in the descriptions
           -- and combine it into the most complete option we
           -- can know about at this point.
-          c  <- O.runOption <$> matchDesc true f
-          cs <- (Option <$>) <$> (matchDesc false `traverse` fs)
+          match   <- O.runOption <$> matchDesc true f
+          matches <- (Option <$>) <$> (matchDesc false `traverse` fs)
 
+          -- Check to see if this option has an explicitly bound argument.
+          -- In this case, a check to consume an adjacent arg must not take
+          -- place.
           case o.arg of
-            (Just an) -> do
-              return
-                $ Unconsumed
-                  $ (toList cs)
-                    ++ (singleton $ Option $ O.Option c)
-            _ ->
+            (Just exarg) -> do
+
+              -- Ensure that in case the option descripton mentions specifies
+              -- the action takes an argument, that argument matches the one
+              -- explicitly assigned. This is for consistency for the user.
+              let out = Unconsumed
+                    $ (toList matches)
+                      ++ (singleton $ Option $ O.Option match)
+              maybe (return true)
+                    (guardArgs exarg.name <<< _.name)
+                    (O.runArgument <$> match.arg)
+              return out
+            Nothing ->
+
               -- Look ahead if any of the following arguments should be consumed.
               -- Return either `Nothing` to signify that nothing should be consumed
               -- or a value signifieng that it should be consumed, and the
               -- `isRepeated` flag should be inherited.
               let mr = do
-                    guard $ not c.repeatable
-                    arg' <- O.runArgument <$> c.arg
+                    guard $ not match.repeatable
+                    arg' <- O.runArgument <$> match.arg
                     case adj of
                       Just (U.Positional n r) ->
-                        return $ const r <$> compareArgs n arg'.name
+                        return $ const r <$> guardArgs n arg'.name
                       Just (U.Command n r) ->
-                        return $ const r <$> compareArgs n arg'.name
-                      _ -> Nothing
+                        return $ const r <$> guardArgs n arg'.name
+                      _ ->
+                        return $ Left $ SolveError
+                          $ "Option-Argument specified in options-section missing"
+                            ++ " -" ++ fromChar o.flag
 
                in case mr of
                 Nothing -> do
                   return $ Unconsumed
-                    $ (toList cs) ++ (singleton $ Option $ O.Option c)
+                    $ (toList matches) ++ (singleton $ Option $ O.Option match)
                 Just er -> do
                   r <- er
                   return $ Consumed
-                    $ (toList cs) ++ (singleton $ Option $ O.Option c {
+                    $ (toList matches) ++ (singleton $ Option $ O.Option match {
                         repeatable = r
                       })
 
-        compareArgs :: String -> String -> Either SolveError Unit
-        compareArgs n n' | n ^= n' = return unit
-        compareArgs n n' = Left $ SolveError
+        guardArgs :: String -> String -> Either SolveError Boolean
+        guardArgs n n' | n ^= n' = return true
+        guardArgs n n' = Left $ SolveError
           $ "arguments mismatch for option -" ++ fromChar o.flag ++ ": "
               ++ show n ++ " and " ++ show n'
 

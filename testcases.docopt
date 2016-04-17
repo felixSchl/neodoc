@@ -1228,14 +1228,14 @@ $ prog --foo=bar
 "user-error"
 
 r"""
-Usage: prog [-p] [-d]
-   or: prog syncdb [-p] [-d]
+Usage: prog [-p <n>] [-d <connstring>]
+   or: prog syncdb [-p <n>] [-d <connstring>]
 
 common options:
     -p, --port=<n>
         [default: 5000]
 
-    -d, --database=<protocol[://[user[:password]@]host[:port][/database]]>
+    -d, --database=<connstring>
         [default: memory]
 """
 
@@ -1737,10 +1737,52 @@ Options: -f <x>, --file <y>
 $ prog
 "user-error"
 
+# This should fail because the `--input` in the usage section does not mention
+# the option-argument specified in the options section.
+
+r"""
+Usage: prog --input
+Options: --input <y>
+"""
+
+$ prog
+"user-error"
+
+# This should fail because the `--input` in the usage section does not mention
+# the option-argument specified in the options section.
+
 r"""
 Usage: prog -f
-Options: -f <y>, --file <y>
+Options: -f <y>
+"""
+
+$ prog
+"user-error"
+
+# This should fail -f cannot take an argument, since it's stacked.
+
+r"""
+Usage: prog -fb
+Options: -f <y>
 """
 
 $ prog
 {}
+
+#
+# Ensure explicit args don't consume adjacent args
+#
+
+r"""
+Usage: prog --input=<x> <x>
+Options: -i <x>, --input <x>
+"""
+
+$ prog --input10
+"user-error"
+
+$ prog --input 10
+"user-error"
+
+$ prog --input 10 20
+{ "-i": 10, "--input": 10, "<x>": 20, "X": 20 }
