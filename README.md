@@ -141,7 +141,7 @@ if (args['<command>'] === 'remote') {
   that's the assigned alias)</sub>. Likewise, `FOO` yields value `<foo>` as
   well as `FOO`, and `<foo>` yields `FOO` and `<foo>`.
 * **Flags are optional,** always. There's no reason to force the user to
-  explicitely pass an option that takes no argument. The absence of the flag
+  explicitly pass an option that takes no argument. The absence of the flag
   speaks - the flag will be set to `false`. This is also the case for flags
   inside required groups. E.g.: The group `(-a -b)` will match inputs `-a -b`,
   `-ab`, `-ba`, `-b -a`, `-b`, `-a` and the empty input.
@@ -171,7 +171,7 @@ if (args['<command>'] === 'remote') {
   matched - so the key is omitted from the resulting value map. <sub>(this is
   still under consideration)</sub>
 * **Environment variables**. Options can fall back to environment variables,
-  if they are not explicitely defined. The order of evaluation is:
+  if they are not explicitly defined. The order of evaluation is:
     1. User input (per `process.argv`)
     1. Environment variables (per `[env: ...]` tag)
     1. Option defaults (per `[default: ...]` tag)
