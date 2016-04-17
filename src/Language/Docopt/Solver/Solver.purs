@@ -113,31 +113,19 @@ solveBranch as ds = Branch <$> go as
 
     solveArgs (lopt@(U.Option (opt@(UO.LOpt o)))) adjArg = do
 
-      -- XXX: Is `head` the right thing to do here? What if there are more
-      -- matches? That would indicate ambigiutiy and needs to be treated,
-      -- possibly with an error?
-      let match = O.runOption $ flip maybe' id
-                (\_ -> O.Option $ O.empty { name       = pure o.name
-                                          , arg        = convertArg o.arg
-                                          , repeatable = o.repeatable
-                                          })
-                (head $ catMaybes $ coerce <$> ds)
+      -- Find a matching option description, if any.
+      match <- O.runOption <$> matchDesc o.name
 
       -- Check to see if this option has an explicitly bound argument.
       -- In this case, a check to consume an adjacent arg must not take place.
       case o.arg of
         (Just exarg) -> do
+          -- Note: There is no check to see if an explicit argument is
+          --       the same as specified in the option descriptions for
+          --       convenience to the user.
+          return $ Unconsumed (singleton $ Option $ O.Option match)
 
-          -- Ensure that in case the option descripton mentions specifies the
-          -- action takes an argument, that argument matches the one explicitly
-          -- assigned. This is for consistency for the user.
-          let out = Unconsumed (singleton $ Option $ O.Option match)
-          maybe (return true)
-                (guardArgs exarg.name <<< _.name)
-                (O.runArgument <$> match.arg)
-          return out
         Nothing -> do
-
           -- Look ahead if any of the following arguments should be consumed.
           -- Return either `Nothing` to signify that nothing should be consumed
           -- or a value signifieng that it should be consumed, and the
@@ -168,39 +156,37 @@ solveBranch as ds = Branch <$> go as
         guardArgs :: String -> String -> Either SolveError Boolean
         guardArgs n n' | n ^= n' = return true
         guardArgs n n' = Left $ SolveError
-          $ "arguments mismatch for option --" ++ o.name ++ ": "
+          $ "Arguments mismatch for option --" ++ o.name ++ ": "
               ++ show n ++ " and " ++ show n'
 
-        coerce :: Desc -> Maybe O.Option
-        coerce (DE.OptionDesc (DE.Option x))
-          = coerce' x
-            where
-              coerce' { name = DE.Long n' }
-                | n' ^= o.name
-                = do
-                    arg <- either (const Nothing)
-                                  return
-                                  (resolveOptArg o.arg x.arg)
-                    return $ O.Option { name:       pure o.name
-                                      , flag:       Nothing
-                                      , arg:        arg
-                                      , env:        x.env
-                                      , repeatable: o.repeatable
-                                      }
-              coerce' { name = DE.Full f' n' }
-                | n' ^= o.name
-                = do
-                    arg <- either (const Nothing)
-                                  return
-                                  (resolveOptArg o.arg x.arg)
-                    return $ O.Option { name:       pure o.name
-                                      , flag:       pure f'
-                                      , arg:        arg
-                                      , env:        x.env
-                                      , repeatable: o.repeatable
-                                      }
-              coerce' _ = Nothing
-        coerce _ = Nothing
+        matchDesc :: String -> Either SolveError O.Option
+        matchDesc n =
+          case filter isMatch ds of
+            xs | length xs > 1 ->
+              Left $ SolveError
+                    $ "Multiple option descriptions for option --"
+                        ++ n
+            (Cons (DE.OptionDesc (DE.Option desc)) Nil) -> do
+              arg <- resolveOptArg o.arg desc.arg
+              return $ O.Option { flag:       DE.getFlag desc.name
+                                , name:       DE.getName desc.name
+                                , arg:        arg
+                                , env:        desc.env
+                                , repeatable: o.repeatable
+                                }
+            -- default fallback: construct the option from itself alone
+            _ -> return $ O.Option
+                    $ { flag:       Nothing
+                      , name:       pure n
+                      , env:        Nothing
+                      , arg:        convertArg o.arg
+                      , repeatable: o.repeatable
+                      }
+          where
+            isMatch (DE.OptionDesc (DE.Option { name = DE.Long n'   })) = n == n'
+            isMatch (DE.OptionDesc (DE.Option { name = DE.Full _ n' })) = n == n'
+            isMatch _ = false
+
 
     solveArgs (U.OptionStack (opt@(UO.SOpt o))) adj = fromSubsumption
                                                   <|> fromAdjacentArgOrDefault
@@ -324,19 +310,14 @@ solveBranch as ds = Branch <$> go as
           -- place.
           case o.arg of
             (Just exarg) -> do
-
-              -- Ensure that in case the option descripton mentions specifies
-              -- the action takes an argument, that argument matches the one
-              -- explicitly assigned. This is for consistency for the user.
-              let out = Unconsumed
+              -- Note: There is no check to see if an explicit argument is
+              --       the same as specified in the option descriptions for
+              --       convenience to the user.
+              return $ Unconsumed
                     $ (toList matches)
                       ++ (singleton $ Option $ O.Option match)
-              maybe (return true)
-                    (guardArgs exarg.name <<< _.name)
-                    (O.runArgument <$> match.arg)
-              return out
-            Nothing ->
 
+            Nothing ->
               -- Look ahead if any of the following arguments should be consumed.
               -- Return either `Nothing` to signify that nothing should be consumed
               -- or a value signifieng that it should be consumed, and the
@@ -368,7 +349,7 @@ solveBranch as ds = Branch <$> go as
         guardArgs :: String -> String -> Either SolveError Boolean
         guardArgs n n' | n ^= n' = return true
         guardArgs n n' = Left $ SolveError
-          $ "arguments mismatch for option -" ++ fromChar o.flag ++ ": "
+          $ "Arguments mismatch for option -" ++ fromChar o.flag ++ ": "
               ++ show n ++ " and " ++ show n'
 
 
@@ -377,59 +358,44 @@ solveBranch as ds = Branch <$> go as
         -- | in it's stack of flags.
 
         matchDesc :: Boolean -> Char -> Either SolveError O.Option
-        matchDesc isTrailing f = return $
-          maybe' (\_ -> O.Option
-                          $ { flag: pure f
-                            , name: Nothing
-                            , env:  Nothing
-                            , arg:  if isTrailing
-                                        then convertArg o.arg
-                                        else Nothing
-                            , repeatable: o.repeatable
-                            }
-                )
-                id
-                (head $ catMaybes $ coerce f isTrailing <$> ds)
+        matchDesc isTrailing f =
+          case filter isMatch ds of
+            xs | length xs > 1 ->
+              Left $ SolveError
+                    $ "Multiple option descriptions for option -"
+                        ++ fromChar f
 
-        -- | Coerce a given flag into a Docopt Option, given an
-        -- | option description.
+            (Cons (DE.OptionDesc (DE.Option desc)) Nil) -> do
+              arg <- if isTrailing
+                          then resolveOptArg o.arg desc.arg
+                          else if isNothing desc.arg
+                            then return Nothing
+                            else Left $ SolveError
+                              $ "Stacked option -" ++ fromChar f
+                                  ++ " may not specify arguments"
 
-        coerce :: Char -> Boolean -> Desc -> Maybe O.Option
-        coerce f isTrailing (DE.OptionDesc (DE.Option d))
-          = coerce' d
-            where
-              coerce' { name = DE.Flag f' }
-                | (f == f') && (isTrailing || isNothing d.arg)
-                = do
-                    arg <- if isTrailing
-                                then either (const Nothing)
-                                            return
-                                            (resolveOptArg o.arg d.arg)
-                                else return Nothing
+              return $ O.Option { flag:       DE.getFlag desc.name
+                                , name:       DE.getName desc.name
+                                , arg:        arg
+                                , env:        desc.env
+                                , repeatable: o.repeatable
+                                }
 
-                    return $ O.Option { flag:       pure f
-                                      , name:       Nothing
-                                      , arg:        arg
-                                      , env:        d.env
-                                      , repeatable: o.repeatable
-                                      }
-              coerce' { name = DE.Full f' n' }
-                | (f == f') && (isTrailing || isNothing d.arg)
-                = do
-                    arg <- if isTrailing
-                                then either (const Nothing)
-                                            return
-                                            (resolveOptArg o.arg d.arg)
-                                else return Nothing
+            -- default fallback: construct the option from itself alone
+            _ -> return $ O.Option
+                    $ { flag: pure f
+                      , name: Nothing
+                      , env:  Nothing
+                      , arg:  if isTrailing
+                                   then convertArg o.arg
+                                   else Nothing
+                      , repeatable: o.repeatable
+                      }
 
-                    return $ O.Option { flag:       pure f'
-                                      , name:       pure n'
-                                      , arg:        arg
-                                      , env:        d.env
-                                      , repeatable: o.repeatable
-                                      }
-              coerce' _ = Nothing
-        coerce _ _ _ = Nothing
+          where
+            isMatch (DE.OptionDesc (DE.Option { name = DE.Flag f'   })) = f == f'
+            isMatch (DE.OptionDesc (DE.Option { name = DE.Full f' _ })) = f == f'
+            isMatch _ = false
 
     -- | Resolve an option's argument name against that given in the
     -- | description, returning the most complete argument known.
@@ -443,21 +409,16 @@ solveBranch as ds = Branch <$> go as
                                    , default: Nothing }
 
     resolveOptArg Nothing (Just (DE.Argument de)) = do
-      return <<< pure $ O.Argument { name: de.name
+      return <<< pure $ O.Argument { name:     de.name
                                    , optional: de.optional
-                                   , default: de.default }
+                                   , default:  de.default }
 
-    -- XXX: Do we need to guard that `an == a.name` here?
     resolveOptArg (Just a) (Just (DE.Argument de)) = do
-      if a.name ^= de.name
-         then return <<< pure
-          $ O.Argument { name: de.name
-                        -- XXX: Is `||` correct here or should a mismatch
-                        --      generate an error?
-                       , optional: de.optional || a.optional
-                       , default: de.default
-                       }
-         else fail $ "Arguments mismatch: " ++ a.name ++ " != " ++ de.name
+      return <<< pure
+        $ O.Argument  { name:     de.name
+                      , optional: de.optional || a.optional
+                      , default:  de.default
+                      }
 
     resolveOptArg _ _ = return Nothing
 

@@ -296,7 +296,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , fail
             []
             -- XXX: Could this be better?
-            "Expected command: \"b\""
+            "Expected command: \"a\" or command: \"b\""
         ]
 
     , test

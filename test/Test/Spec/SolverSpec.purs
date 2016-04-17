@@ -134,42 +134,48 @@ solverSpec = \_ ->
                 ] ])
         ]
 
-    , test ([ u [ [ U.sopt_ 'f' [], U.poR "FILE" ] ] ])
-        [ pass  [ DE.opt (DE.fname 'f' "file")
+    , test ([ u [ [ U.lopt_ "file", U.poR "FILE" ] ] ])
+        [ fail  [ DE.opt (DE.fname 'f' "file")
                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 , DE.opt (DE.fname 'f' "file")
                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ]
-                ([ out [
-                    [ D.optR 'f' "file" (D.oa "FILE" (StringValue "foo")) ]
-                ] ])
+                "Multiple option descriptions for option --file"
+        ]
+
+    , test ([ u [ [ U.sopt_ 'f' [], U.poR "FILE" ] ] ])
+        [ fail  [ DE.opt (DE.fname 'f' "file")
+                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
+                , DE.opt (DE.fname 'f' "file")
+                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
+                ]
+                "Multiple option descriptions for option -f"
+        ]
+
+    , test ([ u [ [ U.lopt_ "file", U.poR "FILE" ] ] ])
+        [ fail  [ DE.opt (DE.fname 'f' "file")
+                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
+                , DE.opt (DE.fname 'f' "file")
+                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
+                ]
+                "Multiple option descriptions for option --file"
         ]
 
     , test ([ u [ [ U.soptR_ 'f' ['x'] ] ] ])
-        [ pass  ([ DE.opt (DE.fname 'f' "file")
+        [ fail  ([ DE.opt (DE.fname 'f' "file")
                             (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ])
-                ([ out [
-                    [ D.soptR_ 'f'
-                    , D.soptR_ 'x'
-                    ]
-                ] ])
+                "Stacked option -f may not specify arguments"
         ]
 
       -- Note: `f` should not adopt `file` as it's full name since it's in an
       -- option stack and not in trailing position (therefore cannot inherit the
       -- description's argument, rendering it an unfit candidate)
     , test ([ u [ [ U.soptR_ 'f' ['v', 'z', 'x'] ] ] ])
-        [ pass  ([ DE.opt (DE.fname 'f' "file")
+        [ fail  ([ DE.opt (DE.fname 'f' "file")
                             (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ])
-                ([ out [
-                    [ D.soptR_ 'f'
-                    , D.soptR_ 'v'
-                    , D.soptR_ 'z'
-                    , D.soptR_ 'x'
-                    ]
-                ] ])
+                "Stacked option -f may not specify arguments"
         ]
     , test ([ u [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "file")
@@ -232,11 +238,11 @@ solverSpec = \_ ->
       = throwException $ error $
           "Missing exception! Got:\n" ++ prettyPrintOutput output
 
-    evaltest (Left err) (Left expected)
-      = if (show err) == expected
+    evaltest (Left (SolveError err)) (Left expected)
+      = if err == expected
             then return unit
             else throwException $ error $
-              "Unexpected error:\n" ++ show err
+              "Unexpected error:\n" ++ err
 
     evaltest (Left err) _ = throwException $ error $ show err
 
