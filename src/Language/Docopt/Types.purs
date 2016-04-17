@@ -85,9 +85,9 @@ prettyPrintDocoptError (DocoptDescParseError err) =
   ++ (unParseError err).message
   ++ "\n"
   ++ developerErrorMessage
-prettyPrintDocoptError (DocoptSolveError err) =
+prettyPrintDocoptError (DocoptSolveError (SolveError err)) =
   "Incoherent specification:\n"
-  ++ show err
+  ++ err
   ++ "\n"
   ++ developerErrorMessage
 prettyPrintDocoptError

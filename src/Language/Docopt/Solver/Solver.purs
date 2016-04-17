@@ -1,13 +1,5 @@
 -- | Resolve ambiguities by combining the parsed usage section with any parsed
 -- | Option sections, as well as some best effort guessing.
--- |
--- | ===
--- |
--- | Thoughts:
--- |    * It appears there is never a reason to fail hard. It would be nice if
--- |      we could produce warnings, however -> Write monad?
--- |    * Options match their description as good as they can, AND based on the
--- |      name of the argument. Should this be the case?
 
 module Language.Docopt.Solver where
 
@@ -118,7 +110,7 @@ solveBranch as ds = Branch <$> go as
 
         convert _ = Nothing
 
-    solveArgs (U.Option (opt@(UO.LOpt o))) y = do
+    solveArgs (lopt@(U.Option (opt@(UO.LOpt o)))) y = do
 
       -- XXX: Is `head` the right thing to do here? What if there are more
       -- matches? That would indicate ambigiutiy and needs to be treated,
@@ -133,21 +125,31 @@ solveBranch as ds = Branch <$> go as
       -- Look ahead if any of the following arguments should be consumed.
       -- Return either `Nothing` to signify that nothing should be consumed
       -- or a value signifieng that it should be consumed, and the
-      -- `isRepeated` should be inherited.
+      -- `isRepeated` flag should be inherited.
       let mr = do
             guard (not o.repeatable)
             arg' <- O.runArgument <$> x.arg
             case y of
-              Just (U.Positional n r) | n == arg'.name -> return r
-              Just (U.Command n r)    | n == arg'.name -> return r
-              _                                        -> Nothing
+              Just (U.Positional n r) ->
+                return $ const r <$> compareArgs n arg'.name
+              Just (U.Command n r) ->
+                return $ const r <$> compareArgs n arg'.name
+              _ -> Nothing
 
-      return $ (maybe Unconsumed (const Consumed) mr)
-             $ singleton
-             $ Option
-             $ O.Option (x { repeatable = maybe (x.repeatable) id mr })
+      case mr of
+        Nothing -> do
+          return $ Unconsumed (singleton $ Option $ O.Option x)
+        Just er -> do
+          r <- er
+          return $ Consumed (singleton $ Option $ O.Option $ x { repeatable = r })
 
       where
+        compareArgs :: String -> String -> Either SolveError Unit
+        compareArgs n n' | n ^= n' = return unit
+        compareArgs n n' = Left $ SolveError
+          $ "arguments mismatch for option --" ++ o.name ++ ": "
+              ++ show n ++ " and " ++ show n'
+
         coerce :: Desc -> Maybe O.Option
         coerce (DE.OptionDesc (DE.Option x))
           = coerce' x
@@ -306,20 +308,33 @@ solveBranch as ds = Branch <$> go as
               -- Look ahead if any of the following arguments should be consumed.
               -- Return either `Nothing` to signify that nothing should be consumed
               -- or a value signifieng that it should be consumed, and the
-              -- `isRepeated` should be inherited.
+              -- `isRepeated` flag should be inherited.
               let mr = do
                     guard $ not c.repeatable
                     arg' <- O.runArgument <$> c.arg
                     case adj of
-                        Just (U.Positional n r) | n ^= arg'.name -> return r
-                        Just (U.Command n r)    | n ^= arg'.name -> return r
-                        _                                        -> Nothing
-               in return $ (maybe Unconsumed (const Consumed) mr)
-                    $ (toList cs)
-                      ++ (singleton
-                          $ Option
-                            $ O.Option
-                              $ c { repeatable = maybe c.repeatable id mr })
+                      Just (U.Positional n r) ->
+                        return $ const r <$> compareArgs n arg'.name
+                      Just (U.Command n r) ->
+                        return $ const r <$> compareArgs n arg'.name
+                      _ -> Nothing
+
+               in case mr of
+                Nothing -> do
+                  return $ Unconsumed
+                    $ (toList cs) ++ (singleton $ Option $ O.Option c)
+                Just er -> do
+                  r <- er
+                  return $ Consumed
+                    $ (toList cs) ++ (singleton $ Option $ O.Option c {
+                        repeatable = r
+                      })
+
+        compareArgs :: String -> String -> Either SolveError Unit
+        compareArgs n n' | n ^= n' = return unit
+        compareArgs n n' = Left $ SolveError
+          $ "arguments mismatch for option -" ++ fromChar o.flag ++ ": "
+              ++ show n ++ " and " ++ show n'
 
 
         -- | Match a given flag with an option description.

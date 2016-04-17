@@ -1690,3 +1690,57 @@ $ prog -b --no-foo -a
 
 $ prog -b --no-foo -a --foo
 "user-error"
+
+#
+# Issue no. 13
+#
+# TODO: Extend the test runner to verify the actual error messages.
+#
+
+r"""
+Usage: prog --file <x> <a>
+Options: --file <y>
+"""
+
+$ prog
+"user-error"
+
+r"""
+Usage: prog -f <x> <a>
+Options: -f <y>
+"""
+
+$ prog
+"user-error"
+
+r"""
+Usage: prog -f <x> <a>
+Options: -f, --file <y>
+"""
+
+$ prog
+"user-error"
+
+r"""
+Usage: prog -f <x> <a>
+Options: -f <y>, --file <y>
+"""
+
+$ prog
+"user-error"
+
+r"""
+Usage: prog -f <x> <a>
+Options: -f <x>, --file <y>
+"""
+
+$ prog
+"user-error"
+
+r"""
+Usage: prog -f
+Options: -f <y>, --file <y>
+"""
+
+$ prog
+{}
