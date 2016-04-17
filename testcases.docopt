@@ -1789,3 +1789,46 @@ $ prog --input 10
 
 $ prog --input 10 20
 { "-i": 10, "--input": 10, "<x>": 20, "X": 20 }
+
+#
+# Repeating parameterised options
+# Example for issue #16
+#
+
+r"""
+Usage:
+    foobar [-f X ... | --foo X ...]
+Options:
+    -f X, --foo X     bar
+"""
+
+$ prog -f 1 -f 2 -f 3 -f 4 -f 5 -f 6
+{"--foo": [1, 2, 3, 4, 5, 6],
+ "-f": [1, 2, 3, 4, 5, 6]}
+
+$ prog -f 1,2,3,4,5,6
+{"--foo": [1, 2, 3, 4, 5, 6],
+ "-f": [1, 2, 3, 4, 5, 6]}
+
+$ prog -f 1,2,3 --foo 4,5,6
+{"--foo": [1, 2, 3, 4, 5, 6],
+ "-f": [1, 2, 3, 4, 5, 6]}
+
+r"""
+Usage:
+    foobar [-f X ...] [--foo X ...]
+Options:
+    -f X, --foo X    bar.
+"""
+
+$ prog -f 1 -f 2 -f 3 -f 4 -f 5 -f 6
+{"--foo": [1, 2, 3, 4, 5, 6],
+ "-f": [1, 2, 3, 4, 5, 6]}
+
+$ prog -f 1,2,3,4,5,6
+{"--foo": [1, 2, 3, 4, 5, 6],
+ "-f": [1, 2, 3, 4, 5, 6]}
+
+$ prog -f 1,2,3 --foo 4,5,6
+{"--foo": [1, 2, 3, 4, 5, 6],
+ "-f": [1, 2, 3, 4, 5, 6]}
