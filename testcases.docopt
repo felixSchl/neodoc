@@ -490,7 +490,7 @@ $ prog 10 --all
  "KIND": 10}
 
 $ prog 10
-{"--all": false, "<name>": 10, "NAME": 10}
+{"--all": false, "<kind>": 10, "KIND": 10}
 
 $ prog
 "user-error"
@@ -1841,3 +1841,60 @@ $ prog -f 1,2 --foo 3,4 -f 5,6
 {"--foo": [1, 2, 3, 4, 5, 6],
  "-f": [1, 2, 3, 4, 5, 6]}
 
+#
+# Issue #11
+#
+
+r"""
+Usage:
+    git (<y>... | <x> ...)
+"""
+
+$ prog a b c
+{"Y": ["a", "b", "c"], "<y>": ["a", "b", "c"], "X": [], "<x>": []}
+
+r"""
+Usage:
+    git (<x>... | <y> ...)
+"""
+
+$ prog a b c
+{"X": ["a", "b", "c"], "<x>": ["a", "b", "c"], "Y": [], "<y>": []}
+
+r"""
+Usage:
+    git (<y>...|<x>)
+"""
+
+$ prog a b c
+{"Y": ["a", "b", "c"], "<y>": ["a", "b", "c"]}
+
+r"""
+Usage:
+    git (<y>...|<y>)
+"""
+
+$ prog a b c
+{"Y": ["a", "b", "c"], "<y>": ["a", "b", "c"]}
+
+r"""
+Usage:
+    git (<y>|<x>...)
+"""
+
+# This cannot work: `<y>` would result in a match of 'a', leaving a trailing,
+# unmatched input of 'b' and 'c'.
+# Note: There *could* be a way around this be re-ordering the inside of the
+#       group, such that e.g. repeating elements are first. This, however, would
+#       require more design before any hasty implementation.
+
+$ prog a b c
+"user-error"
+
+r"""
+Usage:
+    git (<x>...|<x>)
+"""
+
+$ prog a b c
+{"X": ["a", "b", "c"], "<x>": ["a", "b", "c"]}

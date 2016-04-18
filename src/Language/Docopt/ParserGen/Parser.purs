@@ -348,7 +348,7 @@ genBranchesParser xs term optsFirst canSkip
           (maximumBy (compare `on` (_.depth <<< _.result)) $ mlefts rs)
       )
       (\r -> r { result = Right r.result.value })
-      (maximumBy (compare `on` (_.depth <<< _.result)) $ mrights rs)
+      (maximumBy (compare `on` (_.depth <<< _.result)) $ mrights (reverse rs))
 
   where
     fixMessage m = m

@@ -275,8 +275,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "-b" :> D.bool true ]
         , pass
             []
-            -- XXX: This is awkward:
-            [ "-b" :> D.bool false ]
+            [ "-a" :> D.bool false ]
         ]
 
     , test'
