@@ -548,7 +548,5 @@ runTokenParser :: forall a.
                 -> TokenParser a
                 -> Either P.ParseError a
 runTokenParser s =
-  flip evalState
-  ({ indentation: 0, line: 0 })
-  <<< P.runParserT
-  (P.PState { input: s, position: P.initialPos })
+  flip evalState ({ indentation: 0, line: 0 })
+        <<< P.runParserT (P.PState { input: s, position: P.initialPos })
