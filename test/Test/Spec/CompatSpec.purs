@@ -5,7 +5,7 @@ import Debug.Trace
 import Global (readFloat, readInt)
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Aff (Aff(), liftEff')
+import Control.Monad.Aff (Aff(), liftEff', later)
 import Control.Monad.Trans (lift)
 import Data.List (List(..), toList, concat, last, init)
 import Text.Parsing.Parser as P
@@ -178,6 +178,15 @@ genCompatSpec = do
           let argv = fromJust options.argv
           describe (intercalate " " argv) do
             it ("\n" ++ prettyPrintOut out) do
+
+              -- XXX: Manually break the execution context in order to avoid to
+              --      avoid stack overflows by executing a large amount of Aff
+              --      actions that run purely synchronous. Ideally, we would run
+              --      the `Aff` action using it's `MonadRec` instance.
+              -- Refer: https://github.com/owickstrom/purescript-spec/issues/24
+
+              later (return unit)
+
               let result = runDocopt (dedent doc)
                                      StrMap.empty
                                      argv
