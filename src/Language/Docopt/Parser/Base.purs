@@ -65,44 +65,44 @@ getInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 traceInput :: forall a m. (Show a, Monad m) => P.ParserT a m Unit
 traceInput = getInput >>= debug
 
-regex :: String -> P.Parser String Char
+regex :: forall m. (Monad m) => String -> P.ParserT String m Char
 regex s = P.satisfy \c ->
   Regex.test (Regex.regex s Regex.noFlags) (toString c)
 
-lower :: P.Parser String Char
+lower :: forall m. (Monad m) => P.ParserT String m Char
 lower = P.satisfy \c -> c == toLower c
 
-upper :: P.Parser String Char
+upper :: forall m. (Monad m) => P.ParserT String m Char
 upper = P.satisfy \c -> c == toUpper c
 
-digit :: P.Parser String Char
+digit :: forall m. (Monad m) => P.ParserT String m Char
 digit = regex "[0-9]"
 
-alpha :: P.Parser String Char
+alpha :: forall m. (Monad m) => P.ParserT String m Char
 alpha = regex "[a-zA-Z]"
 
-upperAlpha :: P.Parser String Char
+upperAlpha :: forall m. (Monad m) => P.ParserT String m Char
 upperAlpha = regex "[A-Z]"
 
-lowerAlpha :: P.Parser String Char
+lowerAlpha :: forall m. (Monad m) => P.ParserT String m Char
 lowerAlpha = regex "[a-z]"
 
-lowerAlphaNum :: P.Parser String Char
+lowerAlphaNum :: forall m. (Monad m) => P.ParserT String m Char
 lowerAlphaNum = regex "[0-9a-z]"
 
-upperAlphaNum :: P.Parser String Char
+upperAlphaNum :: forall m. (Monad m) => P.ParserT String m Char
 upperAlphaNum = regex "[0-9A-Z]"
 
-alphaNum :: P.Parser String Char
+alphaNum :: forall m. (Monad m) => P.ParserT String m Char
 alphaNum = alpha <|> digit
 
-space :: P.Parser String Char
+space :: forall m. (Monad m) => P.ParserT String m Char
 space = P.char ' '
 
-eol :: P.Parser String Unit
+eol :: forall m. (Monad m) => P.ParserT String m Unit
 eol = (void $ P.string "\r\n") <|> (void $ P.char '\n')
 
-string' :: String -> P.Parser String String
+string' :: forall m. (Monad m) => String -> P.ParserT String m String
 string' s = fromCharArray <$> A.foldM step [] (toCharArray s)
   where
     step acc x = do
