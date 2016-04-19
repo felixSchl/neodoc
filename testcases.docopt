@@ -1959,3 +1959,21 @@ $ prog -v
 
 $ prog -vv
 {"-v": 2, "--verbose": 2}
+
+#
+# Issue #7 - De-dupe [options] upon inlining
+#
+
+r"""
+Usage: foo -h [options]
+Options: -h
+"""
+
+$ prog
+{"-h": false}
+
+$ prog -h
+{"-h": true}
+
+$ prog -h -h
+"user-error"
