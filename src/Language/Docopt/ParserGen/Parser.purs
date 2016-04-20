@@ -495,7 +495,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       = return $ Pending p (singleton x)
 
     -- "Free" groups always transition to the `Pending state`
-    step (Free p) x@(D.Group _ _ _) | isFree x
+    step (Free p) x@(D.Group _ _ _) | D.isFree x
       = return $ Pending p (singleton x)
 
     -- Any other argument causes immediate evaluation
@@ -509,7 +509,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       = return $ Pending p (x:xs)
 
     -- "Free" groups always keep accumulating
-    step (Pending p xs) x@(D.Group _ _ _) | isFree x
+    step (Pending p xs) x@(D.Group _ _ _) | D.isFree x
       = return $ Pending p (x:xs)
 
     -- Any non-options always leaves the pending state
@@ -635,7 +635,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                                   false
                                   false
                                   -- always allow skipping for non-free groups.
-                                  (not (isFree x) || canSkip)
+                                  (not (D.isFree x) || canSkip)
 
           if score == 0
               then return $ singleton (snd result)
@@ -653,12 +653,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                                             false
                                             -- always allow skipping for
                                             -- non-free groups.
-                                            (not (isFree x) || canSkip)
-
-    isFree :: D.Argument -> Boolean
-    isFree (D.Option _)                                           = true
-    isFree (D.Group _ bs _) | all (all isFree <<< D.runBranch) bs = true
-    isFree _                                                      = false
+                                            (not (D.isFree x) || canSkip)
 
 unParseError :: P.ParseError -> { position :: P.Position, message :: String }
 unParseError (P.ParseError e) = e

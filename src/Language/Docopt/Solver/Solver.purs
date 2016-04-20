@@ -5,6 +5,7 @@ module Language.Docopt.Solver where
 
 import Prelude
 import Debug.Trace
+import Data.Functor
 import Data.Either (Either(..), either)
 import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..), isJust, maybe, maybe', isNothing)
@@ -50,16 +51,24 @@ fail = Left <<< SolveError
 solveBranch :: U.Branch                 -- ^ the usage branch
             -> List Desc                -- ^ the option descriptions
             -> Either SolveError Branch -- ^ the canonical usage branch
-solveBranch as ds = Branch <$> go as
+solveBranch as ds = Branch <$> do
+                      solve          -- Perform solving
+                        (mvRefs as)  -- Move `[options]` into place
   where
-    go :: U.Branch -> Either SolveError (List Argument)
-    go Nil = return Nil
-    go (Cons x Nil) = do runResult <$> do solveArgs x Nothing
-    go (Cons x (Cons y xs)) = do
+    -- | Move `[option]` references to the left-most position within their
+    -- | "free" group. This allows us to later combine the `[options]` with
+    -- | existing options in the same "free" group from left to right.
+    mvRefs :: U.Branch -> U.Branch
+    mvRefs xs = xs
+
+    solve :: U.Branch -> Either SolveError (List Argument)
+    solve Nil = return Nil
+    solve (Cons x Nil) = do runResult <$> do solveArgs x Nothing
+    solve (Cons x (Cons y xs)) = do
       m <- solveArgs x (Just y)
       case m of
-        Unconsumed zs -> (zs ++) <$> go (y:xs)
-        Consumed   zs -> (zs ++) <$> go xs
+        Unconsumed zs -> (zs ++) <$> solve (y:xs)
+        Consumed   zs -> (zs ++) <$> solve xs
 
     -- | Solve two adjacent arguments.
     -- | Should the first argument be an option with an argument that
@@ -132,11 +141,10 @@ solveBranch as ds = Branch <$> go as
                 matchedArg <- O.runArgument <$> match.arg
                 case adjArg of
                   Just (U.Positional n r) ->
-                    return $ const r <$> guardArgs n matchedArg.name
+                    return $ r <$ guardArgs n matchedArg.name
                   Just (U.Command n r) ->
-                    return $ const r <$> guardArgs n matchedArg.name
-                  _ ->
-                    return $ Left $ SolveError
+                    return $ r <$ guardArgs n matchedArg.name
+                  _ -> return $ fail
                       $ "Option-Argument specified in options-section missing"
                         ++ " --" ++ o.name
 
@@ -152,17 +160,15 @@ solveBranch as ds = Branch <$> go as
       where
         guardArgs :: String -> String -> Either SolveError Boolean
         guardArgs n n' | n ^= n' = return true
-        guardArgs n n' = Left $ SolveError
+        guardArgs n n' = fail
           $ "Arguments mismatch for option --" ++ o.name ++ ": "
               ++ show n ++ " and " ++ show n'
 
         matchDesc :: String -> Either SolveError O.Option
         matchDesc n =
           case filter isMatch ds of
-            xs | length xs > 1 ->
-              Left $ SolveError
-                    $ "Multiple option descriptions for option --"
-                        ++ n
+            xs | length xs > 1 -> fail
+              $ "Multiple option descriptions for option --" ++ n
             (Cons (DE.OptionDesc (DE.Option desc)) Nil) -> do
               arg <- resolveOptArg o.arg desc.arg
               return $ O.Option { flag:       DE.getFlag desc.name
@@ -324,11 +330,10 @@ solveBranch as ds = Branch <$> go as
                     arg' <- O.runArgument <$> match.arg
                     case adj of
                       Just (U.Positional n r) ->
-                        return $ const r <$> guardArgs n arg'.name
+                        return $ r <$ guardArgs n arg'.name
                       Just (U.Command n r) ->
-                        return $ const r <$> guardArgs n arg'.name
-                      _ ->
-                        return $ Left $ SolveError
+                        return $ r <$ guardArgs n arg'.name
+                      _ -> return $ fail
                           $ "Option-Argument specified in options-section missing"
                             ++ " -" ++ fromChar o.flag
 
@@ -345,7 +350,7 @@ solveBranch as ds = Branch <$> go as
 
         guardArgs :: String -> String -> Either SolveError Boolean
         guardArgs n n' | n ^= n' = return true
-        guardArgs n n' = Left $ SolveError
+        guardArgs n n' = fail
           $ "Arguments mismatch for option -" ++ fromChar o.flag ++ ": "
               ++ show n ++ " and " ++ show n'
 
@@ -357,8 +362,7 @@ solveBranch as ds = Branch <$> go as
         matchDesc :: Boolean -> Char -> Either SolveError O.Option
         matchDesc isTrailing f =
           case filter isMatch ds of
-            xs | length xs > 1 ->
-              Left $ SolveError
+            xs | length xs > 1 -> fail
                     $ "Multiple option descriptions for option -"
                         ++ fromChar f
 
@@ -367,7 +371,7 @@ solveBranch as ds = Branch <$> go as
                           then resolveOptArg o.arg desc.arg
                           else if isNothing desc.arg
                             then return Nothing
-                            else Left $ SolveError
+                            else fail
                               $ "Stacked option -" ++ fromChar f
                                   ++ " may not specify arguments"
 

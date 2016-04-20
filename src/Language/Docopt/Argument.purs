@@ -20,6 +20,7 @@ module Language.Docopt.Argument (
   , isOption
   , isFlag
   , isCommand
+  , isFree
   , opt',   opt,   optR,   opt_,   optR_
   , lopt',  lopt,  loptR,  lopt_,  loptR_
   , sopt',  sopt,  soptR,  sopt_,  soptR_
@@ -31,7 +32,7 @@ module Language.Docopt.Argument (
 import Prelude
 import Data.Maybe (Maybe(..), maybe)
 import Data.List (List())
-import Data.Foldable (intercalate)
+import Data.Foldable (intercalate, all)
 import Data.String as Str
 import Data.Function (on)
 import Data.String (fromChar)
@@ -176,6 +177,11 @@ isPositional _                = false
 isOption :: Argument -> Boolean
 isOption (Option _) = true
 isOption _          = false
+
+isFree :: Argument -> Boolean
+isFree (Option _)     = true
+isFree (Group _ bs _) = all (all isFree <<< runBranch) bs
+isFree _              = false
 
 --------------------------------------------------------------------------------
 -- Short hand option creation
