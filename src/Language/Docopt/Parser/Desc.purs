@@ -2,6 +2,7 @@ module Language.Docopt.Parser.Desc where
 
 import Prelude
 import Debug.Trace
+import Data.Functor (($>), (<$))
 import Control.Lazy (defer)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
@@ -60,9 +61,10 @@ runArgument :: Argument -> {
 runArgument (Argument a) = a
 
 newtype Option = Option {
-  name :: Name
-, arg  :: Maybe Argument
-, env  :: Maybe String
+  name       :: Name
+, arg        :: Maybe Argument
+, env        :: Maybe String
+, repeatable :: Boolean
 }
 
 data Content
@@ -136,6 +138,7 @@ prettyPrintOption (Option opt)
           (if a.optional then "[" else "")
             ++ "=" ++ a.name
             ++ (if a.optional then "]" else "")
+            ++ (if opt.repeatable then "..." else "")
             ++ (maybe ""
                       (\v -> "[default: " ++ prettyPrintValue v ++ "]")
                       a.default)
@@ -250,15 +253,18 @@ descParser =
                   (return <<< Just)
                   opt.arg
 
+          repeatable <- P.option false (L.tripleDot $> true)
+
           return $ Option { name: Flag opt.flag
                           , arg:  Argument <$> do
                               a <- arg
                               return {
-                                name:     a.name
-                              , optional: a.optional
-                              , default:  Nothing
+                                name:       a.name
+                              , optional:   a.optional
+                              , default:    Nothing
                               }
-                          , env:  Nothing
+                          , env:        Nothing
+                          , repeatable: repeatable
                           }
 
         long :: L.TokenParser Option
@@ -276,15 +282,18 @@ descParser =
                   (return <<< Just)
                   opt.arg
 
+          repeatable <- P.option false (L.tripleDot $> true)
+
           return $ Option { name: Long opt.name
                           , arg:  Argument <$> do
                               a <- arg
                               return {
-                                name:     a.name
-                              , optional: a.optional
-                              , default:  Nothing
+                                name:       a.name
+                              , optional:   a.optional
+                              , default:    Nothing
                               }
-                          , env:  Nothing
+                          , env:        Nothing
+                          , repeatable: repeatable
                           }
 
         both :: L.TokenParser Option
@@ -305,9 +314,10 @@ descParser =
               either P.fail return do
                 arg <- combineArg x.arg y.arg
                 return $ Option {
-                  name: Full f n
-                , arg: arg
-                , env: Nothing -- No need to keep at this stage
+                  name:       Full f n
+                , arg:        arg
+                , env:        Nothing -- No need to keep at this stage
+                , repeatable: x.repeatable || y.repeatable
                 }
 
               where

@@ -46,61 +46,79 @@ descParserSpec = \_ ->
   describe "The description parser" do
     for_ [
           pass ("-f enable the --foo flag")
-            [ o { name: Desc.Flag 'f'
-                , arg: Nothing
-                , env: Nothing } ]
+            [ o { name:       Desc.Flag 'f'
+                , arg:        Nothing
+                , env:        Nothing
+                , repeatable: false
+                } ]
         , pass ("-f ENABLE the --foo flag")
-            [ o { name: Desc.Flag 'f'
-                , arg: Just $ arg_ "ENABLE"
-                , env: Nothing } ]
+            [ o { name:       Desc.Flag 'f'
+                , arg:        Just $ arg_ "ENABLE"
+                , env:        Nothing
+                , repeatable: false
+                } ]
         , pass ("-f[=ENABLE] the --foo flag")
-            [ o { name: Desc.Flag 'f'
-                , arg: Just $ optarg_ "ENABLE"
-                , env: Nothing } ]
+            [ o { name:       Desc.Flag 'f'
+                , arg:        Just $ optarg_ "ENABLE"
+                , env:        Nothing
+                , repeatable: false
+                } ]
         , pass ("-f [=ENABLE] the --foo flag")
-            [ o { name: Desc.Flag 'f'
-                , arg: Just $ optarg_ "ENABLE"
-                , env: Nothing } ]
+            [ o { name:       Desc.Flag 'f'
+                , arg:        Just $ optarg_ "ENABLE"
+                , env:        Nothing
+                , repeatable: false
+                } ]
         , pass ("--foo enable the --foo flag")
-            [ o { name: Desc.Long "foo"
-                , arg: Nothing
-                , env: Nothing
+            [ o { name:       Desc.Long "foo"
+                , arg:        Nothing
+                , env:        Nothing
+                , repeatable: false
                 } ]
         , pass ("--foo ENABLE the --foo flag")
-            [ o { name: Desc.Long "foo"
-                , arg: Just $ arg_ "ENABLE"
-                , env: Nothing
+            [ o { name:       Desc.Long "foo"
+                , arg:        Just $ arg_ "ENABLE"
+                , env:        Nothing
+                , repeatable: false
                 } ]
         , pass ("--foo[=ENABLE] the --foo flag")
-            [ o { name: Desc.Long "foo"
-                , arg: Just $ optarg_ "ENABLE"
-                , env: Nothing
+            [ o { name:       Desc.Long "foo"
+                , arg:        Just $ optarg_ "ENABLE"
+                , env:        Nothing
+                , repeatable: false
                 } ]
         , pass ("--foo [=ENABLE] the --foo flag")
-            [ o { name: Desc.Long "foo"
-                , arg: Just $ optarg_ "ENABLE"
-                , env: Nothing
+            [ o { name:       Desc.Long "foo"
+                , arg:        Just $ optarg_ "ENABLE"
+                , env:        Nothing
+                , repeatable: false
                 } ]
         , pass ("-f, --foo")
-            [ o { name: Desc.Full 'f' "foo"
-                , arg: Nothing
-                , env: Nothing
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Nothing
+                , env:        Nothing
+                , repeatable: false
                 } ]
         , pass ("-f=BAZ, --foo=BAZ")
-            [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ arg_ "BAZ"
-                , env:  Nothing }
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg_ "BAZ"
+                , env:        Nothing
+                , repeatable: false
+                }
             ]
           -- XXX: Indecisive here: Should this throw an error instead?
         , pass ("-f=BAZ, --foo[=BAZ]")
-            [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ optarg_ "BAZ"
-                , env:  Nothing }
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ optarg_ "BAZ"
+                , env:        Nothing
+                , repeatable: false
+                }
             ]
         , pass ("-f=BAZ, --foo=BAZ [default: 100]")
-            [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ arg "BAZ" (int 100)
-                , env:  Nothing
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
                 }
             ]
         , pass (dedent
@@ -108,13 +126,15 @@ descParserSpec = \_ ->
             -f=BAZ, --foo=BAZ [default: 100]
             -q=BAZ, --qux=BAZ [default: 200]
             """)
-            [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ arg "BAZ" (int 100)
-                , env:  Nothing
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
                 }
-            , o { name: Desc.Full 'q' "qux"
-                , arg:  Just $ arg "BAZ" (int 200)
-                , env:  Nothing
+            , o { name:       Desc.Full 'q' "qux"
+                , arg:        Just $ arg "BAZ" (int 200)
+                , env:        Nothing
+                , repeatable: false
                 }
             ]
         , pass (dedent
@@ -126,13 +146,15 @@ descParserSpec = \_ ->
             -q=QIZ, --qux=QIZ this is also more
               text [default: 200]
             """)
-            [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ arg "BAZ" (int 100)
-                , env:  Nothing
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
                 }
-            , o { name: Desc.Full 'q' "qux"
-                , arg:  Just $ arg "QIZ" (int 200)
-                , env:  Nothing
+            , o { name:       Desc.Full 'q' "qux"
+                , arg:        Just $ arg "QIZ" (int 200)
+                , env:        Nothing
+                , repeatable: false
                 }
             ]
         , fail
@@ -145,9 +167,10 @@ descParserSpec = \_ ->
                 -q=QIZ, --qux=QIZ this option is over-indented and won't
                                   be parsed.
             """)
-            [ o { name: Desc.Full 'f' "foo"
-                , arg:  Just $ arg "BAZ" (int 100)
-                , env:  Just "QARK"
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Just "QARK"
+                , repeatable: false
                 }
             ]
         , fail (dedent
