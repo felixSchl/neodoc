@@ -103,8 +103,7 @@ solveBranch as ds = Branch <$> go as
                             , env:        y.env
                             , repeatable: false
                             }))
-                false -- XXX: desc options must be
-                      --      able to indicate this!
+                y.repeatable
           where
             convertArg (Just (DE.Argument arg)) = return $ O.Argument arg
             convertArg _ = Nothing

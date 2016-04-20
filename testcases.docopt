@@ -1898,3 +1898,64 @@ Usage:
 
 $ prog a b c
 {"X": ["a", "b", "c"], "<x>": ["a", "b", "c"]}
+
+#
+# Issue #5
+# Indicate repeatbility in option descriptions
+#
+
+r"""
+Usage: foo [options]
+Options: -v, --verbose
+"""
+
+$ prog
+{"-v": false, "--verbose": false}
+
+$ prog -v
+{"-v": true, "--verbose": true}
+
+$ prog -vv
+"user-error"
+
+r"""
+Usage: foo [options]
+Options: -v, --verbose...
+"""
+
+$ prog
+{"-v": 0, "--verbose": 0}
+
+$ prog -v
+{"-v": 1, "--verbose": 1}
+
+$ prog -vv
+{"-v": 2, "--verbose": 2}
+
+r"""
+Usage: foo [options]
+Options: -v..., --verbose
+"""
+
+$ prog
+{"-v": 0, "--verbose": 0}
+
+$ prog -v
+{"-v": 1, "--verbose": 1}
+
+$ prog -vv
+{"-v": 2, "--verbose": 2}
+
+r"""
+Usage: foo [options]
+Options: -v..., --verbose...
+"""
+
+$ prog
+{"-v": 0, "--verbose": 0}
+
+$ prog -v
+{"-v": 1, "--verbose": 1}
+
+$ prog -vv
+{"-v": 2, "--verbose": 2}
