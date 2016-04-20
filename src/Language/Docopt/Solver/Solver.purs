@@ -90,8 +90,6 @@ solveBranch as ds = Branch <$> go as
 
       where
         -- | Expand `[options]` into optional groups.
-        -- | XXX: These groups may have to be required later, once we have a
-        -- |      `[required]` tag.
         convert (DE.OptionDesc (DE.Option y)) =
           return
             $ Group
