@@ -39,7 +39,9 @@ import Language.Docopt.Parser.Usage          as U
 import Language.Docopt.Parser.Usage.Argument as U
 import Language.Docopt.Parser.Usage.Option   as UO
 
-data Result = Consumed (List Argument) | Unconsumed (List Argument)
+data Result
+  = Consumed   (List Argument)
+  | Unconsumed (List Argument)
 
 runResult :: Result -> List Argument
 runResult (Consumed   xs) = xs
@@ -434,7 +436,7 @@ solveBranch as ds = Branch <$> do
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
 solveUsage (U.Usage _ bs) ds = Usage <$> do traverse (flip solveBranch ds) bs
 
-solve :: (List U.Usage)
-      -> (List Desc)
+solve :: List U.Usage
+      -> List Desc
       -> Either SolveError (List Usage)
 solve us ds = traverse (flip solveUsage ds) us

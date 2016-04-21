@@ -39,6 +39,7 @@ import Language.Docopt.Trans     as T
 
 import Language.Docopt.Scanner      as Scanner
 import Language.Docopt.Solver       as Solver
+import Language.Docopt.Solver2      as Solver2
 import Language.Docopt.Parser.Usage as Usage
 import Language.Docopt.Parser.Desc  as Desc
 
@@ -57,7 +58,7 @@ parseDocopt docopt = do
   doc <- toScanErr       $ Scanner.scan $ dedent docopt
   us  <- toUsageParseErr $ Usage.run doc.usage
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
-  prg <- toSolveErr      $ Solver.solve us ds
+  prg <- toSolveErr      $ Solver2.solve us ds
   return $ { specification: prg , usage: doc.usage }
 
 -- |
