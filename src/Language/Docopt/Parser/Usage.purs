@@ -6,37 +6,26 @@ module Language.Docopt.Parser.Usage (
   ) where
 
 import Prelude
-import Debug.Trace
 import Control.Lazy (defer)
 import Control.MonadPlus (guard)
-import Control.Monad.Trans (lift)
-import Control.Monad.State (get)
 import Control.Alt ((<|>))
-import Control.Apply ((*>), (<*))
-import Data.Foldable (intercalate)
-import Data.List (List(..), many, some, (:), toList, concat, singleton
-                  , modifyAt, length)
-import Text.Parsing.Parser             as P
-import Text.Parsing.Parser.Combinators as P
+import Control.Apply ((*>))
+import Data.List (List(..), many, some, singleton, length, modifyAt)
+import Text.Parsing.Parser (ParseError) as P
+import Text.Parsing.Parser.Combinators (try, optional, choice, sepBy1, between,
+                                       lookAhead) as P
 import Text.Parsing.Parser.Combinators ((<?>), (<??>))
-import Text.Parsing.Parser.Pos         as P
-import Text.Parsing.Parser.String      as P
-import Data.List as L
-import Data.String (fromChar)
-import Data.String as Str
-import Data.Either (Either(..))
-import Data.Tuple (Tuple(..))
+import Text.Parsing.Parser.Pos (Position(Position)) as P
+import Data.Either (Either())
 import Data.Maybe (Maybe(..), maybe)
-import Data.Array as A
 import Control.Bind ((=<<))
 
-import Language.Docopt.Parser.Base
-import Language.Docopt.Parser.Common
-import Language.Docopt.Parser.State
-import Language.Docopt.Parser.Usage.Usage
-import Language.Docopt.Parser.Usage.Argument
-import Language.Docopt.Parser.Usage.Usage  as U
-import Language.Docopt.Parser.Lexer        as L
+import Language.Docopt.Parser.Common (markIndent', markLine, indented,
+                                     sameIndent, lessIndented, moreIndented)
+import Language.Docopt.Parser.Usage.Usage (Usage(..))
+import Language.Docopt.Parser.Usage.Argument (Argument(..))
+import Language.Docopt.Parser.Usage.Usage as U
+import Language.Docopt.Parser.Lexer as L
 import Language.Docopt.Parser.Usage.Option as O
 
 -- | TokenParser to parse the usage section
@@ -67,7 +56,7 @@ usageParser = do
       <$> (usageLine name)
       <*> many do
             P.optional $ P.try do
-              L.name >>= guard <<< (== "or")
+              L.name >>= guard <<< (_ == "or")
               L.colon
             P.try do
               program

@@ -4,48 +4,39 @@
 module Language.Docopt.Solver where
 
 import Prelude
-import Debug.Trace
-import Data.Functor
+import Data.Functor ((<$))
 import Data.Either (Either(..), either)
 import Data.Maybe.Unsafe (fromJust)
-import Data.Maybe (Maybe(..), isJust, maybe, maybe', isNothing)
-import Data.List (List(..), filter, head, foldM, concat, (:), singleton
-                , catMaybes, toList, last, init, length)
+import Data.Maybe (Maybe(Nothing, Just), isNothing, maybe, isJust)
+import Data.List (List(..), length, filter, singleton, toList, catMaybes, head,
+                  (:))
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..), fst, snd)
-import Data.Foldable (foldl, intercalate)
+import Data.Tuple (Tuple(Tuple))
 import Control.MonadPlus (guard)
-import Control.Plus (empty)
 import Control.Alt ((<|>))
-import Control.Apply((*>))
-import Data.Monoid (mempty)
-import Control.Monad.Error.Class (throwError)
-import Data.String (fromCharArray, fromChar, toUpper, charAt, toCharArray)
+import Data.String (fromChar, fromCharArray, toCharArray, toUpper)
 import Data.Array as A
 import Data.String as S
 import Data.String.Unsafe as US
-import Data.StrMap as StrMap
-import Data.StrMap (StrMap())
 
 import Data.String.Ext ((^=), endsWith)
-import Language.Docopt.Errors
-import Language.Docopt.Argument
-import Language.Docopt.Usage
-import Language.Docopt.Parser.Desc (Desc(..))
-import Language.Docopt.Value (Value(..))
-import Language.Docopt.Option                as O
-import Language.Docopt.Parser.Desc           as DE
-import Language.Docopt.Parser.Usage          as U
-import Language.Docopt.Parser.Usage.Argument as U
-import Language.Docopt.Parser.Usage.Option   as UO
+import Language.Docopt.Errors (SolveError(..))
+import Language.Docopt.Argument (Argument(..), Branch(..))
+import Language.Docopt.Usage (Usage(..))
+import Language.Docopt.Parser.Desc (Desc())
+import Language.Docopt.Option as O
+import Language.Docopt.Parser.Desc as DE
+import Language.Docopt.Parser.Usage (Usage(..)) as U
+import Language.Docopt.Parser.Usage.Argument (Branch, Argument(..)) as U
+import Language.Docopt.Parser.Usage.Option as UO
 
-data Result
-  = Consumed   (List Argument)
-  | Unconsumed (List Argument)
+data Slurp a
+  = Slurp (List a)
+  | Keep  (List a)
 
-runResult :: Result -> List Argument
-runResult (Consumed   xs) = xs
-runResult (Unconsumed xs) = xs
+runSlurp :: Slurp Argument -> List Argument
+runSlurp (Slurp xs) = xs
+runSlurp (Keep  xs) = xs
 
 fail :: forall a. String -> Either SolveError a
 fail = Left <<< SolveError
@@ -53,24 +44,16 @@ fail = Left <<< SolveError
 solveBranch :: U.Branch                 -- ^ the usage branch
             -> List Desc                -- ^ the option descriptions
             -> Either SolveError Branch -- ^ the canonical usage branch
-solveBranch as ds = Branch <$> do
-                      solve          -- Perform solving
-                        (mvRefs as)  -- Move `[options]` into place
+solveBranch as ds = Branch <$> go as
   where
-    -- | Move `[option]` references to the left-most position within their
-    -- | "free" group. This allows us to later combine the `[options]` with
-    -- | existing options in the same "free" group from left to right.
-    mvRefs :: U.Branch -> U.Branch
-    mvRefs xs = xs
-
-    solve :: U.Branch -> Either SolveError (List Argument)
-    solve Nil = return Nil
-    solve (Cons x Nil) = do runResult <$> do solveArgs x Nothing
-    solve (Cons x (Cons y xs)) = do
+    go :: U.Branch -> Either SolveError (List Argument)
+    go Nil = return Nil
+    go (Cons x Nil) = do runSlurp <$> do solveArgs x Nothing
+    go (Cons x (Cons y xs)) = do
       m <- solveArgs x (Just y)
       case m of
-        Unconsumed zs -> (zs ++) <$> solve (y:xs)
-        Consumed   zs -> (zs ++) <$> solve xs
+        Keep  zs -> (zs ++ _) <$> go (y:xs)
+        Slurp zs -> (zs ++ _) <$> go xs
 
     -- | Solve two adjacent arguments.
     -- | Should the first argument be an option with an argument that
@@ -78,15 +61,15 @@ solveBranch as ds = Branch <$> do
     -- | argument from the input (consume).
     solveArgs :: U.Argument
               -> Maybe U.Argument
-              -> Either SolveError Result
+              -> Either SolveError (Slurp Argument)
 
-    solveArgs (U.EOA) _ = Unconsumed <<< singleton <$> return (EOA)
-    solveArgs (U.Stdin) _ = Unconsumed <<< singleton <$> return (Stdin)
-    solveArgs (U.Command s r) _ = Unconsumed <<< singleton <$> return (Command s r)
-    solveArgs (U.Positional s r) _ = Unconsumed <<< singleton <$> return (Positional s r)
+    solveArgs (U.EOA) _ = Keep <<< singleton <$> return (EOA)
+    solveArgs (U.Stdin) _ = Keep <<< singleton <$> return (Stdin)
+    solveArgs (U.Command s r) _ = Keep <<< singleton <$> return (Command s r)
+    solveArgs (U.Positional s r) _ = Keep <<< singleton <$> return (Positional s r)
 
     solveArgs (U.Group o bs r) _
-      = Unconsumed <<< singleton <$> do
+      = Keep <<< singleton <$> do
         flip (Group o) r <$> do
           flip solveBranch ds `traverse` bs
 
@@ -97,7 +80,7 @@ solveBranch as ds = Branch <$> do
     -- |      once option descriptions are keyed, `r` can be used as the lookup
     -- |      into the map of `key => [Description]`
     solveArgs (U.Reference r) _ = do
-      return $ Unconsumed (catMaybes $ convert <$> ds)
+      return $ Keep (catMaybes $ convert <$> ds)
 
       where
         -- | Expand `[options]` into optional groups.
@@ -108,14 +91,14 @@ solveBranch as ds = Branch <$> do
                 (singleton $ Branch $ singleton $ Option $
                   (O.Option { flag:       DE.getFlag y.name
                             , name:       DE.getName y.name
-                            , arg:        convertArg y.arg
+                            , arg:        convertDescArg y.arg
                             , env:        y.env
                             , repeatable: false
                             }))
                 y.repeatable
           where
-            convertArg (Just (DE.Argument arg)) = return $ O.Argument arg
-            convertArg _ = Nothing
+            convertDescArg (Just (DE.Argument arg)) = return $ O.Argument arg
+            convertDescArg _ = Nothing
 
         convert _ = Nothing
 
@@ -131,12 +114,12 @@ solveBranch as ds = Branch <$> do
           -- Note: There is no check to see if an explicit argument is
           --       the same as specified in the option descriptions for
           --       convenience to the user.
-          return $ Unconsumed (singleton $ Option $ O.Option match)
+          return $ Keep (singleton $ Option $ O.Option match)
 
         Nothing -> do
-          -- Look ahead if any of the following arguments should be consumed.
-          -- Return either `Nothing` to signify that nothing should be consumed
-          -- or a value signifieng that it should be consumed, and the
+          -- Look ahead if any of the following arguments should be slurped.
+          -- Return either `Nothing` to signify that nothing should be slurped
+          -- or a value signifieng that it should be slurped, and the
           -- `isRepeated` flag should be inherited.
           let mr = do
                 guard (not o.repeatable)
@@ -152,12 +135,12 @@ solveBranch as ds = Branch <$> do
 
           case mr of
             Nothing -> do
-              return $ Unconsumed (singleton $ Option $ O.Option match)
+              return $ Keep (singleton $ Option $ O.Option match)
             Just er -> do
               r <- er
-              return $ Consumed (singleton $ Option $ O.Option $ match {
-                                  repeatable = r
-                                })
+              return $ Slurp (singleton $ Option $ O.Option $ match {
+                                repeatable = r
+                              })
 
       where
         guardArgs :: String -> String -> Either SolveError Boolean
@@ -217,7 +200,7 @@ solveBranch as ds = Branch <$> do
         -- | However, this solve is simpler as the option is proven
         -- | not to accept an argument at all.
 
-        fromSubsumption :: Either SolveError Result
+        fromSubsumption :: Either SolveError (Slurp Argument)
         fromSubsumption = do
 
           -- XXX: Well, this error should not be thrown, but rather,
@@ -237,7 +220,7 @@ solveBranch as ds = Branch <$> do
                 (head $ catMaybes $ subsume fs <$> ds)
 
           where
-            subsume :: String -> Desc -> Maybe Result
+            subsume :: String -> Desc -> Maybe (Slurp Argument)
             subsume fs (DE.OptionDesc (DE.Option d)) = do
               f <- DE.getFlag d.name
               a <- DE.runArgument <$> d.arg
@@ -268,7 +251,7 @@ solveBranch as ds = Branch <$> do
                            (pure <<< id)
                            (matchDesc false `traverse` fs)
 
-              return $ Unconsumed
+              return $ Keep
                      $ (Option <$> toList cs) ++ (singleton $ Option o)
 
 
@@ -287,7 +270,7 @@ solveBranch as ds = Branch <$> do
         -- | "armmsg ARG"
         -- |       ~ ~~~
         -- |       ^  ^
-        -- |       |  `-- only consumed if description found and
+        -- |       |  `-- only slurped if description found and
         -- |       |      has matching argument.
         -- |       `----- look for a description of `-g``
         -- |
@@ -295,20 +278,20 @@ solveBranch as ds = Branch <$> do
         -- | However, this solve is simpler as the option is proven
         -- | not to accept an argument at all.
 
-        fromAdjacentArgOrDefault :: Either SolveError Result
+        fromAdjacentArgOrDefault :: Either SolveError (Slurp Argument)
         fromAdjacentArgOrDefault = do
 
           -- (flag, ...flags) -> (...flags, flag)
           (Tuple fs f) <- do
             return case A.last (o.stack) of
-              Just f  -> Tuple (o.flag A.: (fromJust $ A.init o.stack)) f
+              Just f'  -> Tuple (o.flag A.: (fromJust $ A.init o.stack)) f'
               Nothing -> Tuple [] o.flag
 
           -- Look the trailing option up in the descriptions
           -- and combine it into the most complete option we
           -- can know about at this point.
           match   <- O.runOption <$> matchDesc true f
-          matches <- (Option <$>) <$> (matchDesc false `traverse` fs)
+          matches <- (Option <$> _) <$> (matchDesc false `traverse` fs)
 
           -- Check to see if this option has an explicitly bound argument.
           -- In this case, a check to consume an adjacent arg must not take
@@ -318,15 +301,15 @@ solveBranch as ds = Branch <$> do
               -- Note: There is no check to see if an explicit argument is
               --       the same as specified in the option descriptions for
               --       convenience to the user.
-              return $ Unconsumed
+              return $ Keep
                     $ (toList matches)
                       ++ (singleton $ Option $ O.Option match)
 
             Nothing ->
-              -- Look ahead if any of the following arguments should be consumed.
-              -- Return either `Nothing` to signify that nothing should be consumed
-              -- or a value signifieng that it should be consumed, and the
-              -- `isRepeated` flag should be inherited.
+              -- Look ahead if any of the following arguments should be slurped.
+              -- Return either `Nothing` to signify that nothing should be
+              -- slurped or a value signifieng that it should be slurped, and
+              -- the `isRepeated` flag should be inherited.
               let mr = do
                     guard $ not match.repeatable
                     arg' <- O.runArgument <$> match.arg
@@ -341,11 +324,11 @@ solveBranch as ds = Branch <$> do
 
                in case mr of
                 Nothing -> do
-                  return $ Unconsumed
+                  return $ Keep
                     $ (toList matches) ++ (singleton $ Option $ O.Option match)
                 Just er -> do
                   r <- er
-                  return $ Consumed
+                  return $ Slurp
                     $ (toList matches) ++ (singleton $ Option $ O.Option match {
                         repeatable = r
                       })

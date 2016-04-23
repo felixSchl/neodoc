@@ -1,60 +1,40 @@
 module Test.Spec.CompatSpec (genCompatSpec) where
 
 import Prelude
-import Debug.Trace
-import Global (readFloat, readInt)
+import Global (readFloat)
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Aff (Aff(), liftEff', later)
-import Control.Monad.Trans (lift)
-import Data.List (List(..), toList, concat, last, init)
-import Text.Parsing.Parser as P
-import Data.Traversable (traverse)
-import Data.Bifunctor (lmap)
+import Control.Monad.Aff (Aff, later)
 import Data.StrMap as StrMap
-import Data.StrMap (StrMap())
-import Data.Map (Map(..))
-import Data.Map as Map
 import Data.Tuple (Tuple(..))
 import Data.Either (Either(..), either)
 import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
-import Data.Foldable (foldl, for_, intercalate)
+import Data.Foldable (intercalate, for_)
 import Text.Wrap (dedent)
-import Control.Monad.Aff (launchAff)
 import Data.Maybe (Maybe(..))
 import Data.Maybe.Unsafe (fromJust)
+import Data.List (List, many, fromList)
 
-import Test.Assert (assert)
 import Test.Spec (Spec(), describe, it)
-import Test.Spec.Reporter.Console (consoleReporter)
-import Test.Assert.Simple
 import Data.String (fromCharArray)
 
-import Test.Support (vliftEff, runEitherEff, prettyPrintMap)
-import Test.Support.Usage  as U
-import Test.Support.Docopt as D
-import Test.Support.Desc   as Desc
+import Test.Support (vliftEff, runEitherEff)
 
 import Docopt as Docopt
 import Language.Docopt (runDocopt)
-import Language.Docopt.Value as D
-import Language.Docopt.Value as Value
+import Language.Docopt.Value (Value(..)) as D
 
-import Data.List (List(..), many, some, (:), toList, concat, singleton, length
-                , fromList)
-import Text.Parsing.Parser             as P
-import Text.Parsing.Parser.Combinators as P
-import Text.Parsing.Parser.Pos         as P
-import Text.Parsing.Parser.String      as P
+import Text.Parsing.Parser (runParser) as P
+import Text.Parsing.Parser.Combinators (manyTill, optional, between, sepBy,
+                                       try, choice, (<?>), option) as P
+import Text.Parsing.Parser.String (eof, string, anyChar, skipSpaces,
+                                  char, noneOf) as P
 
-import Language.Docopt.Parser.Base
+import Language.Docopt.Parser.Base (space, digit)
 import Node.FS (FS)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync as FS
-import Data.Identity
-import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
-import Control.Plus (empty)
 import Data.Array as A
 import Data.Int as Int
 
@@ -147,7 +127,7 @@ parseUniversalDocoptTests = do
             si <- P.option 1 (P.char '-' *> return (-1))
             xs <- fromCharArray <$> A.some digit
             P.choice [
-              D.FloatValue <<< ((Int.toNumber si) *) <<< readFloat <$> do
+              D.FloatValue <<< ((Int.toNumber si) * _) <<< readFloat <$> do
                 xss <- do
                   P.char '.'
                   fromCharArray <$> A.some digit

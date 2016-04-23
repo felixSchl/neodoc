@@ -5,20 +5,16 @@
 module Language.Docopt.Parser.Common where
 
 import Prelude
-import Debug.Trace
 import Control.Monad.Trans (lift)
 import Control.MonadPlus (guard)
-import Control.Monad.State
+import Control.Monad.State (get, modify)
 import Data.List (List(..))
 import Data.Either (Either(..))
-import Language.Docopt.Parser.Lexer
-import Language.Docopt.Parser.State
-import Language.Docopt.Parser.Base
-import qualified Text.Parsing.Parser as P
-import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Token as P
-import qualified Text.Parsing.Parser.Pos as P
-import qualified Text.Parsing.Parser.String as P
+import Language.Docopt.Parser.Lexer (TokenParser, PositionedToken(..))
+import Language.Docopt.Parser.State (ParserState)
+import Text.Parsing.Parser (PState(..), ParserT(..)) as P
+import Text.Parsing.Parser.Combinators ((<?>), try) as P
+import Text.Parsing.Parser.Pos (Position(..)) as P
 
 traceState :: TokenParser String
 traceState = do

@@ -11,59 +11,51 @@ module Language.Docopt.ParserGen.Parser (
   ) where
 
 import Prelude
-import Control.Plus (class Plus, empty)
-import Debug.Trace
-import Data.Identity (Identity(), runIdentity)
-import Control.Apply ((*>), (<*))
+import Control.Plus (empty)
+import Debug.Trace (traceA)
+import Control.Apply ((<*))
 import Data.Function (on)
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), isJust, isNothing, maybe, maybe', fromMaybe)
-import Data.List (List(..), foldM, (:), singleton, some, toList, delete, length
-                 , head, many, tail, fromList, filter, reverse, concat, catMaybes)
+import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
+import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
+                  some, filter, head, fromList)
 import Control.Alt ((<|>))
-import Data.Traversable (class Traversable, traverse, for)
+import Data.Traversable (traverse)
 import Control.Lazy (defer)
-import Data.Foldable (class Foldable, maximum, maximumBy, foldl, intercalate, for_, all)
+import Data.Foldable (all, intercalate, maximumBy)
 import Data.String as String
 import Data.String (fromCharArray, stripPrefix)
-import Data.Bifunctor (class Bifunctor, rmap)
-import Data.List as L
 import Data.List.Unsafe as LU
 import Data.Array as A
 import Data.Array.Unsafe as AU
-import Data.Array (uncons)
-import Data.Monoid (Monoid)
+import Data.Monoid (class Monoid, mempty)
 import Data.Tuple (Tuple(..), fst, snd)
-import Data.Monoid (mempty)
-import Data.Map (Map())
-import Control.Monad.Reader (Reader(), ask, runReader)
+import Control.Monad.Reader (ask)
 import Control.Monad.Reader.Trans (ReaderT(), runReaderT)
-import Control.Monad.State (State(), runState, evalState, execState)
+import Control.Monad.State (State, evalState)
 import Control.Monad.State as State
-import Data.Map as Map
 import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
-import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
-import Control.Bind ((=<<))
+import Control.MonadPlus.Partial (mrights, mlefts)
+import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), fail,
+                            parseFailed, unParserT) as P
+import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>)) as P
+import Text.Parsing.Parser.Pos (Position, initialPos) as P
 
-import Text.Parsing.Parser             as P
-import Text.Parsing.Parser.Combinators as P
-import Text.Parsing.Parser.Pos         as P
-import Text.Parsing.Parser.String      as P
-
-import Language.Docopt.Env      as Env
-import Language.Docopt.Errors   as D
-import Language.Docopt.Value    as D
-import Language.Docopt.Argument as D
-import Language.Docopt.Usage    as D
-import Language.Docopt.Env      as D
-import Language.Docopt.Option   as O
-import Language.Docopt.Value    as Value
-
-import Language.Docopt.ParserGen.Token
+import Language.Docopt.Value (Value(..), isBoolValue) as D
+import Language.Docopt.Argument (Argument(..), Branch(..), isFree, runBranch,
+                                prettyPrintArg, prettyPrintArgNaked,
+                                hasEnvBacking, getArgument, hasDefault,
+                                isRepeatable, isFlag, setRequired) as D
+import Language.Docopt.Usage (Usage, runUsage) as D
+import Language.Docopt.Env (Env) as D
+import Language.Docopt.Option as O
+import Language.Docopt.Value  as Value
+import Language.Docopt.Parser.Base (getInput)
 import Language.Docopt.ParserGen.Token as Token
-import Language.Docopt.ParserGen.ValueMapping
-import Language.Docopt.Parser.Base (alphaNum, space, getInput)
+import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
+                                        unPositionedToken, prettyPrintToken)
+import Language.Docopt.ParserGen.ValueMapping (ValueMapping)
 
 debug :: Boolean
 debug = false
@@ -169,8 +161,8 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
           , input:    let pushed = maybe empty
-                                         (\v -> singleton $ PositionedToken {
-                                                  token:     v
+                                         (\v' -> singleton $ PositionedToken {
+                                                  token:     v'
                                                 , sourcePos: pos
                                                 , source:    s
                                                 }
@@ -224,8 +216,8 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
           , input:    let pushed = maybe empty
-                                         (\v -> singleton $ PositionedToken {
-                                                  token:     v
+                                         (\v' -> singleton $ PositionedToken {
+                                                  token:     v'
                                                 , sourcePos: pos
                                                 , source:    s
                                                 }
@@ -339,9 +331,9 @@ genBranchesParser xs term optsFirst canSkip
                           -- it replaces some text that comes from
                           -- purescript-parsing.
                           let m  = _.message $ unParseError (LU.head errors)
-                              ms = LU.tail errors <#> \e ->
-                                    let m = _.message $ unParseError e
-                                     in String.replace "Expected " "" m
+                              ms = LU.tail errors <#> \e' ->
+                                    let m' = _.message $ unParseError e'
+                                     in String.replace "Expected " "" m'
                            in intercalate " or " (m : ms)
                     } }
           )
@@ -546,7 +538,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     genParser x@(D.Command n r) _ = (do
       scoreFromList <$> do
         if r then (some go) else (singleton <$> go)
-      <* lift (State.modify (1+))
+      <* lift (State.modify (1 + _))
       ) P.<?> "command: " ++ (show $ D.prettyPrintArg x)
         where go = Tuple x <$> (command n)
 
@@ -554,7 +546,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     genParser x@(D.EOA) _ = (do
       scoreFromList <<< singleton <<< Tuple x <$> do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
-      <* lift (State.modify (1+))
+      <* lift (State.modify (1 + _))
       ) P.<?> "end of arguments: \"--\""
 
     -- Generate a parser for a `Stdin` argument
@@ -562,7 +554,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       scoreFromList <<< singleton <<< Tuple x <$> do
         dash
         return (D.BoolValue true)
-      <* lift (State.modify (1+))
+      <* lift (State.modify (1 + _))
       ) P.<?> "stdin: \"-\""
 
     genParser x@(D.Positional n r) _
@@ -573,7 +565,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     genParser x@(D.Positional n r) _ = (do
       scoreFromList <$> do
         if r then (some go) else (singleton <$> go)
-      <* lift (State.modify (1+))
+      <* lift (State.modify (1 + _))
       ) P.<?> "positional argument: " ++ (show $ D.prettyPrintArg x)
         where go = Tuple x <$> (positional n)
 
@@ -581,7 +573,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     genParser x@(D.Option (O.Option o)) _ = (do
       scoreFromList <$> do
         if o.repeatable then (some go) else (singleton <$> go)
-      <* lift (State.modify (1+))
+      <* lift (State.modify (1 + _))
       )
         where
           go = do

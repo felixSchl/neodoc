@@ -7,21 +7,14 @@ module Language.Docopt.ParserGen.Token (
   ) where
 
 import Prelude
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(), maybe)
 import Data.Foldable (intercalate)
-import qualified Data.Array as A
-import Data.List (List(..))
+import Data.List (List())
 import Data.String (fromCharArray)
-import Data.Tuple (Tuple())
-import qualified Data.Array as A
-import qualified Text.Parsing.Parser     as P
-import qualified Text.Parsing.Parser.Pos as P
+import Data.Array as A
+import Text.Parsing.Parser.Pos (Position) as P
 
-import qualified Language.Docopt.Errors   as D
-import qualified Language.Docopt.Value    as D
-import qualified Language.Docopt.Argument as D
-
--- | Represents each item in ARGV
+import Language.Docopt.Value (Value, prettyPrintValue) as D
 data Token
   = LOpt String (Maybe String)
   | SOpt Char (Array Char) (Maybe String)
@@ -41,9 +34,9 @@ prettyPrintToken (Stdin) = "-"
 prettyPrintToken (EOA xs) = "-- " ++ intercalate " " (D.prettyPrintValue <$> xs)
 prettyPrintToken (Lit s) = show s
 prettyPrintToken (LOpt n a) = "--" ++ n ++ arg
-  where arg = maybe "" ("=" ++) a
+  where arg = maybe "" ("=" ++ _) a
 prettyPrintToken (SOpt n s a) = "-"  ++ (fromCharArray (A.cons n s)) ++ arg
-  where arg = maybe "" ("=" ++) a
+  where arg = maybe "" ("=" ++ _) a
 
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position

@@ -17,10 +17,9 @@ module Language.Docopt.Parser.Usage.Argument (
   ) where
 
 import Prelude
-import Data.Maybe (Maybe(..))
-import Data.List (List(..))
+import Data.List (List())
 import Data.Foldable (intercalate, all)
-import qualified Language.Docopt.Parser.Usage.Option as O
+import Language.Docopt.Parser.Usage.Option as O
 
 type IsRepeatable = Boolean
 type IsOptional = Boolean

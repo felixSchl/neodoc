@@ -1,28 +1,9 @@
 module Language.Docopt.Errors where
 
 import Prelude
-import Debug.Trace
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
-import Data.List (List(..), reverse, toList)
-import Data.Function (on)
-import Data.Foldable (intercalate)
-import Data.Monoid (Monoid)
-import Data.String (fromChar, fromCharArray)
-import Data.String.Ext (startsWith)
-import Control.Apply ((*>))
-import Data.Generic
-import Data.Array as A
+import Data.List (List(Nil, Cons), reverse)
+import Data.Generic (class Generic, gShow)
 import Text.Wrap (dedent)
-import qualified Data.String as Str
-
-import Language.Docopt.Value
-import Language.Docopt.Argument
-import qualified Language.Docopt.Option as O
-
---------------------------------------------------------------------------------
--- XXX: Temporary polyfill until new version of `Data.List` is released.
---------------------------------------------------------------------------------
 
 mapWithIndex :: forall a b. (a -> Int -> b) -> List a -> List b
 mapWithIndex f lst = reverse $ go 0 lst Nil
@@ -34,8 +15,8 @@ mapWithIndex f lst = reverse $ go 0 lst Nil
 -- Errors (XXX: needs migration and improvement) -------------------------------
 --------------------------------------------------------------------------------
 
-import qualified Text.Parsing.Parser     as P
-import qualified Text.Parsing.Parser.Pos as P
+import Text.Parsing.Parser (ParseError(ParseError)) as P
+import Text.Parsing.Parser.Pos (Position) as P
 
 type Argv = Array String
 newtype SolveError = SolveError String
@@ -59,8 +40,8 @@ instance showDocoptError :: Show DocoptError where
   show (DocoptUserParseError _ e) = "DocoptParseError " ++ show e
   show (DocoptSolveError       e) = "DocoptSolveError"  ++ show e
 
-unParseError :: forall r. P.ParseError -> { message :: String
-                                          , position :: P.Position }
+unParseError :: P.ParseError -> { message :: String
+                                , position :: P.Position }
 unParseError (P.ParseError e) = e
 
 developerErrorMessage :: String

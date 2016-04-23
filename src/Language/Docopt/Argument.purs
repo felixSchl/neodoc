@@ -1,6 +1,5 @@
 module Language.Docopt.Argument (
     Argument (..)
-  , IsRepeatable ()
   , Branch (..)
   , IsOptional ()
   , IsRepeatable ()
@@ -33,13 +32,9 @@ import Prelude
 import Data.Maybe (Maybe(..), maybe)
 import Data.List (List())
 import Data.Foldable (intercalate, all)
-import Data.String as Str
 import Data.Function (on)
-import Data.String (fromChar)
 import Data.String.Ext ((^=))
-import Control.Apply ((*>))
 
-import Language.Docopt.Value (Value(..), prettyPrintValue)
 import Language.Docopt.Option as O
 import Language.Docopt.Env as Env
 import Language.Docopt.Env (Env())

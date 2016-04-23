@@ -9,31 +9,20 @@
 module Docopt.FFI (run) where
 
 import Prelude
-import Debug.Trace
-import Data.Function
-import Docopt as Docopt
-import Data.Foreign
-import Data.Tuple (Tuple(..))
-import Data.Maybe (Maybe(..), maybe)
-import Data.Foreign.Class (IsForeign)
-import Data.Either (Either(..))
-import Data.Bifunctor (rmap)
+import Data.Function (Fn2, mkFn2)
+import Data.Maybe (Maybe(Nothing))
 import Control.Monad.Eff (Eff())
-import Data.Either (Either(), either)
+import Data.Either (Either(..), either)
 import Data.StrMap (StrMap())
 import Control.Bind ((=<<))
-import Control.Alt (alt, (<|>))
-import Data.Foreign       as F
-import Data.Foreign.Index as F
-import Data.Foreign.Class as F
-import Data.Foreign (Foreign(), F())
-
+import Control.Alt (alt)
+import Data.Foreign (readArray, typeOf) as F
+import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign)
+import Data.Foreign.Class (readProp) as F
 import Unsafe.Coerce (unsafeCoerce)
-import Control.Monad.Eff.Exception (throwException, error)
-import Control.Monad.Eff.Console as Console
+
+import Docopt as Docopt
 import Language.Docopt.Value (Value(..))
-import Node.Process as Process
-import Text.Wrap (dedent)
 
 type RawValue = Unit
 

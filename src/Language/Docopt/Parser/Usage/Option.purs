@@ -9,11 +9,10 @@ module Language.Docopt.Parser.Usage.Option (
   ) where
 
 import Prelude
-import Data.Maybe (Maybe(..), maybe, fromMaybe, isNothing, isJust)
+import Data.Maybe (Maybe(..), maybe, fromMaybe, isNothing)
 import Data.String (fromChar)
 import Data.Foldable (intercalate)
-import Data.List (List(..), toList)
-import Data.Generic
+import Data.List (toList)
 
 type Argument = { name     :: String
                 , optional :: Boolean }
