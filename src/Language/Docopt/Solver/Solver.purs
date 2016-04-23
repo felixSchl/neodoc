@@ -34,7 +34,11 @@ data Slurp a
   = Slurp (List a)
   | Keep  (List a)
 
-runSlurp :: Slurp Argument -> List Argument
+data Node
+  = Resolved   Argument
+  | Unresolved U.Argument
+
+runSlurp :: forall a. Slurp a -> List a
 runSlurp (Slurp xs) = xs
 runSlurp (Keep  xs) = xs
 
@@ -47,62 +51,45 @@ solveBranch :: U.Branch                 -- ^ the usage branch
 solveBranch as ds = Branch <$> go as
   where
     go :: U.Branch -> Either SolveError (List Argument)
-    go Nil = return Nil
-    go (Cons x Nil) = do runSlurp <$> do solveArgs x Nothing
-    go (Cons x (Cons y xs)) = do
-      m <- solveArgs x (Just y)
+    go us = do
+      xs <- solveArgs us
+      return Nil
+
+    solveArgs :: U.Branch -> Either SolveError (List Node)
+    solveArgs Nil = return Nil
+    solveArgs (Cons x Nil) = do
+      m <- solveArg x Nothing
+      return $ runSlurp m
+    solveArgs (Cons x (Cons y xs)) = do
+      m <- solveArg x (Just y)
       case m of
-        Keep  zs -> (zs ++ _) <$> go (y:xs)
-        Slurp zs -> (zs ++ _) <$> go xs
+        Keep  zs -> (zs ++ _) <$> solveArgs (y:xs)
+        Slurp zs -> (zs ++ _) <$> solveArgs xs
+
+    simpleResolve v = Keep <<< singleton <$> return (Resolved v)
 
     -- | Solve two adjacent arguments.
     -- | Should the first argument be an option with an argument that
     -- | matches an adjacent command or positional, consume the adjacent
     -- | argument from the input (consume).
-    solveArgs :: U.Argument
+    solveArg :: U.Argument
               -> Maybe U.Argument
-              -> Either SolveError (Slurp Argument)
+              -> Either SolveError (Slurp Node)
 
-    solveArgs (U.EOA) _ = Keep <<< singleton <$> return (EOA)
-    solveArgs (U.Stdin) _ = Keep <<< singleton <$> return (Stdin)
-    solveArgs (U.Command s r) _ = Keep <<< singleton <$> return (Command s r)
-    solveArgs (U.Positional s r) _ = Keep <<< singleton <$> return (Positional s r)
+    solveArg (U.EOA) _ = simpleResolve EOA
+    solveArg (U.Stdin) _ = simpleResolve Stdin
+    solveArg (U.Command s r) _ = simpleResolve $ Command s r
+    solveArg (U.Positional s r) _ = simpleResolve $ Positional s r
 
-    solveArgs (U.Group o bs r) _
-      = Keep <<< singleton <$> do
+    solveArg (U.Group o bs r) _
+      = Keep <<< singleton <<< Resolved <$> do
         flip (Group o) r <$> do
           flip solveBranch ds `traverse` bs
 
-    -- | Resolve the reference by expanding into real
-    -- | options, as derived from the descriptions.
-    -- |
-    -- | XXX: Currently `r` is unused as all descriptions are in a flat list.
-    -- |      once option descriptions are keyed, `r` can be used as the lookup
-    -- |      into the map of `key => [Description]`
-    solveArgs (U.Reference r) _ = do
-      return $ Keep (catMaybes $ convert <$> ds)
+    solveArg r@(U.Reference _) _ = do
+      return $ Keep $ singleton $ Unresolved r
 
-      where
-        -- | Expand `[options]` into optional groups.
-        convert (DE.OptionDesc (DE.Option y)) =
-          return
-            $ Group
-                true
-                (singleton $ Branch $ singleton $ Option $
-                  (O.Option { flag:       DE.getFlag y.name
-                            , name:       DE.getName y.name
-                            , arg:        convertDescArg y.arg
-                            , env:        y.env
-                            , repeatable: false
-                            }))
-                y.repeatable
-          where
-            convertDescArg (Just (DE.Argument arg)) = return $ O.Argument arg
-            convertDescArg _ = Nothing
-
-        convert _ = Nothing
-
-    solveArgs (lopt@(U.Option (opt@(UO.LOpt o)))) adjArg = do
+    solveArg (lopt@(U.Option (opt@(UO.LOpt o)))) adjArg = do
 
       -- Find a matching option description, if any.
       match <- O.runOption <$> matchDesc o.name
@@ -114,7 +101,11 @@ solveBranch as ds = Branch <$> go as
           -- Note: There is no check to see if an explicit argument is
           --       the same as specified in the option descriptions for
           --       convenience to the user.
-          return $ Keep (singleton $ Option $ O.Option match)
+          return
+            $ Keep
+              $ singleton
+                $ Resolved
+                  $ Option $ O.Option match
 
         Nothing -> do
           -- Look ahead if any of the following arguments should be slurped.
@@ -134,13 +125,18 @@ solveBranch as ds = Branch <$> go as
                         ++ " --" ++ o.name
 
           case mr of
-            Nothing -> do
-              return $ Keep (singleton $ Option $ O.Option match)
+            Nothing -> return
+              $ Keep
+                $ singleton
+                  $ Resolved
+                    $ Option $ O.Option match
             Just er -> do
               r <- er
-              return $ Slurp (singleton $ Option $ O.Option $ match {
-                                repeatable = r
-                              })
+              return
+                $ Slurp
+                  $ singleton
+                    $ Resolved
+                      $ Option $ O.Option $ match { repeatable = r }
 
       where
         guardArgs :: String -> String -> Either SolveError Boolean
@@ -176,8 +172,8 @@ solveBranch as ds = Branch <$> go as
             isMatch _ = false
 
 
-    solveArgs (U.OptionStack (opt@(UO.SOpt o))) adj = fromSubsumption
-                                                  <|> fromAdjacentArgOrDefault
+    solveArg (U.OptionStack (opt@(UO.SOpt o))) adj
+      = fromSubsumption <|> fromAdjacentArgOrDefault
 
       where
         -- | Subsumption method:
@@ -200,7 +196,7 @@ solveBranch as ds = Branch <$> go as
         -- | However, this solve is simpler as the option is proven
         -- | not to accept an argument at all.
 
-        fromSubsumption :: Either SolveError (Slurp Argument)
+        fromSubsumption :: Either SolveError (Slurp Node)
         fromSubsumption = do
 
           -- XXX: Well, this error should not be thrown, but rather,
@@ -220,7 +216,7 @@ solveBranch as ds = Branch <$> go as
                 (head $ catMaybes $ subsume fs <$> ds)
 
           where
-            subsume :: String -> Desc -> Maybe (Slurp Argument)
+            subsume :: String -> Desc -> Maybe (Slurp Node)
             subsume fs (DE.OptionDesc (DE.Option d)) = do
               f <- DE.getFlag d.name
               a <- DE.runArgument <$> d.arg
@@ -252,7 +248,8 @@ solveBranch as ds = Branch <$> go as
                            (matchDesc false `traverse` fs)
 
               return $ Keep
-                     $ (Option <$> toList cs) ++ (singleton $ Option o)
+                     $ (Resolved <<< Option <$> toList cs)
+                        ++ (singleton $ Resolved $ Option o)
 
 
             subsume _ _ = Nothing
@@ -278,7 +275,7 @@ solveBranch as ds = Branch <$> go as
         -- | However, this solve is simpler as the option is proven
         -- | not to accept an argument at all.
 
-        fromAdjacentArgOrDefault :: Either SolveError (Slurp Argument)
+        fromAdjacentArgOrDefault :: Either SolveError (Slurp Node)
         fromAdjacentArgOrDefault = do
 
           -- (flag, ...flags) -> (...flags, flag)
@@ -302,8 +299,8 @@ solveBranch as ds = Branch <$> go as
               --       the same as specified in the option descriptions for
               --       convenience to the user.
               return $ Keep
-                    $ (toList matches)
-                      ++ (singleton $ Option $ O.Option match)
+                    $ (Resolved <$> toList matches)
+                      ++ (singleton $ Resolved $ Option $ O.Option match)
 
             Nothing ->
               -- Look ahead if any of the following arguments should be slurped.
@@ -325,13 +322,17 @@ solveBranch as ds = Branch <$> go as
                in case mr of
                 Nothing -> do
                   return $ Keep
-                    $ (toList matches) ++ (singleton $ Option $ O.Option match)
+                    $ (Resolved <$> toList matches)
+                      ++ (singleton
+                          $ Resolved
+                            $ Option $ O.Option match)
                 Just er -> do
                   r <- er
                   return $ Slurp
-                    $ (toList matches) ++ (singleton $ Option $ O.Option match {
-                        repeatable = r
-                      })
+                    $ (Resolved <$> toList matches)
+                      ++ (singleton
+                          $ Resolved
+                            $ Option $ O.Option match { repeatable = r })
 
         guardArgs :: String -> String -> Either SolveError Boolean
         guardArgs n n' | n ^= n' = return true
