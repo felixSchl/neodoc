@@ -10,17 +10,14 @@ module Language.Docopt.Value (
 
 import Prelude
 import Unsafe.Coerce (unsafeCoerce)
-import Debug.Trace
-import Data.Generic
+import Data.Generic (class Generic)
 import Data.Either (Either(), either)
-import Data.Int as Int
 import Data.List (List(..), fromList, many, some)
-import Data.Maybe (fromMaybe)
-import Control.Apply ((*>), (<*))
+import Control.Apply ((*>))
 import Control.Alt ((<|>))
-import Text.Parsing.Parser             as P
-import Text.Parsing.Parser.Combinators as P
-import Text.Parsing.Parser.String      as P
+import Text.Parsing.Parser (ParseError, runParser, fail) as P
+import Text.Parsing.Parser.Combinators (between, choice, try, sepBy1) as P
+import Text.Parsing.Parser.String (noneOf, char, string) as P
 import Data.Array as A
 import Data.String (fromCharArray)
 import Data.String as Str

@@ -1,39 +1,29 @@
 module Language.Docopt.Parser.Desc where
 
 import Prelude
-import Debug.Trace
-import Data.Functor (($>), (<$))
-import Control.Lazy (defer)
+import Data.Functor (($>))
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
-import Control.Monad.State (get)
 import Control.MonadPlus (guard)
-import Control.Monad.Trans (lift)
-import Data.List (List(..), some, (:), toList, length, fromList
-                 , singleton, many, head, catMaybes, filter)
-import Text.Parsing.Parser as P
-import Text.Parsing.Parser.Combinators as P
-import Text.Parsing.Parser.Pos as P
-import Text.Parsing.Parser.String as P
-import Data.Foldable (intercalate)
+import Data.List (List, (:), many, head, length, filter)
+import Text.Parsing.Parser (ParseError, fail) as P
+import Text.Parsing.Parser.Combinators ((<?>), try, choice, lookAhead, manyTill,
+                                        option, optionMaybe, notFollowedBy) as P
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), maybe, maybe', isJust)
-import Data.Generic
-import Data.String (toLower, fromChar, fromCharArray)
+import Data.Maybe (Maybe(Nothing, Just), isJust, maybe)
+import Data.Generic (class Generic, gEq, gShow)
+import Data.String (fromChar)
 import Data.Array as A
-import Data.String as Str
 import Data.String.Ext ((^=))
 
-import Language.Docopt.Value hiding (parse, read)
-import Language.Docopt.Parser.Base
-import Language.Docopt.Parser.Common
-import Language.Docopt.Parser.State
+import Language.Docopt.Value (Value, prettyPrintValue)
+import Language.Docopt.Parser.Common (sameIndent, markIndent, sameLine, markLine)
 import Language.Docopt.Parser.Lexer (lexDescs)
 import Language.Docopt.Parser.Lexer as L
 import Language.Docopt.Value as Value
 
 data Desc = OptionDesc Option
-          | CommandDesc
+          | CommandDesc -- XXX: Can be removed now?
 
 data Name = Flag Char | Long String | Full Char String
 
@@ -123,6 +113,7 @@ instance eqDesc :: Eq Desc
 
 prettyPrintDesc :: Desc -> String
 prettyPrintDesc (OptionDesc opt) = "Option " ++ prettyPrintOption opt
+prettyPrintDesc (CommandDesc) = "Command"
 
 prettyPrintOption :: Option -> String
 prettyPrintOption (Option opt)
@@ -319,7 +310,6 @@ descParser =
                 , env:        Nothing -- No need to keep at this stage
                 , repeatable: x.repeatable || y.repeatable
                 }
-
               where
                 combineArg (Just (Argument a)) (Just (Argument a'))
                   | (a.name ^= a'.name) = return $ Just
@@ -327,12 +317,13 @@ descParser =
                                  , optional: a.optional || a'.optional
                                  , default:  a.default <|> a'.default
                                  }
-                combineArg Nothing  (Just b)            = return (pure b)
-                combineArg (Just a) Nothing             = return (pure a)
-                combineArg Nothing Nothing              = return Nothing
-                combineArg (Just a) (Just b) | (a /= b) = Left $
+                combineArg Nothing  (Just b) = return (pure b)
+                combineArg (Just a) Nothing  = return (pure a)
+                combineArg Nothing Nothing   = return Nothing
+                combineArg (Just a) (Just b) = Left $
                         "Arguments mismatch: " ++ (show $ prettyPrintArgument a)
                                     ++ " and " ++ (show $ prettyPrintArgument b)
+            combine _ _ = P.fail "Invalid case - expected flag and long option"
 
     sopt :: L.TokenParser { flag :: Char, arg :: Maybe { name :: String
                                                        , optional :: Boolean

@@ -1,43 +1,40 @@
 module Language.Docopt.Parser.Lexer where
 
-import Debug.Trace
 import Prelude
-import Control.Apply ((*>), (<*))
-import Control.Alt ((<|>))
-import Control.Plus (empty)
-import Control.Monad.State (State(), evalState, get)
-import Control.Monad.Trans
-import Data.Foldable (foldl)
-import Data.String as Str
-import Text.Parsing.Parser as P
-import Text.Parsing.Parser.Combinators as P
-import Text.Parsing.Parser.Token as P
-import Text.Parsing.Parser.Pos as P
-import Text.Parsing.Parser.String as P
-import Data.List as L
 import Data.Array as A
-import Data.Char (toString, toLower, toUpper)
-import Data.String (fromCharArray, fromChar, trim)
-import Data.List (List(..), (:), fromList, many)
+import Data.List as L
+import Control.Alt ((<|>))
+import Control.Apply ((*>), (<*))
+import Control.Monad.State (State, evalState)
+import Control.Monad.State.Trans (StateT())
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), maybe, fromMaybe, isNothing)
+import Data.Identity (Identity())
+import Data.List (List(..), many, fromList)
+import Data.Maybe (Maybe(..), fromMaybe, isNothing)
+import Data.String (fromCharArray, trim)
 import Data.String.Ext ((^=))
-import Language.Docopt.Parser.Base
-import Language.Docopt.Parser.State
-import Data.Tuple
-import Data.Int
-import Data.Int as I
-import Global (isNaN, readFloat)
+import Language.Docopt.Parser.Base (lowerAlphaNum, alphaNum, alpha, space,
+                                   lowerAlpha, regex, upperAlpha, string',
+                                   getPosition, getInput)
+import Language.Docopt.Parser.State (ParserState)
+import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..),
+                            runParserT, parseFailed, fail, runParser) as P
+import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
+                                        lookAhead, optional, between, manyTill
+                                        ) as P
+import Text.Parsing.Parser.Pos (Position, initialPos) as P
+import Text.Parsing.Parser.String (skipSpaces, anyChar, string, char, oneOf,
+                                  whiteSpace, eof, noneOf, satisfy) as P
 
 data Mode = Usage | Descriptions
 
 isDescMode :: Mode -> Boolean
 isDescMode Descriptions = true
-isDescMode _ = false
+isDescMode _            = false
 
 isUsageMode :: Mode -> Boolean
 isUsageMode Usage = true
-isUsageMode _ = false
+isUsageMode _     = false
 
 lex :: Mode -> String -> Either P.ParseError (List PositionedToken)
 lex m = flip P.runParser (parseTokens m)
@@ -170,21 +167,21 @@ parseToken m = P.choice (P.try <$> A.concat [
     [ P.char   '('   *> pure LParen
     , P.char   ')'   *> pure RParen
     ]
-  , if isDescMode m then [ tag ] else []
-  , [ reference
+  , if isDescMode m then [ _tag ] else []
+  , [ _reference
     , P.char   '['   *> pure LSquare
     , P.char   ']'   *> pure RSquare
     , P.char   '|'   *> pure VBar
     , P.char   ':'   *> pure Colon
     , P.char   ','   *> pure Comma
-    , longOption
-    , shortOption
-    , AngleName <$> angleName
+    , _longOption
+    , _shortOption
+    , AngleName <$> _angleName
     , P.string "--"  *> pure DoubleDash
     , P.char   '-'   *> pure Dash
     , P.string "..." *> pure TripleDot
-    , ShoutName <$> shoutName
-    , Name      <$> name
+    , ShoutName <$> _shoutName
+    , Name      <$> _name
     ]
   , if isDescMode m
         then [ Garbage <$> P.anyChar ]
@@ -199,8 +196,8 @@ parseToken m = P.choice (P.try <$> A.concat [
     P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     pure unit
 
-  reference :: P.Parser String Token
-  reference = Reference <$> do
+  _reference :: P.Parser String Token
+  _reference = Reference <$> do
     P.between (P.char '[') (P.char ']') go
 
     where
@@ -219,8 +216,8 @@ parseToken m = P.choice (P.try <$> A.concat [
         string' "options"
         P.optional $ P.string "..."
 
-  tag :: P.Parser String Token
-  tag = P.between (P.char '[')
+  _tag :: P.Parser String Token
+  _tag = P.between (P.char '[')
                   (P.char ']')
                   (withValue <|> withoutValue)
 
@@ -237,8 +234,8 @@ parseToken m = P.choice (P.try <$> A.concat [
         k <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
         return (Tag k Nothing)
 
-  shoutName :: P.Parser String String
-  shoutName = do
+  _shoutName :: P.Parser String String
+  _shoutName = do
     n <- fromCharArray <$> do
       A.cons
         <$> upperAlpha
@@ -246,8 +243,8 @@ parseToken m = P.choice (P.try <$> A.concat [
     P.notFollowedBy lowerAlpha
     return n
 
-  name :: P.Parser String String
-  name = do
+  _name :: P.Parser String String
+  _name = do
     n  <- alphaNum
     ns <- do
       A.many $ P.try $ do
@@ -258,8 +255,8 @@ parseToken m = P.choice (P.try <$> A.concat [
       ]
     return $ fromCharArray (n A.: ns)
 
-  angleName :: P.Parser String String
-  angleName = do
+  _angleName :: P.Parser String String
+  _angleName = do
     P.char '<'
     n <- fromCharArray <$> do
       A.some $ P.choice [
@@ -271,8 +268,8 @@ parseToken m = P.choice (P.try <$> A.concat [
     P.char '>'
     return n
 
-  shortOption :: P.Parser String Token
-  shortOption = do
+  _shortOption :: P.Parser String Token
+  _shortOption = do
     P.char '-'
     x  <- alphaNum
     xs <- A.many alphaNum
@@ -283,7 +280,7 @@ parseToken m = P.choice (P.try <$> A.concat [
       Just <$> do
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
-        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         return { name:     n
                , optional: false
                }
@@ -293,7 +290,7 @@ parseToken m = P.choice (P.try <$> A.concat [
         P.char '[' <* many space
         -- XXX: Drop the spaces?
         P.optional (many space *> P.char '=' <* many space)
-        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         many space *> P.char ']' <* many space
         return { name:     n
                , optional: true
@@ -304,7 +301,7 @@ parseToken m = P.choice (P.try <$> A.concat [
         -- XXX: Drop the spaces?
         many space *> P.char '[' <* many space
         many space *> P.char '=' <* many space
-        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         many space *> P.char ']' <* many space
         return { name:     n
                , optional: true
@@ -312,7 +309,7 @@ parseToken m = P.choice (P.try <$> A.concat [
 
       -- Case 4: Option<ARG>
     , Just <$> do
-        n <- angleName
+        n <- _angleName
         return { name:     n
                , optional: false
                }
@@ -333,8 +330,8 @@ parseToken m = P.choice (P.try <$> A.concat [
 
     return $ SOpt x xs arg
 
-  longOption :: P.Parser String Token
-  longOption = do
+  _longOption :: P.Parser String Token
+  _longOption = do
     P.string "--"
 
     name' <- fromCharArray <$> do
@@ -351,7 +348,7 @@ parseToken m = P.choice (P.try <$> A.concat [
       Just <$> do
         -- XXX: Drop the spaces?
         many space *> P.char '=' <* many space
-        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         return { name:     n
                , optional: false
                }
@@ -361,7 +358,7 @@ parseToken m = P.choice (P.try <$> A.concat [
         P.char '[' <* many space
         -- XXX: Drop the spaces?
         P.optional (many space *> P.char '=' <* many space)
-        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         many space *> P.char ']' <* many space
         return { name:     n
                , optional: true
@@ -372,7 +369,7 @@ parseToken m = P.choice (P.try <$> A.concat [
         P.char '[' <* many space
         -- XXX: Drop the spaces?
         P.optional (many space *> P.char '=' <* many space)
-        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         many space *> P.char ']' <* many space
         return { name:     n
                , optional: true
@@ -383,7 +380,7 @@ parseToken m = P.choice (P.try <$> A.concat [
         -- XXX: Drop the spaces?
         many space *> P.char '[' <* many space
         many space *> P.char '=' <* many space
-        n <- P.choice $ P.try <$> [ angleName, shoutName, name ]
+        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         many space *> P.char ']' <* many space
         return { name:     n
                , optional: true
@@ -438,10 +435,13 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     _ -> P.parseFailed toks pos "expected token, met EOF"
 
 -- | Match the token at the head of the stream
-match :: forall a. Token -> TokenParser Unit
+match :: Token -> TokenParser Unit
 match tok = token (\tok' -> if (tok' == tok) then Just unit else Nothing)
-            P.<?> prettyPrintToken tok
+              P.<?> prettyPrintToken tok
 
+anyToken :: P.ParserT (List PositionedToken)
+                      (StateT { indentation :: Int , line :: Int } Identity )
+                      Token
 anyToken = token $ Just
 
 eof :: TokenParser Unit

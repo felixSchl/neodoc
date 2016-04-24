@@ -2,7 +2,7 @@ module Test.Main where
 
 import Prelude
 
-import Control.Monad.Aff (Aff(), launchAff)
+import Control.Monad.Aff (launchAff)
 import Test.Spec.Runner (run)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.ScannerSpec (scannerSpec)
@@ -18,13 +18,8 @@ import Node.FS (FS())
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Eff.Console (CONSOLE)
 import Node.Process (PROCESS)
-import Node.Process as Process
-import Control.Bind((=<<))
 import Test.Assert (ASSERT)
 
-import Debug.Trace
-import Node.Encoding (Encoding(..))
-import Node.FS.Aff (readTextFile)
 
 main :: Eff ( err     :: EXCEPTION
             , process :: PROCESS

@@ -14,38 +14,23 @@ module Docopt (
   ) where
 
 import Prelude
-import Debug.Trace
-import Control.Monad.Aff (Aff(), launchAff, liftEff')
+import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
-import Data.Either (Either(..), either)
-import Node.Path (FilePath())
+import Data.Either (either)
 import Control.Monad.Eff (Eff())
-import Node.FS.Aff (readTextFile)
-import Data.String (fromCharArray)
-import Data.List (fromList)
 import Data.Maybe (Maybe(..), maybe)
 import Node.FS (FS())
 import Node.Process (PROCESS())
 import Node.Process as Process
 import Control.Monad.Eff.Class (liftEff)
-import Control.Alt ((<|>))
-import Control.Apply ((*>))
-import Control.Monad.Eff.Console (log, CONSOLE)
+import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Console as Console
 import Text.Wrap (dedent)
-import Data.Map (Map())
 import Data.StrMap (StrMap())
-import Data.StrMap as StrMap
-import Data.Array (drop)
 import Data.Array as A
 import Data.Bifunctor (lmap)
-import Data.Foldable (intercalate)
 import Data.List.WordsLines (lines, unlines)
 
-import Text.Parsing.Parser             as P
-import Text.Parsing.Parser.Combinators as P
-import Text.Parsing.Parser.Pos         as P
-import Text.Parsing.Parser.String      as P
 
 import Language.Docopt (parseDocopt, applyDocopt)
 import Language.Docopt as D
@@ -93,11 +78,10 @@ run :: forall e
 run d o = do
   argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
   env  <- maybe Process.getEnv              (return <<< id) o.env
-
   either onError return
          do
           { specification, usage } <- parseDocopt d
-          lmap ((help usage) ++) do
+          lmap ((help usage) ++ _) do
             applyDocopt specification env argv o.optionsFirst
 
   where
@@ -111,5 +95,5 @@ run d o = do
 
     help usage
       = "Usage:\n"
-          ++ (unlines $ ("  " ++) <$> lines (dedent usage))
+          ++ (unlines $ ("  " ++ _) <$> lines (dedent usage))
           ++ "\n"

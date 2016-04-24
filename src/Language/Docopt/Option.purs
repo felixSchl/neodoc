@@ -22,12 +22,11 @@ module Language.Docopt.Option (
   , soptE', soptE, soptE_, soptER, soptER_
   ) where
 
-import Prelude
-import Data.Maybe (Maybe(..), maybe, isJust)
+import Prelude (class Eq, class Show, pure, (++), flip, const)
+import Data.Maybe (Maybe(..), maybe)
 import Data.String (fromChar)
 import Control.Apply ((*>))
-import qualified Data.String as Str
-import Data.Generic
+import Data.Generic (class Generic, gEq, gShow)
 
 import Language.Docopt.Value (Value(..), prettyPrintValue)
 
@@ -47,7 +46,6 @@ runArgument :: Argument -> { name     :: String
                            , optional :: Boolean
                            }
 runArgument (Argument a) = a
-
 
 newtype Option = Option {
   flag       :: Maybe Flag
@@ -97,12 +95,12 @@ isRepeatable :: Option -> Boolean
 isRepeatable (Option o) = o.repeatable
 
 hasDefault :: Option -> Boolean
-hasDefault (Option { arg: Just (Argument a) }) = isJust a.default
-hasDefault _                                   = false
+hasDefault (Option { arg: Just (Argument { default: Just _ }) }) = true
+hasDefault _                                                     = false
 
 takesArgument :: Option -> Boolean
-takesArgument (Option { arg: a }) = isJust a
-takesArgument _                   = false
+takesArgument (Option { arg: Just _ }) = true
+takesArgument _                        = false
 
 isFlag :: Option -> Boolean
 isFlag (Option { arg: Just (Argument { default: Just (BoolValue _)})}) = true
@@ -113,11 +111,11 @@ prettyPrintOption :: Option -> String
 prettyPrintOption (Option o)
   = short ++ long ++ arg' ++ rep ++ default ++ env
   where
-    short   = maybe "" (\f -> "-" ++ (fromChar f)) o.flag
-    long    = maybe "" (const ", ") (o.flag *> o.name)
-              ++ maybe "" ("--" ++) o.name
-    rep     = if o.repeatable then "..." else ""
-    arg'    = flip (maybe "") o.arg \(Argument { name, optional }) ->
+    short = maybe "" (\f -> "-" ++ (fromChar f)) o.flag
+    long  = maybe "" (const ", ") (o.flag *> o.name)
+              ++ maybe "" ("--" ++ _) o.name
+    rep  = if o.repeatable then "..." else ""
+    arg' = flip (maybe "") o.arg \(Argument { name, optional }) ->
                 (if optional then "[" else "")
                   ++ "=" ++ name
                   ++ (if optional then "]" else "")
@@ -130,11 +128,11 @@ prettyPrintOptionNaked :: Option -> String
 prettyPrintOptionNaked (Option o)
   = short ++ long ++ arg' ++ rep
   where
-    short   = maybe "" (\f -> "-" ++ (fromChar f)) o.flag
-    long    = maybe "" (const "|") (o.flag *> o.name)
-              ++ maybe "" ("--" ++) o.name
-    rep     = if o.repeatable then "..." else ""
-    arg'    = flip (maybe "") o.arg \(Argument { name }) -> "="  ++ name
+    short = maybe "" (\f -> "-" ++ (fromChar f)) o.flag
+    long  = maybe "" (const "|") (o.flag *> o.name)
+              ++ maybe "" ("--" ++ _) o.name
+    rep  = if o.repeatable then "..." else ""
+    arg' = flip (maybe "") o.arg \(Argument { name }) -> "="  ++ name
 
 --------------------------------------------------------------------------------
 -- Short hand option creation

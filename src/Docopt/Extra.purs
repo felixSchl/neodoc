@@ -6,7 +6,7 @@ import Prelude
 import Node.FS.Aff (readTextFile)
 import Control.Monad.Aff (Aff())
 import Data.List (fromList)
-import Data.Either (Either(..), either)
+import Data.Either (either)
 import Data.String (fromCharArray)
 import Node.Path (FilePath())
 import Node.FS (FS())
@@ -16,10 +16,9 @@ import Node.Encoding (Encoding(..))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Eff.Exception (error)
 
-import Text.Parsing.Parser             as P
-import Text.Parsing.Parser.Combinators as P
-import Text.Parsing.Parser.Pos         as P
-import Text.Parsing.Parser.String      as P
+import Text.Parsing.Parser (Parser, runParser) as P
+import Text.Parsing.Parser.Combinators (manyTill) as P
+import Text.Parsing.Parser.String (string, char, anyChar) as P
 
 fromREADME :: forall e
             . FilePath

@@ -1,28 +1,20 @@
 module Test.Spec.DescParserSpec (descParserSpec) where
 
 import Prelude
-import Control.Monad.Eff (Eff())
-import Control.Monad.Eff.Exception (EXCEPTION())
-import Debug.Trace
-import Data.List (fromList)
-import Data.Either (Either(..), either)
+import Language.Docopt.Parser.Desc as Desc
+import Language.Docopt.Parser.Lexer as Lexer
+import Text.Parsing.Parser as P
 import Control.Bind ((=<<))
-import Data.Maybe (Maybe(..))
-import Data.Foldable (intercalate, for_)
 import Control.Monad.Eff.Exception (error, throwException)
-import qualified Text.Parsing.Parser as P
-
-import Language.Docopt
-import qualified Language.Docopt.Parser.Desc as Desc
-import qualified Language.Docopt.Parser.Lexer as Lexer
-import Language.Docopt.Parser.Base (debug)
-import Text.Wrap (dedent)
-
-import Test.Assert (assert)
+import Control.Monad.State.Trans (StateT(StateT))
+import Data.Either (Either(..), either)
+import Data.Foldable (intercalate, for_)
+import Data.List (fromList)
+import Data.Maybe (Maybe(..))
+import Language.Docopt (Value(..))
 import Test.Spec (describe, it)
-import Test.Spec.Reporter.Console (consoleReporter)
-import Test.Assert.Simple
 import Test.Support (vliftEff)
+import Text.Wrap (dedent)
 
 newtype TestCase = TestCase { input :: String
                             , output :: Either String (Array Desc.Desc) }

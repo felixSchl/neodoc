@@ -791,34 +791,33 @@ r"""usage: prog go..."""
 $ prog go go go go go
 {"go": 5}
 
-
+#
 # [options] does not include options from usage-pattern
 #
-# XXX: These tests do not pass yet. Not sure how to resolve.
-#
-# TODO: Make this pass
-#
-# r"""usage: prog [options] [-a]
-#
-# options: -a
-#          -b
-# """
-# $ prog -a
-# {"-a": true, "-b": false}
-#
-# $ prog -aa
-# "user-error"
-# 
+
+r"""usage: prog [options] [-a]
+
+options: -a
+         -b
+"""
+
+$ prog -a
+{"-a": true, "-b": false}
+
+$ prog -aa
+"user-error"
+
 #
 # Test [options] shourtcut
 #
-#
+
 r"""Usage: prog [options] A
 Options:
     -q  Be quiet
     -v  Be verbose.
 
 """
+
 $ prog arg
 {"-q": false, "-v": false, "<a>": "arg", "A": "arg"}
 
@@ -1959,3 +1958,63 @@ $ prog -v
 
 $ prog -vv
 {"-v": 2, "--verbose": 2}
+
+#
+# Issue #7 - De-dupe [options] upon inlining
+#
+
+r"""
+Usage: foo -h [options]
+Options: -h
+"""
+
+$ prog
+{"-h": false}
+
+$ prog -h
+{"-h": true}
+
+$ prog -h -h
+"user-error"
+
+r"""
+Usage: foo -h [options] -h
+Options: -h
+"""
+
+$ prog
+{"-h": 0}
+
+$ prog -h
+{"-h": 1}
+
+$ prog -h -h
+{"-h": 2}
+
+r"""
+Usage: foo --input [options]
+Options: --input
+"""
+
+$ prog
+{"--input": false}
+
+$ prog --input
+{"--input": true}
+
+$ prog --input --input
+"user-error"
+
+r"""
+Usage: foo --input [options]
+Options: -i, --input
+"""
+
+$ prog
+{"-i": false, "--input": false}
+
+$ prog -i
+{"-i": true, "--input": true}
+
+$ prog -i -i
+"user-error"

@@ -1,20 +1,23 @@
 module Data.String.Ext (
     (^=), (^/=)
+  , upperCaseEq
+  , notUpperCaseEq
   , endsWith
   , startsWith
   ) where
 
 import Prelude
-import Debug.Trace
 import Data.Maybe (maybe)
 import Data.String as Str
-import Data.Function
+import Data.Function (on)
 
-(^=) :: String -> String -> Boolean
-(^=) = eq `on` Str.toUpper
+upperCaseEq :: String -> String -> Boolean
+upperCaseEq = eq `on` Str.toUpper
+infixl 9 upperCaseEq as ^=
 
-(^/=) :: String -> String -> Boolean
-(^/=) a b = not (a ^= b)
+notUpperCaseEq :: String -> String -> Boolean
+notUpperCaseEq a b = not (a ^= b)
+infixl 9 notUpperCaseEq as ^/=
 
 startsWith :: String -> String -> Boolean
 startsWith needle haystack = maybe false id do

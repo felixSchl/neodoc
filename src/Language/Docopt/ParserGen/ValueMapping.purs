@@ -3,8 +3,7 @@ module Language.Docopt.ParserGen.ValueMapping (
   ) where
 
 import Data.Tuple (Tuple())
-import qualified Language.Docopt.Errors   as D
-import qualified Language.Docopt.Value    as D
-import qualified Language.Docopt.Argument as D
+import Language.Docopt.Value (Value)
+import Language.Docopt.Argument (Argument)
 
-type ValueMapping = Tuple D.Argument D.Value
+type ValueMapping = Tuple Argument Value

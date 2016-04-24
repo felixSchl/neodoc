@@ -7,9 +7,9 @@ module Language.Docopt.Usage (
 
 import Prelude
 import Data.List (List(..))
-import Data.Monoid (Monoid)
+import Data.Monoid (class Monoid)
 import Data.Foldable (intercalate)
-import Language.Docopt.Argument
+import Language.Docopt.Argument (Branch, prettyPrintBranch)
 
 type Program = List Usage
 newtype Usage = Usage (List Branch)

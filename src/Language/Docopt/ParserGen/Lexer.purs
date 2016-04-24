@@ -9,25 +9,21 @@ module Language.Docopt.ParserGen.Lexer (
   lex
   ) where
 
-import Prelude
-import Debug.Trace
-import Data.List (List(..))
-import Data.Either (Either(..))
+import Prelude ((++), return, ($), (+), bind, (<$>), (<<<), pure)
+import Data.Either (Either())
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
 import Data.String (fromCharArray)
-import Data.List (List(..), foldM, many, singleton)
-import qualified Text.Parsing.Parser             as P
-import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Pos         as P
-import qualified Text.Parsing.Parser.String      as P
-import qualified Data.Array as A
+import Data.List (List(..), singleton, many)
+import Text.Parsing.Parser (ParseError, Parser, runParser) as P
+import Text.Parsing.Parser.Combinators (try, choice, optional) as P
+import Text.Parsing.Parser.Pos (Position(Position)) as P
+import Text.Parsing.Parser.String (eof, anyChar, char, noneOf, string) as P
+import Data.Array as A
 import Control.Plus (empty)
-import Control.Bind ((=<<))
-import Language.Docopt.ParserGen.Token
-import Language.Docopt.Parser.Base
-import qualified Language.Docopt.Errors as D
-import qualified Language.Docopt.Value  as D
+import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..))
+import Language.Docopt.Parser.Base (space, alphaNum)
+import Language.Docopt.Value (Value(..)) as D
 
 -- | Parse a single token from the ARGV stream.
 -- | Because each item on the ARGV stream is a a string itself, apply a parser

@@ -3,6 +3,7 @@ module Language.Docopt.Parser.Usage.Argument (
   , IsRepeatable ()
   , IsOptional ()
   , Branch ()
+  , isFree
   , prettyPrintArg
   , prettyPrintBranch
   , sopt, sopt_, soptR, soptR_
@@ -16,10 +17,9 @@ module Language.Docopt.Parser.Usage.Argument (
   ) where
 
 import Prelude
-import Data.Maybe (Maybe(..))
-import Data.List (List(..))
-import Data.Foldable (intercalate)
-import qualified Language.Docopt.Parser.Usage.Option as O
+import Data.List (List())
+import Data.Foldable (intercalate, all)
+import Language.Docopt.Parser.Usage.Option as O
 
 type IsRepeatable = Boolean
 type IsOptional = Boolean
@@ -33,6 +33,11 @@ data Argument
   | EOA
   | Stdin
   | Reference String
+
+isFree :: Argument -> Boolean
+isFree (Option _)     = true
+isFree (Group _ bs _) = all (all isFree) bs
+isFree _              = false
 
 instance showArgument :: Show Argument where
   show (EOA)            = "--"

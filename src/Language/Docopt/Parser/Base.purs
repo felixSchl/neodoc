@@ -6,22 +6,16 @@ module Language.Docopt.Parser.Base where
 
 import Prelude
 import Control.Alt ((<|>))
-import Control.Apply ((*>), (<*))
-import Control.Monad.State (get)
-import Control.Monad.Trans (lift)
-import qualified Text.Parsing.Parser as P
-import qualified Text.Parsing.Parser.Combinators as P
-import qualified Text.Parsing.Parser.Pos as P
-import qualified Text.Parsing.Parser.String as P
-import qualified Data.String.Regex as Regex
-import qualified Data.Array as A
-import Data.Array ((:))
+import Text.Parsing.Parser (PState(..), ParserT(..)) as P
+import Text.Parsing.Parser.Pos (Position(..)) as P
+import Text.Parsing.Parser.String (satisfy, char, string) as P
+import Data.String.Regex as Regex
+import Data.Array as A
 import Data.Char (toString, toLower, toUpper)
-import Data.String (fromCharArray, toCharArray, fromChar)
-import Data.Maybe hiding (maybe)
-import Data.Either
-import Debug.Trace
-import Data.Tuple (Tuple(..))
+import Data.String (toCharArray, fromCharArray)
+import Data.Maybe (Maybe(Nothing, Just))
+import Data.Either (Either(Right))
+import Debug.Trace (traceShow)
 import Control.MonadPlus (guard)
 
 debug :: forall a m. (Show a, Monad m) => a -> m Unit
@@ -52,6 +46,7 @@ getRow = do
 
 -- | Return the current parser row
 -- | XXX: Use either `line` or `row` - not both!
+getLine :: forall a m. (Monad m) => P.ParserT a m Int
 getLine = getRow
 
 tryMaybe :: forall s m a. (Monad m) => P.ParserT s m a -> P.ParserT s m (Maybe a)
@@ -106,4 +101,4 @@ string' :: forall m. (Monad m) => String -> P.ParserT String m String
 string' s = fromCharArray <$> A.foldM step [] (toCharArray s)
   where
     step acc x = do
-      (acc ++) <<< A.singleton <$> P.satisfy \c -> toLower c == toLower x
+      (acc ++ _) <<< A.singleton <$> P.satisfy \c -> toLower c == toLower x

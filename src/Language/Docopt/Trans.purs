@@ -3,35 +3,30 @@ module Language.Docopt.Trans (
   ) where
 
 import Prelude
-import Debug.Trace
-import Data.Maybe (Maybe(..), isJust, isNothing, maybe)
+import Data.Maybe (Maybe(Nothing, Just), maybe)
 import Data.Foldable (foldl)
-import Control.Plus (empty)
 import Data.Bifunctor (lmap)
 import Data.Array as A
 import Data.StrMap as StrMap
 import Data.StrMap (StrMap())
 import Data.Map (Map())
 import Data.String (fromChar)
-import Data.Monoid (mempty)
 import Data.Map as Map
 import Data.String as Str
-import Data.Tuple (Tuple(..), fst, snd)
-import Control.MonadPlus (guard)
+import Data.Tuple (Tuple(Tuple))
 import Control.Alt ((<|>))
 import Data.Function (on)
-import Language.Docopt.Env (Env())
-import Language.Docopt.Usage    as D
-import Language.Docopt.Errors   as D
-import Language.Docopt.Env      as D
-import Language.Docopt.Value    as D
-import Language.Docopt.Argument as D
-import Language.Docopt.Option   as O
-import Language.Docopt.Env      as Env
+import Language.Docopt.Usage (Usage(Usage), runUsage) as D
+import Language.Docopt.Env (Env) as D
+import Language.Docopt.Value (Value(..), isArrayValue) as D
+import Language.Docopt.Argument (Argument(..), Branch(..), isRepeatable,
+                                setRepeatable, runBranch, setRepeatableOr,
+                                isCommand, isFlag) as D
+import Language.Docopt.Option as O
+import Language.Docopt.Env as Env
 import Data.String.Ext ((^=))
-import Data.List (List(..), toList, concat, singleton, groupBy, catMaybes)
-import Data.List as L
-import Language.Docopt.ParserGen.ValueMapping
+import Data.List (List, singleton, catMaybes, toList, concat)
+import Language.Docopt.ParserGen.ValueMapping (ValueMapping)
 
 newtype Key = Key { arg :: D.Argument }
 
@@ -144,7 +139,7 @@ reduce us env b vs =
       where
         reduceBranches :: List D.Branch -> Map Key D.Argument
         reduceBranches bs =
-          let ms = combine <<< (expand <$>) <<< D.runBranch <$> bs
+          let ms = combine <<< (expand <$> _) <<< D.runBranch <$> bs
           in foldl (Map.unionWith resolveOR)
                     Map.empty
                     ms
@@ -157,7 +152,7 @@ reduce us env b vs =
         expand :: D.Argument -> Map Key D.Argument
         expand (D.Group _ bs r) =
           reduceBranches
-            $ D.Branch <<< ((flip D.setRepeatableOr r) <$>)
+            $ D.Branch <<< ((flip D.setRepeatableOr r) <$> _)
                        <<< D.runBranch
                        <$> bs
 
