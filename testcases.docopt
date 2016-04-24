@@ -791,34 +791,33 @@ r"""usage: prog go..."""
 $ prog go go go go go
 {"go": 5}
 
-
+#
 # [options] does not include options from usage-pattern
 #
-# XXX: These tests do not pass yet. Not sure how to resolve.
-#
-# TODO: Make this pass
-#
-# r"""usage: prog [options] [-a]
-#
-# options: -a
-#          -b
-# """
-# $ prog -a
-# {"-a": true, "-b": false}
-#
-# $ prog -aa
-# "user-error"
-# 
+
+r"""usage: prog [options] [-a]
+
+options: -a
+         -b
+"""
+
+$ prog -a
+{"-a": true, "-b": false}
+
+$ prog -aa
+"user-error"
+
 #
 # Test [options] shourtcut
 #
-#
+
 r"""Usage: prog [options] A
 Options:
     -q  Be quiet
     -v  Be verbose.
 
 """
+
 $ prog arg
 {"-q": false, "-v": false, "<a>": "arg", "A": "arg"}
 

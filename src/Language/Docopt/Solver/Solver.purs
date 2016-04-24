@@ -4,39 +4,50 @@
 module Language.Docopt.Solver where
 
 import Prelude
-import Data.Functor ((<$))
-import Data.Either (Either(..), either)
-import Data.Maybe.Unsafe (fromJust)
-import Data.Maybe (Maybe(Nothing, Just), isNothing, maybe, isJust)
-import Data.List (List(..), length, filter, singleton, toList, catMaybes, head,
-                  (:))
-import Data.Traversable (traverse)
-import Data.Tuple (Tuple(Tuple))
-import Control.MonadPlus (guard)
-import Control.Alt ((<|>))
-import Data.String (fromChar, fromCharArray, toCharArray, toUpper)
 import Data.Array as A
 import Data.String as S
 import Data.String.Unsafe as US
-
-import Data.String.Ext ((^=), endsWith)
-import Language.Docopt.Errors (SolveError(..))
-import Language.Docopt.Argument (Argument(..), Branch(..))
-import Language.Docopt.Usage (Usage(..))
-import Language.Docopt.Parser.Desc (Desc())
+import Language.Docopt.Argument as Arg
 import Language.Docopt.Option as O
 import Language.Docopt.Parser.Desc as DE
+import Language.Docopt.Parser.Usage.Option as UO
+import Control.Alt ((<|>))
+import Control.MonadPlus (guard)
+import Control.MonadPlus.Partial (mpartition)
+import Data.Bifunctor (bimap)
+import Data.Either (Either(..), either)
+import Data.Foldable (any)
+import Data.Function (on)
+import Data.Functor ((<$))
+import Data.List (findIndex, groupBy, List(..), length, filter, singleton, toList, catMaybes, head, (:), concat)
+import Data.Maybe (fromMaybe, Maybe(Nothing, Just), isNothing, maybe, isJust)
+import Data.Maybe.Unsafe (fromJust)
+import Data.String (fromChar, fromCharArray, toCharArray, toUpper)
+import Data.String.Ext ((^=), endsWith)
+import Data.Traversable (traverse)
+import Data.Tuple (Tuple(Tuple))
+import Language.Docopt.Argument (runBranch, Argument(..), Branch(..))
+import Language.Docopt.Errors (SolveError(..))
+import Language.Docopt.Parser.Desc (Desc)
 import Language.Docopt.Parser.Usage (Usage(..)) as U
 import Language.Docopt.Parser.Usage.Argument (Branch, Argument(..)) as U
-import Language.Docopt.Parser.Usage.Option as UO
+import Language.Docopt.Usage (Usage(..))
+
+foreign import undefined :: forall a. a
+
+type Reference = String -- [options] reference
 
 data Slurp a
-  = Slurp (List a)
-  | Keep  (List a)
+  = Slurp (List a) -- slurp the adjacent argument
+  | Keep  (List a) -- keep  the adjacent argument
 
-data Node
-  = Resolved   (Slurp Argument)
-  | Unresolved U.Argument
+data ResolveTo a b
+  = Resolved   a
+  | Unresolved b
+
+instance showResolveTo :: (Show a, Show b) => Show (ResolveTo a b) where
+  show (Resolved   a) = "Resolved "   ++ show a
+  show (Unresolved b) = "Unresolved " ++ show b
 
 fail :: forall a. String -> Either SolveError a
 fail = Left <<< SolveError
@@ -44,22 +55,93 @@ fail = Left <<< SolveError
 solveBranch :: U.Branch                 -- ^ the usage branch
             -> List Desc                -- ^ the option descriptions
             -> Either SolveError Branch -- ^ the canonical usage branch
-solveBranch as ds = Branch <$> solveArgs as
+solveBranch as ds = Branch <$> go as
   where
-    solveArgs :: U.Branch -> Either SolveError (List Argument)
+    go :: U.Branch -> Either SolveError (List Argument)
+    go us = do
+      concat <<< expand <<< partition <<< groupFree <$> solveArgs us
+      where
+        groupFree = groupBy (eq `on` isFree)
+        partition xs = f <$> (mpartition isResolved <$> xs)
+          where f = bimap (_ <#> \a -> case a of
+                            (Resolved x) -> x
+                            otherwise    -> undefined
+                          )
+                          (_ <#> \a -> case a of
+                            (Unresolved x) -> x
+                            otherwise      -> undefined
+                          )
+
+        expand = (expand' <$> _)
+          where
+            -- Resolve references for [options] (references)
+            expand' (Tuple args' refs) | length refs > 0 = map args' ds
+              where
+                map args (Cons (DE.OptionDesc o@(DE.Option opt)) xs) =
+                  -- Assuming description and usage have already been merged,
+                  -- find all options that are not present in the surrounding
+                  -- "free" area and add them.
+                  if isJust (findIndex isMatch args)
+                     then map args xs
+                     else
+                      let converted = Group
+                            true
+                            (singleton $ Branch $ singleton $ Option $
+                              (O.Option {
+                                  flag:       DE.getFlag opt.name
+                                , name:       DE.getName opt.name
+                                , arg:        convArg opt.arg
+                                , env:        opt.env
+                                , repeatable: false
+                                }
+                              ))
+                            opt.repeatable
+                       in map (converted:args) xs
+
+                  where
+                    isMatch (Option (O.Option o))
+                      = if isJust (DE.getFlag opt.name) &&
+                           isJust (o.flag)
+                           then fromMaybe false do
+                                  eq <$> (DE.getFlag opt.name)
+                                     <*> o.flag
+                            else if isJust (DE.getName opt.name) &&
+                                    isJust (o.name)
+                                    then fromMaybe false do
+                                          (^=) <$> (DE.getName opt.name)
+                                               <*> o.name
+                                    else false
+                    isMatch (Group _ bs _)
+                      = any isMatch (concat $ runBranch <$> bs)
+                    isMatch _ = false
+
+                    convArg arg = O.Argument <<< DE.runArgument <$> arg
+                map args _ = args
+            expand' (Tuple args _) = args
+
+        isFree (Resolved a)   = Arg.isFree a
+        isFree (Unresolved _) = true
+
+        isResolved (Resolved _) = true
+        isResolved _            = false
+
+    solveArgs :: U.Branch -> Either SolveError
+                                    (List (ResolveTo Argument
+                                                     Reference))
     solveArgs Nil = return Nil
     solveArgs (Cons x Nil) = do
       m <- solveArg x Nothing
       return case m of
-           Resolved (Slurp xs) -> xs
-           Resolved (Keep xs)  -> xs
-           Unresolved (_)      -> Nil -- XXX
+           Resolved (Slurp xs) -> Resolved <$> xs
+           Resolved (Keep xs)  -> Resolved <$> xs
+           Unresolved a        -> singleton $ Unresolved a
     solveArgs (Cons x (Cons y xs)) = do
       m <- solveArg x (Just y)
       case m of
-           Resolved (Keep  zs) -> (zs ++ _) <$> solveArgs (y:xs)
-           Resolved (Slurp zs) -> (zs ++ _) <$> solveArgs xs
-           Unresolved (_)      -> return Nil -- XXX
+           Resolved (Keep  zs) -> ((Resolved <$> zs) ++ _) <$> solveArgs (y:xs)
+           Resolved (Slurp zs) -> ((Resolved <$> zs) ++ _) <$> solveArgs xs
+           Unresolved a        -> ((singleton $ Unresolved a) ++ _)
+                                    <$> solveArgs (y:xs)
 
     simpleResolve v = Right $ Resolved $ Keep $ singleton v
 
@@ -69,7 +151,7 @@ solveBranch as ds = Branch <$> solveArgs as
     -- | argument from the input (consume).
     solveArg :: U.Argument
               -> Maybe U.Argument
-              -> Either SolveError Node
+              -> Either SolveError (ResolveTo (Slurp Argument) Reference)
 
     solveArg (U.EOA) _ = simpleResolve EOA
     solveArg (U.Stdin) _ = simpleResolve Stdin
@@ -81,7 +163,7 @@ solveBranch as ds = Branch <$> solveArgs as
         flip (Group o) r <$> do
           flip solveBranch ds `traverse` bs
 
-    solveArg r@(U.Reference _) _ = do
+    solveArg (U.Reference r) _ = do
       return $ Unresolved r
 
     solveArg (lopt@(U.Option (opt@(UO.LOpt o)))) adjArg = do
@@ -180,7 +262,7 @@ solveBranch as ds = Branch <$> solveArgs as
         -- |    |`- the arg  matches - case INSENSITIVE
         -- |    `-- the flag matches - case SENSITIVE
         -- |
-        -- | Should this check, yield a match, slice the matched
+        -- | Should this check yield a match, slice the matched
         -- | string off the stack and return the remainder option
         -- | stack (if any).
         -- |
@@ -188,7 +270,9 @@ solveBranch as ds = Branch <$> solveArgs as
         -- | However, this solve is simpler as the option is proven
         -- | not to accept an argument at all.
 
-        fromSubsumption :: Either SolveError Node
+        fromSubsumption :: Either SolveError
+                                  (ResolveTo (Slurp Argument)
+                                              Reference)
         fromSubsumption = do
 
           -- XXX: Well, this error should not be thrown, but rather,
@@ -208,7 +292,8 @@ solveBranch as ds = Branch <$> solveArgs as
                 (head $ catMaybes $ subsume fs <$> ds)
 
           where
-            subsume :: String -> Desc -> Maybe Node
+            subsume :: String -> Desc -> Maybe (ResolveTo (Slurp Argument)
+                                                          Reference)
             subsume fs (DE.OptionDesc (DE.Option d)) = do
               f <- DE.getFlag d.name
               a <- DE.runArgument <$> d.arg
@@ -267,7 +352,9 @@ solveBranch as ds = Branch <$> solveArgs as
         -- | However, this solve is simpler as the option is proven
         -- | not to accept an argument at all.
 
-        fromAdjacentArgOrDefault :: Either SolveError Node
+        fromAdjacentArgOrDefault :: Either SolveError
+                                            (ResolveTo (Slurp Argument)
+                                                        Reference)
         fromAdjacentArgOrDefault = do
 
           -- (flag, ...flags) -> (...flags, flag)
