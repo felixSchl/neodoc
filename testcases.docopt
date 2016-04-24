@@ -1976,3 +1976,45 @@ $ prog -h
 
 $ prog -h -h
 "user-error"
+
+r"""
+Usage: foo -h [options] -h
+Options: -h
+"""
+
+$ prog
+{"-h": 0}
+
+$ prog -h
+{"-h": 1}
+
+$ prog -h -h
+{"-h": 2}
+
+r"""
+Usage: foo --input [options]
+Options: --input
+"""
+
+$ prog
+{"--input": false}
+
+$ prog --input
+{"--input": true}
+
+$ prog --input --input
+"user-error"
+
+r"""
+Usage: foo --input [options]
+Options: -i, --input
+"""
+
+$ prog
+{"-i": false, "--input": false}
+
+$ prog -i
+{"-i": true, "--input": true}
+
+$ prog -i -i
+"user-error"
