@@ -1,6 +1,6 @@
 /* global exports */
 "use strict";
 
-// module Docopt.Solver
+// module Language.Docopt.Solver
 
 exports.undefined = undefined;
