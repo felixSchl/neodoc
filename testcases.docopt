@@ -2063,3 +2063,148 @@ $ prog/s -i 123
 $ prog/s -i
 "user-error"
 
+r"""
+Usage: foo [-i ARG]...
+"""
+
+$ prog/s
+{}
+
+$ prog/s -i 123
+{"-i": [123]}
+
+$ prog/s -i 123 -i 123
+{"-i": [123, 123]}
+
+$ prog/s -i
+"user-error"
+
+r"""
+Usage: foo [-i ARG...]
+"""
+
+$ prog/s
+{}
+
+$ prog/s -i 123
+{"-i": [123]}
+
+$ prog/s -i 123 -i 123
+{"-i": [123, 123]}
+
+$ prog/s -i
+"user-error"
+
+r"""
+Usage: foo [-i ARG...]...
+"""
+
+$ prog/s
+{}
+
+$ prog/s -i 123
+{"-i": [123]}
+
+$ prog/s -i 123 -i 123
+{"-i": [123, 123]}
+
+$ prog/s -i
+"user-error"
+
+#
+# Smart-flags
+# Issue #12
+#
+
+r"""
+Usage: foo [-oi ARG]
+"""
+
+$ prog/s
+{"-o": false} # XXX: Awkward
+
+$ prog/s -i 123
+{"-i": 123, "-o": false}
+
+$ prog/s -i
+"user-error"
+
+r"""
+Usage: foo [-oi [ARG]]
+"""
+
+$ prog/s
+{"-o": false} # XXX: Awkward
+
+$ prog/s -i 123
+{"-i": 123, "-o": false}
+
+$ prog/s -i
+{"-i": true, "-o": false}
+
+r"""
+Usage: foo (-oi ARG)
+"""
+
+$ prog/s
+"user-error"
+
+$ prog/s -i 123
+{"-i": 123, "-o": false}
+
+$ prog/s -i
+"user-error"
+
+r"""
+Usage: foo [-oi ARG]...
+"""
+
+$ prog/s
+{"-o": 0} # XXX: Awkward
+
+$ prog/s -i 123
+{"-i": [123], "-o": 0}
+
+$ prog/s -i 123 -i 123
+{"-i": [123, 123], "-o": 0}
+
+$ prog/s -i
+"user-error"
+
+r"""
+Usage: foo [-oi ARG...]
+"""
+
+$ prog/s
+{"-o": 0} # XXX: Awkward
+
+$ prog/s -i 123
+{"-i": [123], "-o": 0}
+
+$ prog/s -i 123 -i 123
+{"-i": [123, 123], "-o": 0}
+
+$ prog/s -i
+"user-error"
+
+r"""
+Usage: foo [-oi ARG...]...
+"""
+
+$ prog/s
+{"-o": 0} # XXX: Awkward
+
+$ prog/s -i 123
+{"-i": [123], "-o": 0}
+
+$ prog/s -i 123 -o
+{"-i": [123], "-o": 1}
+
+$ prog/s -i 123 -o 456
+"user-error"
+
+$ prog/s -i 123 -i 123
+{"-i": [123, 123], "-o": 0}
+
+$ prog/s -i
+"user-error"

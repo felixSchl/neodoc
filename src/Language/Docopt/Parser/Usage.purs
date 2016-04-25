@@ -111,19 +111,23 @@ usageParser smartOpts = do
       optf <- do
         case opt of
               (Option (O.LOpt o)) | isNothing o.arg ->
-                return $ \argName isArgOptional -> Option $ O.LOpt $ o {
-                  arg = return {
-                    name:     argName
-                  , optional: isArgOptional
+                return $ \argName isArgOptional isRepeatable ->
+                  Option $ O.LOpt $ o {
+                    arg = return {
+                      name:     argName
+                    , optional: isArgOptional
+                    }
+                  , repeatable = isRepeatable
                   }
-                }
               (OptionStack (O.SOpt o)) | isNothing o.arg ->
-                return $ \argName isArgOptional -> OptionStack $ O.SOpt $ o {
-                  arg = return {
-                    name:     argName
-                  , optional: isArgOptional
+                return $ \argName isArgOptional isRepeatable ->
+                  OptionStack $ O.SOpt $ o {
+                    arg = return {
+                      name:     argName
+                    , optional: isArgOptional
+                    }
+                  , repeatable = isRepeatable
                   }
-                }
               otherwise -> Nothing
 
       (Tuple (Tuple name isRepeatable) isOptional) <- do
@@ -138,8 +142,8 @@ usageParser smartOpts = do
               otherwise -> Nothing
       return
         $ Group oo
-                (singleton $ singleton (optf name isOptional))
-                isRepeatable
+                (singleton $ singleton (optf name isOptional isRepeatable))
+                r
     trySmartOpt x = x
 
     stdin :: L.TokenParser Argument
