@@ -14,29 +14,26 @@ import Text.Wrap (dedent)
 import Data.Maybe (Maybe(..))
 import Data.Maybe.Unsafe (fromJust)
 import Data.List (List, many, fromList)
-
 import Test.Spec (Spec(), describe, it)
 import Data.String (fromCharArray)
-
+import Data.String as String
 import Test.Support (vliftEff, runEitherEff)
-
-import Docopt as Docopt
-import Language.Docopt (runDocopt)
-import Language.Docopt.Value (Value(..)) as D
-
 import Text.Parsing.Parser (runParser) as P
 import Text.Parsing.Parser.Combinators (manyTill, optional, between, sepBy,
                                        try, choice, (<?>), option) as P
 import Text.Parsing.Parser.String (eof, string, anyChar, skipSpaces,
                                   char, noneOf) as P
-
-import Language.Docopt.Parser.Base (space, digit)
 import Node.FS (FS)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync as FS
 import Control.Apply ((*>), (<*))
 import Data.Array as A
 import Data.Int as Int
+
+import Docopt as Docopt
+import Language.Docopt (runDocopt)
+import Language.Docopt.Value (Value(..)) as D
+import Language.Docopt.Parser.Base (space, digit, alpha)
 
 newtype Test = Test {
   doc   :: String
@@ -47,6 +44,17 @@ newtype Kase = Kase {
   out     :: Either String (List (Tuple String D.Value))
 , options :: Docopt.Options
 }
+
+type Flags = {
+  optionsFirst :: Boolean -- ^ 'p'
+, smartOptions :: Boolean -- ^ 's'
+}
+
+parseFlags :: String -> Flags
+parseFlags s = {
+    optionsFirst: String.contains "p" s
+  , smartOptions: String.contains "s" s
+  }
 
 parseUniversalDocoptTests :: forall eff
   . Eff (fs :: FS, err :: EXCEPTION | eff) (List Test)
@@ -70,10 +78,12 @@ parseUniversalDocoptTests = do
 
     application = do
       P.skipSpaces *> skipComments *>  P.skipSpaces
-      optionsFirst <- (P.choice $ P.try <$> [
-        P.string "$ prog"    *> return false
-      , P.string "$ partial" *> return true
-      ]) P.<?> "\"$ prog\" or \"$ partial\""
+      P.string "$ prog"
+      flags <- P.option { optionsFirst: false
+                        , smartOptions: false
+                        } $ parseFlags <$> do
+                              P.char '/'
+                              fromCharArray <$> A.many alpha
       P.skipSpaces
       input <- flip P.sepBy (P.char ' ') do
         many (P.char ' ')
@@ -102,10 +112,10 @@ parseUniversalDocoptTests = do
       return $ Kase { out: output
                     , options: {
                         argv:         return $ fromList input
-                      , optionsFirst: optionsFirst
+                      , optionsFirst: flags.optionsFirst
                       , env:          Nothing
                       , dontExit:     true
-                      , smartOptions: false -- XXX: Expose somehow
+                      , smartOptions: flags.smartOptions
                       }
                     }
 

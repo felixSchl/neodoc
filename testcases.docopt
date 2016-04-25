@@ -1325,7 +1325,7 @@ Options:
     -0, --foo ARG  Do something [default: 100]
 """
 
-$ partial foo -0 bar
+$ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
  "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
 
@@ -1336,7 +1336,7 @@ Options:
     -0, --foo ARG  Do something [default: 100]
 """
 
-$ partial foo -0 bar
+$ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
  "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
 
@@ -1347,7 +1347,7 @@ Options:
     -0, --foo ARG  Do something [default: 100]
 """
 
-$ partial foo -0 bar
+$ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
  "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
 
@@ -1358,11 +1358,11 @@ Options:
     -0, --foo ARG  Do something [default: 100]
 """
 
-$ partial foo -0 bar
+$ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
  "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
 
-$ partial foo -0 bar
+$ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
  "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
 
@@ -1371,7 +1371,7 @@ Usage: create_ec2.py [ARG...]...
 
 """
 
-$ partial foo bar
+$ prog/p foo bar
 {"ARG": ["foo", "bar"], "<arg>": ["foo", "bar"]}
 
 #
@@ -1386,11 +1386,11 @@ Options:
 """
 
 # XXX: this returns superflous "-0" in the output:
-$ partial foo bar -0
+$ prog/p foo bar -0
 {"-0": false, "ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
 
 # XXX: this returns superflous "-0" in the output:
-$ partial -0
+$ prog/p -0
 {"-0": false, "ARG": ["-0"], "<arg>": ["-0"]}
 
 r"""
@@ -1401,11 +1401,11 @@ Options:
 """
 
 # XXX: this returns superflous "-0" in the output:
-$ partial foo bar -0
+$ prog/p foo bar -0
 {"-0": false, "ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
 
 # XXX: this returns superflous "-0" in the output:
-$ partial -0
+$ prog/p -0
 {"-0": false, "ARG": ["-0"], "<arg>": ["-0"]}
 
 
@@ -1421,7 +1421,7 @@ $ prog -0
 "user-error"
 
 # XXX: this returns superflous "-0" and "-1" in the output:
-$ partial -01
+$ prog/p -01
 {"-0": false, "-1": false, "ARG": ["-01"], "<arg>": ["-01"]}
 
 #
@@ -1996,13 +1996,13 @@ Usage: foo --input [options]
 Options: --input
 """
 
-$ prog
+$ prog/s
 {"--input": false}
 
-$ prog --input
+$ prog/s --input
 {"--input": true}
 
-$ prog --input --input
+$ prog/s --input --input
 "user-error"
 
 r"""
@@ -2010,13 +2010,13 @@ Usage: foo --input [options]
 Options: -i, --input
 """
 
-$ prog
+$ prog/s
 {"-i": false, "--input": false}
 
-$ prog -i
+$ prog/s -i
 {"-i": true, "--input": true}
 
-$ prog -i -i
+$ prog/s -i -i
 "user-error"
 
 #
@@ -2028,18 +2028,18 @@ r"""
 Usage: foo [-i ARG]
 """
 
-$ prog -i 123
+$ prog/s -i 123
 {"-i": 123}
 
-$ prog -i
+$ prog/s -i
 "user-error"
 
 r"""
 Usage: foo [-i [ARG]]
 """
 
-$ prog -i 123
+$ prog/s -i 123
 {"-i": 123}
 
-$ prog -i
+$ prog/s -i
 {"-i": true}
