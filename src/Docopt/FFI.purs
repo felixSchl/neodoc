@@ -70,6 +70,13 @@ run = mkFn2 go
                             (isTruthy <$> do
                               F.readProp "optionsFirst" fopts)
 
+            -- enable "smart-options" parsing. This causes singleton groups that
+            -- "look like" they are describing an option to expand to such an
+            -- option, e.g.: '[-o ARG]' becomes '[-o=ARG]'.
+          , smartOptions = either (const Docopt.defaultOptions.smartOptions) id
+                            (isTruthy <$> do
+                              F.readProp "smartOptions" fopts)
+
             -- don't exit the process upon failure. By default, neodoc will
             -- exit the program if an error occured, right after printing the
             -- help text alongside an error message.

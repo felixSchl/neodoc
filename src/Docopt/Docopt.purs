@@ -55,6 +55,7 @@ type Options = {
 , env          :: Maybe Env   -- ^ override env.  Defaults to `process.env`
 , optionsFirst :: Boolean     -- ^ enable "option-first"
 , dontExit     :: Boolean     -- ^ don't exit the process upon failure
+, smartOptions :: Boolean     -- ^ parse singleton groups as opts if possible
 }
 
 defaultOptions :: Options
@@ -63,6 +64,7 @@ defaultOptions = {
 , env:          Nothing
 , optionsFirst: false
 , dontExit:     false
+, smartOptions: false
 }
 
 -- |
@@ -80,7 +82,7 @@ run d o = do
   env  <- maybe Process.getEnv              (return <<< id) o.env
   either onError return
          do
-          { specification, usage } <- parseDocopt d
+          { specification, usage } <- parseDocopt d o.smartOptions
           lmap ((help usage) ++ _) do
             applyDocopt specification env argv o.optionsFirst
 

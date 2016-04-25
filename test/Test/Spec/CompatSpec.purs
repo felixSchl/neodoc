@@ -105,6 +105,7 @@ parseUniversalDocoptTests = do
                       , optionsFirst: optionsFirst
                       , env:          Nothing
                       , dontExit:     true
+                      , smartOptions: false -- XXX: Expose somehow
                       }
                     }
 
@@ -171,6 +172,7 @@ genCompatSpec = do
                                      StrMap.empty
                                      argv
                                      options.optionsFirst
+                                     options.smartOptions
               vliftEff $ case result of
                 Left e ->
                   either
