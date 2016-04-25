@@ -102,7 +102,7 @@ usageParser smartOpts = do
         ] <?> "Option, Positional, Command, Group or Reference"
 
     trySmartOpt :: Argument -> Argument
-    trySmartOpt grp@(Group _ bs r) = fromMaybe grp $ do
+    trySmartOpt grp@(Group oo bs r) = fromMaybe grp $ do
       Tuple opt optarg <- case bs of
                               (Cons (Cons opt' (Cons arg' Nil)) Nil) ->
                                 return $ Tuple opt' arg'
@@ -111,24 +111,22 @@ usageParser smartOpts = do
       optf <- do
         case opt of
               (Option (O.LOpt o)) | isNothing o.arg ->
-                return $ \n r x -> Option $ O.LOpt $ o {
+                return $ \argName isArgOptional -> Option $ O.LOpt $ o {
                   arg = return {
-                    name:     n
-                  , optional: x
+                    name:     argName
+                  , optional: isArgOptional
                   }
-                , repeatable = r
                 }
               (OptionStack (O.SOpt o)) | isNothing o.arg ->
-                return $ \n r x -> OptionStack $ O.SOpt $ o {
+                return $ \argName isArgOptional -> OptionStack $ O.SOpt $ o {
                   arg = return {
-                    name:     n
-                  , optional: x
+                    name:     argName
+                  , optional: isArgOptional
                   }
-                , repeatable = r
                 }
               otherwise -> Nothing
 
-      (Tuple (Tuple n r) x) <- do
+      (Tuple (Tuple name isRepeatable) isOptional) <- do
         case optarg of
               (Positional n r') -> return $ tuple3 n (r' || r) false
               (Command    n r') -> return $ tuple3 n (r' || r) false
@@ -138,7 +136,10 @@ usageParser smartOpts = do
                   (Command    n r') -> return $ tuple3 n (r' || r) o
                   otherwise -> Nothing
               otherwise -> Nothing
-      return $ optf n r x
+      return
+        $ Group oo
+                (singleton $ singleton (optf name isOptional))
+                isRepeatable
     trySmartOpt x = x
 
     stdin :: L.TokenParser Argument

@@ -1996,13 +1996,13 @@ Usage: foo --input [options]
 Options: --input
 """
 
-$ prog/s
+$ prog
 {"--input": false}
 
-$ prog/s --input
+$ prog --input
 {"--input": true}
 
-$ prog/s --input --input
+$ prog --input --input
 "user-error"
 
 r"""
@@ -2010,13 +2010,13 @@ Usage: foo --input [options]
 Options: -i, --input
 """
 
-$ prog/s
+$ prog
 {"-i": false, "--input": false}
 
-$ prog/s -i
+$ prog -i
 {"-i": true, "--input": true}
 
-$ prog/s -i -i
+$ prog -i -i
 "user-error"
 
 #
@@ -2028,6 +2028,9 @@ r"""
 Usage: foo [-i ARG]
 """
 
+$ prog/s
+{}
+
 $ prog/s -i 123
 {"-i": 123}
 
@@ -2038,8 +2041,25 @@ r"""
 Usage: foo [-i [ARG]]
 """
 
+$ prog/s
+{}
+
 $ prog/s -i 123
 {"-i": 123}
 
 $ prog/s -i
 {"-i": true}
+
+r"""
+Usage: foo (-i ARG)
+"""
+
+$ prog/s
+"user-error"
+
+$ prog/s -i 123
+{"-i": 123}
+
+$ prog/s -i
+"user-error"
+
