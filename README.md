@@ -42,6 +42,16 @@ reading values from **environment variables**, type coercion and much more. For
 an (in-)comprehensive comparison to the original, click
 [here](#deviations-from-the-original).
 
+## Features ##
+
+* Derive command line interface from help text
+* Helpful error messages for developer and user
+* _Options-first_ parsing to compose large programs (see example below)
+* Fallback to alternate values:
+    * User input -> Environment -> Defaults
+* Convenient, concise and widely accepted POSIX-style syntax
+    * _Mostly_ compatible a typical `git <command> --help` output
+
 ## Installation ##
 
 ```sh
@@ -64,8 +74,8 @@ Options:
    argument, then collect the rest into an array, given the help indicates
    another, repeatable, positional argument, e.g. : `[options] <ommand>
    [<args>...]`
-
-Example:
+* `opts.smartOptions` - Enable parsing groups that "look like" flags as such,
+  for example, parse `[-f ARG...]` as `[-f=ARG...]`
 
 ```javascript
 #!/usr/bin/env node
@@ -180,11 +190,11 @@ if (args['<command>'] === 'remote') {
 
 ## Project status ##
 
-### Beta Target ####
+> **Neodoc** is fully usable and well-tested. If you find there is something
+> broken or unintuitive about neodoc, please do [open an issue][issue-tracker].
+> The following gives on overview of where docopt is headed
 
-> The work to be done to release a usable product with some known caveats.
-> This release will serve as way to collect feedback and plan improvements for
-> subsequent releases based on the feedback.
+### Beta Target (complete) ####
 
 * [x] Scan the docopt text for usage sections and 0 or more description sections
 * [x] Lex and parse usage sections
@@ -230,13 +240,14 @@ if (args['<command>'] === 'remote') {
 * [ ] Read options from config file
 * [x] Allow for `--foo[=<bar>]` syntax (git style).
 * [x] Auto-infer types when not specified (e.g. numbers, strings, booleans)
+* [x] Implement `[-f BAR]` flag syntax ("smart-options")
 * [ ] Allow flag negation sintax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
+* [x] Fix all purescript (pscid) warnings
 
 ### Wishlist ###
 
 > A list of things that are desired, but have not found a place on the roadmap.
 
-* Fix all purescript warnings
 * Provide typescript typings
 * Read options from config file
 * Add ranges support: `-[0-9]` would expand to `-0123456789` (or `-1`, `-2` ...).
@@ -247,8 +258,6 @@ if (args['<command>'] === 'remote') {
   "default", "user"
 * Consider  `+o` syntax: `-o, --option` and it's negation: `--no-option` or
   `+o`.
-* Make commands first class citizens, enabling easy subcommands, inheriting
-  options and all that.
 * Provide warnings. This would mean a largish refactor to use either a custom
   monad, or the Writer monad, stacked on top of the Either monad.
 * Refactor `Language.Docopt.ParserGen.Parser.genBranchParser` to use manual
@@ -312,3 +321,4 @@ Options:
 
 [docopt-orig]: http://docopt.org
 [POSIX]: http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html
+[issue-tracker]: https://github.com/felixSchl/neodoc/issues
