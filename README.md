@@ -170,6 +170,8 @@ if (args['<command>'] === 'remote') {
 * **There is no `null`** in the resulting value map. `null` simply means not
   matched - so the key is omitted from the resulting value map. <sub>(this is
   still under consideration)</sub>
+* **Smart-options**. Options can be inferred from groups that "look like"
+  options: `Usage: foo [-f FILE]` would then expand to `Usage: foo [-f=FILE]`
 * **Environment variables**. Options can fall back to environment variables,
   if they are not explicitly defined. The order of evaluation is:
     1. User input (per `process.argv`)

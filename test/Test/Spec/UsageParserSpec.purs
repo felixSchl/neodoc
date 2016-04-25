@@ -53,7 +53,8 @@ usageParserSpec = \_ ->
       vliftEff do
         usage <- runEitherEff do
           toks <- Lexer.lexUsage "foo bar"
-          U.parse toks
+          U.parse false toks
+               -- ^ Disable "smart-options"
         assertEqual 1 (length usage)
         (U.Usage _ u) <- runMaybeEff $ usage !! 0
         g <- runMaybeEff $ u !! 0
@@ -231,7 +232,8 @@ usageParserSpec = \_ ->
               NOT PART OF SECTION
               """
           toks <- Lexer.lexUsage docopt.usage
-          U.parse toks
+          U.parse false toks
+                -- ^ Disable "smart-options"
         assertEqual 2 (length usage)
 
         -- Validate the first usage
@@ -280,7 +282,8 @@ usageParserSpec = \_ ->
                 ++ intercalate "\n" (U.prettyPrintUsage <$> expected'))  do
               vliftEff do
                 usages <- runEitherEff do
-                  Lexer.lexUsage input >>= U.parse
+                  Lexer.lexUsage input >>= U.parse false
+                                                -- ^ Disable "smart-options"
                 flip assertEqual
                   (U.prettyPrintUsage <$> usages)
                   (U.prettyPrintUsage <$> expected')
@@ -290,7 +293,9 @@ usageParserSpec = \_ ->
               assertThrows (const true) do
                 runEitherEff do
                   toks  <- Lexer.lexUsage input
-                  usage <- U.parse toks
+                  usage <- U.parse false toks
+                                -- ^ Disable "smart-options"
+
                   debug usage
 
     runSingleArgumentTests xs =
@@ -307,7 +312,8 @@ usageParserSpec = \_ ->
                 it (input ++ " -> " ++ U.prettyPrintArg expected)  do
                   vliftEff do
                     usage <- runEitherEff do
-                      Lexer.lexUsage input >>= U.parse
+                      Lexer.lexUsage input >>= U.parse false
+                                                    -- ^ Disable "smart-options"
 
                     -- There should only be one top-level mutex group
                     assertEqual 1 (length usage)
@@ -322,5 +328,6 @@ usageParserSpec = \_ ->
                   assertThrows (const true) do
                     runEitherEff do
                       toks  <- Lexer.lexUsage input
-                      usage <- U.parse toks
+                      usage <- U.parse false toks
+                                    -- ^ Disable "smart-options"
                       debug usage

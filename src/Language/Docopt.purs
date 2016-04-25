@@ -45,10 +45,11 @@ type Docopt = {
 -- | that can be applied to user input.
 -- |
 parseDocopt :: String  -- ^ The docopt text
+            -> Boolean -- ^ Enable smart-options
             -> Either String Docopt
-parseDocopt docopt = do
+parseDocopt docopt smartOpts = do
   doc <- toScanErr       $ Scanner.scan $ dedent docopt
-  us  <- toUsageParseErr $ Usage.run doc.usage
+  us  <- toUsageParseErr $ Usage.run doc.usage smartOpts
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve us ds
   return $ { specification: prg , usage: doc.usage }
@@ -73,9 +74,10 @@ runDocopt :: String        -- ^ The docopt text
           -> StrMap String -- ^ The environment
           -> Array String  -- ^ The user input
           -> Boolean       -- ^ Enable "options-first"
+          -> Boolean       -- ^ Enable "smart-options"
           -> Either String (StrMap D.Value)
-runDocopt docopt env argv optsFirst = do
-  { specification } <- parseDocopt docopt
+runDocopt docopt env argv optsFirst smartOpts = do
+  { specification } <- parseDocopt docopt smartOpts
   applyDocopt specification env argv optsFirst
 
 toScanErr :: forall a. Either P.ParseError a -> Either String a

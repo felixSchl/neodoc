@@ -6,27 +6,28 @@ module Language.Docopt.Parser.Usage (
   ) where
 
 import Prelude
-import Control.Lazy (defer)
-import Control.MonadPlus (guard)
+import Language.Docopt.Parser.Lexer as L
+import Language.Docopt.Parser.Usage.Option as O
+import Language.Docopt.Parser.Usage.Usage as U
 import Control.Alt ((<|>))
 import Control.Apply ((*>))
+import Control.Bind ((=<<))
+import Control.Lazy (defer)
+import Control.MonadPlus (guard)
+import Data.Either (Either)
 import Data.List (List(..), many, some, singleton, length, modifyAt)
+import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
+import Data.Tuple (Tuple(Tuple))
+import Data.Tuple.Nested (tuple3)
+import Language.Docopt.Parser.Common (markIndent', markLine, indented,
+                                     sameIndent, lessIndented, moreIndented)
+import Language.Docopt.Parser.Usage.Argument (Argument(..))
+import Language.Docopt.Parser.Usage.Usage (Usage(..))
 import Text.Parsing.Parser (ParseError) as P
 import Text.Parsing.Parser.Combinators (try, optional, choice, sepBy1, between,
                                        lookAhead) as P
 import Text.Parsing.Parser.Combinators ((<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(Position)) as P
-import Data.Either (Either())
-import Data.Maybe (Maybe(..), maybe)
-import Control.Bind ((=<<))
-
-import Language.Docopt.Parser.Common (markIndent', markLine, indented,
-                                     sameIndent, lessIndented, moreIndented)
-import Language.Docopt.Parser.Usage.Usage (Usage(..))
-import Language.Docopt.Parser.Usage.Argument (Argument(..))
-import Language.Docopt.Parser.Usage.Usage as U
-import Language.Docopt.Parser.Lexer as L
-import Language.Docopt.Parser.Usage.Option as O
 
 -- | TokenParser to parse the usage section
 -- |
@@ -44,8 +45,9 @@ import Language.Docopt.Parser.Usage.Option as O
 -- |      are IGNORED.
 -- |    * A token at the identation mark starts a new usage pattern parse.
 -- |
-usageParser :: L.TokenParser (List Usage)
-usageParser = do
+usageParser :: Boolean -- ^ Enable "smart-options" parsing
+            -> L.TokenParser (List Usage)
+usageParser smartOpts = do
 
   -- Calculate and mark the original program indentation.
   P.Position { column: startCol } <- L.nextTokPos <?> "Program name"
@@ -94,10 +96,55 @@ usageParser = do
         [ option
         , positional
         , command
-        , group
+        , (if smartOpts then trySmartOpt else id) <$> group
         , reference
         , stdin
         ] <?> "Option, Positional, Command, Group or Reference"
+
+    trySmartOpt :: Argument -> Argument
+    trySmartOpt grp@(Group oo bs r) = fromMaybe grp $ do
+      Tuple opt optarg <- case bs of
+                              (Cons (Cons opt' (Cons arg' Nil)) Nil) ->
+                                return $ Tuple opt' arg'
+                              otherwise -> Nothing
+
+      optf <- do
+        case opt of
+              (Option (O.LOpt o)) | isNothing o.arg ->
+                return $ \argName isArgOptional isRepeatable ->
+                  Option $ O.LOpt $ o {
+                    arg = return {
+                      name:     argName
+                    , optional: isArgOptional
+                    }
+                  , repeatable = isRepeatable
+                  }
+              (OptionStack (O.SOpt o)) | isNothing o.arg ->
+                return $ \argName isArgOptional isRepeatable ->
+                  OptionStack $ O.SOpt $ o {
+                    arg = return {
+                      name:     argName
+                    , optional: isArgOptional
+                    }
+                  , repeatable = isRepeatable
+                  }
+              otherwise -> Nothing
+
+      (Tuple (Tuple name isRepeatable) isOptional) <- do
+        case optarg of
+              (Positional n r') -> return $ tuple3 n (r' || r) false
+              (Command    n r') -> return $ tuple3 n (r' || r) false
+              (Group o (Cons (Cons a Nil) Nil) r) ->
+                case a of
+                  (Positional n r') -> return $ tuple3 n (r' || r) o
+                  (Command    n r') -> return $ tuple3 n (r' || r) o
+                  otherwise -> Nothing
+              otherwise -> Nothing
+      return
+        $ Group oo
+                (singleton $ singleton (optf name isOptional isRepeatable))
+                r
+    trySmartOpt x = x
 
     stdin :: L.TokenParser Argument
     stdin = L.dash *> return Stdin
@@ -155,8 +202,12 @@ usageParser = do
     program :: L.TokenParser String
     program = "Program name" <??> L.name
 
-parse :: (List L.PositionedToken) -> Either P.ParseError (List Usage)
-parse = flip L.runTokenParser usageParser
+parse :: Boolean                  -- ^ Enable "smart-options"
+      -> (List L.PositionedToken) -- ^ The token stream
+      -> Either P.ParseError (List Usage)
+parse smartOpts = flip L.runTokenParser (usageParser smartOpts)
 
-run :: String -> Either P.ParseError (List Usage)
-run x = parse =<< L.lexUsage x
+run :: String  -- ^ The usage section text
+    -> Boolean -- ^ Enable "smart-options"
+    -> Either P.ParseError (List Usage)
+run x smartOpts = parse smartOpts =<< L.lexUsage x
