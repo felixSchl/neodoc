@@ -603,7 +603,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           mkSoptParser Nothing _  = P.fail "flag"
 
     genParser x@(D.Group optional bs r) _
-      | optional && optsFirst && (length bs == 1) &&
+      | optsFirst && (length bs == 1) &&
         all (\(D.Branch xs) ->
           case xs of
             Cons (D.Positional n r') Nil -> r' || r
