@@ -4,6 +4,9 @@ module Language.Docopt.Parser.Usage.Argument (
   , IsOptional ()
   , Branch ()
   , isFree
+  , isOption
+  , isPositional
+  , isCommand
   , prettyPrintArg
   , prettyPrintBranch
   , sopt, sopt_, soptR, soptR_
@@ -38,6 +41,19 @@ isFree :: Argument -> Boolean
 isFree (Option _)     = true
 isFree (Group _ bs _) = all (all isFree) bs
 isFree _              = false
+
+isOption :: Argument -> Boolean
+isOption (Option _)      = true
+isOption (OptionStack _) = true
+isOption _               = false
+
+isPositional :: Argument -> Boolean
+isPositional (Positional _ _) = true
+isPositional _                = false
+
+isCommand :: Argument -> Boolean
+isCommand (Command _ _) = true
+isCommand _             = false
 
 instance showArgument :: Show Argument where
   show (EOA)            = "--"

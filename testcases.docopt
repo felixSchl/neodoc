@@ -1379,7 +1379,7 @@ $ partial foo bar
 #
 
 r"""
-Usage: create_ec2.py ARG... [options]
+Usage: create_ec2.py (ARG...) [options]
 
 Options:
     -0  This is a zero
@@ -2018,3 +2018,28 @@ $ prog -i
 
 $ prog -i -i
 "user-error"
+
+#
+# Smart-flags
+# Issue #12
+#
+
+r"""
+Usage: foo [-i ARG]
+"""
+
+$ prog -i 123
+{"-i": 123}
+
+$ prog -i
+"user-error"
+
+r"""
+Usage: foo [-i [ARG]]
+"""
+
+$ prog -i 123
+{"-i": 123}
+
+$ prog -i
+{"-i": true}

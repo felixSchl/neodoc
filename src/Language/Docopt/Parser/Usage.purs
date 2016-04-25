@@ -6,27 +6,28 @@ module Language.Docopt.Parser.Usage (
   ) where
 
 import Prelude
-import Control.Lazy (defer)
-import Control.MonadPlus (guard)
+import Language.Docopt.Parser.Lexer as L
+import Language.Docopt.Parser.Usage.Option as O
+import Language.Docopt.Parser.Usage.Usage as U
 import Control.Alt ((<|>))
 import Control.Apply ((*>))
+import Control.Bind ((=<<))
+import Control.Lazy (defer)
+import Control.MonadPlus (guard)
+import Data.Either (Either)
 import Data.List (List(..), many, some, singleton, length, modifyAt)
+import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
+import Data.Tuple (Tuple(Tuple))
+import Data.Tuple.Nested (tuple3)
+import Language.Docopt.Parser.Common (markIndent', markLine, indented,
+                                     sameIndent, lessIndented, moreIndented)
+import Language.Docopt.Parser.Usage.Argument (Argument(..))
+import Language.Docopt.Parser.Usage.Usage (Usage(..))
 import Text.Parsing.Parser (ParseError) as P
 import Text.Parsing.Parser.Combinators (try, optional, choice, sepBy1, between,
                                        lookAhead) as P
 import Text.Parsing.Parser.Combinators ((<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(Position)) as P
-import Data.Either (Either())
-import Data.Maybe (Maybe(..), maybe)
-import Control.Bind ((=<<))
-
-import Language.Docopt.Parser.Common (markIndent', markLine, indented,
-                                     sameIndent, lessIndented, moreIndented)
-import Language.Docopt.Parser.Usage.Usage (Usage(..))
-import Language.Docopt.Parser.Usage.Argument (Argument(..))
-import Language.Docopt.Parser.Usage.Usage as U
-import Language.Docopt.Parser.Lexer as L
-import Language.Docopt.Parser.Usage.Option as O
 
 -- | TokenParser to parse the usage section
 -- |
@@ -94,10 +95,52 @@ usageParser = do
         [ option
         , positional
         , command
-        , group
+        , maybeSmartOpt <$> group
         , reference
         , stdin
         ] <?> "Option, Positional, Command, Group or Reference"
+
+    maybeSmartOpt :: Argument -> Argument
+    maybeSmartOpt grp@(Group _ bs r) = fromMaybe grp $ do
+      Tuple opt optarg <- case bs of
+                              (Cons (Cons opt' (Cons arg' Nil)) Nil) ->
+                                return $ Tuple opt' arg'
+                              otherwise -> Nothing
+
+      optf <- do
+        case opt of
+              (Option (O.LOpt o)) | isNothing o.arg ->
+                return $ \n r x -> Option $ O.LOpt $ o {
+                  arg = return {
+                    name:     n
+                  , optional: x
+                  }
+                , repeatable = r
+                }
+              (OptionStack (O.SOpt o)) | isNothing o.arg ->
+                return $ \n r x -> OptionStack $ O.SOpt $ o {
+                  arg = return {
+                    name:     n
+                  , optional: x
+                  }
+                , repeatable = r
+                }
+              otherwise -> Nothing
+
+      (Tuple (Tuple n r) x) <- do
+        case optarg of
+              (Positional n r') -> return $ tuple3 n (r' || r) false
+              (Command    n r') -> return $ tuple3 n (r' || r) false
+              (Group o (Cons (Cons a Nil) Nil) r) ->
+                case a of
+                  (Positional n r') -> return $ tuple3 n (r' || r) o
+                  (Command    n r') -> return $ tuple3 n (r' || r) o
+                  otherwise -> Nothing
+              otherwise -> Nothing
+
+      return $ optf n r x
+
+    maybeSmartOpt x = x
 
     stdin :: L.TokenParser Argument
     stdin = L.dash *> return Stdin
