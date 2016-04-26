@@ -2,6 +2,7 @@ module Test.Spec.CompatSpec (genCompatSpec) where
 
 import Prelude
 import Global (readFloat)
+import Debug.Trace (traceShowA)
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)
@@ -11,7 +12,7 @@ import Data.Either (Either(..), either)
 import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
 import Data.Foldable (intercalate, for_)
 import Text.Wrap (dedent)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Maybe.Unsafe (fromJust)
 import Data.List (List, many, fromList)
 import Test.Spec (Spec(), describe, it)
@@ -32,8 +33,8 @@ import Data.Int as Int
 
 import Docopt as Docopt
 import Language.Docopt (runDocopt)
-import Language.Docopt.Value (Value(..)) as D
-import Language.Docopt.Parser.Base (space, digit, alpha)
+import Language.Docopt.Value (Value(..), prettyPrintValue) as D
+import Language.Docopt.Parser.Base (space, digit, alpha, upperAlpha)
 
 newtype Test = Test {
   doc   :: String
@@ -78,7 +79,12 @@ parseUniversalDocoptTests = do
 
     application = do
       P.skipSpaces *> skipComments *>  P.skipSpaces
-      P.string "$ prog"
+      P.char '$'
+      env <- StrMap.fromFoldable <$> (many $ P.try do
+        A.many (P.char ' ')
+        envVar)
+      many (P.char ' ')
+      P.string "prog"
       flags <- P.option { optionsFirst: false
                         , smartOptions: false
                         } $ parseFlags <$> do
@@ -113,13 +119,23 @@ parseUniversalDocoptTests = do
                     , options: {
                         argv:         return $ fromList input
                       , optionsFirst: flags.optionsFirst
-                      , env:          Nothing
+                      , env:          return env
                       , dontExit:     true
                       , smartOptions: flags.smartOptions
                       }
                     }
 
       where
+        envVar = do
+          key <- fromCharArray <$> do
+            A.many upperAlpha
+          P.char '='
+          val <- P.choice $ P.try <$> [
+              D.prettyPrintValue <$> value
+            , fromCharArray <$> (A.many $ P.noneOf [ ' ' ])
+            ]
+          return $ Tuple key val
+
         value = P.choice $ P.try <$> [
           D.BoolValue <$> do
             P.choice $ P.try <$> [
@@ -179,7 +195,7 @@ genCompatSpec = do
               later (return unit)
 
               let result = runDocopt (dedent doc)
-                                     StrMap.empty
+                                     (fromMaybe StrMap.empty options.env)
                                      argv
                                      options.optionsFirst
                                      options.smartOptions

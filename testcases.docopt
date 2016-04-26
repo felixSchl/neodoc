@@ -2208,3 +2208,16 @@ $ prog/s -i 123 -i 123
 
 $ prog/s -i
 "user-error"
+
+#
+# Environment variables
+#
+
+r"""
+Usage: foo
+   or: foo --input=FILE
+Options: --input [env: INPUT]
+"""
+
+$ INPUT=bar prog
+{"--input": "bar"}
