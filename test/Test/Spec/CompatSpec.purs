@@ -7,7 +7,7 @@ import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)
 import Data.StrMap as StrMap
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.Either (Either(..), either)
 import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
 import Data.Foldable (intercalate, for_)
@@ -30,11 +30,12 @@ import Node.FS.Sync as FS
 import Control.Apply ((*>), (<*))
 import Data.Array as A
 import Data.Int as Int
+import Data.String.Argv as Argv
 
 import Docopt as Docopt
 import Language.Docopt (runDocopt)
 import Language.Docopt.Value (Value(..), prettyPrintValue) as D
-import Language.Docopt.Parser.Base (space, digit, alpha, upperAlpha)
+import Language.Docopt.Parser.Base (space, digit, alpha, upperAlpha, getInput)
 
 newtype Test = Test {
   doc   :: String
@@ -90,13 +91,9 @@ parseUniversalDocoptTests = do
                         } $ parseFlags <$> do
                               P.char '/'
                               fromCharArray <$> A.many alpha
-      P.skipSpaces
-      input <- flip P.sepBy (P.char ' ') do
-        many (P.char ' ')
-        fromCharArray <$> do
-          -- Note: Terminate on '{'. This is hacky and pragmatic,
-          -- but it doesn't have to be any more than that...
-          A.some $ P.noneOf [ ' ', '{', '\n', '"' ]
+      many (P.char ' ')
+      input <- Argv.parse <<< fromCharArray <<< fromList <$>
+        P.manyTill (P.noneOf ['\n']) (P.char '\n')
       P.skipSpaces *> skipComments *>  P.skipSpaces
       output <- P.choice $ P.try <$>
         [ Right <$> do
@@ -117,7 +114,7 @@ parseUniversalDocoptTests = do
       P.skipSpaces *> skipComments *>  P.skipSpaces
       return $ Kase { out: output
                     , options: {
-                        argv:         return $ fromList input
+                        argv:         return input
                       , optionsFirst: flags.optionsFirst
                       , env:          return env
                       , dontExit:     true
@@ -183,7 +180,12 @@ genCompatSpec = do
       describe (doc ++ "\n") do
         for_ kases \(Kase { options, out }) -> do
           let argv = fromJust options.argv
-          describe (intercalate " " argv) do
+              env  = fromJust options.env
+          describe (intercalate " " $
+            (fromList $ StrMap.toList env <#> \t ->
+              fst t ++ "=\"" ++ snd t ++ "\"")
+            ++ argv
+            ) do
             it ("\n" ++ prettyPrintOut out) do
 
               -- XXX: Manually break the execution context in order to avoid to

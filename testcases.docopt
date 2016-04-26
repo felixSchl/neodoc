@@ -1806,16 +1806,16 @@ $ prog -f 1 -f 2 -f 3 -f 4 -f 5 -f 6
  "-f": [1, 2, 3, 4, 5, 6]}
 
 $ prog -f 1,2,3,4,5,6
-{"--foo": [1, 2, 3, 4, 5, 6],
- "-f": [1, 2, 3, 4, 5, 6]}
+{"--foo": ["1,2,3,4,5,6"],
+ "-f": ["1,2,3,4,5,6"]}
 
 $ prog -f 1,2,3 --foo 4,5,6
-{"--foo": [1, 2, 3, 4, 5, 6],
- "-f": [1, 2, 3, 4, 5, 6]}
+{"--foo": ["1,2,3", "4,5,6"],
+ "-f": ["1,2,3", "4,5,6"]}
 
 $ prog -f 1,2 --foo 3,4 -f 5,6
-{"--foo": [1, 2, 3, 4, 5, 6],
- "-f": [1, 2, 3, 4, 5, 6]}
+{"--foo": ["1,2", "3,4", "5,6"],
+ "-f": ["1,2", "3,4", "5,6"]}
 
 r"""
 Usage:
@@ -1829,16 +1829,16 @@ $ prog -f 1 -f 2 -f 3 -f 4 -f 5 -f 6
  "-f": [1, 2, 3, 4, 5, 6]}
 
 $ prog -f 1,2,3,4,5,6
-{"--foo": [1, 2, 3, 4, 5, 6],
- "-f": [1, 2, 3, 4, 5, 6]}
+{"--foo": ["1,2,3,4,5,6"],
+ "-f": ["1,2,3,4,5,6"]}
 
 $ prog -f 1,2,3 --foo 4,5,6
-{"--foo": [1, 2, 3, 4, 5, 6],
- "-f": [1, 2, 3, 4, 5, 6]}
+{"--foo": ["1,2,3", "4,5,6"],
+ "-f": ["1,2,3", "4,5,6"]}
 
 $ prog -f 1,2 --foo 3,4 -f 5,6
-{"--foo": [1, 2, 3, 4, 5, 6],
- "-f": [1, 2, 3, 4, 5, 6]}
+{"--foo": ["1,2", "3,4", "5,6"],
+ "-f": ["1,2", "3,4", "5,6"]}
 
 #
 # Issue #11
@@ -2245,7 +2245,31 @@ $ prog
 "user-error"
 
 $ INPUT="foo bar" prog
-{"--input": "foo bar"}
+{"--input": ["foo bar"]}
+
+#
+# Ensure comma separated values provided on the command line or through the
+# environment are *NOT* parsed into arrays. This has been identified as flaw
+# in design an is subject to removal from neodoc. This change excludes default
+# value declarations ([default: a,b,c]) since it's in the developers control
+# and comma-parsing can be skipped by quoting ([default: 'a,b,c'])
+#
+# Refer #16
+#
+
+r"""
+Usage: foo --input=FILE...
+Options: --input [env: INPUT]
+"""
 
 $ INPUT="foo,bar" prog
-{"--input": "foo,bar"}
+{"--input": ["foo,bar"]}
+
+$ prog --input "foo bar"
+{"--input": ["foo bar"]}
+
+$ prog --input "foo,bar"
+{"--input": ["foo,bar"]}
+
+$ prog --input foo,bar
+{"--input": ["foo,bar"]}

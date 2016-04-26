@@ -10,6 +10,7 @@ module Language.Docopt.Value (
 
 import Prelude
 import Unsafe.Coerce (unsafeCoerce)
+import Control.Apply ((<*))
 import Data.Generic (class Generic)
 import Data.Either (Either(), either)
 import Data.List (List(..), fromList, many, some)
@@ -17,7 +18,7 @@ import Control.Apply ((*>))
 import Control.Alt ((<|>))
 import Text.Parsing.Parser (ParseError, runParser, fail) as P
 import Text.Parsing.Parser.Combinators (between, choice, try, sepBy1) as P
-import Text.Parsing.Parser.String (noneOf, char, string) as P
+import Text.Parsing.Parser.String (noneOf, char, string, eof) as P
 import Data.Array as A
 import Data.String (fromCharArray)
 import Data.String as Str
@@ -78,8 +79,10 @@ prettyPrintValue (ArrayValue xs) = show $ prettyPrintValue <$> xs
 prettyPrintValue (IntValue    i) = show i
 prettyPrintValue (FloatValue  f) = show f
 
-read :: String -> Value
-read s = either (const $ StringValue s) id (parse s)
+read :: String  -- ^ the input
+     -> Boolean -- ^ allow splitting?
+     -> Value
+read s split = either (const $ StringValue s) id (parse s split)
 
 -- | Parse a string into a value
 -- | Values can be command *AND* space separated:
@@ -89,8 +92,14 @@ read s = either (const $ StringValue s) id (parse s)
 -- | a  b, c -> [ a, b, c ]
 -- | a, b  c -> [ a, b, c ]
 -- |
-parse :: String -> Either P.ParseError Value
-parse = flip P.runParser values
+parse :: String  -- ^ the input
+      -> Boolean -- ^ allow splitting?
+      -> Either P.ParseError Value
+parse s split = P.runParser s do
+                  v <- if split then values
+                                else value
+                  P.eof
+                  return v
 
   where
     values = do
@@ -105,7 +114,7 @@ parse = flip P.runParser values
 
     white = P.char ' ' <|> P.char '\n'
 
-    inner =do
+    inner = do
       P.try value <|> do StringValue <$> do
                                   fromCharArray <<< fromList <$> do
                                     many $ P.try (P.noneOf [',', ' ', '\n'])

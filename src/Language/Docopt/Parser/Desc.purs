@@ -67,7 +67,7 @@ isDefaultTag (Default _) = true
 isDefaultTag _           = false
 
 getDefaultValue :: Content -> Maybe Value
-getDefaultValue (Default v) = either (const Nothing) Just (Value.parse v)
+getDefaultValue (Default v) = either (const Nothing) Just (Value.parse v true)
 getDefaultValue _           = Nothing
 
 isEnvTag :: Content -> Boolean
