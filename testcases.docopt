@@ -2219,5 +2219,33 @@ Usage: foo
 Options: --input [env: INPUT]
 """
 
+$ prog
+{}
+
 $ INPUT=bar prog
 {"--input": "bar"}
+
+r"""
+Usage: foo --input=FILE
+Options: --input [env: INPUT]
+"""
+
+$ prog
+"user-error"
+
+$ INPUT=bar prog
+{"--input": "bar"}
+
+r"""
+Usage: foo --input=FILE...
+Options: --input [env: INPUT]
+"""
+
+$ prog
+"user-error"
+
+$ INPUT="foo bar" prog
+{"--input": "foo bar"}
+
+$ INPUT="foo,bar" prog
+{"--input": "foo,bar"}

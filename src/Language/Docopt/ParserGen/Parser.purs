@@ -23,7 +23,7 @@ import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
 import Control.Alt ((<|>))
 import Data.Traversable (traverse)
 import Control.Lazy (defer)
-import Data.Foldable (all, intercalate, maximumBy, sum)
+import Data.Foldable (all, intercalate, maximumBy, sum, any)
 import Data.String as String
 import Data.String (fromCharArray, stripPrefix)
 import Data.List.Unsafe as LU
@@ -322,7 +322,7 @@ genBranchesParser xs term optsFirst canSkip
 
       -- Evaluate the winning candidates, if any.
       -- First, sort the positive results by their depth, then group consecutive
-      -- elements, take the first element and sort the inner values by their
+      -- elements, take the highest element and sort the inner values by their
       -- fallback score.
       winner =
           maximumBy (compare `on` (_.score <<< unScoredResult
@@ -413,15 +413,16 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                 ++ (intercalate " " (D.prettyPrintArg <$> ps))
                 ++ " - canSkip: " ++  show canSkip
           else return unit
-      draw ps (length ps)
+      draw ps (length ps) Nil
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
         -- apply `draw` until the parser fails, with a modified `ps`.
         draw :: List D.Argument -- ^ the arguments to parse
              -> Int             -- ^ the number of options left to parse
+             -> List D.Argument -- ^ the unique arguments parsed
              -> Parser (ScoredResult (List ValueMapping))
 
-        draw pss@(Cons p ps') n | n >= 0 = (do
+        draw pss@(Cons p ps') n tot | n >= 0 = (do
           if debug
             then do
                 i <- getInput
@@ -460,13 +461,13 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
           r' <- unScoredResult <$> P.try do
                   if D.isRepeatable p
-                        then draw pss (length pss)
-                        else draw ps' (length ps')
+                        then draw pss (length pss) (p:tot)
+                        else draw ps' (length ps') (p:tot)
 
           return $ ScoredResult r ++ ScoredResult r'
-        ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
+        ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1) tot)
 
-        draw ps' n | (length ps' > 0) && (n < 0) = do
+        draw ps' n tot | (length ps' > 0) && (n < 0) = do
           env :: StrMap String <- lift ask
 
           -- Find flags missing from the input.
@@ -497,16 +498,16 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
             isSkippable env (D.Group o bs _)
               = o || (all (all (isSkippable env) <<< D.runBranch) bs)
             isSkippable env o
-              =  (D.isRepeatable  o)
-              || (D.hasDefault    o)
+              =  (D.hasDefault o)
               || (maybe true id do
                   arg <- O.runArgument <$> do
                             D.getArgument o
                   return arg.optional
                 )
               || (D.hasEnvBacking o env)
+              || (D.isRepeatable o && (any (_ == o) tot))
 
-        draw _ _ = return mempty
+        draw _ _ _ = return mempty
 
     step :: Acc (ScoredResult (List ValueMapping))
          -> D.Argument
