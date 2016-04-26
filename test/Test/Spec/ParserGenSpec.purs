@@ -372,7 +372,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             ]
 
         , pass
-            [ "foo", "-o", "-i", "-bax", "baz" ]
+            [ "foo", "-o", "-i", "-bax", "-f=ox", "baz" ]
             [ "foo"     :> D.bool true
             , "--out"   :> D.bool true
             , "-o"      :> D.bool true
@@ -385,14 +385,16 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-b"      :> D.str "ax"
             , "--qux"   :> D.int 0
             , "-q"      :> D.int 0
+            , "--foo"   :> D.array [ D.str "ox" ]
+            , "-f"      :> D.array [ D.str "ox" ]
             ]
 
         , fail
             [ "foo" ]
-            "Expected command: \"baz\""
+            "Missing required options: -f|--foo=FOZ..."
         , fail
             [ "foo", "-o", "-i", "-bax" ]
-            "Expected command: \"baz\""
+            "Missing required options: -f|--foo=FOZ..."
         ]
 
     , test

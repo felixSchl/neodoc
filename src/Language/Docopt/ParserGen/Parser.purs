@@ -12,17 +12,18 @@ module Language.Docopt.ParserGen.Parser (
 
 import Prelude
 import Control.Plus (empty)
-import Debug.Trace (traceA)
+import Control.Bind ((=<<))
+import Debug.Trace (traceA, traceShowA)
 import Control.Apply ((<*))
 import Data.Function (on)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
 import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
-                  some, filter, head, fromList)
+                  some, filter, head, fromList, sortBy, groupBy, last)
 import Control.Alt ((<|>))
 import Data.Traversable (traverse)
 import Control.Lazy (defer)
-import Data.Foldable (all, intercalate, maximumBy)
+import Data.Foldable (all, intercalate, maximumBy, sum, any)
 import Data.String as String
 import Data.String (fromCharArray, stripPrefix)
 import Data.List.Unsafe as LU
@@ -68,7 +69,10 @@ type Parser a = P.ParserT (List PositionedToken)
                           (ReaderT D.Env (State Int))
                           a
 
-newtype ScoredResult a = ScoredResult { score :: Int, result :: a }
+newtype ScoredResult a = ScoredResult {
+  score  :: Int -- ^ the score of the parse
+, result :: a   -- ^ the result of the parse
+}
 
 unScoredResult :: forall a. ScoredResult a -> { score :: Int, result :: a }
 unScoredResult (ScoredResult r) = r
@@ -90,6 +94,9 @@ instance ordScoredResult :: Ord (ScoredResult a)
 
 instance eqScoredResult :: Eq (ScoredResult a)
   where eq = eq `on` (_.score <<< unScoredResult)
+
+score :: forall a. Int -> List a -> ScoredResult (List a)
+score score result = ScoredResult { score, result }
 
 scoreFromList :: forall a. List a -> ScoredResult (List a)
 scoreFromList xs = ScoredResult { score: length xs, result: xs }
@@ -307,10 +314,25 @@ genBranchesParser :: List D.Branch -- ^ The branches to test
 genBranchesParser xs term optsFirst canSkip
   = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
     env :: D.Env <- ask
-    let ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> do
+    let
+      ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> do
                             genBranchParser x optsFirst canSkip
                             <* if term then eof else return unit
-        rs = evalState (runReaderT (collect s ps) env) 0
+      rs = evalState (runReaderT (collect s ps) env) 0
+
+      -- Evaluate the winning candidates, if any.
+      -- First, sort the positive results by their depth, then group consecutive
+      -- elements, take the highest element and sort the inner values by their
+      -- fallback score.
+      winner =
+          maximumBy (compare `on` (_.score <<< unScoredResult
+                                   <<< _.value
+                                   <<< _.result))
+            =<< do
+                  last $ groupBy (eq `on` (_.depth <<< _.result))
+                                 (sortBy (compare `on` (_.depth <<< _.result))
+                                         (mrights $ reverse rs))
+
     return $ maybe'
       (\_ ->
         maybe'
@@ -340,7 +362,7 @@ genBranchesParser xs term optsFirst canSkip
           (maximumBy (compare `on` (_.depth <<< _.result)) $ mlefts rs)
       )
       (\r -> r { result = Right r.result.value })
-      (maximumBy (compare `on` (_.depth <<< _.result)) $ mrights (reverse rs))
+      winner
 
   where
     fixMessage m = m
@@ -391,15 +413,16 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                 ++ (intercalate " " (D.prettyPrintArg <$> ps))
                 ++ " - canSkip: " ++  show canSkip
           else return unit
-      draw ps (length ps)
+      draw ps (length ps) Nil
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
         -- apply `draw` until the parser fails, with a modified `ps`.
         draw :: List D.Argument -- ^ the arguments to parse
              -> Int             -- ^ the number of options left to parse
+             -> List D.Argument -- ^ the unique arguments parsed
              -> Parser (ScoredResult (List ValueMapping))
 
-        draw pss@(Cons p ps') n | n >= 0 = (do
+        draw pss@(Cons p ps') n tot | n >= 0 = (do
           if debug
             then do
                 i <- getInput
@@ -438,13 +461,13 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
           r' <- unScoredResult <$> P.try do
                   if D.isRepeatable p
-                        then draw pss (length pss)
-                        else draw ps' (length ps')
+                        then draw pss (length pss) (p:tot)
+                        else draw ps' (length ps') (p:tot)
 
           return $ ScoredResult r ++ ScoredResult r'
-        ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1))
+        ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1) tot)
 
-        draw ps' n | (length ps' > 0) && (n < 0) = do
+        draw ps' n tot | (length ps' > 0) && (n < 0) = do
           env :: StrMap String <- lift ask
 
           -- Find flags missing from the input.
@@ -461,22 +484,30 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
             then P.fail $
               "Missing required options: "
                 ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
-            else return mempty
+            else return $ ScoredResult {
+              score: sum $ ps' <#> \o ->
+                        if D.hasEnvBacking o env
+                            then 2
+                            else if D.hasDefault o
+                                    then 1
+                                    else 0
+            , result: Nil
+            }
 
           where
             isSkippable env (D.Group o bs _)
               = o || (all (all (isSkippable env) <<< D.runBranch) bs)
             isSkippable env o
-              =  (D.isRepeatable  o)
-              || (D.hasDefault    o)
+              =  (D.hasDefault o)
               || (maybe true id do
                   arg <- O.runArgument <$> do
                             D.getArgument o
                   return arg.optional
                 )
               || (D.hasEnvBacking o env)
+              || (D.isRepeatable o && (any (_ == o) tot))
 
-        draw _ _ = return mempty
+        draw _ _ _ = return mempty
 
     step :: Acc (ScoredResult (List ValueMapping))
          -> D.Argument
@@ -536,7 +567,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
     -- Generate a parser for a `Command` argument
     genParser x@(D.Command n r) _ = (do
-      scoreFromList <$> do
+      score 0 <$> do
         if r then (some go) else (singleton <$> go)
       <* lift (State.modify (1 + _))
       ) P.<?> "command: " ++ (show $ D.prettyPrintArg x)
@@ -544,14 +575,14 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) _ = (do
-      scoreFromList <<< singleton <<< Tuple x <$> do
+      score 0 <<< singleton <<< Tuple x <$> do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
       <* lift (State.modify (1 + _))
       ) P.<?> "end of arguments: \"--\""
 
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) _ = (do
-      scoreFromList <<< singleton <<< Tuple x <$> do
+      score 0 <<< singleton <<< Tuple x <$> do
         dash
         return (D.BoolValue true)
       <* lift (State.modify (1 + _))
@@ -563,7 +594,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional n r) _ = (do
-      scoreFromList <$> do
+      score 0 <$> do
         if r then (some go) else (singleton <$> go)
       <* lift (State.modify (1 + _))
       ) P.<?> "positional argument: " ++ (show $ D.prettyPrintArg x)
@@ -571,7 +602,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option (O.Option o)) _ = (do
-      scoreFromList <$> do
+      score 0 <$> do
         if o.repeatable then (some go) else (singleton <$> go)
       <* lift (State.modify (1 + _))
       )
@@ -618,7 +649,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           let mod    = if optional then P.try >>> P.option mempty else \p -> p
               parser = if repeated then goR else singleton <$> go
           in mod parser
-      return $ scoreFromList vs
+      return $ score 0 vs
       where
         goR :: Parser (List (List ValueMapping))
         goR = do
@@ -629,7 +660,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                                   -- always allow skipping for non-free groups.
                                   (not (D.isFree x) || canSkip)
 
-          if score == 0
+          if (length (snd result) == 0)
               then return $ singleton (snd result)
               else do
                 xs <- goR <|> pure Nil
