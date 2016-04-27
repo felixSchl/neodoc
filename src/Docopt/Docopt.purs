@@ -31,8 +31,8 @@ import Data.Array as A
 import Data.Bifunctor (lmap)
 import Data.List.WordsLines (lines, unlines)
 
-
-import Language.Docopt (parseDocopt, applyDocopt)
+import Language.Docopt (parseDocopt, evalDocopt)
+import Language.Docopt.Value (Value())
 import Language.Docopt as D
 import Language.Docopt.Env (Env())
 
@@ -76,7 +76,7 @@ defaultOptions = {
 run :: forall e
      . String
     -> Options
-    -> Eff (DocoptEff e) (StrMap D.Value)
+    -> Eff (DocoptEff e) (StrMap Value)
 run d o = do
   argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
   env  <- maybe Process.getEnv              (return <<< id) o.env
@@ -84,7 +84,7 @@ run d o = do
          do
           { specification, usage } <- parseDocopt d o.smartOptions
           lmap ((help usage) ++ _) do
-            applyDocopt specification env argv o.optionsFirst
+            evalDocopt specification env argv o.optionsFirst
 
   where
     onError e = do

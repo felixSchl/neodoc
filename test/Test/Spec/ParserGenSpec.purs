@@ -30,10 +30,10 @@ import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.Env (Env())
 import Language.Docopt.ParserGen (genParser, runParser)
-import Language.Docopt.Argument as D
-import Language.Docopt.Env      as Env
-import Language.Docopt.Trans    as T
-import Test.Support.Docopt      as D
+import Language.Docopt.Argument   as D
+import Language.Docopt.Env        as Env
+import Language.Docopt.Trans.Flat as T
+import Test.Support.Docopt        as D
 
 data Test = Test (List (Array Argument)) (Array Case)
 data Case = Case (Array String)
