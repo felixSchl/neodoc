@@ -1,11 +1,13 @@
 module Language.Docopt.Trans.Key (
     key
+  , toKeys
   , Key(..)
   ) where
 
 import Prelude
 import Data.Maybe (maybe)
 import Data.String (fromChar)
+import Data.String (toUpper, toLower) as Str
 import Data.Function (on)
 import Data.String.Ext ((^=))
 import Language.Docopt.Option as O
@@ -37,3 +39,18 @@ key :: D.Argument -> Key
 key arg = Key { arg: arg }
 
 
+-- | Derive a key from an argument.
+-- | This key is what the user will use to check the value of
+-- | a mathed argument.
+toKeys :: D.Argument -> Array String
+toKeys (D.Command n _)    = [n]
+toKeys (D.Positional n _) = [ "<" ++ Str.toLower n ++ ">"
+                            , Str.toUpper n
+                            ]
+toKeys (D.Group _ _ _)    = []
+toKeys (D.EOA)            = ["--"]
+toKeys (D.Stdin)          = ["-"]
+toKeys (D.Option (O.Option o))
+                          = []
+                          ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) o.flag
+                          ++ maybe [] (\s -> [ "--" ++ s ]) o.name

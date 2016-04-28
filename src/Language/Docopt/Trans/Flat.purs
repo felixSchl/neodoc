@@ -25,7 +25,7 @@ import Language.Docopt.Option as O
 import Language.Docopt.Env as Env
 import Data.List (List, singleton, catMaybes, toList, concat)
 import Language.Docopt.ParserGen.ValueMapping (ValueMapping)
-import Language.Docopt.Trans.Key (Key(..), key)
+import Language.Docopt.Trans.Key (Key(..), key, toKeys)
 
 -- | Reduce the list of (Argument, Value) mappings down to a Set of (String,
 -- | Value), where `String` is the name of the argument.
@@ -79,7 +79,7 @@ reduce us env b vs =
                             D.ArrayValue xs ->
                               D.IntValue (A.length $ flip A.filter xs \x ->
                                 case x of
-                                      D.BoolValue b | b -> true
+                                      D.BoolValue b -> b
                                       _ -> false
                               )
                             D.BoolValue b ->
@@ -187,7 +187,7 @@ reduce us env b vs =
     -- Handle option flags. Flags indicate only truthiness via their
     -- presence. Absent flags are always falsy!
     getDefaultValue (D.Option (O.Option o@{ arg: Nothing }))
-      = return $ if o.repeatable then D.ArrayValue [ D.BoolValue false ]
+      = return $ if o.repeatable then D.ArrayValue []
                                  else D.BoolValue false
     getDefaultValue (D.Positional _ r)
       = if r then return $ D.ArrayValue []
@@ -198,20 +198,3 @@ reduce us env b vs =
     getDefaultValue (D.Stdin) = return $ D.BoolValue false
     getDefaultValue (D.EOA) = Just $ D.ArrayValue []
     getDefaultValue _ = Nothing
-
--- | Derive a key from an argument.
--- | This key is what the user will use to check the value of
--- | a mathed argument.
-toKeys :: D.Argument -> Array String
-toKeys (D.Command n _)    = [n]
-toKeys (D.Positional n _) = [ "<" ++ Str.toLower n ++ ">"
-                            , Str.toUpper n
-                            ]
-toKeys (D.Group _ _ _)    = []
-toKeys (D.EOA)            = ["--"]
-toKeys (D.Stdin)          = ["-"]
-toKeys (D.Option (O.Option o))
-                          = []
-                          ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) o.flag
-                          ++ maybe [] (\s -> [ "--" ++ s ]) o.name
-

@@ -3,8 +3,9 @@ module Language.Docopt.Trans.Rich (
   , RichValue
   ) where
 
-import Data.List (List(), catMaybes, singleton)
-import Data.Maybe (Maybe(..))
+import Data.List (List(), catMaybes, singleton, concat, toList)
+import Data.Array (length, filter) as A
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Maybe.Unsafe (fromJust)
 import Data.Map as Map
 import Data.Tuple (Tuple(Tuple))
@@ -27,7 +28,7 @@ import Language.Docopt.Argument (Argument(..), Branch(..), isRepeatable,
 import Language.Docopt.ParserGen.ValueMapping (ValueMapping)
 import Language.Docopt.Trans.Origin as Origin
 import Language.Docopt.Trans.Origin (Origin())
-import Language.Docopt.Trans.Key (Key(..), key)
+import Language.Docopt.Trans.Key (Key(..), key, toKeys)
 
 newtype RichValue = RichValue {
   value  :: Value
@@ -44,8 +45,7 @@ reduce :: List D.Usage       -- ^ the program specification
 reduce us env b vs =
   let vm = Map.fromFoldableWith mergeVals $ fromArgv vs
       m  = applyValues vm $ reduceUsage (D.Usage (singleton b))
-    -- in expandMap m
-   in StrMap.empty
+    in expandMap m
 
   where
 
@@ -82,7 +82,9 @@ reduce us env b vs =
     getValue vm a = Map.lookup (key a) vm
 
     getFallback :: D.Argument -> Maybe RichValue
-    getFallback a = getEnvValue a -- <|> getDefaultValue a
+    getFallback a = getEnvValue     a
+                <|> getDefaultValue a
+                <|> getEmptyValue   a
 
       where
       getEnvValue :: D.Argument -> Maybe RichValue
@@ -93,6 +95,61 @@ reduce us env b vs =
         , value:  StringValue s
         }
       getEnvValue _ = Nothing
+
+      getDefaultValue :: D.Argument -> Maybe RichValue
+      getDefaultValue (D.Option (O.Option o@{
+          arg: Just (O.Argument { default: Just v })
+        })) = return
+                $ RichValue {
+                    origin: Origin.Default
+                  , value: if (o.repeatable)
+                              then ArrayValue $ Value.intoArray v
+                              else v
+                  }
+      getDefaultValue _ = Nothing
+
+      getEmptyValue :: D.Argument -> Maybe RichValue
+      getEmptyValue x = go x <#> \v -> RichValue { origin: Origin.Empty
+                                                 , value:  v
+                                                 }
+        where
+        go (D.Option (O.Option o@{ arg: Nothing }))
+          = return
+              $ if o.repeatable then ArrayValue []
+                                else BoolValue false
+        go (D.Positional _ r) | r = return $ ArrayValue []
+        go (D.Command _ r)    | r = return $ ArrayValue []
+        go (D.Stdin)              = return $ BoolValue false
+        go (D.EOA)                = return $ ArrayValue []
+        go _                      = Nothing
+
+  expandMap :: Map Key RichValue -> StrMap RichValue
+  expandMap m =
+    StrMap.fromFoldable $ concat
+      $ Map.toList m
+          <#> \(Tuple (Key { arg: a }) (RichValue rv)) ->
+                  let v = fromMaybe rv.value do
+                        if D.isFlag a || D.isCommand a
+                          then case rv.value of
+                            ArrayValue xs ->
+                              return
+                                $ IntValue (A.length $ flip A.filter xs \x ->
+                                    case x of
+                                        BoolValue b -> b
+                                        _           -> false
+                                  )
+                            BoolValue b ->
+                              if D.isRepeatable a
+                                  then
+                                    return $ if b
+                                              then IntValue 1
+                                              else IntValue 0
+                                  else Nothing
+                            _ -> Nothing
+                          else Nothing
+                    in flip Tuple (RichValue $ rv { value = v }) <$> do
+                        toList $ toKeys a
+
 
 -- | Reduce a usage application specification down to a list of unique
 -- | arguments, merging declarations where requried. This will later indicate
@@ -107,12 +164,12 @@ reduceUsage = Map.values <<< reduceBranches <<< D.runUsage
     reduceBranches :: List D.Branch -> Map Key D.Argument
     reduceBranches bs =
       let ms = combine <<< (expand <$> _) <<< D.runBranch <$> bs
-      in foldl (Map.unionWith resolveOR)
+      in foldl (Map.unionWith resolveAcrossBranches)
                 Map.empty
                 ms
       where
       combine :: List (Map Key D.Argument) -> Map Key D.Argument
-      combine xs = foldl (Map.unionWith resolveLCD)
+      combine xs = foldl (Map.unionWith resolveInSameBranch)
                           Map.empty
                           xs
 
@@ -125,8 +182,8 @@ reduceUsage = Map.values <<< reduceBranches <<< D.runUsage
 
     expand arg = Map.singleton (key arg) arg
 
-    resolveOR :: D.Argument -> D.Argument -> D.Argument
-    resolveOR (D.Option (O.Option o))
+    resolveAcrossBranches :: D.Argument -> D.Argument -> D.Argument
+    resolveAcrossBranches (D.Option (O.Option o))
               (D.Option (O.Option o'))
         = D.Option (O.Option o {
                     arg = do
@@ -139,10 +196,10 @@ reduceUsage = Map.values <<< reduceBranches <<< D.runUsage
                       }
                     , repeatable = o.repeatable || o'.repeatable
                     })
-    resolveOR a b = D.setRepeatable a (D.isRepeatable a || D.isRepeatable b)
+    resolveAcrossBranches a b = D.setRepeatable a (D.isRepeatable a || D.isRepeatable b)
 
-    resolveLCD :: D.Argument -> D.Argument -> D.Argument
-    resolveLCD (D.Option (O.Option o))
+    resolveInSameBranch :: D.Argument -> D.Argument -> D.Argument
+    resolveInSameBranch (D.Option (O.Option o))
               (D.Option (O.Option o'))
         = D.Option (O.Option o {
                     arg = do
@@ -155,4 +212,4 @@ reduceUsage = Map.values <<< reduceBranches <<< D.runUsage
                       }
                     , repeatable = true
                     })
-    resolveLCD a b =  D.setRepeatable a true
+    resolveInSameBranch a b =  D.setRepeatable a true
