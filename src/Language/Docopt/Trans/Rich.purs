@@ -3,6 +3,8 @@ module Language.Docopt.Trans.Rich (
   , RichValue
   ) where
 
+import Prelude
+
 import Data.List (List(), catMaybes, singleton, concat, toList)
 import Data.Array (length, filter) as A
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -35,8 +37,6 @@ newtype RichValue = RichValue {
 , origin :: Origin
 }
 
-import Prelude
-
 reduce :: List D.Usage       -- ^ the program specification
        -> Env                -- ^ the environment
        -> D.Branch           -- ^ the matched specification
@@ -45,7 +45,7 @@ reduce :: List D.Usage       -- ^ the program specification
 reduce us env b vs =
   let vm = Map.fromFoldableWith mergeVals $ fromArgv vs
       m  = applyValues vm $ reduceUsage (D.Usage (singleton b))
-    in expandMap m
+    in finalFold m
 
   where
 
@@ -70,7 +70,11 @@ reduce us env b vs =
   applyValues vm as = Map.fromFoldableWith mergeVals
     $ catMaybes
     $ as <#> \a -> Tuple (key a) <$> do
-      (RichValue v) <- (getValue vm a) <|> (getFallback a)
+      (RichValue v) <-  getValue vm     a
+                    <|> getEnvValue     a
+                    <|> getDefaultValue a
+                    <|> getEmptyValue   a
+
       return $ RichValue v {
         value = if D.isRepeatable a
                     then ArrayValue $ Value.intoArray v.value
@@ -81,50 +85,44 @@ reduce us env b vs =
     getValue :: Map Key RichValue -> D.Argument -> Maybe RichValue
     getValue vm a = Map.lookup (key a) vm
 
-    getFallback :: D.Argument -> Maybe RichValue
-    getFallback a = getEnvValue     a
-                <|> getDefaultValue a
-                <|> getEmptyValue   a
+    getEnvValue :: D.Argument -> Maybe RichValue
+    getEnvValue (D.Option (O.Option o@{ env: Just k })) = do
+      s <- Env.lookup k env
+      return $ RichValue {
+        origin: Origin.Environment
+      , value:  StringValue s
+      }
+    getEnvValue _ = Nothing
 
+    getDefaultValue :: D.Argument -> Maybe RichValue
+    getDefaultValue (D.Option (O.Option o@{
+        arg: Just (O.Argument { default: Just v })
+      })) = return
+              $ RichValue {
+                  origin: Origin.Default
+                , value: if (o.repeatable)
+                            then ArrayValue $ Value.intoArray v
+                            else v
+                }
+    getDefaultValue _ = Nothing
+
+    getEmptyValue :: D.Argument -> Maybe RichValue
+    getEmptyValue x = RichValue <<< { origin: Origin.Empty
+                                    , value:  _
+                                    } <$> go x
       where
-      getEnvValue :: D.Argument -> Maybe RichValue
-      getEnvValue (D.Option (O.Option o@{ env: Just k })) = do
-        s <- Env.lookup k env
-        return $ RichValue {
-          origin: Origin.Environment
-        , value:  StringValue s
-        }
-      getEnvValue _ = Nothing
+      go (D.Option (O.Option o@{ arg: Nothing }))
+        = return
+            $ if o.repeatable then ArrayValue []
+                              else BoolValue false
+      go (D.Positional _ r) | r = return $ ArrayValue []
+      go (D.Command _ r)    | r = return $ ArrayValue []
+      go (D.Stdin)              = return $ BoolValue false
+      go (D.EOA)                = return $ ArrayValue []
+      go _                      = Nothing
 
-      getDefaultValue :: D.Argument -> Maybe RichValue
-      getDefaultValue (D.Option (O.Option o@{
-          arg: Just (O.Argument { default: Just v })
-        })) = return
-                $ RichValue {
-                    origin: Origin.Default
-                  , value: if (o.repeatable)
-                              then ArrayValue $ Value.intoArray v
-                              else v
-                  }
-      getDefaultValue _ = Nothing
-
-      getEmptyValue :: D.Argument -> Maybe RichValue
-      getEmptyValue x = go x <#> \v -> RichValue { origin: Origin.Empty
-                                                 , value:  v
-                                                 }
-        where
-        go (D.Option (O.Option o@{ arg: Nothing }))
-          = return
-              $ if o.repeatable then ArrayValue []
-                                else BoolValue false
-        go (D.Positional _ r) | r = return $ ArrayValue []
-        go (D.Command _ r)    | r = return $ ArrayValue []
-        go (D.Stdin)              = return $ BoolValue false
-        go (D.EOA)                = return $ ArrayValue []
-        go _                      = Nothing
-
-  expandMap :: Map Key RichValue -> StrMap RichValue
-  expandMap m =
+  finalFold :: Map Key RichValue -> StrMap RichValue
+  finalFold m =
     StrMap.fromFoldable $ concat
       $ Map.toList m
           <#> \(Tuple (Key { arg: a }) (RichValue rv)) ->

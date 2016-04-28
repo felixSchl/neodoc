@@ -94,7 +94,9 @@ reduce us env b vs =
     applyValues vm as = Map.fromFoldableWith resolveArg
       $ catMaybes
       $ as <#> \a -> Tuple (key a) <$> do
-        v <- (getValue vm a <|> getFallback a)
+        v <- getValue vm a
+              <|> getEnvValue a
+              <|> getDefaultValue a
         return $ if D.isRepeatable a
                     then D.ArrayValue $ valIntoArray v
                     else v
@@ -168,9 +170,6 @@ reduce us env b vs =
     getValue :: Map Key D.Value -> D.Argument -> Maybe D.Value
     getValue vm a = do
       Map.lookup (key a) vm
-
-    getFallback :: D.Argument -> Maybe D.Value
-    getFallback a = getEnvValue a <|> getDefaultValue a
 
     getEnvValue :: D.Argument -> Maybe D.Value
     getEnvValue (D.Option (O.Option o@{ env: Just k }))
