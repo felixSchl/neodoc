@@ -1,6 +1,8 @@
 module Language.Docopt.Trans.Rich (
     reduce
   , RichValue
+  , RichValueObj
+  , unRichValue
   ) where
 
 import Prelude
@@ -32,10 +34,15 @@ import Language.Docopt.Trans.Origin as Origin
 import Language.Docopt.Trans.Origin (Origin())
 import Language.Docopt.Trans.Key (Key(..), key, toKeys)
 
-newtype RichValue = RichValue {
+type RichValueObj = {
   value  :: Value
 , origin :: Origin
 }
+
+newtype RichValue = RichValue RichValueObj
+
+unRichValue :: RichValue -> RichValueObj
+unRichValue (RichValue o) = o
 
 reduce :: List D.Usage       -- ^ the program specification
        -> Env                -- ^ the environment
@@ -62,8 +69,8 @@ reduce us env b vs =
   mergeVals :: RichValue -> RichValue -> RichValue
   mergeVals (RichValue v) (RichValue v') = RichValue $ {
     origin: fromJust $ maximum [ v.origin, v'.origin ]
-  , value:  ArrayValue $ Value.intoArray v.value
-                      ++ Value.intoArray v'.value
+  , value:  ArrayValue $ Value.intoArray v'.value
+                      ++ Value.intoArray v.value
   }
 
   applyValues :: Map Key RichValue -> List D.Argument -> Map Key RichValue
