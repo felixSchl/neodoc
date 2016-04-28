@@ -2,15 +2,19 @@
     <h1>
         <strong>&lt;neodoc&gt;</strong>
     </h1>
-    <em><sub></sub></em>
+    <em>Beautiful, handcrafted commandlines</em>
 </div>
 
+<hr>
+
+<!--
 <p align="center">
   <a href="https://travis-ci.org/felixSchl/neodoc">
     <img src="https://travis-ci.org/felixSchl/neodoc.svg"
          alt="Build Status">
   </a>
 <br/>
+-->
 
 <p align="center">
     <b><a href="#about">About</a></b>
@@ -23,6 +27,8 @@
 </p>
 
 ![preview](https://raw.githubusercontent.com/felixSchl/felixSchl.github.io/master/neodoc/neodoc.png)
+
+<hr>
 
 <br/>
 
