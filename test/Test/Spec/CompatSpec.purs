@@ -106,10 +106,15 @@ parseUniversalDocoptTests = do
                           A.many $ P.noneOf [ '"' ]
                 P.skipSpaces *> P.char ':' <* P.skipSpaces
                 Tuple key <$> value
-        , P.string "\"user-error\""
-            *> many (P.char ' ')
-            *> P.optional comment
-            *> return (Left "user-error")
+        , Left <$> do
+            P.char '"'
+            s <- fromCharArray <$> A.many do
+                  P.try do
+                    P.noneOf ['"', '\n']
+            P.char '"'
+            many $ P.char ' '
+            P.optional comment
+            return $ s
         ]
       P.skipSpaces *> skipComments *>  P.skipSpaces
       return $ Kase { out: output
@@ -204,7 +209,14 @@ genCompatSpec = do
               vliftEff $ case result of
                 Left e ->
                   either
-                    (const $ pure unit)
+                    (\es ->
+                      if es == "user-error"
+                        then return unit
+                        else if e == es
+                          then return unit
+                          else throwException $ error $
+                            "Unexpected exception message: \"" ++ e ++ "\""
+                    )
                     (const $ throwException $ error $ e)
                     out
                 Right output -> do
@@ -225,6 +237,7 @@ genCompatSpec = do
 
   where
     prettyPrintOut :: Either String (List (Tuple String D.Value)) -> String
-    prettyPrintOut (Left err) = "fail with " ++ show err
+    prettyPrintOut (Left "user-error") = "fail"
+    prettyPrintOut (Left err) = "fail with: \"" ++ err ++ "\""
     prettyPrintOut (Right xs)
       = intercalate "\n" $ xs <#> \(Tuple k v) -> k ++ " => " ++ show v

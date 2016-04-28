@@ -2273,3 +2273,15 @@ $ prog --input "foo,bar"
 
 $ prog --input foo,bar
 {"--input": ["foo,bar"]}
+
+#
+# Validate error messages
+#
+
+r"""
+Usage: foo -f ARG
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
