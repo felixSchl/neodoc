@@ -13,7 +13,7 @@ module Language.Docopt.ParserGen.Parser (
 import Prelude
 import Control.Plus (empty)
 import Control.Bind ((=<<))
-import Debug.Trace (traceA, traceShowA)
+import Debug.Trace
 import Control.Apply ((<*))
 import Data.Function (on)
 import Data.Either (Either(..), either)
@@ -600,6 +600,15 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       ) P.<?> "positional argument: " ++ (show $ D.prettyPrintArg x)
         where go = Tuple x <$> (positional n)
 
+    genParser x@(D.Group optional bs r) _
+      | optsFirst && (length bs == 1) &&
+        all (\(D.Branch xs) ->
+          case xs of
+            Cons (D.Positional n r') Nil -> r' || r
+            _                            -> false
+        ) bs
+      = terminate (LU.head (D.runBranch (LU.head bs)))
+
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option (O.Option o)) _ = (do
       score 0 <$> do
@@ -633,15 +642,6 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           mkSoptParser (Just f) a = shortOption f a
           mkSoptParser Nothing _  = P.fail "flag"
 
-    genParser x@(D.Group optional bs r) _
-      | optsFirst && (length bs == 1) &&
-        all (\(D.Branch xs) ->
-          case xs of
-            Cons (D.Positional n r') Nil -> r' || r
-            _                            -> false
-        ) bs
-      = terminate (LU.head (D.runBranch (LU.head bs)))
-
     -- Generate a parser for an argument `Group`
     -- The total score a group is the sum of all scores inside of it.
     genParser x@(D.Group optional bs repeated) canSkip = do
@@ -656,7 +656,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           {score, result} <- unScoredResult
             <$> genBranchesParser bs
                                   false
-                                  false
+                                  optsFirst
                                   -- always allow skipping for non-free groups.
                                   (not (D.isFree x) || canSkip)
 
@@ -673,7 +673,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                     snd <<< _.result <<<  unScoredResult
                       <$> genBranchesParser bs
                                             false
-                                            false
+                                            optsFirst
                                             -- always allow skipping for
                                             -- non-free groups.
                                             (not (D.isFree x) || canSkip)

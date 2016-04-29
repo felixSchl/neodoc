@@ -1425,6 +1425,33 @@ $ prog/p -01
 {"-0": false, "-1": false, "ARG": ["-01"], "<arg>": ["-01"]}
 
 #
+# Options-first fix for issue #21
+#
+
+r"""
+Usage: foo [[<args>...]]
+"""
+
+$ prog/p
+{"ARGS": [], "<args>": []}
+
+$ prog/p bar -a -b -c
+{"ARGS": ["bar", "-a", "-b", "-c"],
+ "<args>": ["bar", "-a", "-b", "-c"]}
+
+r"""
+Usage: foo [<command> [<args>...]]
+"""
+
+$ prog/p
+{"ARGS": [], "<args>": []}
+
+$ prog/p bar -a -b -c
+{"COMMAND": "bar", "<command>": "bar",
+ "ARGS": ["-a", "-b", "-c"],
+ "<args>": ["-a", "-b", "-c"]}
+
+#
 # Optional arguments
 #
 
