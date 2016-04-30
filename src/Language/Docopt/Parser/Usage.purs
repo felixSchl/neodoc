@@ -10,7 +10,7 @@ import Language.Docopt.Parser.Lexer as L
 import Language.Docopt.Parser.Usage.Option as O
 import Language.Docopt.Parser.Usage.Usage as U
 import Control.Alt ((<|>))
-import Control.Apply ((*>))
+import Control.Apply ((<*), (*>))
 import Control.Bind ((=<<))
 import Control.Lazy (defer)
 import Control.MonadPlus (guard)
@@ -60,9 +60,9 @@ usageParser smartOpts = do
             P.optional $ P.try do
               L.name >>= guard <<< (_ == "or")
               L.colon
-            P.try do
-              program
-              usageLine name
+            program
+            usageLine name
+  <* (L.eof <?> "End of usage section")
 
   where
 
@@ -73,13 +73,15 @@ usageParser smartOpts = do
       eoa <- P.choice [
         P.try $ do
           moreIndented *> L.doubleDash
+          P.optional do
+            many elem
           return $ Just EOA
       , (do
           L.eof <|> (P.lookAhead $ lessIndented <|> sameIndent)
           return Nothing
         )
         -- XXX: We could show the last token that failed to be consumed, here
-        <?> "start of next usage line or end of usage section"
+        <?> "End of usage line"
       ]
 
       -- Push the EOA onto the last branch (the most right branch)
