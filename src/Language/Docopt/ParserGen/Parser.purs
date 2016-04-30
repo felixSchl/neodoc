@@ -644,39 +644,25 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
     -- Generate a parser for an argument `Group`
     -- The total score a group is the sum of all scores inside of it.
-    genParser x@(D.Group optional bs repeated) canSkip = do
-      vs <- concat <$>
-          let mod    = if optional then P.try >>> P.option mempty else \p -> p
-              parser = if repeated then goR else singleton <$> go
-          in mod parser
-      return $ score 0 vs
+    genParser x@(D.Group optional bs repeated) canSkip =
+      let mod = if optional then P.option mempty <<< P.try else \p -> p
+       in mod go
       where
-        goR :: Parser (List (List ValueMapping))
-        goR = do
-          {score, result} <- unScoredResult
-            <$> genBranchesParser bs
+        go | length bs == 0 = return mempty
+        go = do
+          x <- step
+          if repeated && length (_.result $ unScoredResult x) > 0
+             then do
+                xs <- step <|> return mempty
+                return $ x ++ xs
+             else return x
+
+        step = rmapScoreResult snd <$> do
+                genBranchesParser bs
                                   false
                                   optsFirst
                                   -- always allow skipping for non-free groups.
                                   (not (D.isFree x) || canSkip)
-
-          if (length (snd result) == 0)
-              then return $ singleton (snd result)
-              else do
-                xs <- goR <|> pure Nil
-                return $ (snd result) : xs
-
-        go :: Parser (List ValueMapping)
-        go = if length bs == 0
-                  then return mempty
-                  else do
-                    snd <<< _.result <<<  unScoredResult
-                      <$> genBranchesParser bs
-                                            false
-                                            optsFirst
-                                            -- always allow skipping for
-                                            -- non-free groups.
-                                            (not (D.isFree x) || canSkip)
 
 unParseError :: P.ParseError -> { position :: P.Position, message :: String }
 unParseError (P.ParseError e) = e

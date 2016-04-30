@@ -2275,6 +2275,38 @@ $ INPUT="foo bar" prog
 {"--input": ["foo bar"]}
 
 #
+# Environment variables - issue #22
+#
+
+r"""
+Usage: foo
+   or: foo (--input=FILE)
+Options: --input [env: INPUT]
+"""
+
+$ prog
+{}
+
+$ INPUT=bar prog
+{"--input": "bar"}
+
+r"""
+Usage: foo
+   or: foo (--input=FILE) | (--input=FILE --output=BAR)
+Options: --input  [env: INPUT]
+         --output [env: OUTPUT]
+"""
+
+$ prog
+{}
+
+$ INPUT=bar OUTPUT=qux prog
+{"--input": "bar", "--output": "qux"}
+
+$ OUTPUT=qux prog --input=bar
+{"--input": "bar", "--output": "qux"}
+
+#
 # Ensure comma separated values provided on the command line or through the
 # environment are *NOT* parsed into arrays. This has been identified as flaw
 # in design an is subject to removal from neodoc. This change excludes default
