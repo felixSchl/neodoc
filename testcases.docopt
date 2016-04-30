@@ -2344,3 +2344,15 @@ Options: -f, --foo ARG
 
 $ prog -f
 "Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+#
+# This usage section parse must fail until #23 comes to fruition.
+#
+
+r"""
+usage: git remote [-v | --verbose]
+       git remote [--[no-]tags]
+"""
+
+$ prog
+"user-error"
