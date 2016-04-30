@@ -91,7 +91,7 @@ prettyPrintArg (Group b xs r)
   ++ (intercalate " | " (prettyPrintBranch <$> xs))
   ++ (if b then "]" else ")")
   ++ (if r then "..." else "")
-prettyPrintArg (EOA) = "-- ARGS..."
+prettyPrintArg (EOA) = "--"
 prettyPrintArg (Stdin) = "-"
 prettyPrintArg (Reference r) = "[" ++ show r ++ " options...]"
 
