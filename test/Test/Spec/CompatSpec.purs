@@ -6,6 +6,7 @@ import Debug.Trace (traceShowA)
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)
+import Control.Alt ((<|>))
 import Data.StrMap as StrMap
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Either (Either(..), either)
@@ -110,7 +111,7 @@ parseUniversalDocoptTests = do
             P.char '"'
             s <- fromCharArray <$> A.many do
                   P.try do
-                    P.noneOf ['"', '\n']
+                    (P.char '\\' *> P.char '"') <|> P.noneOf ['"', '\n']
             P.char '"'
             many $ P.char ' '
             P.optional comment
