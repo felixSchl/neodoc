@@ -90,7 +90,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             "Expected positional argument: \"qux...\""
         , fail
             [ "a", "--foo", "-f=10" ]
-            "Trailing input: --foo, -f=10"
+            "Unmatched option: --foo"
         ]
 
     , test
@@ -141,7 +141,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
     , test
         [ D.grr false [[ D.opt 'i' "input" (D.oa_ "FILE") ]]
         ]
-        [ fail [] "Missing required options: -i|--input=FILE"
+        [ fail [] "Expected option(s): -i|--input=FILE"
         , pass
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -151,7 +151,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
     , test
         [ D.grr false [[ D.opt 'i' "input" (D.oa_ "FILE") ]]
         ]
-        [ fail [] "Missing required options: -i|--input=FILE"
+        [ fail [] "Expected option(s): -i|--input=FILE"
         , pass
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -163,10 +163,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Missing required options: -o|--output=FILE, -i|--input=FILE"
+          $ "Expected option(s): -o|--output=FILE, -i|--input=FILE"
 
         , fail [ "-i", "bar" ]
-          $ "Missing required options: -o|--output=FILE"
+          $ "Expected option(s): -o|--output=FILE"
 
         , pass [ "-i", "bar", "-o", "bar" ]
             [ "--input"  :> D.str "bar"
@@ -192,10 +192,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Missing required options: -o|--output=FILE, -i|--input=FILE -r|--redirect=FILE"
+          $ "Expected option(s): -o|--output=FILE, -i|--input=FILE -r|--redirect=FILE"
 
         , fail [ "-i", "bar", "-r", "bar" ]
-            "Missing required options: -o|--output=FILE"
+            "Expected option(s): -o|--output=FILE"
 
         , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
             [ "--input"    :> D.str "bar"
@@ -232,7 +232,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           ]]
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
-        [ fail [] "Missing required options: -i|--input=FILE"
+        [ fail [] "Expected option(s): -i|--input=FILE"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
         , pass [ "-i", "bar", "x", "-o", "bar" ]
@@ -244,7 +244,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-o"       :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail [ "-o", "bar", "x", "-i", "bar" ]
-            "Missing required options: -i|--input=FILE"
+            "Expected option(s): -i|--input=FILE"
         ]
 
     , test
@@ -288,14 +288,14 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "b" :> D.bool true ]
         , fail
             [ "a", "b" ]
-            "Trailing input: \"b\""
+            "Unmatched command: b"
         , fail
             [ "b", "a" ]
-            "Trailing input: \"a\""
+            "Unmatched command: a"
         , fail
             []
             -- XXX: Could this be better?
-            "Expected command: \"a\" or command: \"b\""
+            "Expected command: \"b\""
         ]
 
     , test
@@ -391,15 +391,15 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
         , fail
             [ "foo" ]
-            "Missing required options: -f|--foo=FOZ..."
+            "Expected option(s): -f|--foo=FOZ..."
         , fail
             [ "foo", "-o", "-i", "-bax" ]
-            "Missing required options: -f|--foo=FOZ..."
+            "Expected option(s): -f|--foo=FOZ..."
         ]
 
     , test
         [ D.gro false [[ D.co "foo" ]] ]
-        [ fail [ "goo" ] "Trailing input: \"goo\"" ]
+        [ fail [ "goo" ] "Unmatched command: goo" ]
     , test
         [ D.grr false [[ D.co "foo" ]] ]
         [ fail [ "goo" ] "Expected command: \"foo\"" ]

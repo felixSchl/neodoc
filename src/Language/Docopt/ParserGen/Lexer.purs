@@ -31,13 +31,19 @@ import Language.Docopt.Value (Value(..)) as D
 parseToken :: P.Parser String Token
 parseToken = do
   P.choice $ P.try <$> [
-    sopt <* P.eof
-  , lopt <* P.eof
-  , eoa  <* P.eof
-  , lit  <* P.eof
+    stdin <* P.eof
+  , sopt  <* P.eof
+  , lopt  <* P.eof
+  , eoa   <* P.eof
+  , lit   <* P.eof
   ]
 
   where
+    stdin :: P.Parser String Token
+    stdin = do
+      P.char '-'
+      return $ Stdin
+
     eoa :: P.Parser String Token
     eoa = do
       P.string "--"

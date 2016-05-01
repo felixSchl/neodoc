@@ -2334,6 +2334,60 @@ $ prog --input foo,bar
 {"--input": ["foo,bar"]}
 
 #
+# Test stdin (-)
+#
+
+r"""
+Usage: foo -
+"""
+
+$ prog
+"Expected \"-\""
+
+$ prog -
+{"-": true}
+
+r"""
+Usage: foo [-]
+"""
+
+$ prog
+{"-": false}
+
+$ prog -
+{"-": true}
+
+#
+# Test EOA (--)
+#
+
+r"""
+Usage: foo -- ARGS...
+"""
+
+$ prog
+{"--": []}
+
+$ prog --
+{"--": []}
+
+$ prog -- --foo bar
+{"--": ["--foo", "bar"]}
+
+r"""
+Usage: foo --
+"""
+
+$ prog
+{"--": []}
+
+$ prog --
+{"--": []}
+
+$ prog -- --foo bar
+{"--": ["--foo", "bar"]}
+
+#
 # Validate error messages
 #
 
@@ -2344,6 +2398,15 @@ Options: -f, --foo ARG
 
 $ prog -f
 "Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+# Ambigous errors
+r"""
+Usage: foo remote
+       foo
+"""
+
+$ prog --fooo
+"Unmatched option: --fooo"
 
 #
 # This usage section parse must fail until #23 comes to fruition.

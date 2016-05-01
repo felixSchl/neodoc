@@ -57,6 +57,7 @@ import Language.Docopt.ParserGen.Token as Token
 import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
                                         unPositionedToken, prettyPrintToken)
 import Language.Docopt.ParserGen.ValueMapping (ValueMapping)
+import Data.String.Ext (startsWith)
 
 debug :: Boolean
 debug = false
@@ -150,11 +151,11 @@ positional n = token go P.<?> "positional argument " ++ show n
     go (Lit v) = Just (Value.read v false)
     go _       = Nothing
 
-dash :: Parser D.Value
-dash = token go P.<?> "stdin flag"
+stdin :: Parser D.Value
+stdin = token go P.<?> "stdin flag"
   where
-    go (Lit v) | v == "-" = Just (D.BoolValue true)
-    go _                  = Nothing
+    go Stdin = Just (D.BoolValue true)
+    go _     = Nothing
 
 type HasConsumedArg = Boolean
 data OptParse = OptParse D.Value (Maybe Token) HasConsumedArg
@@ -288,10 +289,15 @@ eof :: Parser Unit
 eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
   return $ case s of
     Nil -> { consumed: false, input: s, result: Right unit, position: pos }
-    _   -> P.parseFailed s pos $
-              "Trailing input: "
-            ++ (intercalate ", "
-                  $ prettyPrintToken <<< _.token <<< unPositionedToken <$> s)
+    (Cons (PositionedToken {token: tok, source}) _) ->
+      P.parseFailed s pos
+        $ case tok of
+              LOpt _ _   -> "Unmatched option: " ++ source
+              SOpt _ _ _ -> "Unmatched option: " ++ source
+              EOA _      -> "Unmatched option: --"
+              Stdin      -> "Unmatched option: -"
+              Lit _      -> "Unmatched command: " ++ source
+
 
 -- | Generate a parser for a single program usage.
 genUsageParser :: List D.Usage -- ^ The list of usage specs
@@ -319,6 +325,7 @@ genBranchesParser xs term optsFirst canSkip
                             genBranchParser x optsFirst canSkip
                             <* if term then eof else return unit
       rs = evalState (runReaderT (collect s ps) env) 0
+      rs' = reverse rs
 
       -- Evaluate the winning candidates, if any.
       -- First, sort the positive results by their depth, then group consecutive
@@ -331,35 +338,28 @@ genBranchesParser xs term optsFirst canSkip
             =<< do
                   last $ groupBy (eq `on` (_.depth <<< _.result))
                                  (sortBy (compare `on` (_.depth <<< _.result))
-                                         (mrights $ reverse rs))
+                                         (mrights rs'))
+
+      -- Evaluate the losing candidates, if any.
+      losers =
+          last $ groupBy (eq `on` (_.depth <<< _.result))
+                         (sortBy (compare `on` (_.depth <<< _.result))
+                                (mlefts rs))
 
     return $ maybe'
       (\_ ->
-        maybe'
-          (\_ -> P.parseFailed Nil P.initialPos
-                  "The impossible happened. Failure without error")
-          (\e ->
-            -- of all `mlefts` are zeros, it's an ambigious fail and all
-            -- branches must be presented as an option.
-            if e.result.depth > 0
-              then e { result = Left e.result.error }
-              else
-                let errors = _.error <<< _.result <$> mlefts rs
-                 in e { result = Left $ P.ParseError {
-                        position: _.position $ unParseError (LU.head errors)
-                      , message:
-                          -- Concatenate the error such that it looks like one
-                          -- continuos error. This is borderline brittle because
-                          -- it replaces some text that comes from
-                          -- purescript-parsing.
-                          let m  = _.message $ unParseError (LU.head errors)
-                              ms = LU.tail errors <#> \e' ->
-                                    let m' = _.message $ unParseError e'
-                                     in String.replace "Expected " "" m'
-                           in intercalate " or " (m : ms)
-                    } }
-          )
-          (maximumBy (compare `on` (_.depth <<< _.result)) $ mlefts rs)
+        fromMaybe
+          (P.parseFailed i pos
+            "The impossible happened. Failure without error")
+          do
+            es <- sortBy
+                    (\e _ ->
+                      let msg = _.message $ unParseError e.result.error
+                       in if startsWith "Unmatched" msg
+                            then GT
+                            else LT) <$> losers
+            e <- last es
+            return (e { result = Left $ e.result.error })
       )
       (\r -> r { result = Right r.result.value })
       winner
@@ -482,7 +482,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
           if (length missing > 0)
             then P.fail $
-              "Missing required options: "
+              "Expected option(s): "
                 ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
             else return $ ScoredResult {
               score: sum $ ps' <#> \o ->
@@ -583,10 +583,10 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) _ = (do
       score 0 <<< singleton <<< Tuple x <$> do
-        dash
-        return (D.BoolValue true)
+        stdin
+        -- return (D.BoolValue true)
       <* lift (State.modify (1 + _))
-      ) P.<?> "stdin: \"-\""
+      ) <|> P.fail "Expected \"-\""
 
     genParser x@(D.Positional n r) _
       | r && optsFirst
