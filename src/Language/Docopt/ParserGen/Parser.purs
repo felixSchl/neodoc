@@ -574,26 +574,26 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
               -> Parser (ScoredResult (List ValueMapping))
 
     -- Generate a parser for a `Command` argument
-    genParser x@(D.Command n r) _ = (do
-      score 0 <$> do
+    genParser x@(D.Command n r) _ = do
+      i <- getInput
+      score 0 <$> (do
         if r then (some go) else (singleton <$> go)
-      <* lift (State.modify (1 + _))
-      ) <|> (P.fail $ "Expected " ++ D.prettyPrintArg x)
+        <* lift (State.modify (1 + _))
+      ) <|> (P.fail $ "Expected " ++ D.prettyPrintArg x ++ butGot i)
         where go = Tuple x <$> (command n)
 
     -- Generate a parser for a `EOA` argument
-    genParser x@(D.EOA) _ = (do
-      score 0 <<< singleton <<< Tuple x <$> do
+    genParser x@(D.EOA) _ = do
+      score 0 <<< singleton <<< Tuple x <$> (do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
-      <* lift (State.modify (1 + _))
+        <* lift (State.modify (1 + _))
       ) <|> P.fail "Expected \"--\""
 
     -- Generate a parser for a `Stdin` argument
-    genParser x@(D.Stdin) _ = (do
-      score 0 <<< singleton <<< Tuple x <$> do
+    genParser x@(D.Stdin) _ = do
+      score 0 <<< singleton <<< Tuple x <$> (do
         stdin
-        -- return (D.BoolValue true)
-      <* lift (State.modify (1 + _))
+        <* lift (State.modify (1 + _))
       ) <|> P.fail "Expected \"-\""
 
     genParser x@(D.Positional n r) _
@@ -601,11 +601,12 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       = terminate x
 
     -- Generate a parser for a `Positional` argument
-    genParser x@(D.Positional n r) _ = (do
-      score 0 <$> do
+    genParser x@(D.Positional n r) _ = do
+      i <- getInput
+      score 0 <$> (do
         if r then (some go) else (singleton <$> go)
-      <* lift (State.modify (1 + _))
-      ) <|> P.fail ("Expected " ++ D.prettyPrintArg x)
+        <* lift (State.modify (1 + _))
+      ) <|> P.fail ("Expected " ++ D.prettyPrintArg x ++ butGot i)
         where go = Tuple x <$> (positional n)
 
     genParser x@(D.Group optional bs r) _
@@ -671,6 +672,10 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                                   optsFirst
                                   -- always allow skipping for non-free groups.
                                   (not (D.isFree x) || canSkip)
+
+    butGot :: List PositionedToken -> String
+    butGot (Cons (PositionedToken { source }) _) = ", but got " ++ source
+    butGot Nil                                   = ""
 
 unParseError :: P.ParseError -> { position :: P.Position, message :: String }
 unParseError (P.ParseError e) = e

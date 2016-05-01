@@ -87,7 +87,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "QUX"   :> D.array [ D.str "a", D.str "b", D.str "c" ]
             ]
         , fail [ "--foo", "baz" ]
-            "Expected <qux>..."
+            "Expected <qux>..., but got --foo"
         , fail
             [ "a", "--foo", "-f=10" ]
             "Unmatched option: --foo"
@@ -399,7 +399,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ fail [ "goo" ] "Unmatched command: goo" ]
     , test
         [ D.grr false [[ D.co "foo" ]] ]
-        [ fail [ "goo" ] "Expected foo" ]
+        [ fail [ "goo" ] "Expected foo, but got goo" ]
   ]
 
   for_ testCases \(Test bs kases) -> do
