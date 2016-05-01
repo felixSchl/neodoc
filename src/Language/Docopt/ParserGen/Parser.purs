@@ -19,7 +19,7 @@ import Data.Function (on)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
 import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
-                  some, filter, head, fromList, sortBy, groupBy, last)
+                  some, filter, head, fromList, sortBy, groupBy, last, null)
 import Control.Alt ((<|>))
 import Data.Traversable (traverse)
 import Control.Lazy (defer)
@@ -352,14 +352,22 @@ genBranchesParser xs term optsFirst canSkip
           (P.parseFailed i pos
             "The impossible happened. Failure without error")
           do
-            es <- sortBy
-                    (\e _ ->
-                      let msg = _.message $ unParseError e.result.error
-                       in if startsWith "Unmatched" msg
-                            then GT
-                            else LT) <$> losers
-            e <- last es
-            return (e { result = Left $ e.result.error })
+            -- Provide the most useful error message to the user possible from
+            -- the information given. Unfortunately, we only get strings at
+            -- this point.
+            es  <- losers
+            let
+              es' = if length es > 1
+                      then es `flip filter` (\e ->
+                        let msg = _.message $ unParseError e.result.error
+                        in  not $ startsWith "Expected" msg)
+                      else es
+            (do
+              e <- last es'
+              return (e { result = Left $ e.result.error })
+            ) <|> (do
+              return $ P.parseFailed i pos ""
+            )
       )
       (\r -> r { result = Right r.result.value })
       winner
@@ -570,7 +578,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       score 0 <$> do
         if r then (some go) else (singleton <$> go)
       <* lift (State.modify (1 + _))
-      ) P.<?> "command: " ++ (show $ D.prettyPrintArg x)
+      ) <|> (P.fail $ "Expected " ++ D.prettyPrintArg x)
         where go = Tuple x <$> (command n)
 
     -- Generate a parser for a `EOA` argument
@@ -578,7 +586,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       score 0 <<< singleton <<< Tuple x <$> do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
       <* lift (State.modify (1 + _))
-      ) P.<?> "end of arguments: \"--\""
+      ) <|> P.fail "Expected \"--\""
 
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) _ = (do
@@ -597,7 +605,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       score 0 <$> do
         if r then (some go) else (singleton <$> go)
       <* lift (State.modify (1 + _))
-      ) P.<?> "positional argument: " ++ (show $ D.prettyPrintArg x)
+      ) <|> P.fail ("Expected " ++ D.prettyPrintArg x)
         where go = Tuple x <$> (positional n)
 
     genParser x@(D.Group optional bs r) _

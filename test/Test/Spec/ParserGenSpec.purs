@@ -87,7 +87,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "QUX"   :> D.array [ D.str "a", D.str "b", D.str "c" ]
             ]
         , fail [ "--foo", "baz" ]
-            "Expected positional argument: \"qux...\""
+            "Expected <qux>..."
         , fail
             [ "a", "--foo", "-f=10" ]
             "Unmatched option: --foo"
@@ -234,7 +234,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
         [ fail [] "Expected option(s): -i|--input=FILE"
           -- XXX: Would be cool to show the reason the group did not parse!
-        , fail [ "-i", "bar" ] "Expected positional argument: \"env\""
+        , fail [ "-i", "bar" ] "Expected <env>"
         , pass [ "-i", "bar", "x", "-o", "bar" ]
             [ "--input"  :> D.str "bar"
             , "-i"       :> D.str "bar"
@@ -292,10 +292,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , fail
             [ "b", "a" ]
             "Unmatched command: a"
-        , fail
-            []
-            -- XXX: Could this be better?
-            "Expected command: \"b\""
+        , fail [] ""
         ]
 
     , test
@@ -402,7 +399,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ fail [ "goo" ] "Unmatched command: goo" ]
     , test
         [ D.grr false [[ D.co "foo" ]] ]
-        [ fail [ "goo" ] "Expected command: \"foo\"" ]
+        [ fail [ "goo" ] "Expected foo" ]
   ]
 
   for_ testCases \(Test bs kases) -> do

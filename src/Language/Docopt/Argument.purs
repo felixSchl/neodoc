@@ -34,6 +34,7 @@ import Data.List (List())
 import Data.Foldable (intercalate, all)
 import Data.Function (on)
 import Data.String.Ext ((^=))
+import Data.String as String
 
 import Language.Docopt.Option as O
 import Language.Docopt.Env as Env
@@ -62,37 +63,36 @@ instance eqBranch :: Eq Branch where
   eq (Branch xs) (Branch xs') = (xs == xs')
 
 instance showArgument :: Show Argument where
-  show (EOA) = "EOA"
-  show (Stdin) = "Stdin"
-  show (Command n r)
-    = intercalate " " [ "Command", show n, show r ]
-  show (Positional n r)
-    = intercalate " " [ "Positional", show n, show r ]
-  show (Group o bs r) 
-    = intercalate " " [ "Group", show o, show bs, show r ]
-  show (Option o) = "Option " ++ show o
+  show (EOA)            = "EOA"
+  show (Stdin)          = "Stdin"
+  show (Command n r)    = intercalate " " [ "Command", show n, show r ]
+  show (Positional n r) = intercalate " " [ "Positional", show n, show r ]
+  show (Group o bs r)   = intercalate " " [ "Group", show o, show bs, show r ]
+  show (Option o)       = "Option " ++ show o
 
 instance ordArgument :: Ord Argument where
   -- XXX: Implement a more efficient `compare` function
   compare = compare `on` show
 
 instance eqArgument :: Eq Argument where
-  eq (EOA) (EOA) = true
-  eq (Stdin) (Stdin) = true
-  eq (Command n r) (Command n' r') = (n == n') && (r == r')
+  eq (EOA)            (EOA)              = true
+  eq (Stdin)          (Stdin)            = true
+  eq (Command n r)    (Command n' r')    = (n == n') && (r == r')
   eq (Positional n r) (Positional n' r') = (n ^= n') && (r == r')
-  eq (Group o bs r) (Group o' bs' r') = (o == o') && (bs == bs') && (r == r')
-  eq (Option o) (Option o') = o == o'
-  eq _ _ = false
+  eq (Group o bs r)   (Group o' bs' r')  = (o == o') && (bs == bs') && (r == r')
+  eq (Option o)       (Option o')        = o == o'
+  eq _                _                  = false
 
 prettyPrintBranch :: Branch -> String
 prettyPrintBranch (Branch xs) = intercalate " " (prettyPrintArg <$> xs)
 
 prettyPrintArg :: Argument -> String
-prettyPrintArg (Stdin)             = "-"
-prettyPrintArg (EOA)               = "-- ARGS..."
-prettyPrintArg (Command name r)    = name ++ (if r then "..." else "")
-prettyPrintArg (Positional name r) = name ++ (if r then "..." else "")
+prettyPrintArg (Stdin)          = "-"
+prettyPrintArg (EOA)            = "--"
+prettyPrintArg (Command name r) = name ++ (if r then "..." else "")
+prettyPrintArg (Positional n r) = name ++ (if r then "..." else "")
+  where
+    name = if String.toUpper n == n then n else "<" ++ n ++ ">"
 prettyPrintArg (Option o)          = O.prettyPrintOption o
 prettyPrintArg (Group o bs r)      = open ++ inner ++ close ++ repetition
   where

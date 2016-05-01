@@ -2399,6 +2399,25 @@ Options: -f, --foo ARG
 $ prog -f
 "Missing required arguments for -f|--foo=ARG" # XXX This should change.
 
+r"""Usage: git <command> -f"""
+$ prog
+"Expected <command>"
+
+r"""Usage: git COMMAND -f"""
+$ prog
+"Expected COMMAND"
+
+r"""Usage: git pull -f"""
+$ prog
+"Expected pull"
+
+r"""
+Usage: git <command> -f
+   or: git <foo> -f
+"""
+$ prog
+""
+
 # Ambigous errors
 r"""
 Usage: foo remote
