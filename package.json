@@ -1,6 +1,6 @@
 {
   "name": "neodoc",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Docopt implementation for node",
   "main": "index.js",
   "directories": {
