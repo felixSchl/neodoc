@@ -9,20 +9,20 @@ module Language.Docopt.Value (
   ) where
 
 import Prelude
-import Unsafe.Coerce (unsafeCoerce)
-import Control.Apply ((<*))
 import Data.Generic (class Generic)
 import Data.Either (Either(), either)
+import Data.Maybe.Unsafe (fromJust)
 import Data.List (List(..), fromList, many, some)
 import Control.Apply ((*>))
 import Control.Alt ((<|>))
-import Text.Parsing.Parser (ParseError, runParser, fail) as P
-import Text.Parsing.Parser.Combinators (between, choice, try, sepBy1) as P
+import Text.Parsing.Parser (ParseError, runParser) as P
+import Text.Parsing.Parser.Combinators (between, choice, try, sepBy1, option) as P
 import Text.Parsing.Parser.String (noneOf, char, string, eof) as P
+import Language.Docopt.Parser.Base (digit)
 import Data.Array as A
+import Data.Int (toNumber, fromString) as Int
 import Data.String (fromCharArray)
-import Data.String as Str
-import Global (isNaN, readFloat)
+import Global (readFloat)
 
 data Value
   = StringValue String
@@ -122,12 +122,16 @@ parse s split = P.runParser s do
     value = P.choice $ P.try <$> [ bool, number, quoted ]
 
     number = do
-      s <- fromCharArray <$> A.some (P.noneOf [',', ' ', '\n'])
-      let n = readFloat s
-      if isNaN n then P.fail "NaN"
-                 else if (Str.contains "." s)
-                        then return (FloatValue n)
-                        else return (IntValue   (unsafeCoerce n))
+      si <- P.option 1 (P.char '-' *> return (-1))
+      xs <- fromCharArray <$> A.some digit
+      P.choice [
+        FloatValue <<< ((Int.toNumber si) * _) <<< readFloat <$> do
+          xss <- do
+            P.char '.'
+            fromCharArray <$> A.some digit
+          return $ xs ++ "." ++ xss
+      , return $ IntValue $ si * (fromJust $ Int.fromString xs)
+      ]
 
 
     bool = true' <|> false'

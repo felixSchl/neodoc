@@ -1233,13 +1233,13 @@ r"""
 Usage: prog [options]
 
 Options: -f=<n>  [default: foo , bar qux, "foo bar", 400, true,
-                           false, 10.0, 10., 0x10 TRUE, FALSE, True False,
+                           false, 10.0, TRUE, FALSE, True False,
                            -100, -10.0
                            "True" "True False 10"]
 """
 
 $ prog
-{ "-f": ["foo", "bar", "qux", "foo bar", 400, true, false, 10.0, 10.0, 0,
+{ "-f": ["foo", "bar", "qux", "foo bar", 400, true, false, 10.0,
          true, false, true, false,
          -100, -10.0,
          "True", "True False 10"] }
@@ -2482,3 +2482,15 @@ $ prog --foobar QUX
 
 $ prog --foo=bar QUX
 "Unmatched command: QUX"
+
+#
+# Proper value parsing
+#
+
+r"""
+Usage: foo <command> [-f ARG]
+"""
+
+$ prog/s 123foo -f123foo
+{"<command>": "123foo", "COMMAND": "123foo",
+ "-f": "123foo"}
