@@ -248,7 +248,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- argument may have been passed.
     go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.length xs == 0)
       = case v of
-          Just val -> return $ OptParse (D.StringValue val) Nothing false
+          Just s -> return $ OptParse (Value.read s false) Nothing false
           _  -> return case atok of
             Just (Lit s) -> OptParse (Value.read s false) Nothing true
             _ -> OptParse (D.BoolValue true)

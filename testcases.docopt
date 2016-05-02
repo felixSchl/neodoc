@@ -2488,9 +2488,9 @@ $ prog --foo=bar QUX
 #
 
 r"""
-Usage: foo <command> [-f ARG]
+Usage: foo <command> [-f ARG] [-b ARG]
 """
 
-$ prog/s 123foo -f123foo
+$ prog/s 123foo -f123foo -b=123foo
 {"<command>": "123foo", "COMMAND": "123foo",
- "-f": "123foo"}
+ "-f": "123foo", "-b": "123foo"}
