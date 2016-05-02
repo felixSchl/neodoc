@@ -9,16 +9,18 @@ module Language.Docopt.ParserGen.Lexer (
   lex
   ) where
 
-import Prelude ((++), return, ($), (+), bind, (<$>), (<<<), pure)
+import Prelude
+import Debug.Trace
 import Data.Either (Either())
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
+import Control.Alt ((<|>))
 import Data.String (fromCharArray)
 import Data.List (List(..), singleton, many)
 import Text.Parsing.Parser (ParseError, Parser, runParser) as P
-import Text.Parsing.Parser.Combinators (try, choice, optional) as P
+import Text.Parsing.Parser.Combinators (try, choice, optional, optionMaybe) as P
 import Text.Parsing.Parser.Pos (Position(Position)) as P
-import Text.Parsing.Parser.String (eof, anyChar, char, noneOf, string) as P
+import Text.Parsing.Parser.String (eof, anyChar, char, oneOf, noneOf, string) as P
 import Data.Array as A
 import Control.Plus (empty)
 import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..))
@@ -42,25 +44,23 @@ parseToken = do
     stdin :: P.Parser String Token
     stdin = do
       P.char '-'
+      P.eof
       return $ Stdin
 
     eoa :: P.Parser String Token
     eoa = do
       P.string "--"
+      P.eof
       return $ EOA empty
 
     -- | Parse a short option
     sopt :: P.Parser String Token
     sopt = do
       P.char '-'
-      x  <- alphaNum
-      xs <- A.many $ P.noneOf [ ' ', '='  ]
-      P.optional do many space *> P.char '=' <* many space
-      arg <- P.choice $ P.try <$> [
-        return <$> fromCharArray <$> do A.some P.anyChar
-      , return Nothing
-      ]
-      many space
+      x   <- alphaNum
+      xs  <- A.many $ P.noneOf [ '=' ]
+      arg <- P.optionMaybe arg
+      P.eof
       return $ SOpt x xs arg
 
     -- | Parse a long option
@@ -68,20 +68,19 @@ parseToken = do
     lopt = do
       P.string "--"
       xs <- fromCharArray <$> do
-        A.some $ P.noneOf [ ' ', '='  ]
-      arg <- P.choice $ P.try <$> [
-        Just <$> do
-          many space *> P.char '=' <* many space
-          fromCharArray <$> do A.many P.anyChar
-      , pure Nothing
-      ]
-      many space
+        A.some $ P.noneOf [ '=' ]
+      arg <- P.optionMaybe arg
+      P.eof
       pure $ LOpt xs arg
 
     -- | Parse a literal
     lit :: P.Parser String Token
     lit = Lit <<< fromCharArray <$> do
       A.many P.anyChar
+
+    arg = do
+      P.char '='
+      fromCharArray <$> do A.some P.anyChar
 
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
 -- | item individually.

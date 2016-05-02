@@ -260,7 +260,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- argument has been passed and the option takes an argument.
     go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (A.length xs > 0)
       = do
-        let a = fromCharArray xs ++ maybe "" id v
+        let a = fromCharArray xs ++ maybe "" ("=" ++ _) v
         return $ OptParse (Value.read a false)
                           Nothing
                           false

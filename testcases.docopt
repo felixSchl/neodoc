@@ -987,23 +987,6 @@ $ prog  go left --speed=5  go right --speed=9
  "go": 2}
 
 
-# Required options should work with option shortcut
-#
-# XXX: This test currently fails and requires further
-#      consideration. Should the option descriptions
-#      merge with the input? Currently they simply
-#      expand in-place during solving, causing `-a -a`
-#      to expand into an array.
-#
-# TODO: Make this pass
-# r"""usage: prog [options] -a
-# 
-# options: -a
-# 
-# """
-# $ prog -a
-# {"-a": true}
-#
 #
 # If option could be repeated its defaults should be split into a list
 #
@@ -2438,3 +2421,64 @@ usage: git remote [-v | --verbose]
 
 $ prog
 "user-error"
+
+#
+# Check proper option subsumption takes place
+#
+
+r"""
+Usage: foo [-f=FOO] [-b=BAR]
+"""
+
+$ prog -foobar
+{"-f": "oobar"}
+
+$ prog -f=oobar
+{"-f": "oobar"}
+
+$ prog -fb=oobar
+{"-f": "b=oobar"}
+
+r"""
+Usage: foo [-f[=FOO]] [-b=BAR]
+"""
+
+$ prog -foobar
+{"-f": "oobar"}
+
+$ prog -fboobar
+{"-f": "boobar"}
+
+r"""
+Usage: foo [-f=FOO] [-b=BAR]
+Options: -f, --foo=FOO
+"""
+
+$ prog --foobar
+{"-f": "bar", "--foo": "bar"}
+
+$ prog --foo=bar
+{"-f": "bar", "--foo": "bar"}
+
+$ prog --foobar QUX
+"Unmatched command: QUX"
+
+$ prog --foo=bar QUX
+"Unmatched command: QUX"
+
+r"""
+Usage: foo [-f[=FOO]] [-b=BAR]
+Options: -f, --foo[=FOO]
+"""
+
+$ prog --foobar
+{"-f": "bar", "--foo": "bar"}
+
+$ prog --foo=bar
+{"-f": "bar", "--foo": "bar"}
+
+$ prog --foobar QUX
+"Unmatched command: QUX"
+
+$ prog --foo=bar QUX
+"Unmatched command: QUX"
