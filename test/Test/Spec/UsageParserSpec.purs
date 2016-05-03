@@ -76,31 +76,32 @@ usageParserSpec = \_ ->
     describe "long options" do
       runSingleArgumentTests
         [ pass "--bar"         $ lopt_ "bar"
-        , pass "--bar = foo"   $ lopt  "bar" (arg "foo")
+        , fail "--bar = foo"
         , pass "--bar=<foo>"   $ lopt  "bar" (arg "foo")
         , pass "--bar=FOO"     $ lopt  "bar" (arg "FOO")
-        , pass "--bar = FOO"   $ lopt  "bar" (arg "FOO")
+        , fail "--bar = FOO"
         , pass "--bar=fOo"     $ lopt  "bar" (arg "fOo")
-        , pass "--bar = fOo"   $ lopt  "bar" (arg "fOo")
-        , pass "--bar = <foo>" $ lopt  "bar" (arg "foo")
+        , fail "--bar = fOo"
+        , fail "--bar = <foo>"
         , pass "--barFOO"      $ lopt_ "barFOO"
 
-        , pass "--bar[ = foo]"   $ lopt  "bar" (arg "foo")
+        , fail "--bar[ = foo]"
         , pass "--bar[=<foo>]"   $ lopt  "bar" (arg "foo")
         , pass "--bar[=FOO]"     $ lopt  "bar" (arg "FOO")
-        , pass "--bar[ = FOO]"   $ lopt  "bar" (arg "FOO")
+        , fail "--bar[ = FOO]"
         , pass "--bar[=fOo]"     $ lopt  "bar" (arg "fOo")
-        , pass "--bar[ = fOo]"   $ lopt  "bar" (arg "fOo")
-        , pass "--bar[ = <foo>]" $ lopt  "bar" (arg "foo")
+        , fail "--bar[ = fOo]"
+        , fail "--bar[ = <foo>]"
         , pass "--bar[FOO]"      $ lopt  "bar" (arg "FOO")
 
-        , pass "--bar [ = foo]"   $ lopt  "bar" (arg "foo")
-        , pass "--bar [=<foo>]"   $ lopt  "bar" (arg "foo")
-        , pass "--bar [=FOO]"     $ lopt  "bar" (arg "FOO")
-        , pass "--bar [ = FOO]"   $ lopt  "bar" (arg "FOO")
-        , pass "--bar [=fOo]"     $ lopt  "bar" (arg "fOo")
-        , pass "--bar [ = fOo]"   $ lopt  "bar" (arg "fOo")
-        , pass "--bar [ = <foo>]" $ lopt  "bar" (arg "foo")
+        -- disallow space
+        , fail "--bar [ = foo]"
+        , fail "--bar [=<foo>]"
+        , fail "--bar [=FOO]"
+        , fail "--bar [ = FOO]"
+        , fail "--bar [=fOo]"
+        , fail "--bar [ = fOo]"
+        , fail "--bar [ = <foo>]"
 
         , fail "--bar="
         , fail "--bar=<>"
@@ -111,6 +112,10 @@ usageParserSpec = \_ ->
         , fail "--bar[=<>]"
         , fail "--bar[=--foo]"
         , fail "--bar[=-foo]"
+
+          -- disallow immediate following by '-'
+        , fail "--bar[=FOO]-"
+        , fail "--BAR-"
         ]
 
     -- Test stacked options in various formats.
@@ -134,9 +139,10 @@ usageParserSpec = \_ ->
         , pass "-b[=FOO]"    $ sopt  'b' [] (arg "FOO")
         , pass "-b[=<foo>]"  $ sopt  'b' [] (arg "foo")
 
-        , pass "-b [=foo]"    $ sopt  'b' [] (arg "foo")
-        , pass "-b [=FOO]"    $ sopt  'b' [] (arg "FOO")
-        , pass "-b [=<foo>]"  $ sopt  'b' [] (arg "foo")
+        -- disallow space
+        , fail "-b [=foo]"
+        , fail "-b [=FOO]"
+        , fail "-b [=<foo>]"
 
         , pass "-bar"        $ sopt_ 'b' ['a', 'r']
         , pass "-barFOO"     $ sopt_ 'b' ['a', 'r', 'F', 'O', 'O']
@@ -155,6 +161,10 @@ usageParserSpec = \_ ->
         , pass "-bar[=FOO]"   $ sopt 'b' ['a', 'r'] (arg_ "FOO")
         , pass "-bar[=<foo>]" $ sopt 'b' ['a', 'r'] (arg_ "foo")
         , pass "-bAR[foo]"    $ sopt 'b' ['A', 'R'] (arg_ "foo")
+
+          -- disallow immediate following by '-'
+        , fail "-bAR[=FOO]-"
+        , fail "-bAR-"
         ]
 
     -- Test required groups in various formats.

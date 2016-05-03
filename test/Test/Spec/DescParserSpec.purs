@@ -55,12 +55,6 @@ descParserSpec = \_ ->
                 , env:        Nothing
                 , repeatable: false
                 } ]
-        , pass ("-f [=ENABLE] the --foo flag")
-            [ o { name:       Desc.Flag 'f'
-                , arg:        Just $ optarg_ "ENABLE"
-                , env:        Nothing
-                , repeatable: false
-                } ]
         , pass ("--foo enable the --foo flag")
             [ o { name:       Desc.Long "foo"
                 , arg:        Nothing
@@ -74,12 +68,6 @@ descParserSpec = \_ ->
                 , repeatable: false
                 } ]
         , pass ("--foo[=ENABLE] the --foo flag")
-            [ o { name:       Desc.Long "foo"
-                , arg:        Just $ optarg_ "ENABLE"
-                , env:        Nothing
-                , repeatable: false
-                } ]
-        , pass ("--foo [=ENABLE] the --foo flag")
             [ o { name:       Desc.Long "foo"
                 , arg:        Just $ optarg_ "ENABLE"
                 , env:        Nothing

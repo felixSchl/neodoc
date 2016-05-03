@@ -2,11 +2,13 @@ module Language.Docopt.Parser.Lexer where
 
 import Prelude
 import Data.Array as A
+import Debug.Trace
 import Data.List as L
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.Monad.State (State, evalState)
 import Control.Monad.State.Trans (StateT())
+import Control.MonadPlus (guard)
 import Data.Either (Either(..))
 import Data.Identity (Identity())
 import Data.List (List(..), many, fromList)
@@ -24,7 +26,7 @@ import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
                                         ) as P
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Text.Parsing.Parser.String (skipSpaces, anyChar, string, char, oneOf,
-                                  whiteSpace, eof, noneOf, satisfy) as P
+                                  whiteSpace, eof, noneOf) as P
 
 data Mode = Usage | Descriptions
 
@@ -174,12 +176,12 @@ parseToken m = P.choice (P.try <$> A.concat [
     , P.char   '|'   *> pure VBar
     , P.char   ':'   *> pure Colon
     , P.char   ','   *> pure Comma
+    , P.string "..." *> pure TripleDot
     , _longOption
     , _shortOption
+    , _eoa
+    , _stdin
     , AngleName <$> _angleName
-    , P.string "--"  *> pure DoubleDash
-    , P.char   '-'   *> pure Dash
-    , P.string "..." *> pure TripleDot
     , ShoutName <$> _shoutName
     , Name      <$> _name
     ]
@@ -191,10 +193,32 @@ parseToken m = P.choice (P.try <$> A.concat [
 
  where
 
-  whitespace :: P.Parser String Unit
-  whitespace = do
-    P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
-    pure unit
+  white :: P.Parser String Unit
+  white = void $ P.oneOf [ '\n', '\r', ' ', '\t' ]
+
+  _stdin :: P.Parser String Token
+  _stdin = do
+    P.char '-'
+    -- Ensure the argument is correctly bounded
+    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+      void $ white
+    , void $ P.char '|'
+    , void $ P.char ']'
+    , void $ P.char ')'
+    , void $ P.string "..."
+    ])
+    return Dash
+
+  _eoa :: P.Parser String Token
+  _eoa = do
+    P.string "--"
+    -- Ensure the argument is correctly bounded
+    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+      void $ white
+    , void $ P.char ']'
+    , void $ P.char ')'
+    ])
+    return DoubleDash
 
   _reference :: P.Parser String Token
   _reference = Reference <$> do
@@ -203,12 +227,10 @@ parseToken m = P.choice (P.try <$> A.concat [
     where
       go = do
         many space
-        x <- fromCharArray <<< fromList <$> do
+        fromCharArray <<< fromList <$> do
           flip P.manyTill (P.lookAhead $ P.try end) do
-            P.noneOf [']']
-        end
-        many space
-        return x
+            P.noneOf [ ']' ]
+        <* end <* many space
 
       end = do
         many space
@@ -217,18 +239,20 @@ parseToken m = P.choice (P.try <$> A.concat [
         P.optional $ P.string "..."
 
   _tag :: P.Parser String Token
-  _tag = P.between (P.char '[')
-                  (P.char ']')
-                  (withValue <|> withoutValue)
+  _tag = P.between (P.char '[') (P.char ']') do
+    P.choice $ P.try <$> [
+      withValue
+    , withoutValue
+    ]
 
     where
       withValue = do
-        many whitespace
+        many white
         k <- fromCharArray <$> do A.many (P.noneOf [':'])
         P.char ':'
-        many whitespace
+        many white
         v <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
-        many whitespace
+        many white
         return (Tag k (Just v))
       withoutValue = do
         k <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
@@ -276,38 +300,25 @@ parseToken m = P.choice (P.try <$> A.concat [
 
     arg <- P.choice $ P.try <$> [
 
-      -- Case 1: OPTION = ARG
+      -- Case 1: -foo=BAR
       Just <$> do
-        -- XXX: Drop the spaces?
-        many space *> P.char '=' <* many space
+        P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         return { name:     n
                , optional: false
                }
 
-      -- Case 2: Option[ = ARG ]
+      -- Case 2: Option[=ARG]
     , Just <$> do
-        P.char '[' <* many space
-        -- XXX: Drop the spaces?
-        P.optional (many space *> P.char '=' <* many space)
+        P.char '['
+        P.optional $ P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        many space *> P.char ']' <* many space
+        P.char ']'
         return { name:     n
                , optional: true
                }
 
-      -- Case 3: Option[ARG]
-    , Just <$> do
-        -- XXX: Drop the spaces?
-        many space *> P.char '[' <* many space
-        many space *> P.char '=' <* many space
-        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        many space *> P.char ']' <* many space
-        return { name:     n
-               , optional: true
-               }
-
-      -- Case 4: Option<ARG>
+      -- Case 3: Option<ARG>
     , Just <$> do
         n <- _angleName
         return { name:     n
@@ -318,15 +329,14 @@ parseToken m = P.choice (P.try <$> A.concat [
     ]
 
     -- Ensure the argument is correctly bounded
-    P.lookAhead $ P.choice [
-      P.eof
-    , P.try $ void $ P.whiteSpace
-    , P.try $ void $ P.char ','
-    , P.try $ void $ P.char '|'
-    , P.try $ void $ P.char '['
-    , P.try $ void $ P.char '('
-    , P.try $ void $ P.string "..."
-    ]
+    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+      void $ white
+    , void $ P.char '|'
+    , void $ P.string "..."
+    , void $ P.char ']'
+    , void $ P.char ')'
+    , void $ P.char ',' -- desc mode only
+    ])
 
     return $ SOpt x xs arg
 
@@ -344,44 +354,20 @@ parseToken m = P.choice (P.try <$> A.concat [
 
     arg <- P.choice $ P.try <$> [
 
-      -- Case 1: OPTION = ARG
+      -- Case 1: OPTION=ARG
       Just <$> do
-        -- XXX: Drop the spaces?
-        many space *> P.char '=' <* many space
+        P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         return { name:     n
                , optional: false
                }
 
-      -- Case 2: Option[ = ARG ]
+      -- Case 2: Option[=ARG]
     , Just <$> do
-        P.char '[' <* many space
-        -- XXX: Drop the spaces?
-        P.optional (many space *> P.char '=' <* many space)
+        P.char '['
+        P.optional $ P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        many space *> P.char ']' <* many space
-        return { name:     n
-               , optional: true
-               }
-
-      -- Case 2: Option[ = ARG ]
-    , Just <$> do
-        P.char '[' <* many space
-        -- XXX: Drop the spaces?
-        P.optional (many space *> P.char '=' <* many space)
-        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        many space *> P.char ']' <* many space
-        return { name:     n
-               , optional: true
-               }
-
-      -- Case 3: Option[ARG]
-    , Just <$> do
-        -- XXX: Drop the spaces?
-        many space *> P.char '[' <* many space
-        many space *> P.char '=' <* many space
-        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        many space *> P.char ']' <* many space
+        P.char ']'
         return { name:     n
                , optional: true
                }
@@ -390,15 +376,14 @@ parseToken m = P.choice (P.try <$> A.concat [
     ]
 
     -- Ensure the argument is correctly bounded
-    P.lookAhead $ P.choice [
-      P.eof
-    , P.try $ void $ P.whiteSpace
-    , P.try $ void $ P.char ','
-    , P.try $ void $ P.char '|'
-    , P.try $ void $ P.char '['
-    , P.try $ void $ P.char '('
-    , P.try $ void $ P.string "..."
-    ]
+    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+      void $ white
+    , void $ P.char '|'
+    , void $ P.string "..."
+    , void $ P.char ']'
+    , void $ P.char ')'
+    , void $ P.char ',' -- desc mode only
+    ])
 
     return $ LOpt name' arg
 
@@ -436,8 +421,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
 -- | Match the token at the head of the stream
 match :: Token -> TokenParser Unit
-match tok = token (\tok' -> if (tok' == tok) then Just unit else Nothing)
-              P.<?> prettyPrintToken tok
+match tok = token (guard <<< (_ == tok)) P.<?> prettyPrintToken tok
 
 anyToken :: P.ParserT (List PositionedToken)
                       (StateT { indentation :: Int , line :: Int } Identity )

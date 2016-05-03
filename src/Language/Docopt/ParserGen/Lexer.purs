@@ -80,7 +80,7 @@ parseToken = do
 
     arg = do
       P.char '='
-      fromCharArray <$> do A.some P.anyChar
+      fromCharArray <$> A.many P.anyChar
 
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
 -- | item individually.

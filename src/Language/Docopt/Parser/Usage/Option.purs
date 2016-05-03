@@ -32,7 +32,7 @@ newtype LOpt = LOpt {
 
 instance showSOpt :: Show SOpt where
   show (SOpt o)
-    = "LOpt { flag: " ++ show o.flag
+    = "SOpt { flag: " ++ show o.flag
         ++ ", stack: " ++ show o.stack
         ++ ", repeatable: " ++ show o.repeatable
         ++ ", argument: " ++ (fromMaybe "Nothing" do
