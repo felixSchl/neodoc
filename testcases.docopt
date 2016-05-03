@@ -1891,14 +1891,8 @@ Usage:
     git (<y>|<x>...)
 """
 
-# This cannot work: `<y>` would result in a match of 'a', leaving a trailing,
-# unmatched input of 'b' and 'c'.
-# Note: There *could* be a way around this be re-ordering the inside of the
-#       group, such that e.g. repeating elements are first. This, however, would
-#       require more design before any hasty implementation.
-
 $ prog a b c
-"user-error"
+{"<x>": ["a", "b", "c"], "X": ["a", "b", "c"]}
 
 r"""
 Usage:

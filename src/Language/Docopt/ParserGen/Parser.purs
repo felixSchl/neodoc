@@ -578,9 +578,10 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       i <- getInput
       score 0 <$> (do
         if r then (some go) else (singleton <$> go)
-        <* lift (State.modify (1 + _))
       ) <|> (P.fail $ "Expected " ++ D.prettyPrintArg x ++ butGot i)
-        where go = Tuple x <$> (command n)
+        where go = do
+                Tuple x <$> (command n)
+                <* lift (State.modify (1 + _))
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) _ = do
@@ -605,9 +606,10 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       i <- getInput
       score 0 <$> (do
         if r then (some go) else (singleton <$> go)
-        <* lift (State.modify (1 + _))
       ) <|> P.fail ("Expected " ++ D.prettyPrintArg x ++ butGot i)
-        where go = Tuple x <$> (positional n)
+        where go = do
+                Tuple x <$> (positional n)
+                <* lift (State.modify (1 + _))
 
     genParser x@(D.Group optional bs r) _
       | optsFirst && (length bs == 1) &&
