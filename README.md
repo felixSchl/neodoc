@@ -56,7 +56,7 @@ an (in-)comprehensive comparison to the original, click
 * Fallback to alternate values:
     * User input -> Environment -> Defaults
 * Convenient, concise and widely accepted POSIX-style syntax
-    * _Mostly_ compatible a typical `git <command> --help` output
+    * _Mostly_ compatible with a typical `git <command> --help` output
 
 ## Installation ##
 
@@ -68,9 +68,9 @@ npm install --save neodoc
 
 ### neodoc.run(docopt, opts)
 
-Parse and apply the given docopt help text. If not options are provided, apply
+Parse and apply the given docopt help text. If no options are provided, apply
 it to `process.argv` and `process.env`. The result is a mapping of key -> value,
-where the key is the canonical form of the option and it's alias, if available.
+where the key is the canonical form of the option and its alias, if available.
 
 Options:
 
@@ -86,7 +86,7 @@ Options:
 ```javascript
 #!/usr/bin/env node
 
-// (!) This is runnable code and mimics git. The git help below is output of
+// (!) This is runnable code and mimics git. The git help below is the output of
 //     `git --help` with a couple of very minor alterations (couple of
 //      characters) which are also being addressed.
 // (!) Keep in in mind that these strings below could be kept in your README or
@@ -127,7 +127,7 @@ if (args['<command>'] === 'remote') {
 
 ## Project goals ##
 
-> Overview of the short- and longterm goals of this project
+> Overview of the short- and long-term goals of this project
 
 * Provide a declarative way to author command lines. Rather than deriving the
   help text from some EDSL, derive the CLI from a human readable, prose-like help
@@ -170,7 +170,7 @@ if (args['<command>'] === 'remote') {
   Usage: prog [<name> <type>]
   ```
 
-  will fail `prog foo`, but pass `prog foo bar`. The rational being that this is
+  will fail `prog foo`, but pass `prog foo bar`. The rationale being that this is
   more general, since if the opposite behaviour (any match) was desired, it
   could be expressed as such:
 
@@ -198,7 +198,7 @@ if (args['<command>'] === 'remote') {
 
 > **Neodoc** is fully usable and well-tested. If you find there is something
 > broken or unintuitive about neodoc, please do [open an issue][issue-tracker].
-> The following gives on overview of where docopt is headed
+> The following gives on overview of where docopt is headed.
 
 ### Beta Target (complete) ####
 
@@ -247,7 +247,7 @@ if (args['<command>'] === 'remote') {
 * [x] Allow for `--foo[=<bar>]` syntax (git style).
 * [x] Auto-infer types when not specified (e.g. numbers, strings, booleans)
 * [x] Implement `[-f BAR]` flag syntax ("smart-options")
-* [ ] Allow flag negation sintax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
+* [ ] Allow flag negation syntax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
 * [x] Fix all purescript (pscid) warnings
 
 ### Wishlist ###
@@ -262,7 +262,7 @@ if (args['<command>'] === 'remote') {
 * Syntax plugins (vim, ...)
 * Put the "source" of a parsed option's value into the output, e.g. "env",
   "default", "user"
-* Consider  `+o` syntax: `-o, --option` and it's negation: `--no-option` or
+* Consider  `+o` syntax: `-o, --option` and its negation: `--no-option` or
   `+o`.
 * Provide warnings. This would mean a largish refactor to use either a custom
   monad, or the Writer monad, stacked on top of the Either monad.
@@ -274,7 +274,7 @@ if (args['<command>'] === 'remote') {
 ## Contributing ##
 
 **Contributions are highly encouraged and welcome**.
-Bug fixes and clean ups need not much coordination, but if you're interested
+Bug fixes and clean ups do no need much coordination, but if you're interested
 in contributing a feature, contact me at felixschlitter@gmail.com and we can
 get the ball rolling &mdash; There's plenty to do. To get up and running, run:
 
@@ -298,7 +298,7 @@ The project can roughly be broken up into several distinct areas of work:
 1. Parsing the Specification
     1. Lex and parse the usage section
     1. Lex and parse any description sections
-1. Solve the parsed Specification into it's canonical, unambigious form
+1. Solve the parsed Specification into its canonical, unambigious form
 1. Generate a parser from the Specification
 1. Lex and parse the user input
     1. Lex and parse the user input
@@ -307,7 +307,7 @@ The project can roughly be broken up into several distinct areas of work:
 ## License ##
 
 <strong>&lt;neodoc&gt;</strong> is released under the **MIT LICENSE**.
-See file `LICENSE` for a more detailed description of it's terms.
+See file `LICENSE` for a more detailed description of its terms.
 
 ---
 
@@ -315,7 +315,7 @@ See file `LICENSE` for a more detailed description of it's terms.
 
 #### Reading options from config files ####
 
-> Options should fall back values read from file.
+> Options should fall back to values read from file.
 
 Options:
 * Can this be a developer-provided file or lookup rather than on the command
