@@ -26,7 +26,7 @@ import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
 import Control.Alt ((<|>))
 import Data.Traversable (traverse)
 import Control.Lazy (defer)
-import Control.Monad (when)
+import Control.Monad (when, unless)
 import Control.MonadPlus (guard)
 import Data.Foldable (all, intercalate, maximumBy, sum, any, for_, foldl)
 import Data.String as String
@@ -339,8 +339,8 @@ genBranchesParser xs term optsFirst canSkip
 
     let
       ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> do
-                            genBranchParser x optsFirst canSkip
-                            <* if term then eof else return unit
+                          genBranchParser x optsFirst canSkip
+                            <* unless (not term) eof
       rs  = evalState (runReaderT (collect s ps) env) initialState
       rs' = reverse rs
 
