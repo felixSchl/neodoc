@@ -209,9 +209,12 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
       = case v of
           Just s ->
             return $ OptParse (Value.read s false) Nothing false
-          _  -> return case atok of
-            Just (Lit s) -> OptParse (Value.read s false)  Nothing true
-            _            -> OptParse (D.BoolValue true) Nothing false
+          _  -> case atok of
+            Just (Lit s) -> return $ OptParse (Value.read s false)  Nothing true
+            otherwise    ->
+              if (fromMaybe true (_.optional <<< O.runArgument <$> a))
+                 then Right $ OptParse (D.BoolValue true) Nothing false
+                 else Left  $ "Option requires argument: --" ++ n'
 
     -- case 2:
     -- The name is an exact match and takes no argument
@@ -261,19 +264,20 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
     -- argument may have been passed.
-    go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.length xs == 0)
+    go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.null xs)
       = case v of
-          Just s -> return $ OptParse (Value.read s false) Nothing false
-          _  -> return case atok of
-            Just (Lit s) -> OptParse (Value.read s false) Nothing true
-            _ -> OptParse (D.BoolValue true)
-                          Nothing
-                          false
+          Just s    -> return $ OptParse (Value.read s false) Nothing false
+          otherwise -> case atok of
+            Just (Lit s) -> return $ OptParse (Value.read s false) Nothing true
+            otherwise    ->
+              if (fromMaybe true (_.optional <<< O.runArgument <$> a))
+                 then Right $ OptParse (D.BoolValue true) Nothing false
+                 else  Left $ "Option requires argument: -" ++ fromChar f'
 
     -- case 2:
     -- The leading flag matches, there are stacked options, no explicit
     -- argument has been passed and the option takes an argument.
-    go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (A.length xs > 0)
+    go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
       = do
         let a = fromCharArray xs ++ maybe "" ("=" ++ _) v
         return $ OptParse (Value.read a false)
@@ -283,7 +287,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 3:
     -- The leading flag matches, there are stacked options, the option takes
     -- no argument and an explicit argument has not been provided.
-    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.length xs > 0)
+    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
       = return $ OptParse (D.BoolValue true)
                           (Just $ SOpt (AU.head xs) (AU.tail xs) v)
                           false
@@ -291,7 +295,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 4:
     -- The leading flag matches, there are no stacked options and the option
     -- takes no argument - total consumption!
-    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.length xs == 0)
+    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
       = case v of
               Just _  -> Left $ "Option takes no argument: -" ++ fromChar f'
               Nothing -> return $ OptParse (D.BoolValue true)
@@ -361,7 +365,7 @@ genBranchesParser xs term optsFirst canSkip
       losers =
           last $ groupBy (eq `on` (_.depth <<< _.result))
                          (sortBy (compare `on` (_.depth <<< _.result))
-                                (mlefts rs))
+                                 (mlefts rs))
 
     maybe'
       (\_ ->
@@ -373,10 +377,13 @@ genBranchesParser xs term optsFirst canSkip
             es <- losers
             return case es of
               Cons e es | null es || not (null i) -> do
-                when (startsWith
-                        "Missing required arguments"
-                        (unParseError e.result.error).message) do
-                    lift $ State.modify (_ { fatal = Just e.result.error })
+                when ((startsWith
+                        "Option takes no argument"
+                        (unParseError e.result.error).message)
+                    || (startsWith
+                        "Option requires argument"
+                        (unParseError e.result.error).message)) do
+                          lift $ State.modify (_ {  fatal = Just e.result.error })
                 return $ e { result = Left e.result.error }
               otherwise -> return $ P.parseFailed i pos ""
           )
@@ -404,7 +411,11 @@ genBranchesParser xs term optsFirst canSkip
         return
           $ return
             $ Left
-              $ o { result = { error: e, depth: state.depth } }
+              -- XXX: use a huge depth for fatal errors to be bubbled
+              --      up properly (be selected). Again, this is due to
+              --      insufficient control over handling fatal vs.
+              --      non-fatal errors.
+              $ o { result = { error: e, depth: 99999 } }
       )
       (return $ bimap
         (\e -> o { result = { error: e, depth: state.depth } })
@@ -473,30 +484,18 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           r <- unScoredResult <$> (P.try $ genParser (D.setRequired p true)
                                                      (not $ n > 0))
 
-          -- verify the arguments for the parsed set of options when an option
-          -- takes anything but a bool value, i.e. it is not a flag, an explicit
-          -- argument *must* be provided.
-          let missing = fst <$> flip filter r.result
-                    (\(Tuple a v) -> (fromMaybe false do
-                                        arg <- O.runArgument <$> do
-                                                  D.getArgument a
-                                        return $ not arg.optional
-                                     )
-                                  && (not $ D.isFlag a)
-                                  && (D.isBoolValue v))
-
-          if (length missing == 0)
-            then return unit
-            else P.fail $ "Missing required arguments for "
-                        ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
-
           r' <- unScoredResult <$> P.try do
                   if D.isRepeatable p
                         then draw pss (length pss) (p:tot)
                         else draw ps' (length ps') (p:tot)
 
           return $ ScoredResult r ++ ScoredResult r'
-        ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1) tot)
+        ) <|> (defer \_ -> do
+              state :: StateObj <- lift State.get
+              case state.fatal of
+                Just (P.ParseError { message }) -> P.fail message
+                otherwise -> draw (ps' ++ singleton p) (n - 1) tot
+              )
 
         draw ps' n tot | (length ps' > 0) && (n < 0) = do
           env :: StrMap String <- lift ask
@@ -666,10 +665,13 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                   else P.fail "long or short option") s
               case o.result of
                   (Left e) -> do
-                    when (startsWith
+                    when ((startsWith
                             "Option takes no argument"
-                            (unParseError e).message) do
-                      lift $ State.modify (_ { fatal = Just e })
+                            (unParseError e).message)
+                       || (startsWith
+                            "Option requires argument"
+                            (unParseError e).message)) do
+                              lift $ State.modify (_ { fatal = Just e })
                     return o
                   otherwise -> return o
 
