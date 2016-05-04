@@ -7,23 +7,28 @@
 
 module Language.Docopt.ParserGen.Parser (
     genUsageParser
+  , initialState
   , Parser()
+  , StateObj
   ) where
 
 import Prelude
 import Control.Plus (empty)
 import Control.Bind ((=<<))
 import Debug.Trace
-import Control.Apply ((<*))
+import Control.Apply ((<*), (*>))
 import Data.Function (on)
-import Data.Either (Either(..), either)
+import Data.Bifunctor
+import Data.Either (Either(..), either, isRight)
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
 import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
                   some, filter, head, fromList, sortBy, groupBy, last, null)
 import Control.Alt ((<|>))
 import Data.Traversable (traverse)
 import Control.Lazy (defer)
-import Data.Foldable (all, intercalate, maximumBy, sum, any)
+import Control.Monad (when)
+import Control.MonadPlus (guard)
+import Data.Foldable (all, intercalate, maximumBy, sum, any, for_, foldl)
 import Data.String as String
 import Data.String (fromCharArray, stripPrefix)
 import Data.List.Unsafe as LU
@@ -66,9 +71,19 @@ debug = false
 -- | Unfortunately, the State Monad is needed because we try matching all
 -- | program branches and must select the best fit.
 -- |
+type StateObj = { depth :: Int
+                , fatal :: Maybe P.ParseError }
 type Parser a = P.ParserT (List PositionedToken)
-                          (ReaderT D.Env (State Int))
+                          (ReaderT D.Env (State StateObj))
                           a
+
+initialState :: StateObj
+initialState = { depth: 0
+               , fatal: Nothing }
+
+modifyDepth :: (Int -> Int) -> Parser Unit
+modifyDepth f = do
+  lift (State.modify \s -> s { depth = f s.depth })
 
 newtype ScoredResult a = ScoredResult {
   score  :: Int -- ^ the score of the parse
@@ -319,12 +334,14 @@ genBranchesParser :: List D.Branch -- ^ The branches to test
                   -> Parser (ScoredResult (Tuple D.Branch (List ValueMapping)))
 genBranchesParser xs term optsFirst canSkip
   = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
-    env :: D.Env <- ask
+    env   :: D.Env    <- ask
+    state :: StateObj <- lift State.get
+
     let
       ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> do
                             genBranchParser x optsFirst canSkip
                             <* if term then eof else return unit
-      rs = evalState (runReaderT (collect s ps) env) 0
+      rs  = evalState (runReaderT (collect s ps) env) initialState
       rs' = reverse rs
 
       -- Evaluate the winning candidates, if any.
@@ -346,48 +363,53 @@ genBranchesParser xs term optsFirst canSkip
                          (sortBy (compare `on` (_.depth <<< _.result))
                                 (mlefts rs))
 
-    return $ maybe'
+    maybe'
       (\_ ->
         fromMaybe
-          (P.parseFailed i pos
-            "The impossible happened. Failure without error")
-          do
-            -- Provide the most useful error message to the user possible from
-            -- the information given. Unfortunately, we only get strings at
-            -- this point.
-            es  <- losers
-            let
-              es' = if length es > 1
-                      then es `flip filter` (\e ->
-                        let msg = _.message $ unParseError e.result.error
-                        in  not $ startsWith "Expected" msg)
-                      else es
-            (do
-              e <- last es'
-              return (e { result = Left $ e.result.error })
-            ) <|> (do
-              return $ P.parseFailed i pos ""
-            )
+          (return do
+            P.parseFailed i pos
+                "The impossible happened. Failure without error")
+          (do
+            es <- losers
+            return case es of
+              Cons e es | null es || not (null i) -> do
+                when (startsWith
+                        "Missing required arguments"
+                        (unParseError e.result.error).message) do
+                    lift $ State.modify (_ { fatal = Just e.result.error })
+                return $ e { result = Left e.result.error }
+              otherwise -> return $ P.parseFailed i pos ""
+          )
       )
-      (\r -> r { result = Right r.result.value })
+      (\r -> return $ r { result = Right r.result.value })
       winner
 
   where
-    fixMessage m = m
-    collect s ps = ps `flip traverse` \p -> P.unParserT p s >>= \o -> do
-                    depth :: Int <- lift State.get
-                    return $ either
-                      (\e -> Left  { input:    o.input
-                                   , consumed: o.consumed
-                                   , position: o.position
-                                   , result:   { error: e, depth: depth }
-                                   })
-                      (\r -> Right { input:    o.input
-                                   , consumed: o.consumed
-                                   , position: o.position
-                                   , result:   { value: r, depth: depth }
-                                   })
-                      o.result
+  fixMessage m = m
+  collect s ps = ps `flip traverse` \p -> do
+
+    o                 <- P.unParserT p s
+    state :: StateObj <- lift State.get
+
+    -- If any parse encountered a fatal error, fail with that error.
+    -- XXX: this approach is pragmatic and works around not being able to catch
+    --      errors in purescript-parsing. Ideally, this would not be needed.
+    --      Also, using "o" is actually misleading here as it claims the error
+    --      happened at a different location as to where it actually
+    --      did. This has no impact atm on the way neodoc works, but is
+    --      something to keep in mind.
+    flip fromMaybe
+      (do
+        e <- state.fatal
+        return
+          $ return
+            $ Left
+              $ o { result = { error: e, depth: state.depth } }
+      )
+      (return $ bimap
+        (\e -> o { result = { error: e, depth: state.depth } })
+        (\r -> o { result = { value: r, depth: state.depth } })
+        o.result)
 
 -- | Generate a parser for a single usage branch
 genBranchParser :: D.Branch  -- ^ The branch to match
@@ -395,7 +417,7 @@ genBranchParser :: D.Branch  -- ^ The branch to match
                 -> Boolean   -- ^ Can we skip input via fallbacks?
                 -> Parser (ScoredResult (List ValueMapping))
 genBranchParser (D.Branch xs) optsFirst canSkip = do
-  lift (State.put 0) -- reset the depth counter
+  modifyDepth (const 0) -- reset the depth counter
   either
     (\_   -> P.fail "Failed to generate parser")
     (\acc -> case acc of
@@ -421,7 +443,17 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                 ++ (intercalate " " (D.prettyPrintArg <$> ps))
                 ++ " - canSkip: " ++  show canSkip
           else return unit
-      draw ps (length ps) Nil
+
+      -- track errors that are occuring during group parses
+      P.ParserT \s -> do
+        o <- P.unParserT (draw ps (length ps) Nil) s
+        case o.result of
+             (Left  e) -> do
+               return $ Left e
+             (Right r) -> do
+               return $ Right r
+        return o
+
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
         -- apply `draw` until the parser fails, with a modified `ps`.
@@ -581,20 +613,20 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       ) <|> (P.fail $ "Expected " ++ D.prettyPrintArg x ++ butGot i)
         where go = do
                 Tuple x <$> (command n)
-                <* lift (State.modify (1 + _))
+                <* modifyDepth (_ + 1)
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) _ = do
       score 0 <<< singleton <<< Tuple x <$> (do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
-        <* lift (State.modify (1 + _))
+        <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"--\""
 
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) _ = do
       score 0 <<< singleton <<< Tuple x <$> (do
         stdin
-        <* lift (State.modify (1 + _))
+        <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"-\""
 
     genParser x@(D.Positional n r) _
@@ -609,7 +641,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       ) <|> P.fail ("Expected " ++ D.prettyPrintArg x ++ butGot i)
         where go = do
                 Tuple x <$> (positional n)
-                <* lift (State.modify (1 + _))
+                <* modifyDepth (_ + 1)
 
     genParser x@(D.Group optional bs r) _
       | optsFirst && (length bs == 1) &&
@@ -624,7 +656,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     genParser x@(D.Option (O.Option o)) _ = (do
       score 0 <$> do
         if o.repeatable then (some go) else (singleton <$> go)
-      <* lift (State.modify (1 + _))
+      <* modifyDepth (_ + 1)
       )
         where
           go = do
