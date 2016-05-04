@@ -30,7 +30,7 @@ import Control.Monad (when)
 import Control.MonadPlus (guard)
 import Data.Foldable (all, intercalate, maximumBy, sum, any, for_, foldl)
 import Data.String as String
-import Data.String (fromCharArray, stripPrefix)
+import Data.String (fromChar, fromCharArray, stripPrefix)
 import Data.List.Unsafe as LU
 import Data.Array as A
 import Data.Array.Unsafe as AU
@@ -217,7 +217,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- The name is an exact match and takes no argument
     go (LOpt n' v) _ | isFlag && (n' == n)
       = case v of
-             Just _  -> Left "Option takes no argument"
+             Just _  -> Left $ "Option takes no argument: --" ++ n'
              Nothing -> return $ OptParse (D.BoolValue true) Nothing false
 
     -- case 3:
@@ -293,7 +293,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- takes no argument - total consumption!
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.length xs == 0)
       = case v of
-              Just _  -> Left "Option takes no argument"
+              Just _  -> Left $ "Option takes no argument: -" ++ fromChar f'
               Nothing -> return $ OptParse (D.BoolValue true)
                                             Nothing
                                             false
@@ -443,16 +443,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                 ++ (intercalate " " (D.prettyPrintArg <$> ps))
                 ++ " - canSkip: " ++  show canSkip
           else return unit
-
-      -- track errors that are occuring during group parses
-      P.ParserT \s -> do
-        o <- P.unParserT (draw ps (length ps) Nil) s
-        case o.result of
-             (Left  e) -> do
-               return $ Left e
-             (Right r) -> do
-               return $ Right r
-        return o
+      draw ps (length ps) Nil
 
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
@@ -667,11 +658,20 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
             -- a LOpt).
             isLopt <- P.option false (P.lookAhead $ P.try $ token isAnyLopt)
             isSopt <- P.option false (P.lookAhead $ P.try $ token isAnySopt)
-            if isLopt
-               then P.try $ Tuple x <$> mkLoptParser o.name o.arg
-               else if isSopt
-                then P.try $ Tuple x <$> mkSoptParser o.flag o.arg
-                else P.fail "long or short option"
+            P.ParserT \s -> do
+              o <- P.unParserT (if isLopt
+                then P.try $ Tuple x <$> mkLoptParser o.name o.arg
+                else if isSopt
+                  then P.try $ Tuple x <$> mkSoptParser o.flag o.arg
+                  else P.fail "long or short option") s
+              case o.result of
+                  (Left e) -> do
+                    when (startsWith
+                            "Option takes no argument"
+                            (unParseError e).message) do
+                      lift $ State.modify (_ { fatal = Just e })
+                    return o
+                  otherwise -> return o
 
           isAnyLopt (LOpt _ _) = return true
           isAnyLopt _          = return false

@@ -2448,7 +2448,7 @@ usage: git (([-b ARG | -f ARG]))
 Options: -f, --foo ARG
 """
 
-$ prog -f
+$ prog --foo
 "Missing required arguments for -f|--foo=ARG" # XXX This should change.
 
 r"""
@@ -2466,6 +2466,25 @@ Options: -f, --foo ARG
 
 $ prog -f
 {"-f": true, "--foo": true, "-b": false}
+
+#
+# Given an option-argument to a flag is a fatal error, no pardon:
+#
+
+r"""
+usage: git -b
+options: -b, --boo
+"""
+
+$ prog -b=FOO
+"Option takes no argument: -b"
+
+$ prog --boo=FOO
+"Option takes no argument: --boo"
+
+#
+# Command and positional errors:
+#
 
 r"""Usage: git <command> -f"""
 $ prog
