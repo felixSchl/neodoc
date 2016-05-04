@@ -2373,8 +2373,99 @@ Usage: foo -f ARG
 Options: -f, --foo ARG
 """
 
+# Missing option-arguments are fatal errors, no pardon:
+
 $ prog -f
 "Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+Usage: foo [-f ARG]
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+Usage: foo [[-f ARG]]
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+Usage: foo [[-bf=ARG]]
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+Usage: foo (-bf=ARG)
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+usage: git (([-f ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+usage: git (([-f ARG]))
+   or: git -f ARG
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+usage: git (([-f ARG | -b]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+usage: git (([-b | -f ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+usage: git (([-b ARG | -f ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+
+r"""
+usage: git (([-b | -f ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog
+{"-b": false}
+
+r"""
+usage: git (([-b | -f[=ARG]]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+{"-f": true, "--foo": true, "-b": false}
 
 r"""Usage: git <command> -f"""
 $ prog
@@ -2399,6 +2490,14 @@ $ prog
 r"""
 Usage: foo remote
        foo
+"""
+
+$ prog --fooo
+"Expected remote, but got --fooo"
+
+r"""
+Usage: foo
+       foo remote
 """
 
 $ prog --fooo

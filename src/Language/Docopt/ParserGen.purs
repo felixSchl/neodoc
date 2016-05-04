@@ -21,7 +21,8 @@ import Language.Docopt.Env (Env) as D
 import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
                                         getSource, prettyPrintToken,
                                         unPositionedToken) as G
-import Language.Docopt.ParserGen.Parser (Parser, genUsageParser) as G
+import Language.Docopt.ParserGen.Parser (Parser, genUsageParser,
+                                        initialState) as G
 import Language.Docopt.ParserGen.Lexer (lex) as G
 import Language.Docopt.ParserGen.ValueMapping (ValueMapping) as G
 
@@ -40,7 +41,7 @@ runParser :: D.Env                      -- ^ the user input
           -> Either P.ParseError Result -- ^ the parsed output
 runParser env argv p = do
   toks <- G.lex (toList argv)
-  evalState (runReaderT (go toks p) env) 0
+  evalState (runReaderT (go toks p) env) G.initialState
   where go i = P.runParserT (P.PState { input: i
                                       , position: P.initialPos
                                       })
