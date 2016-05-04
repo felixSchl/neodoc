@@ -6,6 +6,7 @@ import Debug.Trace (traceShowA)
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)
+import Control.Monad.Trampoline (runTrampoline)
 import Control.Alt ((<|>))
 import Data.StrMap as StrMap
 import Data.Tuple (Tuple(..), fst, snd)
@@ -20,7 +21,8 @@ import Test.Spec (Spec(), describe, it)
 import Data.String (fromCharArray)
 import Data.String as String
 import Test.Support (vliftEff, runEitherEff)
-import Text.Parsing.Parser (runParser) as P
+import Text.Parsing.Parser.Pos (initialPos) as P
+import Text.Parsing.Parser (runParser, runParserT, PState(..)) as P
 import Text.Parsing.Parser.Combinators (manyTill, optional, between, sepBy,
                                        try, choice, (<?>), option) as P
 import Text.Parsing.Parser.String (eof, string, anyChar, skipSpaces,
@@ -63,8 +65,10 @@ parseUniversalDocoptTests :: forall eff
   . Eff (fs :: FS, err :: EXCEPTION | eff) (List Test)
 parseUniversalDocoptTests = do
   f <- FS.readTextFile UTF8 "testcases.docopt"
-  runEitherEff $ P.runParser f do
-    many kase <* P.eof
+  runEitherEff
+    $ runTrampoline
+      $ P.runParserT (P.PState { input: f, position: P.initialPos }) do
+          many kase <* P.eof
 
   where
     comment = P.char '#' *> P.manyTill P.anyChar (P.char '\n')
