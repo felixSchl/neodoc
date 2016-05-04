@@ -2376,7 +2376,7 @@ Options: -f, --foo ARG
 # Missing option-arguments are fatal errors, no pardon:
 
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
 
 r"""
 Usage: foo [-f ARG]
@@ -2384,7 +2384,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
 
 r"""
 Usage: foo [[-f ARG]]
@@ -2392,7 +2392,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
 
 r"""
 Usage: foo [[-bf=ARG]]
@@ -2400,7 +2400,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
 
 r"""
 Usage: foo (-bf=ARG)
@@ -2408,7 +2408,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
 
 r"""
 usage: git (([-f ARG]))
@@ -2416,7 +2416,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
 
 r"""
 usage: git (([-f ARG]))
@@ -2425,7 +2425,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
 
 r"""
 usage: git (([-f ARG | -b]))
@@ -2433,7 +2433,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
 
 r"""
 usage: git (([-b | -f ARG]))
@@ -2441,7 +2441,15 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
+
+r"""
+usage: git (([-bf ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
 
 r"""
 usage: git (([-b ARG | -f ARG]))
@@ -2449,7 +2457,7 @@ Options: -f, --foo ARG
 """
 
 $ prog --foo
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: --foo"
 
 r"""
 usage: git (([-b | -f ARG]))
