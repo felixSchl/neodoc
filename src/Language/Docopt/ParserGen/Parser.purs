@@ -7,25 +7,30 @@
 
 module Language.Docopt.ParserGen.Parser (
     genUsageParser
+  , initialState
   , Parser()
+  , StateObj
   ) where
 
 import Prelude
 import Control.Plus (empty)
 import Control.Bind ((=<<))
 import Debug.Trace
-import Control.Apply ((<*))
+import Control.Apply ((<*), (*>))
 import Data.Function (on)
-import Data.Either (Either(..), either)
+import Data.Bifunctor
+import Data.Either (Either(..), either, isRight)
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
 import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
                   some, filter, head, fromList, sortBy, groupBy, last, null)
 import Control.Alt ((<|>))
 import Data.Traversable (traverse)
 import Control.Lazy (defer)
-import Data.Foldable (all, intercalate, maximumBy, sum, any)
+import Control.Monad (when, unless)
+import Control.MonadPlus (guard)
+import Data.Foldable (all, intercalate, maximumBy, sum, any, for_, foldl)
 import Data.String as String
-import Data.String (fromCharArray, stripPrefix)
+import Data.String (fromChar, fromCharArray, stripPrefix)
 import Data.List.Unsafe as LU
 import Data.Array as A
 import Data.Array.Unsafe as AU
@@ -66,9 +71,19 @@ debug = false
 -- | Unfortunately, the State Monad is needed because we try matching all
 -- | program branches and must select the best fit.
 -- |
+type StateObj = { depth :: Int
+                , fatal :: Maybe P.ParseError }
 type Parser a = P.ParserT (List PositionedToken)
-                          (ReaderT D.Env (State Int))
+                          (ReaderT D.Env (State StateObj))
                           a
+
+initialState :: StateObj
+initialState = { depth: 0
+               , fatal: Nothing }
+
+modifyDepth :: (Int -> Int) -> Parser Unit
+modifyDepth f = do
+  lift (State.modify \s -> s { depth = f s.depth })
 
 newtype ScoredResult a = ScoredResult {
   score  :: Int -- ^ the score of the parse
@@ -194,15 +209,18 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
       = case v of
           Just s ->
             return $ OptParse (Value.read s false) Nothing false
-          _  -> return case atok of
-            Just (Lit s) -> OptParse (Value.read s false)  Nothing true
-            _            -> OptParse (D.BoolValue true) Nothing false
+          _  -> case atok of
+            Just (Lit s) -> return $ OptParse (Value.read s false)  Nothing true
+            otherwise    ->
+              if (fromMaybe true (_.optional <<< O.runArgument <$> a))
+                 then Right $ OptParse (D.BoolValue true) Nothing false
+                 else Left  $ "Option requires argument: --" ++ n'
 
     -- case 2:
     -- The name is an exact match and takes no argument
     go (LOpt n' v) _ | isFlag && (n' == n)
       = case v of
-             Just _  -> Left "Option takes no argument"
+             Just _  -> Left $ "Option takes no argument: --" ++ n'
              Nothing -> return $ OptParse (D.BoolValue true) Nothing false
 
     -- case 3:
@@ -216,23 +234,26 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     go a b = Left $ "Invalid token" ++ show a ++ " (input: " ++ show b ++ ")"
 
 shortOption :: Char -> (Maybe O.Argument) -> Parser D.Value
-shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
   return $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks pos e
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
-          , input:    let pushed = maybe empty
-                                         (\v' -> singleton $ PositionedToken {
-                                                  token:     v'
-                                                , sourcePos: pos
-                                                , source:    s
-                                                }
-                                          )
-                                          newtok
-                          rest   = if hasConsumedArg then LU.tail xs else xs
-                       in pushed ++ rest
+          , input:
+              let
+                pushed = maybe empty
+                                (\v' ->
+                                  singleton
+                                    $ PositionedToken
+                                        { token:     v'
+                                        , sourcePos: pos
+                                        , source:    "-" ++ String.drop 2 s
+                                        })
+                                newtok
+                rest = if hasConsumedArg then LU.tail xs else xs
+              in pushed ++ rest
           , result:   Right v
           , position: maybe pos
                             (_.sourcePos <<< unPositionedToken)
@@ -246,29 +267,30 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 1:
     -- The leading flag matches, there are no stacked options, and an explicit
     -- argument may have been passed.
-    go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.length xs == 0)
+    go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.null xs)
       = case v of
-          Just s -> return $ OptParse (Value.read s false) Nothing false
-          _  -> return case atok of
-            Just (Lit s) -> OptParse (Value.read s false) Nothing true
-            _ -> OptParse (D.BoolValue true)
-                          Nothing
-                          false
+          Just s    -> return $ OptParse (Value.read s false) Nothing false
+          otherwise -> case atok of
+            Just (Lit s) -> return $ OptParse (Value.read s false) Nothing true
+            otherwise    ->
+              if (fromMaybe true (_.optional <<< O.runArgument <$> a))
+                 then Right $ OptParse (D.BoolValue true) Nothing false
+                 else  Left $ "Option requires argument: -" ++ fromChar f'
 
     -- case 2:
-    -- The leading flag matches, there are stacked options, no explicit
-    -- argument has been passed and the option takes an argument.
-    go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (A.length xs > 0)
+    -- The leading flag matches, there are stacked options, a explicit
+    -- argument may have been passed and the option takes an argument.
+    go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
       = do
-        let a = fromCharArray xs ++ maybe "" ("=" ++ _) v
-        return $ OptParse (Value.read a false)
+        let arg = fromCharArray xs ++ maybe "" ("=" ++ _) v
+        return $ OptParse (Value.read arg false)
                           Nothing
                           false
 
     -- case 3:
     -- The leading flag matches, there are stacked options, the option takes
     -- no argument and an explicit argument has not been provided.
-    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.length xs > 0)
+    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
       = return $ OptParse (D.BoolValue true)
                           (Just $ SOpt (AU.head xs) (AU.tail xs) v)
                           false
@@ -276,9 +298,9 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- case 4:
     -- The leading flag matches, there are no stacked options and the option
     -- takes no argument - total consumption!
-    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.length xs == 0)
+    go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
       = case v of
-              Just _  -> Left "Option takes no argument"
+              Just _  -> Left $ "Option takes no argument: -" ++ fromChar f'
               Nothing -> return $ OptParse (D.BoolValue true)
                                             Nothing
                                             false
@@ -319,12 +341,14 @@ genBranchesParser :: List D.Branch -- ^ The branches to test
                   -> Parser (ScoredResult (Tuple D.Branch (List ValueMapping)))
 genBranchesParser xs term optsFirst canSkip
   = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
-    env :: D.Env <- ask
+    env   :: D.Env    <- ask
+    state :: StateObj <- lift State.get
+
     let
       ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> do
-                            genBranchParser x optsFirst canSkip
-                            <* if term then eof else return unit
-      rs = evalState (runReaderT (collect s ps) env) 0
+                          genBranchParser x optsFirst canSkip
+                            <* unless (not term) eof
+      rs  = evalState (runReaderT (collect s ps) env) initialState
       rs' = reverse rs
 
       -- Evaluate the winning candidates, if any.
@@ -344,50 +368,62 @@ genBranchesParser xs term optsFirst canSkip
       losers =
           last $ groupBy (eq `on` (_.depth <<< _.result))
                          (sortBy (compare `on` (_.depth <<< _.result))
-                                (mlefts rs))
+                                 (mlefts rs))
 
-    return $ maybe'
+    maybe'
       (\_ ->
         fromMaybe
-          (P.parseFailed i pos
-            "The impossible happened. Failure without error")
-          do
-            -- Provide the most useful error message to the user possible from
-            -- the information given. Unfortunately, we only get strings at
-            -- this point.
-            es  <- losers
-            let
-              es' = if length es > 1
-                      then es `flip filter` (\e ->
-                        let msg = _.message $ unParseError e.result.error
-                        in  not $ startsWith "Expected" msg)
-                      else es
-            (do
-              e <- last es'
-              return (e { result = Left $ e.result.error })
-            ) <|> (do
-              return $ P.parseFailed i pos ""
-            )
+          (return do
+            P.parseFailed i pos
+                "The impossible happened. Failure without error")
+          (do
+            es <- losers
+            return case es of
+              Cons e es | null es || not (null i) -> do
+                when ((startsWith
+                        "Option takes no argument"
+                        (unParseError e.result.error).message)
+                    || (startsWith
+                        "Option requires argument"
+                        (unParseError e.result.error).message)) do
+                          lift $ State.modify (_ {  fatal = Just e.result.error })
+                return $ e { result = Left e.result.error }
+              otherwise -> return $ P.parseFailed i pos ""
+          )
       )
-      (\r -> r { result = Right r.result.value })
+      (\r -> return $ r { result = Right r.result.value })
       winner
 
   where
-    fixMessage m = m
-    collect s ps = ps `flip traverse` \p -> P.unParserT p s >>= \o -> do
-                    depth :: Int <- lift State.get
-                    return $ either
-                      (\e -> Left  { input:    o.input
-                                   , consumed: o.consumed
-                                   , position: o.position
-                                   , result:   { error: e, depth: depth }
-                                   })
-                      (\r -> Right { input:    o.input
-                                   , consumed: o.consumed
-                                   , position: o.position
-                                   , result:   { value: r, depth: depth }
-                                   })
-                      o.result
+  fixMessage m = m
+  collect s ps = ps `flip traverse` \p -> do
+
+    o                 <- P.unParserT p s
+    state :: StateObj <- lift State.get
+
+    -- If any parse encountered a fatal error, fail with that error.
+    -- XXX: this approach is pragmatic and works around not being able to catch
+    --      errors in purescript-parsing. Ideally, this would not be needed.
+    --      Also, using "o" is actually misleading here as it claims the error
+    --      happened at a different location as to where it actually
+    --      did. This has no impact atm on the way neodoc works, but is
+    --      something to keep in mind.
+    flip fromMaybe
+      (do
+        e <- state.fatal
+        return
+          $ return
+            $ Left
+              -- XXX: use a huge depth for fatal errors to be bubbled
+              --      up properly (be selected). Again, this is due to
+              --      insufficient control over handling fatal vs.
+              --      non-fatal errors.
+              $ o { result = { error: e, depth: 99999 } }
+      )
+      (return $ bimap
+        (\e -> o { result = { error: e, depth: state.depth } })
+        (\r -> o { result = { value: r, depth: state.depth } })
+        o.result)
 
 -- | Generate a parser for a single usage branch
 genBranchParser :: D.Branch  -- ^ The branch to match
@@ -395,7 +431,7 @@ genBranchParser :: D.Branch  -- ^ The branch to match
                 -> Boolean   -- ^ Can we skip input via fallbacks?
                 -> Parser (ScoredResult (List ValueMapping))
 genBranchParser (D.Branch xs) optsFirst canSkip = do
-  lift (State.put 0) -- reset the depth counter
+  modifyDepth (const 0) -- reset the depth counter
   either
     (\_   -> P.fail "Failed to generate parser")
     (\acc -> case acc of
@@ -422,6 +458,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                 ++ " - canSkip: " ++  show canSkip
           else return unit
       draw ps (length ps) Nil
+
       where
         -- iterate over `ps` until a match `x` is found, then, recursively
         -- apply `draw` until the parser fails, with a modified `ps`.
@@ -450,30 +487,18 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           r <- unScoredResult <$> (P.try $ genParser (D.setRequired p true)
                                                      (not $ n > 0))
 
-          -- verify the arguments for the parsed set of options when an option
-          -- takes anything but a bool value, i.e. it is not a flag, an explicit
-          -- argument *must* be provided.
-          let missing = fst <$> flip filter r.result
-                    (\(Tuple a v) -> (fromMaybe false do
-                                        arg <- O.runArgument <$> do
-                                                  D.getArgument a
-                                        return $ not arg.optional
-                                     )
-                                  && (not $ D.isFlag a)
-                                  && (D.isBoolValue v))
-
-          if (length missing == 0)
-            then return unit
-            else P.fail $ "Missing required arguments for "
-                        ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
-
           r' <- unScoredResult <$> P.try do
                   if D.isRepeatable p
                         then draw pss (length pss) (p:tot)
                         else draw ps' (length ps') (p:tot)
 
           return $ ScoredResult r ++ ScoredResult r'
-        ) <|> (defer \_ -> draw (ps' ++ singleton p) (n - 1) tot)
+        ) <|> (defer \_ -> do
+              state :: StateObj <- lift State.get
+              case state.fatal of
+                Just (P.ParseError { message }) -> P.fail message
+                otherwise -> draw (ps' ++ singleton p) (n - 1) tot
+              )
 
         draw ps' n tot | (length ps' > 0) && (n < 0) = do
           env :: StrMap String <- lift ask
@@ -581,20 +606,20 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       ) <|> (P.fail $ "Expected " ++ D.prettyPrintArg x ++ butGot i)
         where go = do
                 Tuple x <$> (command n)
-                <* lift (State.modify (1 + _))
+                <* modifyDepth (_ + 1)
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) _ = do
       score 0 <<< singleton <<< Tuple x <$> (do
         eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
-        <* lift (State.modify (1 + _))
+        <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"--\""
 
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) _ = do
       score 0 <<< singleton <<< Tuple x <$> (do
         stdin
-        <* lift (State.modify (1 + _))
+        <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"-\""
 
     genParser x@(D.Positional n r) _
@@ -609,7 +634,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       ) <|> P.fail ("Expected " ++ D.prettyPrintArg x ++ butGot i)
         where go = do
                 Tuple x <$> (positional n)
-                <* lift (State.modify (1 + _))
+                <* modifyDepth (_ + 1)
 
     genParser x@(D.Group optional bs r) _
       | optsFirst && (length bs == 1) &&
@@ -624,7 +649,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     genParser x@(D.Option (O.Option o)) _ = (do
       score 0 <$> do
         if o.repeatable then (some go) else (singleton <$> go)
-      <* lift (State.modify (1 + _))
+      <* modifyDepth (_ + 1)
       )
         where
           go = do
@@ -635,11 +660,23 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
             -- a LOpt).
             isLopt <- P.option false (P.lookAhead $ P.try $ token isAnyLopt)
             isSopt <- P.option false (P.lookAhead $ P.try $ token isAnySopt)
-            if isLopt
-               then P.try $ Tuple x <$> mkLoptParser o.name o.arg
-               else if isSopt
-                then P.try $ Tuple x <$> mkSoptParser o.flag o.arg
-                else P.fail "long or short option"
+            P.ParserT \s -> do
+              o <- P.unParserT (if isLopt
+                then P.try $ Tuple x <$> mkLoptParser o.name o.arg
+                else if isSopt
+                  then P.try $ Tuple x <$> mkSoptParser o.flag o.arg
+                  else P.fail "long or short option") s
+              case o.result of
+                  (Left e) -> do
+                    when ((startsWith
+                            "Option takes no argument"
+                            (unParseError e).message)
+                       || (startsWith
+                            "Option requires argument"
+                            (unParseError e).message)) do
+                              lift $ State.modify (_ { fatal = Just e })
+                    return o
+                  otherwise -> return o
 
           isAnyLopt (LOpt _ _) = return true
           isAnyLopt _          = return false

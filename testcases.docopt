@@ -2373,8 +2373,133 @@ Usage: foo -f ARG
 Options: -f, --foo ARG
 """
 
+# Missing option-arguments are fatal errors, no pardon:
+
 $ prog -f
-"Missing required arguments for -f|--foo=ARG" # XXX This should change.
+"Option requires argument: -f"
+
+r"""
+Usage: foo [-f ARG]
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
+
+r"""
+Usage: foo [[-f ARG]]
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
+
+r"""
+Usage: foo [[-bf=ARG]]
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
+
+r"""
+Usage: foo (-bf=ARG)
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
+
+r"""
+usage: git (([-f ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
+
+r"""
+usage: git (([-f ARG]))
+   or: git -f ARG
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
+
+r"""
+usage: git (([-f ARG | -b]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
+
+r"""
+usage: git (([-b | -f ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
+
+r"""
+usage: git (([-bf ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+"Option requires argument: -f"
+
+r"""
+usage: git (([-b ARG | -f ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog --foo
+"Option requires argument: --foo"
+
+r"""
+usage: git (([-b | -f ARG]))
+Options: -f, --foo ARG
+"""
+
+$ prog
+{"-b": false}
+
+r"""
+usage: git (([-b | -f[=ARG]]))
+Options: -f, --foo ARG
+"""
+
+$ prog -f
+{"-f": true, "--foo": true, "-b": false}
+
+#
+# Given an option-argument to a flag is a fatal error, no pardon:
+#
+
+r"""
+usage: git -b
+options: -b, --boo
+"""
+
+$ prog -b=FOO
+"Option takes no argument: -b"
+
+$ prog --boo=FOO
+"Option takes no argument: --boo"
+
+r"""
+usage: git -f <foo>
+"""
+
+$ prog/s -fb
+"Expected <foo>, but got -b"
+
+#
+# Command and positional errors:
+#
 
 r"""Usage: git <command> -f"""
 $ prog
@@ -2399,6 +2524,14 @@ $ prog
 r"""
 Usage: foo remote
        foo
+"""
+
+$ prog --fooo
+"Expected remote, but got --fooo"
+
+r"""
+Usage: foo
+       foo remote
 """
 
 $ prog --fooo
