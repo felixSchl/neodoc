@@ -234,23 +234,26 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     go a b = Left $ "Invalid token" ++ show a ++ " (input: " ++ show b ++ ")"
 
 shortOption :: Char -> (Maybe O.Argument) -> Parser D.Value
-shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
   return $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks pos e
         Right (OptParse v newtok hasConsumedArg) ->
           { consumed: maybe true (const false) newtok
-          , input:    let pushed = maybe empty
-                                         (\v' -> singleton $ PositionedToken {
-                                                  token:     v'
-                                                , sourcePos: pos
-                                                , source:    s
-                                                }
-                                          )
-                                          newtok
-                          rest   = if hasConsumedArg then LU.tail xs else xs
-                       in pushed ++ rest
+          , input:
+              let
+                pushed = maybe empty
+                                (\v' ->
+                                  singleton
+                                    $ PositionedToken
+                                        { token:     v'
+                                        , sourcePos: pos
+                                        , source:    "-" ++ String.drop 2 s
+                                        })
+                                newtok
+                rest = if hasConsumedArg then LU.tail xs else xs
+              in pushed ++ rest
           , result:   Right v
           , position: maybe pos
                             (_.sourcePos <<< unPositionedToken)
@@ -275,12 +278,12 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                  else  Left $ "Option requires argument: -" ++ fromChar f'
 
     -- case 2:
-    -- The leading flag matches, there are stacked options, no explicit
-    -- argument has been passed and the option takes an argument.
+    -- The leading flag matches, there are stacked options, a explicit
+    -- argument may have been passed and the option takes an argument.
     go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
       = do
-        let a = fromCharArray xs ++ maybe "" ("=" ++ _) v
-        return $ OptParse (Value.read a false)
+        let arg = fromCharArray xs ++ maybe "" ("=" ++ _) v
+        return $ OptParse (Value.read arg false)
                           Nothing
                           false
 

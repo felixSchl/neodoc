@@ -2490,6 +2490,13 @@ $ prog -b=FOO
 $ prog --boo=FOO
 "Option takes no argument: --boo"
 
+r"""
+usage: git -f <foo>
+"""
+
+$ prog/s -fb
+"Expected <foo>, but got -b"
+
 #
 # Command and positional errors:
 #
