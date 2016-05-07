@@ -1,13 +1,12 @@
 module Language.Docopt.Trans.Rich (
     reduce
-  , RichValue
-  , RichValueObj
-  , unRichValue
   ) where
 
 import Prelude
 
-import Data.List (List(), catMaybes, singleton, concat, toList)
+import Debug.Trace
+import Data.List (List(..), catMaybes, singleton, concat, toList, filter,
+                  reverse, null, nub)
 import Data.Array (length, filter) as A
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Maybe.Unsafe (fromJust)
@@ -16,7 +15,7 @@ import Data.Tuple (Tuple(Tuple))
 import Data.Map (Map())
 import Data.StrMap as StrMap
 import Data.StrMap (StrMap())
-import Data.Bifunctor (lmap)
+import Data.Bifunctor (rmap, lmap)
 import Data.Foldable (foldl, maximum)
 import Control.Alt ((<|>))
 
@@ -29,20 +28,10 @@ import Language.Docopt.Env as Env
 import Language.Docopt.Argument (Argument(..), Branch(..), isRepeatable,
                                 setRepeatable, runBranch, setRepeatableOr,
                                 isCommand, isFlag) as D
-import Language.Docopt.ParserGen.ValueMapping (ValueMapping)
-import Language.Docopt.Trans.Origin as Origin
-import Language.Docopt.Trans.Origin (Origin())
+import Language.Docopt.ParserGen (ValueMapping, RichValue(..), unRichValue)
+import Language.Docopt.Origin as Origin
+import Language.Docopt.Origin (Origin())
 import Language.Docopt.Trans.Key (Key(..), key, toKeys)
-
-type RichValueObj = {
-  value  :: Value
-, origin :: Origin
-}
-
-newtype RichValue = RichValue RichValueObj
-
-unRichValue :: RichValue -> RichValueObj
-unRichValue (RichValue o) = o
 
 reduce :: List D.Usage       -- ^ the program specification
        -> Env                -- ^ the environment
@@ -50,21 +39,13 @@ reduce :: List D.Usage       -- ^ the program specification
        -> List ValueMapping  -- ^ the parse result
        -> StrMap RichValue   -- ^ the output set of (arg => val)
 reduce us env b vs =
-  let vm = Map.fromFoldableWith mergeVals $ fromArgv vs
-      m  = applyValues vm $ reduceUsage (D.Usage (singleton b))
-    in finalFold m
+  let vm = Map.fromFoldableWith (++) (rmap singleton <$>
+                                            lmap key <$>
+                                            reverse vs)
+      m = applyValues vm $ reduceUsage (D.Usage (singleton b))
+   in finalFold m
 
   where
-
-  fromArgv :: List ValueMapping -> List (Tuple Key RichValue)
-  fromArgv vs = lmap key <$> (go <$> vs)
-    where
-    go (Tuple a v) = Tuple a $ RichValue {
-      origin: Origin.Argv
-    , value:  if D.isRepeatable a
-                  then ArrayValue (Value.intoArray v)
-                  else v
-    }
 
   mergeVals :: RichValue -> RichValue -> RichValue
   mergeVals (RichValue v) (RichValue v') = RichValue $ {
@@ -73,60 +54,28 @@ reduce us env b vs =
                       ++ Value.intoArray v.value
   }
 
-  applyValues :: Map Key RichValue -> List D.Argument -> Map Key RichValue
+  applyValues :: Map Key (List RichValue) -> List D.Argument -> Map Key RichValue
   applyValues vm as = Map.fromFoldableWith mergeVals
+    $ concat
     $ catMaybes
-    $ as <#> \a -> Tuple (key a) <$> do
-      (RichValue v) <-  getValue vm     a
-                    <|> getEnvValue     a
-                    <|> getDefaultValue a
-                    <|> getEmptyValue   a
+    $ as <#> \a -> do
+      vs <- Map.lookup (key a) vm
+      let vs' = filter (origin (/=) Origin.Empty) vs
+          vs'' = filter (origin (/=) Origin.Default) vs'
+          vs''' = case vs'' of
+                       Nil -> nub vs'
+                       vs  -> vs
+          vs'''' = vs''' <#> \(RichValue v) -> RichValue $ v {
+                    value = if D.isRepeatable a
+                              then ArrayValue $ Value.intoArray v.value
+                              else v.value
+                    }
 
-      return $ RichValue v {
-        value = if D.isRepeatable a
-                    then ArrayValue $ Value.intoArray v.value
-                    else v.value
-      }
+      return $ (Tuple (key a)) <$> vs''''
+
     where
-
-    getValue :: Map Key RichValue -> D.Argument -> Maybe RichValue
-    getValue vm a = Map.lookup (key a) vm
-
-    getEnvValue :: D.Argument -> Maybe RichValue
-    getEnvValue (D.Option (O.Option o@{ env: Just k })) = do
-      s <- Env.lookup k env
-      return $ RichValue {
-        origin: Origin.Environment
-      , value:  StringValue s
-      }
-    getEnvValue _ = Nothing
-
-    getDefaultValue :: D.Argument -> Maybe RichValue
-    getDefaultValue (D.Option (O.Option o@{
-        arg: Just (O.Argument { default: Just v })
-      })) = return
-              $ RichValue {
-                  origin: Origin.Default
-                , value: if (o.repeatable)
-                            then ArrayValue $ Value.intoArray v
-                            else v
-                }
-    getDefaultValue _ = Nothing
-
-    getEmptyValue :: D.Argument -> Maybe RichValue
-    getEmptyValue x = RichValue <<< { origin: Origin.Empty
-                                    , value:  _
-                                    } <$> go x
-      where
-      go (D.Option (O.Option o@{ arg: Nothing }))
-        = return
-            $ if o.repeatable then ArrayValue []
-                              else BoolValue false
-      go (D.Positional _ r) | r = return $ ArrayValue []
-      go (D.Command _ r)    | r = return $ ArrayValue []
-      go (D.Stdin)              = return $ BoolValue false
-      go (D.EOA)                = return $ ArrayValue []
-      go _                      = Nothing
+    isRelevant a = Map.member (key a) vm
+    origin cmp o = \x -> (_.origin $ unRichValue x) `cmp` o
 
   finalFold :: Map Key RichValue -> StrMap RichValue
   finalFold m =
@@ -146,7 +95,7 @@ reduce us env b vs =
                             BoolValue b ->
                               if D.isRepeatable a
                                   then
-                                    return $ if b
+                                    return if b
                                               then IntValue 1
                                               else IntValue 0
                                   else Nothing

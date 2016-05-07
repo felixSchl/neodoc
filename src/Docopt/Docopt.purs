@@ -80,8 +80,7 @@ run :: forall e
 run d o = do
   argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
   env  <- maybe Process.getEnv              (return <<< id) o.env
-  either onError return
-         do
+  either onError return do
           { specification, usage } <- parseDocopt d o.smartOptions
           lmap ((help usage) ++ _) do
             evalDocopt specification env argv o.optionsFirst

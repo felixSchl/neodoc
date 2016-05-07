@@ -1,4 +1,4 @@
-module Language.Docopt.Trans.Origin (
+module Language.Docopt.Origin (
   Origin(..)
   ) where
 
@@ -16,6 +16,12 @@ weight Argv        = 3
 weight Environment = 2
 weight Default     = 1
 weight Empty       = 0
+
+instance showOrigin :: Show Origin where
+  show Argv        = "Argv"
+  show Environment = "Environment"
+  show Default     = "Default"
+  show Empty       = "Empty"
 
 instance eqOrigin :: Eq Origin where
   eq Argv        Argv        = true

@@ -43,20 +43,6 @@ data Origin
   | Environment
   | Default
 
--- newtype RichValue = RichValue {
---   value   :: D.Value
--- , origin  :: Origin
--- , env     :: Maybe {
---     key   :: String
---   , value :: Maybe String
---   }
--- , default :: Maybe D.Value
--- }
-
--- data Output
---   = SimpleOutput (StrMap D.Value)
---   | RichOutput   (StrMap RichValue)
-
 -- |
 -- | Parse the docopt text and produce a parser
 -- | that can be applied to user input.

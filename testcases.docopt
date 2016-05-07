@@ -15,7 +15,7 @@ Options: -a  All.
 
 """
 $ prog
-{"-a": false}
+{}
 
 $ prog -a
 {"-a": true}
@@ -30,7 +30,7 @@ Options: --all  All.
 
 """
 $ prog
-{"--all": false}
+{}
 
 $ prog --all
 {"--all": true}
@@ -158,12 +158,10 @@ Options: --version
 
 """
 $ prog --version
-{"--verbose": false,
- "--version": true}
+{"--version": true}
 
 $ prog --verbose
-{"--verbose": true,
- "--version": false}
+{"--verbose": true}
 
 
 r"""usage: prog [-a -r -m <msg>]
@@ -213,19 +211,13 @@ $ prog -arm=Hello
  "-r": true}
 
 $ prog -m=Hello
-{"-a": false,
- "-m": "Hello",
- "-r": false}
+{"-m": "Hello"}
 
 $ prog -m Hello
-{"-a": false,
- "-m": "Hello",
- "-r": false}
+{"-m": "Hello"}
 
 $ prog -mHello
-{"-a": false,
- "-m": "Hello",
- "-r": false}
+{"-m": "Hello"}
 
 $ prog -m
 "user-error"
@@ -263,19 +255,13 @@ $ prog -arm=Hello
  "-r": true}
 
 $ prog -m=Hello
-{"-a": false,
- "-m": "Hello",
- "-r": false}
+{"-m": "Hello"}
 
 $ prog -m Hello
-{"-a": false,
- "-m": "Hello",
- "-r": false}
+{"-m": "Hello"}
 
 $ prog -mHello
-{"-a": false,
- "-m": "Hello",
- "-r": false}
+{"-m": "Hello"}
 
 $ prog -m
 "user-error"
@@ -300,10 +286,10 @@ $ prog -ba
 {"-a": true, "-b": true}
 
 $ prog -a
-{"-a": true, "-b": false}
+{"-a": true}
 
 $ prog
-{"-a": false, "-b": false}
+{}
 
 
 r"""usage: prog (-a -b)
@@ -325,10 +311,10 @@ $ prog -ba
 {"-a": true, "-b": true}
 
 $ prog -a
-{"-a": true, "-b": false}
+{"-a": true}
 
 $ prog
-{"-a": false, "-b": false}
+{}
 
 
 r"""usage: prog [-a] -b
@@ -344,13 +330,13 @@ $ prog -b -a
 {"-a": true, "-b": true}
 
 $ prog -a
-{"-a": true, "-b": false}
+{"-a": true}
 
 $ prog -b
-{"-a": false, "-b": true}
+{"-b": true}
 
 $ prog
-{"-a": false, "-b": false}
+{}
 
 
 r"""usage: prog [(-a -b)]
@@ -372,13 +358,13 @@ $ prog -ba
 {"-a": true, "-b": true}
 
 $ prog -a
-{"-a": true, "-b": false}
+{"-a": true}
 
 $ prog -b
-{"-a": false, "-b": true}
+{"-b": true}
 
 $ prog
-{"-a": false, "-b": false}
+{}
 
 
 #
@@ -390,13 +376,13 @@ $ prog -a -b
 "user-error"
 
 $ prog
-{"-a": false, "-b": false}
+{}
 
 $ prog -a
-{"-a": true, "-b": false}
+{"-a": true}
 
 $ prog -b
-{"-a": false, "-b": true}
+{"-b": true}
 
 
 r"""usage: prog [ -a | -b ]
@@ -409,13 +395,13 @@ $ prog -a -b
 "user-error"
 
 $ prog
-{"-a": false, "-b": false}
+{}
 
 $ prog -a
-{"-a": true, "-b": false}
+{"-a": true}
 
 $ prog -b
-{"-a": false, "-b": true}
+{"-b": true}
 
 
 r"""usage: prog <arg>"""
@@ -490,7 +476,7 @@ $ prog 10 --all
  "KIND": 10}
 
 $ prog 10
-{"--all": false, "<kind>": 10, "KIND": 10}
+{"<kind>": 10, "KIND": 10}
 
 $ prog
 "user-error"
@@ -511,7 +497,7 @@ $ prog 10
 "user-error"
 
 $ prog
-{"<name>": [], "NAME": []}
+{}
 
 # Added test case:
 # (See note above)
@@ -523,7 +509,7 @@ $ prog 10
 {"<name>": [10], "NAME": [10]}
 
 $ prog
-{"<name>": [], "NAME": []}
+{}
 
 
 r"""usage: prog [(<name> <name>)]"""
@@ -534,7 +520,7 @@ $ prog 10
 "user-error"
 
 $ prog
-{"<name>": [], "NAME": []}
+{}
 
 r"""usage: prog NAME..."""
 $ prog 10 20
@@ -556,7 +542,7 @@ $ prog 10
 {"<name>": [10], "NAME": [10]}
 
 $ prog
-{"<name>": [], "NAME": []}
+{}
 
 
 r"""usage: prog [NAME...]"""
@@ -567,7 +553,7 @@ $ prog 10
 {"<name>": [10], "NAME": [10]}
 
 $ prog
-{"<name>": [], "NAME": []}
+{}
 
 
 r"""usage: prog [NAME [NAME ...]]"""
@@ -578,7 +564,7 @@ $ prog 10
 {"<name>": [10], "NAME": [10]}
 
 $ prog
-{"<name>": [], "NAME": []}
+{}
 
 
 r"""usage: prog (NAME | --foo NAME)
@@ -587,7 +573,7 @@ options: --foo
 
 """
 $ prog 10
-{"--foo": false, "<name>": 10, "NAME": 10}
+{"<name>": 10, "NAME": 10}
 
 $ prog --foo 10
 {"--foo": true, "<name>": 10, "NAME": 10}
@@ -602,13 +588,13 @@ options: --bar
 
 """
 $ prog 10
-{"--bar": false, "--foo": false, "<name>": [10], "NAME": [10]}
+{"<name>": [10], "NAME": [10]}
 
 $ prog 10 20
-{"--bar": false, "--foo": false, "<name>": [10, 20], "NAME": [10, 20]}
+{"<name>": [10, 20], "NAME": [10, 20]}
 
 $ prog --foo --bar
-{"--bar": true, "--foo": true, "<name>": [], "NAME": []}
+{"--bar": true, "--foo": true}
 
 
 r"""Naval Fate.
@@ -629,30 +615,6 @@ Options:
   --drifting    Drifting mine.
 
 """
-
-# XXX: We are deviating here. See `Language.Docopt.Trans.reduce` for a full
-#      explanation of the issue. In brief, this implementation, collects values
-#      only for arguments of the branch that was actually matched.
-#      Secondly, `<name>` does not evaluate to an array. I don't see why it
-#      would in the original implementation either? What's the rationale here?
-#
-# Original:
-#
-# {"--drifting": false,
-#  "--help": false,
-#  "--moored": false,
-#  "--speed": 20,
-#  "--version": false,
-#  "<name>": ["Guardian"],
-#  "<x>": 150,
-#  "<y>": 300,
-#  "mine": false,
-#  "move": true,
-#  "new": false,
-#  "remove": false,
-#  "set": false,
-#  "ship": true,
-#  "shoot": false}
 
 $ prog ship Guardian move 150 300 --speed=20
 {"--speed": 20,
@@ -681,7 +643,7 @@ $ prog --hello wrld
 
 r"""usage: prog [-o]"""
 $ prog
-{"-o": false}
+{}
 
 $ prog -o
 {"-o": true}
@@ -689,7 +651,7 @@ $ prog -o
 
 r"""usage: prog [-opr]"""
 $ prog -op
-{"-o": true, "-p": true, "-r": false}
+{"-o": true, "-p": true}
 
 
 r"""usage: prog --aabb | --aa"""
@@ -715,7 +677,7 @@ $ prog -v
 
 r"""Usage: prog [-v -v]"""
 $ prog
-{"-v": 0}
+{}
 
 $ prog -v
 {"-v": 1}
@@ -728,7 +690,7 @@ r"""Usage: prog -v ..."""
 # Note: Deviation: We allow not passing flags.
 # Original "user-error"
 $ prog
-{"-v": 0}
+{}
 
 $ prog -v
 {"-v": 1}
@@ -746,7 +708,7 @@ This one is probably most readable user-friednly variant.
 
 """
 $ prog
-{"-v": 0}
+{}
 
 $ prog -v
 {"-v": 1}
@@ -776,7 +738,7 @@ $ prog go
 # r"""usage: prog [go go]"""
 r"""usage: prog [go [go]]"""
 $ prog
-{"go": 0}
+{}
 
 $ prog go
 {"go": 1}
@@ -802,7 +764,7 @@ options: -a
 """
 
 $ prog -a
-{"-a": true, "-b": false}
+{"-a": true}
 
 $ prog -aa
 "user-error"
@@ -819,13 +781,13 @@ Options:
 """
 
 $ prog arg
-{"-q": false, "-v": false, "<a>": "arg", "A": "arg"}
+{"<a>": "arg", "A": "arg"}
 
 $ prog -v arg
-{"-q": false, "-v": true, "<a>": "arg", "A": "arg"}
+{"-v": true, "<a>": "arg", "A": "arg"}
 
 $ prog -q arg
-{"-q": true, "-v": false, "<a>": "arg", "A": "arg"}
+{"-q": true, "<a>": "arg", "A": "arg"}
 
 #
 # Test single dash
@@ -837,7 +799,7 @@ $ prog -
 {"-": true}
 
 $ prog
-{"-": false}
+{}
 
 #
 # If argument is repeated, its value should always be a list
@@ -849,7 +811,7 @@ $ prog a b
 {"<name>": ["a", "b"], "NAME": ["a", "b"]}
 
 $ prog
-{"<name>": [], "NAME": []}
+{}
 
 #
 # Option's argument defaults to null/None
@@ -885,22 +847,22 @@ $ prog --hello wrld
 
 r"""usage: prog [-o]"""
 $ prog
-{"-o": false}
+{}
 
 $ prog -o
 {"-o": true}
 
 r"""usage: prog [-opr]"""
 $ prog -op
-{"-o": true, "-p": true, "-r": false}
+{"-o": true, "-p": true}
 
 r"""usage: git [-v | --verbose]"""
 $ prog -v
-{"--verbose": false, "-v": true}
+{"-v": true}
 
 r"""usage: git remote [-v | --verbose]"""
 $ prog remote -v
-{"--verbose": false, "-v": true, "remote": true}
+{"-v": true, "remote": true}
 
 #
 # Test empty usage pattern
@@ -1142,11 +1104,8 @@ other options:
 
 """
 $ prog --baz --egg
-{"--bar": false,
- "--baz": true,
- "--egg": true,
- "--foo": false,
- "--spam": false}
+{"--baz": true,
+ "--egg": true}
 
 #
 # README example usage
@@ -1368,13 +1327,11 @@ Options:
     -0  This is a zero
 """
 
-# XXX: this returns superflous "-0" in the output:
 $ prog/p foo bar -0
-{"-0": false, "ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
+{"ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
 
-# XXX: this returns superflous "-0" in the output:
 $ prog/p -0
-{"-0": false, "ARG": ["-0"], "<arg>": ["-0"]}
+{"ARG": ["-0"], "<arg>": ["-0"]}
 
 r"""
 Usage: create_ec2.py [ARG...] [options]
@@ -1383,13 +1340,11 @@ Options:
     -0  This is a zero
 """
 
-# XXX: this returns superflous "-0" in the output:
 $ prog/p foo bar -0
-{"-0": false, "ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
+{"ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
 
-# XXX: this returns superflous "-0" in the output:
 $ prog/p -0
-{"-0": false, "ARG": ["-0"], "<arg>": ["-0"]}
+{"ARG": ["-0"], "<arg>": ["-0"]}
 
 
 r"""
@@ -1405,7 +1360,7 @@ $ prog -0
 
 # XXX: this returns superflous "-0" and "-1" in the output:
 $ prog/p -01
-{"-0": false, "-1": false, "ARG": ["-01"], "<arg>": ["-01"]}
+{"ARG": ["-01"], "<arg>": ["-01"]}
 
 #
 # Options-first fix for issue #21
@@ -1416,7 +1371,7 @@ Usage: foo [[<args>...]]
 """
 
 $ prog/p
-{"ARGS": [], "<args>": []}
+{}
 
 $ prog/p bar -a -b -c
 {"ARGS": ["bar", "-a", "-b", "-c"],
@@ -1427,7 +1382,7 @@ Usage: foo [<command> [<args>...]]
 """
 
 $ prog/p
-{"ARGS": [], "<args>": []}
+{}
 
 $ prog/p bar -a -b -c
 {"COMMAND": "bar", "<command>": "bar",
@@ -1525,6 +1480,26 @@ $ prog
 $ prog --foo
 {"--foo": [true]}
 
+r"""
+Usage: manage.py --foo (--foo[=BAR]...) (--foo[=BAR]...) (--foo[=BAR]...)
+"""
+
+$ prog
+{}
+
+$ prog --foo
+{"--foo": [true]}
+
+r"""
+Usage: manage.py --foo (--foo[=BAR]... (--foo[=BAR]...)) (--foo[=BAR]...)
+"""
+
+$ prog
+{}
+
+$ prog --foo
+{"--foo": [true]}
+
 $ prog --foo bar
 "user-error" # "bar" will be considered trailing since the first appearance
              # of '--foo' does not take an argument. XXX: Is this intutive
@@ -1597,40 +1572,40 @@ $ prog -c -a -b
 r"""usage: prog -a [-b -d] -c"""
 
 $ prog -a -b -c
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -abc
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -a -c -b
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -acb
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -b -a -c
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -bac
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -b -c -a
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -bca
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -c -b -a
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -cba
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -c -a -b
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -cab
-{"-a": true, "-b": true, "-c": true, "-d": false}
+{"-a": true, "-b": true, "-c": true}
 
 $ prog -d -a -b -c
 "user-error" # -b and -d must appear together
@@ -1660,13 +1635,13 @@ $ prog -ba
 {"-a": true, "-b": true}
 
 $ prog -a
-{"-a": true, "-b": false}
+{"-a": true}
 
 $ prog -b
-{"-a": false, "-b": true}
+{"-b": true}
 
 $ prog
-{"-a": false, "-b": false}
+{}
 
 r"""usage: prog [(-a[=BAR] -b)]"""
 
@@ -1677,28 +1652,28 @@ $ prog -b -a FOO
 {"-a": "FOO", "-b": true}
 
 $ prog -ab
-{"-a": "b", "-b": false}
+{"-a": "b"}
 
 $ prog -ba
 {"-a": true, "-b": true}
 
 $ prog -a
-{"-a": true, "-b": false}
+{"-a": true}
 
 $ prog -b
 {"-b": true}
 
 $ prog
-{"-b": false}
+{}
 
 
 r"""usage: prog -a (--foo|--no-foo) -b"""
 
-$ prog -b -a --foo
-{"-a": true, "-b": true, "--foo": true, "--no-foo": false}
+# $ prog -b -a --foo
+# {"-a": true, "-b": true, "--foo": true}
 
 $ prog -b --no-foo -a
-{"-a": true, "-b": true, "--foo": false, "--no-foo": true}
+{"-a": true, "-b": true, "--no-foo": true}
 
 $ prog -b --no-foo -a --foo
 "user-error"
@@ -1860,7 +1835,7 @@ Usage:
 """
 
 $ prog a b c
-{"Y": ["a", "b", "c"], "<y>": ["a", "b", "c"], "X": [], "<x>": []}
+{"Y": ["a", "b", "c"], "<y>": ["a", "b", "c"]}
 
 r"""
 Usage:
@@ -1868,7 +1843,7 @@ Usage:
 """
 
 $ prog a b c
-{"X": ["a", "b", "c"], "<x>": ["a", "b", "c"], "Y": [], "<y>": []}
+{"X": ["a", "b", "c"], "<x>": ["a", "b", "c"]}
 
 r"""
 Usage:
@@ -1913,7 +1888,7 @@ Options: -v, --verbose
 """
 
 $ prog
-{"-v": false, "--verbose": false}
+{}
 
 $ prog -v
 {"-v": true, "--verbose": true}
@@ -1927,7 +1902,7 @@ Options: -v, --verbose...
 """
 
 $ prog
-{"-v": 0, "--verbose": 0}
+{}
 
 $ prog -v
 {"-v": 1, "--verbose": 1}
@@ -1941,7 +1916,7 @@ Options: -v..., --verbose
 """
 
 $ prog
-{"-v": 0, "--verbose": 0}
+{}
 
 $ prog -v
 {"-v": 1, "--verbose": 1}
@@ -1955,7 +1930,7 @@ Options: -v..., --verbose...
 """
 
 $ prog
-{"-v": 0, "--verbose": 0}
+{}
 
 $ prog -v
 {"-v": 1, "--verbose": 1}
@@ -1973,7 +1948,7 @@ Options: -h
 """
 
 $ prog
-{"-h": false}
+{}
 
 $ prog -h
 {"-h": true}
@@ -1987,7 +1962,7 @@ Options: -h
 """
 
 $ prog
-{"-h": 0}
+{}
 
 $ prog -h
 {"-h": 1}
@@ -2001,7 +1976,7 @@ Options: --input
 """
 
 $ prog
-{"--input": false}
+{}
 
 $ prog --input
 {"--input": true}
@@ -2015,7 +1990,7 @@ Options: -i, --input
 """
 
 $ prog
-{"-i": false, "--input": false}
+{}
 
 $ prog -i
 {"-i": true, "--input": true}
@@ -2125,10 +2100,10 @@ Usage: foo [-oi ARG]
 """
 
 $ prog/s
-{"-o": false} # XXX: Awkward
+{}
 
 $ prog/s -i 123
-{"-i": 123, "-o": false}
+{"-i": 123}
 
 $ prog/s -i
 "user-error"
@@ -2138,13 +2113,13 @@ Usage: foo [-oi [ARG]]
 """
 
 $ prog/s
-{"-o": false} # XXX: Awkward
+{}
 
 $ prog/s -i 123
-{"-i": 123, "-o": false}
+{"-i": 123}
 
 $ prog/s -i
-{"-i": true, "-o": false}
+{"-i": true}
 
 r"""
 Usage: foo (-oi ARG)
@@ -2154,7 +2129,7 @@ $ prog/s
 "user-error"
 
 $ prog/s -i 123
-{"-i": 123, "-o": false}
+{"-i": 123}
 
 $ prog/s -i
 "user-error"
@@ -2164,13 +2139,13 @@ Usage: foo [-oi ARG]...
 """
 
 $ prog/s
-{"-o": 0} # XXX: Awkward
+{}
 
 $ prog/s -i 123
-{"-i": [123], "-o": 0}
+{"-i": [123]}
 
 $ prog/s -i 123 -i 123
-{"-i": [123, 123], "-o": 0}
+{"-i": [123, 123]}
 
 $ prog/s -i
 "user-error"
@@ -2180,13 +2155,13 @@ Usage: foo [-oi ARG...]
 """
 
 $ prog/s
-{"-o": 0} # XXX: Awkward
+{}
 
 $ prog/s -i 123
-{"-i": [123], "-o": 0}
+{"-i": [123]}
 
 $ prog/s -i 123 -i 123
-{"-i": [123, 123], "-o": 0}
+{"-i": [123, 123]}
 
 $ prog/s -i
 "user-error"
@@ -2196,10 +2171,10 @@ Usage: foo [-oi ARG...]...
 """
 
 $ prog/s
-{"-o": 0} # XXX: Awkward
+{}
 
 $ prog/s -i 123
-{"-i": [123], "-o": 0}
+{"-i": [123]}
 
 $ prog/s -i 123 -o
 {"-i": [123], "-o": 1}
@@ -2208,7 +2183,7 @@ $ prog/s -i 123 -o 456
 "user-error"
 
 $ prog/s -i 123 -i 123
-{"-i": [123, 123], "-o": 0}
+{"-i": [123, 123]}
 
 $ prog/s -i
 "user-error"
@@ -2329,7 +2304,7 @@ Usage: foo [-]
 """
 
 $ prog
-{"-": false}
+{}
 
 $ prog -
 {"-": true}
@@ -2465,7 +2440,7 @@ Options: -f, --foo ARG
 """
 
 $ prog
-{"-b": false}
+{}
 
 r"""
 usage: git (([-b | -f[=ARG]]))
@@ -2473,7 +2448,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-{"-f": true, "--foo": true, "-b": false}
+{"-f": true, "--foo": true}
 
 #
 # Given an option-argument to a flag is a fatal error, no pardon:

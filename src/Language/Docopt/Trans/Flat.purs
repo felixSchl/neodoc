@@ -9,8 +9,7 @@ import Language.Docopt.Env (Env)
 import Language.Docopt.Value (Value())
 import Language.Docopt.Usage (Usage()) as D
 import Language.Docopt.Trans.Rich (reduce) as Rich
-import Language.Docopt.Trans.Rich (unRichValue)
-import Language.Docopt.ParserGen.ValueMapping (ValueMapping)
+import Language.Docopt.ParserGen (ValueMapping, unRichValue)
 import Language.Docopt.Argument (Branch()) as D
 
 reduce :: List D.Usage       -- ^ the program specification

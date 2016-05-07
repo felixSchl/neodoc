@@ -8,8 +8,13 @@
 module Language.Docopt.ParserGen.Parser (
     genUsageParser
   , initialState
-  , Parser()
-  , StateObj
+  , Parser ()
+  , StateObj ()
+  , RichValue (..)
+  , RichValueObj (..)
+  , ValueMapping ()
+  , unRichValue
+  , from
   ) where
 
 import Prelude
@@ -42,39 +47,67 @@ import Control.Monad.State (State, evalState)
 import Control.Monad.State as State
 import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
-import Control.MonadPlus.Partial (mrights, mlefts)
+import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), fail,
                             parseFailed, unParserT) as P
 import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>)) as P
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
 
-import Language.Docopt.Value (Value(..), isBoolValue) as D
 import Language.Docopt.Argument (Argument(..), Branch(..), isFree, runBranch,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 hasEnvBacking, getArgument, hasDefault,
                                 isRepeatable, isFlag, setRequired) as D
 import Language.Docopt.Usage (Usage, runUsage) as D
-import Language.Docopt.Env (Env) as D
+import Language.Docopt.Env (Env ())
+import Language.Docopt.Env as Env
 import Language.Docopt.Option as O
-import Language.Docopt.Value  as Value
+import Language.Docopt.Origin as Origin
+import Language.Docopt.Origin (Origin())
+import Language.Docopt.Value as Value
+import Language.Docopt.Value (Value(..))
 import Language.Docopt.Parser.Base (getInput)
 import Language.Docopt.ParserGen.Token as Token
 import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
                                         unPositionedToken, prettyPrintToken)
-import Language.Docopt.ParserGen.ValueMapping (ValueMapping)
 import Data.String.Ext (startsWith)
 
 debug :: Boolean
 debug = false
 
--- |
--- | Unfortunately, the State Monad is needed because we try matching all
--- | program branches and must select the best fit.
--- |
+
+-- | The value type the parser collects
+type RichValueObj = {
+  value  :: Value
+, origin :: Origin
+}
+
+newtype RichValue = RichValue RichValueObj
+
+instance showRichValue :: Show RichValue where
+  show (RichValue v) = "RichValue { origin: " ++ show v.origin
+                    ++ ", value: " ++ show v.value ++ "}"
+
+instance eqRichValue :: Eq RichValue where
+  eq (RichValue v) (RichValue v') = (v.origin == v'.origin) &&
+                                    (v.value == v'.value)
+
+unRichValue :: RichValue -> RichValueObj
+unRichValue (RichValue o) = o
+
+from :: Origin -> Value -> RichValue
+from o v = RichValue $ { value: v, origin: o }
+
+fromArgv :: Value -> RichValue
+fromArgv = from Origin.Argv
+
+-- | The output value mappings of arg -> val
+type ValueMapping = Tuple D.Argument RichValue
+
+-- | The stateful parser type
 type StateObj = { depth :: Int
                 , fatal :: Maybe P.ParseError }
 type Parser a = P.ParserT (List PositionedToken)
-                          (ReaderT D.Env (State StateObj))
+                          (ReaderT Env (State StateObj))
                           a
 
 initialState :: StateObj
@@ -84,41 +117,6 @@ initialState = { depth: 0
 modifyDepth :: (Int -> Int) -> Parser Unit
 modifyDepth f = do
   lift (State.modify \s -> s { depth = f s.depth })
-
-newtype ScoredResult a = ScoredResult {
-  score  :: Int -- ^ the score of the parse
-, result :: a   -- ^ the result of the parse
-}
-
-unScoredResult :: forall a. ScoredResult a -> { score :: Int, result :: a }
-unScoredResult (ScoredResult r) = r
-
-instance semigroupScoredResult :: (Semigroup a) => Semigroup (ScoredResult a)
-  where append (ScoredResult s) (ScoredResult s')
-          = ScoredResult { score:  s.score  + s'.score
-                         , result: s.result ++ s'.result }
-
-instance monoidScoredResult :: (Monoid a) => Monoid (ScoredResult a)
-  where mempty = ScoredResult { score: 0, result: mempty }
-
-instance showScoredResult :: (Show a) => Show (ScoredResult a)
-  where show (ScoredResult { score, result })
-          = "ScoredResult " ++ show score ++ ": " ++ show result
-
-instance ordScoredResult :: Ord (ScoredResult a)
-  where compare = compare `on` (_.score <<< unScoredResult)
-
-instance eqScoredResult :: Eq (ScoredResult a)
-  where eq = eq `on` (_.score <<< unScoredResult)
-
-score :: forall a. Int -> List a -> ScoredResult (List a)
-score score result = ScoredResult { score, result }
-
-scoreFromList :: forall a. List a -> ScoredResult (List a)
-scoreFromList xs = ScoredResult { score: length xs, result: xs }
-
-rmapScoreResult :: forall a b. (a -> b) -> ScoredResult a -> ScoredResult b
-rmapScoreResult f (ScoredResult (x@{ result })) = ScoredResult $ x { result = f result }
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
@@ -148,34 +146,34 @@ data Acc a
   = Free (Parser a)
   | Pending (Parser a) (List D.Argument)
 
-eoa :: Parser D.Value
+eoa :: Parser Value
 eoa = token go P.<?> "--"
   where
-    go (EOA xs) = Just (D.ArrayValue (fromList xs))
+    go (EOA xs) = Just (ArrayValue (fromList xs))
     go _        = Nothing
 
-command :: String -> Parser D.Value
+command :: String -> Parser Value
 command n = token go P.<?> "command " ++ show n
   where
-    go (Lit s) | s == n = Just (D.BoolValue true)
+    go (Lit s) | s == n = Just (BoolValue true)
     go _                = Nothing
 
-positional :: String -> Parser D.Value
+positional :: String -> Parser Value
 positional n = token go P.<?> "positional argument " ++ show n
   where
     go (Lit v) = Just (Value.read v false)
     go _       = Nothing
 
-stdin :: Parser D.Value
+stdin :: Parser Value
 stdin = token go P.<?> "stdin flag"
   where
-    go Stdin = Just (D.BoolValue true)
+    go Stdin = Just (BoolValue true)
     go _     = Nothing
 
 type HasConsumedArg = Boolean
-data OptParse = OptParse D.Value (Maybe Token) HasConsumedArg
+data OptParse = OptParse Value (Maybe Token) HasConsumedArg
 
-longOption :: O.Name -> (Maybe O.Argument) -> Parser D.Value
+longOption :: O.Name -> (Maybe O.Argument) -> Parser Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
@@ -213,7 +211,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
             Just (Lit s) -> return $ OptParse (Value.read s false)  Nothing true
             otherwise    ->
               if (fromMaybe true (_.optional <<< O.runArgument <$> a))
-                 then Right $ OptParse (D.BoolValue true) Nothing false
+                 then Right $ OptParse (BoolValue true) Nothing false
                  else Left  $ "Option requires argument: --" ++ n'
 
     -- case 2:
@@ -221,7 +219,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     go (LOpt n' v) _ | isFlag && (n' == n)
       = case v of
              Just _  -> Left $ "Option takes no argument: --" ++ n'
-             Nothing -> return $ OptParse (D.BoolValue true) Nothing false
+             Nothing -> return $ OptParse (BoolValue true) Nothing false
 
     -- case 3:
     -- The name is a substring of the input and no explicit argument has been
@@ -233,7 +231,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     go a b = Left $ "Invalid token" ++ show a ++ " (input: " ++ show b ++ ")"
 
-shortOption :: Char -> (Maybe O.Argument) -> Parser D.Value
+shortOption :: Char -> (Maybe O.Argument) -> Parser Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
   return $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->
@@ -274,7 +272,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
             Just (Lit s) -> return $ OptParse (Value.read s false) Nothing true
             otherwise    ->
               if (fromMaybe true (_.optional <<< O.runArgument <$> a))
-                 then Right $ OptParse (D.BoolValue true) Nothing false
+                 then Right $ OptParse (BoolValue true) Nothing false
                  else  Left $ "Option requires argument: -" ++ fromChar f'
 
     -- case 2:
@@ -291,7 +289,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     -- The leading flag matches, there are stacked options, the option takes
     -- no argument and an explicit argument has not been provided.
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
-      = return $ OptParse (D.BoolValue true)
+      = return $ OptParse (BoolValue true)
                           (Just $ SOpt (AU.head xs) (AU.tail xs) v)
                           false
 
@@ -301,7 +299,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
       = case v of
               Just _  -> Left $ "Option takes no argument: -" ++ fromChar f'
-              Nothing -> return $ OptParse (D.BoolValue true)
+              Nothing -> return $ OptParse (BoolValue true)
                                             Nothing
                                             false
 
@@ -326,11 +324,10 @@ genUsageParser :: List D.Usage -- ^ The list of usage specs
                -> Boolean      -- ^ Enable "options-first"
                -> Parser (Tuple D.Branch (List ValueMapping))
 genUsageParser xs optsFirst = do
-  _.result <<< unScoredResult
-    <$> genBranchesParser (concat $ D.runUsage <$> xs)
-                          true
-                          optsFirst
-                          true
+    genBranchesParser (concat $ D.runUsage <$> xs)
+                      true
+                      optsFirst
+                      true
 
 -- | Generate a parser that selects the best branch it parses and
 -- | fails if no branch was parsed.
@@ -338,14 +335,14 @@ genBranchesParser :: List D.Branch -- ^ The branches to test
                   -> Boolean       -- ^ Expect EOF after each branch
                   -> Boolean       -- ^ Enable "options-first"
                   -> Boolean       -- ^ Can we skip input via fallbacks?
-                  -> Parser (ScoredResult (Tuple D.Branch (List ValueMapping)))
+                  -> Parser (Tuple D.Branch (List ValueMapping))
 genBranchesParser xs term optsFirst canSkip
   = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
-    env   :: D.Env    <- ask
+    env   :: Env      <- ask
     state :: StateObj <- lift State.get
 
     let
-      ps = xs <#> \x -> rmapScoreResult (Tuple x) <$> do
+      ps = xs <#> \x -> (Tuple x) <$> do
                           genBranchParser x optsFirst canSkip
                             <* unless (not term) eof
       rs  = evalState (runReaderT (collect s ps) env) initialState
@@ -356,13 +353,12 @@ genBranchesParser xs term optsFirst canSkip
       -- elements, take the highest element and sort the inner values by their
       -- fallback score.
       winner =
-          maximumBy (compare `on` (_.score <<< unScoredResult
-                                   <<< _.value
-                                   <<< _.result))
-            =<< do
-                  last $ groupBy (eq `on` (_.depth <<< _.result))
-                                 (sortBy (compare `on` (_.depth <<< _.result))
-                                         (mrights rs'))
+          maximumBy (compare `on`
+                      (((_.origin <<< unRichValue <<< snd) <$> _) <<< snd
+                        <<< _.value <<< _.result)) =<< do
+                          last $ groupBy (eq `on` (_.depth <<< _.result))
+                                  (sortBy (compare `on` (_.depth <<< _.result))
+                                          (mrights rs'))
 
       -- Evaluate the losing candidates, if any.
       losers =
@@ -429,7 +425,7 @@ genBranchesParser xs term optsFirst canSkip
 genBranchParser :: D.Branch  -- ^ The branch to match
                 -> Boolean   -- ^ Enable "options-first"
                 -> Boolean   -- ^ Can we skip input via fallbacks?
-                -> Parser (ScoredResult (List ValueMapping))
+                -> Parser (List ValueMapping)
 genBranchParser (D.Branch xs) optsFirst canSkip = do
   modifyDepth (const 0) -- reset the depth counter
   either
@@ -448,7 +444,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     -- The only requirement is that all input is consumed in the end.
     genExhaustiveParser :: List D.Argument -- ^ The free arguments
                         -> Boolean         -- ^ Can we skip input via fallbacks?
-                        -> Parser (ScoredResult (List ValueMapping))
+                        -> Parser (List ValueMapping)
     genExhaustiveParser Nil canSkip = return mempty
     genExhaustiveParser ps  canSkip = do
       if debug
@@ -465,34 +461,31 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
         draw :: List D.Argument -- ^ the arguments to parse
              -> Int             -- ^ the number of options left to parse
              -> List D.Argument -- ^ the unique arguments parsed
-             -> Parser (ScoredResult (List ValueMapping))
+             -> Parser (List ValueMapping)
 
         draw pss@(Cons p ps') n tot | n >= 0 = (do
-          if debug
-            then do
-                i <- getInput
-                traceA $
-                  "draw: (" ++ (D.prettyPrintArg p) ++ ":"
-                            ++ (intercalate ":" (D.prettyPrintArg <$> ps'))
-                            ++  ") - n: " ++ show n
-                            ++ "from input: "
-                            ++ (intercalate " " (prettyPrintToken
-                                                  <<< _.token
-                                                  <<< unPositionedToken <$> i))
-            else return unit
+          when debug do
+            i <- getInput
+            traceA $
+              "draw: (" ++ (D.prettyPrintArg p) ++ ":"
+                        ++ (intercalate ":" (D.prettyPrintArg <$> ps'))
+                        ++  ") - n: " ++ show n
+                        ++ "from input: "
+                        ++ (intercalate " " (prettyPrintToken
+                                              <<< _.token
+                                              <<< unPositionedToken <$> i))
 
           -- Generate the parser for the argument `p`. For groups, temporarily
           -- set the required flag to "true", such that it will fail and we have
           -- a chance to retry as part of the exhaustive parsing mechanism
-          r <- unScoredResult <$> (P.try $ genParser (D.setRequired p true)
-                                                     (not $ n > 0))
+          r <- P.try $ genParser (D.setRequired p true) (not $ n > 0)
 
-          r' <- unScoredResult <$> P.try do
+          r' <- P.try do
                   if D.isRepeatable p
                         then draw pss (length pss) (p:tot)
                         else draw ps' (length ps') (p:tot)
 
-          return $ ScoredResult r ++ ScoredResult r'
+          return $ r ++ r'
         ) <|> (defer \_ -> do
               state :: StateObj <- lift State.get
               case state.fatal of
@@ -503,48 +496,78 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
         draw ps' n tot | (length ps' > 0) && (n < 0) = do
           env :: StrMap String <- lift ask
 
-          -- Find flags missing from the input.
-          -- If we are explicitly allowed to skip arguments because of lack of
-          -- input, or we have *at least* one match (i.e. the remainder is less
-          -- than the original), then ignore arguments for which a suitable
-          -- fallback value can be provided.
-          let missing = filter (\o -> not $
-                                  (canSkip || (length ps' < length ps))
-                               && isSkippable env o
-                               ) ps'
+          let
+            vs = ps' <#> \o ->
+              maybe
+                (Left o)
+                (Right <<< Tuple o)
+                do
+                  (RichValue v) <- do
+                    guard (canSkip || (length ps' < length ps))
+                    (getEnvValue env o <#> from Origin.Environment) <|>
+                    (getDefaultValue o <#> from Origin.Default)     <|>
+                    (getEmptyValue   o <#> from Origin.Empty)
 
-          if (length missing > 0)
-            then P.fail $
-              "Expected option(s): "
-                ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
-            else return $ ScoredResult {
-              score: sum $ ps' <#> \o ->
-                        if D.hasEnvBacking o env
-                            then 2
-                            else if D.hasDefault o
-                                    then 1
-                                    else 0
-            , result: Nil
-            }
+                  return $ RichValue v {
+                    value = if D.isRepeatable o
+                                then ArrayValue $ Value.intoArray v.value
+                                else v.value
+                  }
+
+            missing   = filter (not <<< isSkippable) (mlefts vs)
+            fallbacks = mrights vs
+
+          if canSkip
+             then do
+              xs <- genExhaustiveParser missing false
+              return $ fallbacks ++ xs
+             else
+              if (length missing > 0)
+                then P.fail $
+                  "Expected option(s): "
+                    ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
+                else return fallbacks
 
           where
-            isSkippable env (D.Group o bs _)
-              = o || (all (all (isSkippable env) <<< D.runBranch) bs)
-            isSkippable env o
-              =  (D.hasDefault o)
-              || (maybe true id do
-                  arg <- O.runArgument <$> do
-                            D.getArgument o
-                  return arg.optional
-                )
-              || (D.hasEnvBacking o env)
-              || (D.isRepeatable o && (any (_ == o) tot))
+          isSkippable (D.Group o bs _)
+              = o || (all (all isSkippable <<< D.runBranch) bs)
+          isSkippable o = D.isRepeatable o && (any (_ == o) tot)
+
+          getEnvValue :: Env -> D.Argument -> Maybe Value
+          getEnvValue env (D.Option (O.Option o@{ env: Just k })) = do
+            StringValue <$> Env.lookup k env
+          getEnvValue _ _ = Nothing
+
+          getDefaultValue :: D.Argument -> Maybe Value
+          getDefaultValue (D.Option (O.Option o@{
+              arg: Just (O.Argument { default: Just v })
+            })) = return if o.repeatable
+                            then ArrayValue $ Value.intoArray v
+                            else v
+          getDefaultValue _ = Nothing
+
+          getEmptyValue :: D.Argument -> Maybe Value
+          getEmptyValue = go
+            where
+            go (D.Option (O.Option o@{ arg: Nothing }))
+              = return
+                  $ if o.repeatable then ArrayValue []
+                                    else BoolValue false
+            go (D.Option (O.Option o@{ arg: Just (O.Argument { optional: true }) }))
+              = return
+                  $ if o.repeatable then ArrayValue []
+                                    else BoolValue false
+            go (D.Positional _ r) | r = return $ ArrayValue []
+            go (D.Command _ r)    | r = return $ ArrayValue []
+            go (D.Stdin)              = return $ BoolValue false
+            go (D.EOA)                = return $ ArrayValue []
+            go _                      = Nothing
 
         draw _ _ _ = return mempty
 
-    step :: Acc (ScoredResult (List ValueMapping))
+    step :: Acc (List ValueMapping)
          -> D.Argument
-         -> Either P.ParseError (Acc (ScoredResult (List ValueMapping)))
+         -> Either P.ParseError (Acc (List ValueMapping))
 
     -- Options always transition to the `Pending state`
     step (Free p) x@(D.Option _)
@@ -580,44 +603,44 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     -- values int an array ("options-first")
     terminate arg = do
       input <- getInput
-      let rest = Tuple arg <$> do
-                  D.StringValue <<< Token.getSource <$> input
+      let rest = Tuple arg <<< fromArgv <$> do
+                  StringValue <<< Token.getSource <$> input
       P.ParserT \(P.PState { position: pos }) ->
         return {
           consumed: true
         , input:    Nil
-        , result:   return $ ScoredResult {
-                      score: 1
-                    , result: rest
-                    }
+        , result:   return rest
         , position: pos
         }
 
     -- Parser generator for a single `Argument`
     genParser :: D.Argument -- ^ The argument to generate a parser for
               -> Boolean    -- ^ Can we skip input via fallbacks?
-              -> Parser (ScoredResult (List ValueMapping))
+              -> Parser (List ValueMapping)
 
     -- Generate a parser for a `Command` argument
     genParser x@(D.Command n r) _ = do
       i <- getInput
-      score 0 <$> (do
+      (do
         if r then (some go) else (singleton <$> go)
       ) <|> (P.fail $ "Expected " ++ D.prettyPrintArg x ++ butGot i)
-        where go = do
-                Tuple x <$> (command n)
-                <* modifyDepth (_ + 1)
+        where go = do Tuple x <<< fromArgv <$> (do
+                        v <- command n
+                        return if r then ArrayValue $ Value.intoArray v
+                                    else v
+                      )
+                      <* modifyDepth (_ + 1)
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) _ = do
-      score 0 <<< singleton <<< Tuple x <$> (do
-        eoa <|> (return $ D.ArrayValue []) -- XXX: Fix type
+      singleton <<< Tuple x <<< fromArgv <$> (do
+        eoa <|> (return $ ArrayValue []) -- XXX: Fix type
         <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"--\""
 
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) _ = do
-      score 0 <<< singleton <<< Tuple x <$> (do
+      singleton <<< Tuple x <<< fromArgv <$> (do
         stdin
         <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"-\""
@@ -629,12 +652,15 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional n r) _ = do
       i <- getInput
-      score 0 <$> (do
+      (do
         if r then (some go) else (singleton <$> go)
       ) <|> P.fail ("Expected " ++ D.prettyPrintArg x ++ butGot i)
-        where go = do
-                Tuple x <$> (positional n)
-                <* modifyDepth (_ + 1)
+        where go = do Tuple x <<< fromArgv <$> (do
+                        v <- positional n
+                        return if r then ArrayValue $ Value.intoArray v
+                                    else v
+                        )
+                      <* modifyDepth (_ + 1)
 
     genParser x@(D.Group optional bs r) _
       | optsFirst && (length bs == 1) &&
@@ -647,7 +673,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option (O.Option o)) _ = (do
-      score 0 <$> do
+      do
         if o.repeatable then (some go) else (singleton <$> go)
       <* modifyDepth (_ + 1)
       )
@@ -662,9 +688,19 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
             isSopt <- P.option false (P.lookAhead $ P.try $ token isAnySopt)
             P.ParserT \s -> do
               o <- P.unParserT (if isLopt
-                then P.try $ Tuple x <$> mkLoptParser o.name o.arg
+                then P.try do
+                  Tuple x <<< fromArgv <$> (do
+                    v <- mkLoptParser o.name o.arg
+                    return if o.repeatable then ArrayValue $ Value.intoArray v
+                                           else v
+                  )
                 else if isSopt
-                  then P.try $ Tuple x <$> mkSoptParser o.flag o.arg
+                  then P.try do
+                    Tuple x <<< fromArgv <$> (do
+                      v <- mkSoptParser o.flag o.arg
+                      return if o.repeatable then ArrayValue $ Value.intoArray v
+                                            else v
+                    )
                   else P.fail "long or short option") s
               case o.result of
                   (Left e) -> do
@@ -699,13 +735,13 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
         go | length bs == 0 = return mempty
         go = do
           x <- step
-          if repeated && length (_.result $ unScoredResult x) > 0
+          if repeated && length x > 0
              then do
                 xs <- step <|> return mempty
                 return $ x ++ xs
              else return x
 
-        step = rmapScoreResult snd <$> do
+        step = snd <$> do
                 genBranchesParser bs
                                   false
                                   optsFirst

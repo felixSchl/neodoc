@@ -76,6 +76,8 @@ fail' i e err = Case i e (Left err)
 infixr 0 :>
 
 parserGenSpec = \_ -> describe "The parser generator" do
+  it "" do
+    pure unit
 
   -- Some options that will be used for these tests
   let testCases = [
@@ -163,7 +165,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Expected option(s): -o|--output=FILE, -i|--input=FILE"
+          $ "Expected option(s): -i|--input=FILE, -o|--output=FILE"
 
         , fail [ "-i", "bar" ]
           $ "Expected option(s): -o|--output=FILE"
@@ -192,7 +194,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , D.opt 'o' "output" (D.oa_ "FILE")
         ]
         [ fail []
-          $ "Expected option(s): -o|--output=FILE, -i|--input=FILE -r|--redirect=FILE"
+          $ "Expected option(s): -i|--input=FILE -r|--redirect=FILE, -o|--output=FILE"
 
         , fail [ "-i", "bar", "-r", "bar" ]
             "Expected option(s): -o|--output=FILE"
@@ -275,7 +277,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "-b" :> D.bool true ]
         , pass
             []
-            [ "-a" :> D.bool false ]
+            []
         ]
 
     , test'
@@ -364,8 +366,6 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "--input" :> D.bool true
             , "-i"      :> D.bool true
             , "baz"     :> D.bool true
-            , "--qux"   :> D.int 0
-            , "-q"      :> D.int 0
             ]
 
         , pass
@@ -380,8 +380,6 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "baz"     :> D.bool true
             , "--baz"   :> D.str "ax"
             , "-b"      :> D.str "ax"
-            , "--qux"   :> D.int 0
-            , "-q"      :> D.int 0
             , "--foo"   :> D.array [ D.str "ox" ]
             , "-f"      :> D.array [ D.str "ox" ]
             ]
