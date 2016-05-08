@@ -735,12 +735,13 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
         go | length bs == 0 = return mempty
         go = do
           x <- step
-          if repeated && length x > 0
+          if repeated && length (filter (snd >>> from Origin.Argv) x) > 0
              then do
                 xs <- go <|> return mempty
                 return $ x ++ xs
              else return x
 
+        from o (RichValue v) = v.origin == o
         step = snd <$> do
                 genBranchesParser bs
                                   false
