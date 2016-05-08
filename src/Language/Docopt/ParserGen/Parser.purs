@@ -737,7 +737,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           x <- step
           if repeated && length x > 0
              then do
-                xs <- step <|> return mempty
+                xs <- go <|> return mempty
                 return $ x ++ xs
              else return x
 
