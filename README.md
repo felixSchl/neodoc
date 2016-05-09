@@ -7,14 +7,12 @@
 
 <hr>
 
-<!--
 <p align="center">
   <a href="https://travis-ci.org/felixSchl/neodoc">
     <img src="https://travis-ci.org/felixSchl/neodoc.svg"
          alt="Build Status">
   </a>
 <br/>
--->
 
 <p align="center">
     <b><a href="#about">About</a></b>
