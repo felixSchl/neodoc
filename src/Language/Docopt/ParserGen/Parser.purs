@@ -507,7 +507,6 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           env :: StrMap String <- lift ask
 
           i <- getInput
-
           let
             vs = ps' <#> \o ->
               maybe
@@ -515,6 +514,9 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                 (Right <<< Tuple o)
                 do
                   (RichValue v) <- do
+                    -- only allow "skipping" - that is auto-filling - values
+                    -- if we are either explicitly allowed to do so (i.e.
+                    -- the `canSkip` flag is set) or if we consumed all input
                     guard (null i || canSkip || (length ps' < length ps))
                     (getEnvValue env o <#> from Origin.Environment) <|>
                     (getDefaultValue o <#> from Origin.Default)     <|>
