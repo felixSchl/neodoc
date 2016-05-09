@@ -1522,9 +1522,7 @@ $ prog --foo
 {"--foo": [true], "-f": [true]}
 
 $ prog --foo bar
-"user-error" # "bar" will be considered trailing since the first appearance
-             # of '--foo' does not take an argument. XXX: Is this intutive
-             # enough?
+{"--foo": ["bar"], "-f": ["bar"]}
 
 $ prog --foo --foo
 {"--foo": [true, true], "-f": [true, true]}
@@ -2609,3 +2607,25 @@ Options: -p PORT [default: 5000]
 
 $ prog -x
 {"-x": true, "-p": 5000}
+
+r"""
+Usage: foo [-p PORT] -x ([-f=d])
+Options: -p PORT [default: 5000]
+"""
+
+$ prog -x -p 100 -f 100
+{"-x": true, "-p": 100, "-f": 100}
+
+r"""
+Usage: foo [-p PORT] -x... ([-f=d])
+Options: -p PORT [default: 5000]
+"""
+
+$ prog -x -p 100 -x -f 100 -x
+{"-x": 3, "-p": 100, "-f": 100}
+
+$ prog -p 100 -f 100
+{"-p": 100, "-f": 100}
+
+$ prog -p 100 -f 100 -x
+{"-x": 1, "-p": 100, "-f": 100}
