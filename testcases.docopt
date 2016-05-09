@@ -2691,3 +2691,18 @@ $ prog/s -b 2000
 
 $ prog/s -a 1000 -b 2000
 {"-a": 1000, "-b": 2000}
+
+r"""
+Usage: foo [[-a FOO] | [[-a FOO] [-b FOO]]]
+options: -a FOO [default: 100]
+         -b BAR [default: 200]
+"""
+
+$ prog/s -a 2000
+{"-a": 2000, "-b": 200}
+
+$ prog/s -b 2000
+{"-a": 100, "-b": 2000}
+
+$ prog/s -a 1000 -b 2000
+{"-a": 1000, "-b": 2000}
