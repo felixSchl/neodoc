@@ -2629,3 +2629,50 @@ $ prog -p 100 -f 100
 
 $ prog -p 100 -f 100 -x
 {"-x": 1, "-p": 100, "-f": 100}
+
+r"""
+Usage: foo [-a FOO] [-b BAR] [-c QUX]
+options: -b BAR [default: 100]
+"""
+
+$ prog/s
+{"-b": 100}
+
+$ prog/s -c 300
+{"-b": 100, "-c": 300}
+
+$ prog/s -a 200
+{"-a": 200, "-b": 100}
+
+$ prog/s -c 200
+{"-b": 100, "-c": 200}
+
+r"""
+Usage: foo [-a FOO] [-b BAR] [-c QUX]
+options: -a BAR [default: 100]
+"""
+
+$ prog/s
+{"-a": 100}
+
+$ prog/s -c 300
+{"-a": 100, "-c": 300}
+
+$ prog/s -b 200
+{"-b": 200, "-a": 100}
+
+$ prog/s -c 200
+{"-a": 100, "-c": 200}
+
+r"""
+Usage: foo [-a FOO] [-b BAR] [-c QUX]
+options: -a FOO [default: 100]
+         -b BAR [default: 200]
+         -c QUX [default: 300]
+"""
+
+$ prog/s
+{"-a": 100, "-b": 200, "-c": 300}
+
+$ prog/s -c 400
+{"-a": 100, "-b": 200, "-c": 400}

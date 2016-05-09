@@ -74,7 +74,6 @@ import Data.String.Ext (startsWith)
 debug :: Boolean
 debug = false
 
-
 -- | The value type the parser collects
 type RichValueObj = {
   value  :: Value
@@ -507,6 +506,8 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
         draw ps' n tot | (length ps' > 0) && (n < 0) = do
           env :: StrMap String <- lift ask
 
+          i <- getInput
+
           let
             vs = ps' <#> \o ->
               maybe
@@ -514,7 +515,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                 (Right <<< Tuple o)
                 do
                   (RichValue v) <- do
-                    guard (canSkip || (length ps' < length ps))
+                    guard (null i || canSkip || (length ps' < length ps))
                     (getEnvValue env o <#> from Origin.Environment) <|>
                     (getDefaultValue o <#> from Origin.Default)     <|>
                     (getEmptyValue   o <#> from Origin.Empty)
@@ -525,7 +526,8 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                                 else v.value
                   }
 
-            missing   = filter (\o -> not (canSkip && isSkippable o)) (mlefts vs)
+            missing   = filter (\o -> not ((null i || canSkip) &&
+                                  isSkippable o)) (mlefts vs)
             fallbacks = mrights vs
 
           if canSkip
