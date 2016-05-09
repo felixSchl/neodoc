@@ -525,7 +525,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                                 else v.value
                   }
 
-            missing   = filter (not <<< isSkippable) (mlefts vs)
+            missing   = filter (\o -> not (canSkip && isSkippable o)) (mlefts vs)
             fallbacks = mrights vs
 
           if canSkip
