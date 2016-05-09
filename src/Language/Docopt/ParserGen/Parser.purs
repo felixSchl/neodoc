@@ -360,35 +360,45 @@ genBranchesParser xs term optsFirst canSkip
                                   (sortBy (compare `on` (_.depth <<< _.result))
                                           (mrights rs'))
 
+      failures = mlefts rs
+
       -- Evaluate the losing candidates, if any.
       losers =
           last $ groupBy (eq `on` (_.depth <<< _.result))
                          (sortBy (compare `on` (_.depth <<< _.result))
-                                 (mlefts rs))
+                                 failures)
 
-    maybe'
-      (\_ ->
-        fromMaybe
-          (return do
-            P.parseFailed i pos
-                "The impossible happened. Failure without error")
-          (do
-            es <- losers
-            return case es of
-              Cons e es | null es || not (null i) -> do
-                when ((startsWith
-                        "Option takes no argument"
-                        (unParseError e.result.error).message)
-                    || (startsWith
-                        "Option requires argument"
-                        (unParseError e.result.error).message)) do
-                          lift $ State.modify (_ {  fatal = Just e.result.error })
-                return $ e { result = Left e.result.error }
-              otherwise -> return $ P.parseFailed i pos ""
-          )
-      )
-      (\r -> return $ r { result = Right r.result.value })
-      winner
+      -- check losers first for any fatal errors
+      fatal =
+          head $ flip filter failures \e ->
+            let msg = (unParseError e.result.error).message
+             in (startsWith "Option takes no argument" msg) ||
+                (startsWith "Option requires argument" msg)
+
+
+    case fatal of
+         (Just e) -> do
+            lift $ State.modify (_ {  fatal = Just e.result.error })
+            return
+              -- XXX: `i` and `pos` are wrong (
+              $ P.parseFailed i pos (unParseError e.result.error).message
+         otherwise -> do
+          maybe'
+            (\_ ->
+              fromMaybe
+                (return do
+                  P.parseFailed i pos
+                      "The impossible happened. Failure without error")
+                (do
+                  es <- losers
+                  return case es of
+                    Cons e es | null es || not (null i) -> do
+                      return $ e { result = Left e.result.error }
+                    otherwise -> return $ P.parseFailed i pos ""
+                )
+            )
+            (\r -> return $ r { result = Right r.result.value })
+            winner
 
   where
   fixMessage m = m
@@ -478,7 +488,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           -- Generate the parser for the argument `p`. For groups, temporarily
           -- set the required flag to "true", such that it will fail and we have
           -- a chance to retry as part of the exhaustive parsing mechanism
-          r <- P.try $ genParser (D.setRequired p true) (not $ n > 0)
+          r <- P.try $ genParser (D.setRequired p true) (n <= 1)
 
           r' <- P.try do
                   if D.isRepeatable p
@@ -489,7 +499,8 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
         ) <|> (defer \_ -> do
               state :: StateObj <- lift State.get
               case state.fatal of
-                Just (P.ParseError { message }) -> P.fail message
+                Just (P.ParseError { message }) -> do
+                  P.fail message
                 otherwise -> draw (ps' ++ singleton p) (n - 1) tot
               )
 
@@ -596,7 +607,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       Free do
         r   <- p
         rs  <- genExhaustiveParser xs true
-        rss <- genParser y false
+        rss <- genParser y true
         return $ r ++ rs ++ rss
 
     -- Terminate the parser at the given argument and collect all subsequent

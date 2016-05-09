@@ -2596,3 +2596,16 @@ Usage: foo <command> [-f ARG] [-b ARG]
 $ prog/s 123foo -f123foo -b=123foo
 {"<command>": "123foo", "COMMAND": "123foo",
  "-f": "123foo", "-b": "123foo"}
+
+#
+# Fix issue where defaults are not applied.
+# E.g. `-p` would not yield 5000 if `-x` was given.
+#
+
+r"""
+Usage: foo ([-p PORT] -x [-f=d])
+Options: -p PORT [default: 5000]
+"""
+
+$ prog -x
+{"-x": true, "-p": 5000}
