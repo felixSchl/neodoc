@@ -2,7 +2,7 @@
     <h1>
         <strong>&lt;neodoc&gt;</strong>
     </h1>
-    <em>Beautiful, handcrafted commandlines</em>
+    <em>Beautiful, handcrafted command line interfaces</em>
 </div>
 
 <hr>
@@ -22,6 +22,7 @@
   | <b><a href="#project-status">Status</a></b>
   | <b><a href="#contributing">Contributing</a></b>
   | <b><a href="#license">License</a></b>
+  | <b><a href="https://felixschl.github.com/neodoc">Playground <sup>new</sup></a></b>
 </p>
 
 ![preview](https://raw.githubusercontent.com/felixSchl/felixSchl.github.io/master/neodoc/neodoc.png)
@@ -38,13 +39,17 @@ command lines by writing the command line's help text first and then deriving
 a matching parser from it, which can then be applied to user input. The
 advantages are numerous:
 
-* No stagnant documentation - **your help-text is _necessarily_ correct**
-* No awkward, unreadable EDSL - **beautiful, hand-crafted help texts instead**
+* **No boilerplate**
+* Full control over **beautiful, hand-crafted help texts**
+* Documentation comes first - **hence your users come first**
+* Documentation is always right - **your help-text is _necessarily_ correct**
+* Version-controlled help-text - **the help-text becomes a regular part of your codebase**
 
 This implementation features **error reporting**, both for users and developers,
 reading values from **environment variables**, type coercion and much more. For
 an (in-)comprehensive comparison to the original, click
-[here](#deviations-from-the-original).
+[here](#deviations-from-the-original). To take neodoc for a right, click
+[here][playground].
 
 ## Features ##
 
@@ -54,7 +59,18 @@ an (in-)comprehensive comparison to the original, click
 * Fallback to alternate values:
     * User input -> Environment -> Defaults
 * Convenient, concise and widely accepted POSIX-style syntax
-    * _Mostly_ compatible with a typical `git <command> --help` output
+    * `-f[=ARG], --foo[=ARG]` options
+    * `<arg>`, `ARG` positionals
+    * `clone`, `pull`, etc. commands
+    * `[<arg>]` optional groupings
+    * `(<arg>])` required groupings
+    * `[-f ARG]` POSIX-style flags
+    * `-f[=ARG]...` repeating elements
+    * 99% compatible with a typical `git <command> --help` output
+    * **A full overview of the language is still pending**, but things should
+      be intuitive enough to be figured out. To test your intuition, check out
+      the [playground][playground]. _Please do submit an issue if you find
+      something surprising or counter-intuitive._
 
 ## Installation ##
 
@@ -307,22 +323,8 @@ The project can roughly be broken up into several distinct areas of work:
 <strong>&lt;neodoc&gt;</strong> is released under the **MIT LICENSE**.
 See file `LICENSE` for a more detailed description of its terms.
 
----
-
-### Dev Notes ###
-
-#### Reading options from config files ####
-
-> Options should fall back to values read from file.
-
-Options:
-* Can this be a developer-provided file or lookup rather than on the command
-  line?
-* Associate some option or positional argument with a config file lookup. This
-  would end in some "special" code, where the parser is run twice (first, prove
-  the associated option / positional arg was parsed, ignoring any failures for
-  the time being, then run again with the config file default values).
 
 [docopt-orig]: http://docopt.org
 [POSIX]: http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html
 [issue-tracker]: https://github.com/felixSchl/neodoc/issues
+[playground]: https://felixschl.github.com/neodoc
