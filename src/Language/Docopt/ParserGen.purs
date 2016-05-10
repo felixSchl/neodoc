@@ -22,9 +22,9 @@ import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
                                         getSource, prettyPrintToken,
                                         unPositionedToken) as G
 import Language.Docopt.ParserGen.Parser (Parser, genUsageParser,
-                                        initialState) as G
+                                        RichValue(..), unRichValue,
+                                        from, initialState, ValueMapping()) as G
 import Language.Docopt.ParserGen.Lexer (lex) as G
-import Language.Docopt.ParserGen.ValueMapping (ValueMapping) as G
 
 type Result = Tuple D.Branch (List G.ValueMapping)
 

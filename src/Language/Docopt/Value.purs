@@ -6,6 +6,7 @@ module Language.Docopt.Value (
   , isBoolValue
   , isArrayValue
   , prettyPrintValue
+  , intoArray
   ) where
 
 import Prelude
@@ -78,6 +79,9 @@ prettyPrintValue (BoolValue   b) = show b
 prettyPrintValue (ArrayValue xs) = show $ prettyPrintValue <$> xs
 prettyPrintValue (IntValue    i) = show i
 prettyPrintValue (FloatValue  f) = show f
+
+intoArray (ArrayValue xs) = xs
+intoArray v               = [v]
 
 read :: String  -- ^ the input
      -> Boolean -- ^ allow splitting?
