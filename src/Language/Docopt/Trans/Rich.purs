@@ -112,15 +112,19 @@ reduce us env b vs =
 -- | XXX: Explain more here how merging is done and how repetition is merged
 -- |      and so on.
 reduceUsage :: D.Usage -> List D.Argument
-reduceUsage = Map.values <<< reduceBranches <<< D.runUsage
+reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
 
     where
-    reduceBranches :: List D.Branch -> Map Key D.Argument
-    reduceBranches bs =
+    reduceBranches :: Boolean -- ^ force repeatablity? This is used so that
+                              -- nested groups inherit super-group's
+                              -- repeatablity, collecting values into arrays.
+                   -> List D.Branch
+                   -> Map Key D.Argument
+    reduceBranches r bs =
       let ms = combine <<< (expand <$> _) <<< D.runBranch <$> bs
       in foldl (Map.unionWith resolveAcrossBranches)
                 Map.empty
-                ms
+                ((flip D.setRepeatableOr r <$> _) <$> ms)
       where
       combine :: List (Map Key D.Argument) -> Map Key D.Argument
       combine xs = foldl (Map.unionWith resolveInSameBranch)
@@ -129,7 +133,7 @@ reduceUsage = Map.values <<< reduceBranches <<< D.runUsage
 
     expand :: D.Argument -> Map Key D.Argument
     expand (D.Group _ bs r) =
-      reduceBranches
+      reduceBranches r
         $ D.Branch <<< ((flip D.setRepeatableOr r) <$> _)
                     <<< D.runBranch
                     <$> bs
@@ -150,7 +154,8 @@ reduceUsage = Map.values <<< reduceBranches <<< D.runUsage
                       }
                     , repeatable = o.repeatable || o'.repeatable
                     })
-    resolveAcrossBranches a b = D.setRepeatable a (D.isRepeatable a || D.isRepeatable b)
+    resolveAcrossBranches a b = D.setRepeatable a (D.isRepeatable a ||
+                                                   D.isRepeatable b)
 
     resolveInSameBranch :: D.Argument -> D.Argument -> D.Argument
     resolveInSameBranch (D.Option (O.Option o))
@@ -166,4 +171,4 @@ reduceUsage = Map.values <<< reduceBranches <<< D.runUsage
                       }
                     , repeatable = true
                     })
-    resolveInSameBranch a b =  D.setRepeatable a true
+    resolveInSameBranch a b = D.setRepeatable a true
