@@ -12,6 +12,10 @@
     <img src="https://travis-ci.org/felixSchl/neodoc.svg"
          alt="Build Status">
   </a>
+  <a href="https://gitter.im/felixSchl/neodoc">
+    <img src="https://badges.gitter.im/felixSchl/neodoc.svg"
+         alt="Join the chat at https://gitter.im/felixSchl/neodoc">
+  </a>
 <br/>
 
 <p align="center">
