@@ -12,6 +12,11 @@ The most commonly used git commands are:
    bisect     Find by binary search the change that introduced a bug
    branch     List, create, or delete branches
    checkout   Checkout a branch or paths to the working tree
+   clone      Clone a repository into a new directory
+   commit     Record changes to the repository
+   diff       Show changes between commits, commit and working tree, etc
+   fetch      Download objects and refs from another repository
+   grep       Print lines matching a pattern
 
 'git help -a' and 'git help -g' lists available subcommands and some
 concept guides. See 'git help <command>' or 'git help <concept>'
