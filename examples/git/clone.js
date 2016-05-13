@@ -1,10 +1,9 @@
 require('shelljs/global');
 
-// XXX: -- should be [--]. See #31
 module.exports = (argv) => {
 const args = require('../..').run(`
 
-usage: git clone [options] -- <repo> [<dir>]
+usage: git clone [options] [--] <repo> [<dir>]
 
 options:
   -v, --verbose         be more verbose

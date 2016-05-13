@@ -6,6 +6,7 @@ module Language.Docopt.Parser.Usage (
   ) where
 
 import Prelude
+import Debug.Trace
 import Language.Docopt.Parser.Lexer as L
 import Language.Docopt.Parser.Usage.Option as O
 import Language.Docopt.Parser.Usage.Usage as U
@@ -25,7 +26,7 @@ import Language.Docopt.Parser.Usage.Argument (Argument(..))
 import Language.Docopt.Parser.Usage.Usage (Usage(..))
 import Text.Parsing.Parser (ParseError) as P
 import Text.Parsing.Parser.Combinators (try, optional, choice, sepBy1, between,
-                                       lookAhead) as P
+                                       optionMaybe, lookAhead) as P
 import Text.Parsing.Parser.Combinators ((<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(Position)) as P
 
@@ -72,9 +73,12 @@ usageParser smartOpts = do
                   (many $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
       eoa <- P.choice [
         P.try $ do
-          moreIndented *> L.doubleDash
-          P.optional do
+          maybeInParens do
+            maybeInParens do
+              L.doubleDash
+              many elem
             many elem
+          many elem
           return $ Just EOA
       , (do
           L.eof <|> (P.lookAhead $ lessIndented <|> sameIndent)
@@ -91,6 +95,15 @@ usageParser smartOpts = do
           (length xs - 1)
           (\as -> as ++ (singleton e))
           xs
+
+    maybeInParens p = do
+      Tuple close v <- moreIndented *> do
+        Tuple
+          <$> (P.optionMaybe $ P.choice [ L.lparen  *> return L.rparen
+                                        , L.lsquare *> return L.rsquare ])
+          <*> p
+      fromMaybe (pure unit) close
+      return v
 
     elem :: L.TokenParser Argument
     elem = defer \_ -> do

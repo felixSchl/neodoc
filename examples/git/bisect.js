@@ -3,7 +3,6 @@ const _ = require('lodash');
 
 // The git-bisect help text is a bit unconventional and requires some special
 // treatment for prepartion
-// XXX: -- should be [--]. See #31
 module.exports = (argv) => {
 
 const help = `
@@ -11,7 +10,7 @@ usage: git bisect [help|start|bad|good|skip|next|reset|visualize|replay|log|run]
 
 git bisect help
     print this long help message.
-git bisect start [--no-checkout] [<bad> [<good>...]] -- [<pathspec>...]
+git bisect start [--no-checkout] [<bad> [<good>...]] [--] [<pathspec>...]
     reset bisect state and start bisection.
 git bisect bad [<rev>]
     mark <rev> a known-bad revision.

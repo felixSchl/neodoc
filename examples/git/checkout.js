@@ -1,6 +1,5 @@
 require('shelljs/global');
 
-// XXX: -- should be [--]. See #31
 module.exports = (argv) => {
 const args = require('../..').run(`
 

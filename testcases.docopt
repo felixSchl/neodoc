@@ -2721,3 +2721,22 @@ $ prog/s -b 2000
 
 $ prog/s -a 1000 -b 2000
 {"-a": [1000], "-b": [2000]}
+
+# Fix issue #31
+# The syntax is still fairly constrained - but on purpose in order to keep
+# the `--` the definitive EOA marker. The reason `[--] ARGS` is allowed, despite
+# not being "correct" is for compatibilites sake.
+
+r"""
+Usage: foo [--] <pathspec>...
+"""
+
+$ prog
+{"--": []}
+
+r"""
+Usage: foo [[--] ARGS]
+"""
+
+$ prog
+{"--": []}

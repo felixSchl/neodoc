@@ -1,10 +1,9 @@
 require('shelljs/global');
 
-// XXX: -- should be [--]. See #31
 module.exports = (argv) => {
 const args = require('../..').run(`
 
-usage: git commit [options] -- <pathspec>...
+usage: git commit [options] [--] <pathspec>...
 
 options:
     -q, --quiet           suppress summary after successful commit

@@ -1,11 +1,9 @@
 require('shelljs/global');
 
-// XXX: -- should be [--]. See #31
-// original: usage: git grep [options] [-e] <pattern> [<rev>...] [[--] <path>...]
 module.exports = (argv) => {
 const args = require('../..').run(`
 
-usage: git grep [options] <pattern> [<rev>...] -- [<path>...]
+usage: git grep [options] <pattern> [<rev>...] [[--] <path>...]
 
 options:
     --cached              search in index instead of in the work tree
