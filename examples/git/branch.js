@@ -1,12 +1,10 @@
 require('shelljs/global');
 
 // Note: --merged needed to be made optional. The git help seems off here.
-// XXX: Refer to #33. Rewrite `--merged[=<commit>]` to `--merged` once #33 has
-//      been dealt to.
 module.exports = (argv) => {
 const args = require('../..').run(`
 
-usage: git branch [options] [-r | -a] [--merged[=<commit>] | --no-merged[=<commit>]]
+usage: git branch [options] [-r | -a] [--merged | --no-merged]
    or: git branch [options] [-l] [-f] <branchname> [<start-point>]
    or: git branch [options] [-r] (-d | -D) <branchname>...
    or: git branch [options] (-m | -M) [<oldbranch>] <newbranch>

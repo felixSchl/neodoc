@@ -191,14 +191,19 @@ solveBranch as ds = Branch <$> go as
           let mr = do
                 guard (not o.repeatable)
                 matchedArg <- O.runArgument <$> match.arg
+
                 case adjArg of
                   Just (U.Positional n r) ->
                     return $ r <$ guardArgs n matchedArg.name
                   Just (U.Command n r) ->
                     return $ r <$ guardArgs n matchedArg.name
-                  _ -> return $ fail
-                      $ "Option-Argument specified in options-section missing"
-                        ++ " --" ++ o.name
+                  otherwise ->
+                    if not (matchedArg.optional)
+                      then
+                        return $ fail
+                          $ "Option-Argument specified in options-section missing"
+                            ++ " --" ++ o.name
+                      else Nothing
 
           case mr of
             Nothing -> return $ Resolved
@@ -394,9 +399,13 @@ solveBranch as ds = Branch <$> go as
                         return $ r <$ guardArgs n arg'.name
                       Just (U.Command n r) ->
                         return $ r <$ guardArgs n arg'.name
-                      _ -> return $ fail
-                          $ "Option-Argument specified in options-section missing"
-                            ++ " -" ++ fromChar o.flag
+                      otherwise ->
+                        if not (arg'.optional)
+                          then
+                            return $ fail
+                              $ "Option-Argument specified in options-section missing"
+                                ++ " -" ++ fromChar o.flag
+                          else Nothing
 
                in case mr of
                 Nothing -> do

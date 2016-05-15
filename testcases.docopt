@@ -2740,3 +2740,37 @@ Usage: foo [[--] ARGS]
 
 $ prog
 {"--": []}
+
+# Fix issue #33
+# Lift "incoherent specification" restriction for missing option-argument if
+# argument is declared optional.
+
+r"""
+Usage: foo -f
+Options: -f[=ARG]
+"""
+
+$ prog
+{}
+
+$ prog -f
+{"-f": true}
+
+$ prog -fabc
+{"-f": "abc"}
+
+
+r"""
+Usage: foo --foo
+Options: --foo[=ARG]
+"""
+
+$ prog
+{}
+
+$ prog --foo
+{"--foo": true}
+
+$ prog --foo=abc
+{"--foo": "abc"}
+
