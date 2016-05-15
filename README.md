@@ -52,7 +52,7 @@ advantages are numerous:
 This implementation features **error reporting**, both for users and developers,
 reading values from **environment variables**, type coercion and much more. For
 an (in-)comprehensive comparison to the original, click
-[here](#deviations-from-the-original). To take neodoc for a right, click
+[here](#deviations-from-the-original). To take neodoc for a ride, click
 [here][playground].
 
 ## Features ##
