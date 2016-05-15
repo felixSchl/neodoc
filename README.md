@@ -101,30 +101,30 @@ Options:
 * `opts.smartOptions` - Enable parsing groups that "look like" flags as such,
   for example, parse `[-f ARG...]` as `[-f=ARG...]`
 
+
+### Example
+
+> For more examples, check out the 'examples' folder.
+> To see the git example in action, run: `node ./examples/git`
+
 ```javascript
 #!/usr/bin/env node
-
-// (!) This is runnable code and mimics git. The git help below is the output of
-//     `git --help` with a couple of very minor alterations (couple of
-//      characters) which are also being addressed.
-// (!) Keep in in mind that these strings below could be kept in your README or
-//     manpage SYNOPSIS.
 
 const neodoc = require('neodoc');
 
 const args = neodoc.run(`
-usage: git [--version] [--help] [-C=<path>] [-c<name=value>]
+usage: git [--version] [--help] [-C <path>] [-c <name=value>]
            [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
            [-p|--paginate|--no-pager] [--no-replace-objects] [--bare]
            [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
            <command> [<args>...]
-`, { optionsFirst: true });
+`, { optionsFirst: true, smartOptions: true });
 
 if (args['<command>'] === 'remote') {
     const remoteArgs = neodoc.run(`
     usage:
         git remote [-v | --verbose]
-        git remote add [-t=<branch>] [-m=<master>] [-f] [--tags|--no-tags]
+        git remote add [-t <branch>] [-m <master>] [-f] [--tags|--no-tags]
                         [--mirror=<fetch|push>] <name> <url>
         git remote rename <old> <new>
         git remote remove <name>
@@ -136,7 +136,7 @@ if (args['<command>'] === 'remote') {
         git remote [-v | --verbose] show [-n] <name>...
         git remote prune [-n | --dry-run] <name>...
         git remote [-v | --verbose] update [-p | --prune] [(<group> | <remote>)...]
-    `, { argv: ['remote'].concat(args['<args>']) })
+    `, { argv: ['remote'].concat(args['<args>']), smartOptions: true })
 
     // ...
 } else { /* ... */ }
