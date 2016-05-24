@@ -26,16 +26,11 @@ options:
   -u, --upload-pack <path>
                         path to git-upload-pack on the remote
   --depth <depth>       create a shallow clone of that depth
-`
-// XXX: `--branch` trips up the options parser. Refer to #34.
-//      Once #34 is resolved, uncomment the following:
-// --single-branch       clone only one branch, HEAD or --branch */
-+
-`
+  --single-branch       clone only one branch, HEAD or --branch
   --separate-git-dir <gitdir> separate git dir from working tree
   -c, --config <key=value>...  set config inside the new repository
 
 `, { argv: argv, smartOptions: true });
 
-echo(args);
+echo(JSON.stringify(args));
 }

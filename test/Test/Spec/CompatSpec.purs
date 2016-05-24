@@ -2,7 +2,6 @@ module Test.Spec.CompatSpec (genCompatSpec) where
 
 import Prelude
 import Global (readFloat)
-import Debug.Trace (traceShowA)
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)

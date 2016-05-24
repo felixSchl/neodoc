@@ -21,5 +21,5 @@ Options:
   --ignore-missing      check if - even missing - files are ignored in dry run
 `, { argv: argv, smartOptions: true });
 
-echo(args);
+echo(JSON.stringify(args));
 }

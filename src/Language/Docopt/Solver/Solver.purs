@@ -77,7 +77,7 @@ solveBranch as ds = Branch <$> go as
             -- Resolve references for [options] (references)
             expand' (Tuple args' refs) | length refs > 0 = map args' ds
               where
-                map args (Cons (DE.OptionDesc o@(DE.Option opt)) xs) =
+                map args (Cons (DE.OptionDesc opt) xs) =
                   -- Assuming description and usage have already been merged,
                   -- find all options that are not present in the surrounding
                   -- "free" area and add them.
@@ -116,6 +116,7 @@ solveBranch as ds = Branch <$> go as
                     isMatch _ = false
 
                     convArg arg = O.Argument <<< DE.runArgument <$> arg
+                map args (Cons _ xs) = map args xs
                 map args _ = args
             expand' (Tuple args _) = args
 
@@ -229,7 +230,7 @@ solveBranch as ds = Branch <$> go as
           case filter isMatch ds of
             xs | length xs > 1 -> fail
               $ "Multiple option descriptions for option --" ++ n
-            (Cons (DE.OptionDesc (DE.Option desc)) Nil) -> do
+            (Cons (DE.OptionDesc desc) Nil) -> do
               arg <- resolveOptArg o.arg desc.arg
               return $ O.Option { flag:       DE.getFlag desc.name
                                 , name:       DE.getName desc.name
@@ -246,8 +247,8 @@ solveBranch as ds = Branch <$> go as
                       , repeatable: o.repeatable
                       }
           where
-            isMatch (DE.OptionDesc (DE.Option { name = DE.Long n'   })) = n == n'
-            isMatch (DE.OptionDesc (DE.Option { name = DE.Full _ n' })) = n == n'
+            isMatch (DE.OptionDesc { name = DE.Long n'   }) = n == n'
+            isMatch (DE.OptionDesc { name = DE.Full _ n' }) = n == n'
             isMatch _ = false
 
 
@@ -299,7 +300,7 @@ solveBranch as ds = Branch <$> go as
           where
             subsume :: String -> Desc -> Maybe (ResolveTo (Slurp Argument)
                                                           Reference)
-            subsume fs (DE.OptionDesc (DE.Option d)) = do
+            subsume fs (DE.OptionDesc d) = do
               f <- DE.getFlag d.name
               a <- DE.runArgument <$> d.arg
 
@@ -437,7 +438,7 @@ solveBranch as ds = Branch <$> go as
                     $ "Multiple option descriptions for option -"
                         ++ fromChar f
 
-            (Cons (DE.OptionDesc (DE.Option desc)) Nil) -> do
+            (Cons (DE.OptionDesc desc) Nil) -> do
               arg <- if isTrailing
                           then resolveOptArg o.arg desc.arg
                           else if isNothing desc.arg
@@ -465,8 +466,8 @@ solveBranch as ds = Branch <$> go as
                       }
 
           where
-            isMatch (DE.OptionDesc (DE.Option { name = DE.Flag f'   })) = f == f'
-            isMatch (DE.OptionDesc (DE.Option { name = DE.Full f' _ })) = f == f'
+            isMatch (DE.OptionDesc { name = DE.Flag f'   }) = f == f'
+            isMatch (DE.OptionDesc { name = DE.Full f' _ }) = f == f'
             isMatch _ = false
 
     -- | Resolve an option's argument name against that given in the

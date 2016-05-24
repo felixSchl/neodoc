@@ -38,6 +38,6 @@ Specific git-branch options:
 
 `, { argv: argv, smartOptions: true });
 
-echo(args);
+echo(JSON.stringify(args));
 }
 

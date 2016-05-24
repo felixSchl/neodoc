@@ -27,5 +27,5 @@ if (args['<command>']) {
   require(`./${args['<command>']}`)(
     args['<command>'].concat(args['<args>']));
 } else {
-  echo(args);
+  echo(JSON.stringify(args));
 }

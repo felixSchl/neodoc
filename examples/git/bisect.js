@@ -56,6 +56,6 @@ if (_.has(cmds, cmd)) {
   echo(`Unknown git bisect command: ${cmd}`);
   exit(1);
 } else {
-  echo(args);
+  echo(JSON.stringify(args));
 }
 }
