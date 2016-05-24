@@ -12,7 +12,7 @@
     "prebuild": "rm -rf dist",
     "build": "npm run build:src && npm run build:lib",
     "pretest": "npm run build",
-    "test": "pulp test && mocha",
+    "test": "pulp test && mocha test-js",
     "watch": "pulp -w test",
     "deps": "bower install",
     "clean": "git stash && git clean -fdX",
