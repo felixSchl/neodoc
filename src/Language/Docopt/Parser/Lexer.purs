@@ -4,6 +4,8 @@ import Prelude
 import Data.Array as A
 import Debug.Trace
 import Data.List as L
+import Data.Monoid (mempty)
+import Data.Functor (($>))
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.Monad.State (State, evalState)
@@ -11,13 +13,13 @@ import Control.Monad.State.Trans (StateT())
 import Control.MonadPlus (guard)
 import Data.Either (Either(..))
 import Data.Identity (Identity())
-import Data.List (List(..), many, fromList)
+import Data.List (List(..), many, fromList, catMaybes)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (fromCharArray, trim)
 import Data.String.Ext ((^=))
 import Language.Docopt.Parser.Base (lowerAlphaNum, alphaNum, alpha, space,
                                    lowerAlpha, regex, upperAlpha, string',
-                                   getPosition, getInput)
+                                   getPosition, getInput, spaces, eol)
 import Language.Docopt.Parser.State (ParserState)
 import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..),
                             runParserT, parseFailed, fail, runParser) as P
@@ -56,6 +58,7 @@ data Token
   | VBar
   | Colon
   | Comma
+  | Newline
   | TripleDot
   | Reference String
   | LOpt String (Maybe { name :: String, optional :: Boolean })
@@ -74,6 +77,7 @@ prettyPrintToken LSquare           = show '['
 prettyPrintToken RSquare           = show ']'
 prettyPrintToken Dash              = show '-'
 prettyPrintToken VBar              = show '|'
+prettyPrintToken Newline           = show '\n'
 prettyPrintToken Colon             = show ':'
 prettyPrintToken Comma             = show ','
 prettyPrintToken TripleDot         = "..."
@@ -120,6 +124,7 @@ instance eqToken :: Eq Token where
   eq Dash              Dash               = true
   eq DoubleDash        DoubleDash         = true
   eq TripleDot         TripleDot          = true
+  eq Newline           Newline            = true
   eq (Reference r)     (Reference r')     = r == r'
   eq (LOpt n arg)      (LOpt n' arg')
     = (n == n')
@@ -186,10 +191,15 @@ parseToken m = P.choice (P.try <$> A.concat [
     , Name      <$> _name
     ]
   , if isDescMode m
-        then [ Garbage <$> P.anyChar ]
+        then [
+          eol      $> Newline
+        , Garbage <$> P.anyChar
+        ]
         else []
   ])
-  <* P.skipSpaces
+  <* if isDescMode m
+        then void $ spaces -- skip only spaces ' ' and '\t'
+        else P.skipSpaces  -- skip spaces *AND* newlines
 
  where
 
@@ -429,7 +439,7 @@ anyToken :: P.ParserT (List PositionedToken)
 anyToken = token $ Just
 
 eof :: TokenParser Unit
-eof = P.notFollowedBy anyToken
+eof = P.notFollowedBy anyToken P.<?> "EOF"
 
 lparen :: TokenParser Unit
 lparen = match LParen
@@ -457,6 +467,9 @@ comma = match Comma
 
 colon :: TokenParser Unit
 colon = match Colon
+
+newline :: TokenParser Unit
+newline = match Newline
 
 tripleDot :: TokenParser Unit
 tripleDot = match TripleDot

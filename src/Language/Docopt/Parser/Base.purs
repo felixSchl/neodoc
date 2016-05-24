@@ -6,6 +6,7 @@ module Language.Docopt.Parser.Base where
 
 import Prelude
 import Control.Alt ((<|>))
+import Data.List (List(), many)
 import Text.Parsing.Parser (PState(..), ParserT(..)) as P
 import Text.Parsing.Parser.Pos (Position(..)) as P
 import Text.Parsing.Parser.String (satisfy, char, string) as P
@@ -92,7 +93,10 @@ alphaNum :: forall m. (Monad m) => P.ParserT String m Char
 alphaNum = alpha <|> digit
 
 space :: forall m. (Monad m) => P.ParserT String m Char
-space = P.char ' '
+space = P.satisfy \c -> c == ' ' || c == '\t'
+
+spaces :: forall m. (Monad m) => P.ParserT String m (List Char)
+spaces = many space
 
 eol :: forall m. (Monad m) => P.ParserT String m Unit
 eol = (void $ P.string "\r\n") <|> (void $ P.char '\n')

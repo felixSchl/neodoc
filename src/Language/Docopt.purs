@@ -10,7 +10,7 @@ module Language.Docopt (
   , evalDocopt
   ) where
 
-import Prelude ((<<<), bind, return, ($), (<$>))
+import Prelude
 import Data.Either (Either)
 import Data.List (List, concat)
 import Data.StrMap (StrMap())

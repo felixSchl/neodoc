@@ -1,29 +1,41 @@
 module Language.Docopt.Parser.Desc where
 
 import Prelude
+import Data.Tuple (Tuple (Tuple))
 import Data.Functor (($>))
+import Control.Lazy (defer)
+import Control.Bind ((>=>))
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.MonadPlus (guard)
-import Data.List (List, (:), many, head, length, filter)
+import Data.List (List, (:), many, some, head, length, filter, catMaybes)
 import Text.Parsing.Parser (ParseError, fail) as P
 import Text.Parsing.Parser.Combinators ((<?>), try, choice, lookAhead, manyTill,
-                                        option, optionMaybe, notFollowedBy) as P
+                                        option, optionMaybe, notFollowedBy,
+                                        (<??>)) as P
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(Nothing, Just), isJust, maybe)
+import Data.Maybe (Maybe(Nothing, Just), isJust, isNothing, maybe)
 import Data.Generic (class Generic, gEq, gShow)
 import Data.String (fromChar)
 import Data.Array as A
 import Data.String.Ext ((^=))
 
 import Language.Docopt.Value (Value, prettyPrintValue)
-import Language.Docopt.Parser.Common (sameIndent, markIndent, sameLine, markLine)
+import Language.Docopt.Parser.Common (sameIndent, markIndent, indented,
+                                     moreIndented, lessIndented)
 import Language.Docopt.Parser.Lexer (lexDescs)
 import Language.Docopt.Parser.Lexer as L
 import Language.Docopt.Value as Value
 
-data Desc = OptionDesc Option
-          | CommandDesc -- XXX: Can be removed now?
+type OptionObj = {
+  name       :: Name
+, arg        :: Maybe Argument
+, env        :: Maybe String
+, repeatable :: Boolean
+}
+
+data Desc = OptionDesc OptionObj
+          | CommandDesc
 
 data Name = Flag Char | Long String | Full Char String
 
@@ -50,16 +62,8 @@ runArgument :: Argument -> {
 }
 runArgument (Argument a) = a
 
-newtype Option = Option {
-  name       :: Name
-, arg        :: Maybe Argument
-, env        :: Maybe String
-, repeatable :: Boolean
-}
-
 data Content
-  = Text
-  | Default String
+  = Default String
   | Env     String
 
 isDefaultTag :: Content -> Boolean
@@ -78,45 +82,39 @@ getEnvKey :: Content -> Maybe String
 getEnvKey (Env k) = Just k
 getEnvKey _       = Nothing
 
-derive instance genericDesc     :: Generic Desc
 derive instance genericArgument :: Generic Argument
 derive instance genericName     :: Generic Name
-derive instance genericOption   :: Generic Option
 derive instance genericContent  :: Generic Content
 
-instance showDesc :: Show Desc
-  where show = gShow
-
-instance showOption :: Show Option
-  where show = gShow
-
-instance showArgument :: Show Argument
-  where show = gShow
-
-instance showName :: Show Name
-  where show = gShow
-
-instance showContent :: Show Content
-  where show = gShow
-
-instance eqOption :: Eq Option
-  where eq = gEq
-
-instance eqArgument :: Eq Argument
-  where eq = gEq
-
-instance eqName :: Eq Name
-  where eq = gEq
-
-instance eqDesc :: Eq Desc
-  where eq = gEq
+instance showArgument :: Show Argument where show = gShow
+instance showName     :: Show Name     where show = gShow
+instance showContent  :: Show Content  where show = gShow
+instance eqArgument   :: Eq Argument   where eq = gEq
+instance eqName       :: Eq Name       where eq = gEq
 
 prettyPrintDesc :: Desc -> String
 prettyPrintDesc (OptionDesc opt) = "Option " ++ prettyPrintOption opt
 prettyPrintDesc (CommandDesc) = "Command"
 
-prettyPrintOption :: Option -> String
-prettyPrintOption (Option opt)
+instance showDesc :: Show Desc where
+  show (OptionDesc o) = "(OptionDesc { name: "       <> show o.name
+                                 <> ", arg: "        <> show o.arg
+                                 <> ", env: "        <> show o.env
+                                 <> ", repeatable: " <> show o.repeatable
+                                 <> "})"
+  show (CommandDesc) = "CommandDesc"
+
+instance eqDesc :: Eq Desc where
+  eq (OptionDesc o) (OptionDesc o')
+    = o.name       == o'.name        &&
+      o.arg        == o'.arg         &&
+      o.env        == o'.env         &&
+      o.repeatable == o'.repeatable
+  eq (CommandDesc) (CommandDesc) = true
+  eq _ _ = false
+
+prettyPrintOption :: OptionObj -> String
+prettyPrintOption opt
   = (name opt.name) ++ arg ++ env
   where
       name (Flag c)   = "-" ++ fromChar c
@@ -147,39 +145,67 @@ argument :: String
          -> Boolean
          -> Maybe Value
          -> Argument
-argument name optional default = Argument { name:   name
+argument name optional default = Argument { name:     name
                                           , default:  default
                                           , optional: optional
                                           }
 
 run :: String -> Either P.ParseError (List Desc)
-run x = lexDescs x >>= parse
+run = lexDescs >=> parse
 
 parse :: (List L.PositionedToken) -> Either P.ParseError (List Desc)
 parse = flip L.runTokenParser descParser
 
 descParser :: L.TokenParser (List Desc)
-descParser =
-  markIndent do
-    opt  <- option
-    opts <- many $ sameIndent *> option
-    return (opt : opts)
+descParser = markIndent do many desc <* L.eof
   where
 
     anyName :: L.TokenParser String
     anyName = L.angleName <|> L.shoutName <|> L.name
 
-    option :: L.TokenParser Desc
-    option = do
-      xopt@(Option opt) <- start
+    desc :: L.TokenParser Desc
+    desc = defer \_-> "--option or <positional> description" P.<??> do
+            P.choice $ [ optionDesc
+                       , positionalsDesc
+                       ]
 
-      description <- do
-        flip P.manyTill (L.eof <|> (P.lookAhead $ P.try $ void start)) do
+    descContent :: L.TokenParser (List Content)
+    descContent = do
+      markIndent do
+        catMaybes <$> (flip P.manyTill descEnd do
           P.choice $ P.try <$> [
-            Default <$> L.tag "default"
-          , Env     <$> L.tag "env"
-          , L.anyToken *> pure Text
+            Just <<< Default <$> L.tag "default"
+          , Just <<< Env     <$> L.tag "env"
+          , L.anyToken $> Nothing
+          ])
+      <* (void L.eof <|> void (some L.newline))
+      where
+        descEnd = do
+          P.choice [
+            L.eof
+          , void $ P.lookAhead do
+              L.newline
+              lessIndented
+              P.choice [
+                void L.sopt
+              , void L.lopt
+              , void L.angleName
+              , void L.shoutName
+              ]
           ]
+
+    positionalsDesc :: L.TokenParser Desc
+    positionalsDesc = do
+      L.angleName <|> L.shoutName
+      repeatable <- P.option false $ L.tripleDot $> true
+      descContent
+      return CommandDesc
+
+    optionDesc :: L.TokenParser Desc
+    optionDesc = do
+
+      xopt        <- opt
+      description <- descContent
 
       let defaults = getDefaultValue <$> filter isDefaultTag description
           envs     = getEnvKey       <$> filter isEnvTag     description
@@ -199,17 +225,17 @@ descParser =
       let default = head defaults >>= id
           env     = head envs     >>= id
 
-      if (isJust default) && (not $ isJust opt.arg)
+      if (isJust default) && (isNothing xopt.arg)
          then P.fail $
           "Option " ++ (show $ prettyPrintOption xopt)
                     ++ " does not take arguments. "
                     ++ "Cannot specify defaults."
          else return unit
 
-      return $ OptionDesc $ Option $
-        opt { env = env
+      return $ OptionDesc $
+        xopt { env = env
             , arg = do
-                (Argument arg) <- opt.arg
+                (Argument arg) <- xopt.arg
                 return $ Argument $ arg {
                   default = default
                 }
@@ -217,21 +243,12 @@ descParser =
 
       where
 
-        start :: L.TokenParser Option
-        start = do
-          P.choice $ P.try <$> [
-            short <* do
-              P.notFollowedBy do
-                P.choice $ P.try <$> [ L.comma *> long, long ]
-          , long <* do
-              P.notFollowedBy do
-                P.choice $ P.try <$> [ L.comma *> short, short ]
-          , both
-          ]
-
-        short :: L.TokenParser Option
+        short :: L.TokenParser OptionObj
         short = do
-          opt <- sopt
+          opt <- do
+            opt <- L.sopt
+            (guard $ (A.length opt.stack == 0)) P.<?> "No stacked options"
+            return { flag: opt.flag, arg: opt.arg }
 
           -- Grab the adjacent positional-looking argument
           -- in case the token did not have an explicit
@@ -244,23 +261,23 @@ descParser =
                   (return <<< Just)
                   opt.arg
 
-          repeatable <- P.option false (L.tripleDot $> true)
+          repeatable <- P.option false $ L.tripleDot $> true
 
-          return $ Option { name: Flag opt.flag
-                          , arg:  Argument <$> do
-                              a <- arg
-                              return {
-                                name:       a.name
-                              , optional:   a.optional
-                              , default:    Nothing
-                              }
-                          , env:        Nothing
-                          , repeatable: repeatable
-                          }
+          return $ { name: Flag opt.flag
+                   , arg:  Argument <$> do
+                       a <- arg
+                       return {
+                         name:     a.name
+                       , optional: a.optional
+                       , default:  Nothing
+                       }
+                   , env:        Nothing
+                   , repeatable: repeatable
+                   }
 
-        long :: L.TokenParser Option
+        long :: L.TokenParser OptionObj
         long = do
-          opt <- lopt
+          opt <- L.lopt
 
           -- Grab the adjacent positional-looking argument
           -- in case the token did not have an explicit
@@ -273,38 +290,46 @@ descParser =
                   (return <<< Just)
                   opt.arg
 
-          repeatable <- P.option false (L.tripleDot $> true)
+          repeatable <- P.option false $ L.tripleDot $> true
 
-          return $ Option { name: Long opt.name
-                          , arg:  Argument <$> do
-                              a <- arg
-                              return {
-                                name:       a.name
-                              , optional:   a.optional
-                              , default:    Nothing
-                              }
-                          , env:        Nothing
-                          , repeatable: repeatable
-                          }
+          return $ { name: Long opt.name
+                    , arg:  Argument <$> do
+                        a <- arg
+                        return {
+                          name:     a.name
+                        , optional: a.optional
+                        , default:  Nothing
+                        }
+                    , env:        Nothing
+                    , repeatable: repeatable
+                    }
 
-        both :: L.TokenParser Option
-        both = markLine do
-          x <- short
-          y <- do sameLine
-                  P.choice $ P.try <$> [ L.comma *> long
-                                       , long
-                                       ]
-          combine x y
+        opt :: L.TokenParser OptionObj
+        opt = do
+          x <- P.optionMaybe short
+          y <- P.optionMaybe do
+            P.choice $ P.try <$> do
+              maybe [ long ]
+                    (const [ L.comma  *> many L.newline *> indented *> long
+                           , long
+                           ])
+                    x
+
+          case Tuple x y of
+            Tuple (Just x) (Just y) -> combine x y
+            Tuple (Just x) Nothing  -> pure x
+            Tuple Nothing  (Just y) -> pure y
+            otherwise               -> P.fail "Expected options"
 
           where
             -- Combine two options into one. This function *does not* cover all
             -- cases right now. It deals only with a known subset and can there-
             -- fore make assumptions
-            combine :: Option -> Option -> L.TokenParser Option
-            combine (Option x@{ name: Flag f }) (Option y@{ name: Long n }) = do
+            combine :: OptionObj -> OptionObj -> L.TokenParser OptionObj
+            combine (x@{ name: Flag f }) (y@{ name: Long n }) = do
               either P.fail return do
                 arg <- combineArg x.arg y.arg
-                return $ Option {
+                return $ {
                   name:       Full f n
                 , arg:        arg
                 , env:        Nothing -- No need to keep at this stage
@@ -324,16 +349,3 @@ descParser =
                         "Arguments mismatch: " ++ (show $ prettyPrintArgument a)
                                     ++ " and " ++ (show $ prettyPrintArgument b)
             combine _ _ = P.fail "Invalid case - expected flag and long option"
-
-    sopt :: L.TokenParser { flag :: Char, arg :: Maybe { name :: String
-                                                       , optional :: Boolean
-                                                       } }
-    sopt = do
-      opt <- L.sopt
-      (guard $ (A.length opt.stack == 0)) P.<?> "No stacked options"
-      return { flag: opt.flag, arg: opt.arg }
-
-    lopt :: L.TokenParser { name :: String, arg :: Maybe { name :: String
-                                                         , optional :: Boolean
-                                                         } }
-    lopt = L.lopt

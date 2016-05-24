@@ -5,6 +5,5 @@ const args = require('../..').run(`
 usage: git diff [<options>] [<commit> [<commit>]] [--] [<path>...]
 `, { argv: argv, smartOptions: true });
 
-echo(args);
+echo(JSON.stringify(args));
 }
-

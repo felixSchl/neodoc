@@ -2774,3 +2774,86 @@ $ prog --foo
 $ prog --foo=abc
 {"--foo": "abc"}
 
+# Fix issue #34
+# Option parser trips up if `--` is preseent in description RHS
+
+r"""
+usage: foo [options]
+options:
+    --foo This is foo. Not applicable if --qux is given.
+    --bar This is bar.
+"""
+
+$ prog --bar
+{"--bar": true}
+
+r"""
+usage: foo [options] [<command>]
+options:
+    <command> this is command.
+    --foo     This is foo. Not applicable if --qux is given.
+    --bar     This is bar.
+"""
+
+$ prog --bar run
+{"--bar": true, "<command>": "run", "COMMAND": "run"}
+
+$ prog --bar
+{"--bar": true}
+
+r"""
+usage: foo [options] <command>
+options:
+    --foo     This is foo. Not applicable if --qux is given.
+    <command> this is command.
+    --bar     This is bar.
+"""
+
+$ prog --bar run
+{"--bar": true, "<command>": "run", "COMMAND": "run"}
+
+# ARG and '...' should be ignored since they are on different lines:
+r"""
+usage: foo [options]
+options:
+   --foo
+       ARG
+       ...
+   -q
+       ARG
+       ...
+"""
+
+$ prog --foo
+{"--foo": true}
+
+$ prog -q
+{"-q": true}
+
+# -f and --foo should *NOT* be associated w/o a comma if on different lines
+r"""
+usage: foo [options]
+options:
+   -f
+   --foo
+"""
+
+$ prog -f
+{"-f": true}
+
+$ prog --foo
+{"--foo": true}
+
+# -f and --foo should *NOT* be associated w/o a comma if on different lines
+r"""
+usage: foo [options]
+options:
+   -f,
+   --foo
+"""
+
+$ prog -f
+{"-f": true, "--foo": true}
+
+$ prog --foo
+{"-f": true, "--foo": true}

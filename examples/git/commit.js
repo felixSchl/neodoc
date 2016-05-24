@@ -21,11 +21,7 @@ Commit message options:
                           reuse message from specified commit
     --fixup <commit>      use autosquash formatted message to fixup specified commit
     --squash <commit>     use autosquash formatted message to squash specified commit
-`
-//    Refer to #34.
-//    --reset-author        the commit is authored by me now (used with -C/-c/--amend)
-+
-`
+    --reset-author        the commit is authored by me now (used with -C/-c/--amend)
     -s, --signoff         add Signed-off-by:
     -t, --template <file>
                           use specified template file
@@ -55,5 +51,5 @@ Commit contents options:
 
 `, { argv: argv, smartOptions: true });
 
-echo(args);
+echo(JSON.stringify(args));
 }

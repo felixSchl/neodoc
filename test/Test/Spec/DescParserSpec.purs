@@ -25,7 +25,7 @@ pass input output = TestCase { input: input, output: Right output }
 fail :: String -> String -> TestCase
 fail input msg = TestCase { input: input, output: Left msg }
 
-o = Desc.OptionDesc <<< Desc.Option
+o = Desc.OptionDesc
 
 str = StringValue
 int = IntValue
@@ -141,15 +141,36 @@ descParserSpec = \_ ->
               "-f=BAZ, --foo=qux"
               "Arguments mismatch: \"BAZ\" and \"qux\""
         , pass (dedent
+            -- if an option is indented past the start of the description
+            -- block for the previous option, it's considered part of the
+            -- description.
             """
             -f=BAZ, --foo=BAZ this is some more text [default: 100]
                                                      [env: QARK]
-                -q=QIZ, --qux=QIZ this option is over-indented and won't
-                                  be parsed.
+                                -q=QIZ, --qux=QIZ this option is over-indented and won't
+                                                  be parsed.
             """)
             [ o { name:       Desc.Full 'f' "foo"
                 , arg:        Just $ arg "BAZ" (int 100)
                 , env:        Just "QARK"
+                , repeatable: false
+                }
+            ]
+        , pass (dedent
+            """
+            -f=BAZ, --foo=BAZ this is some more text [default: 100]
+                [env: QARK]
+                          -q=QIZ, --qux=QIZ this option is over-indented and won't
+                                            be parsed.
+            """)
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Just "QARK"
+                , repeatable: false
+                }
+            , o { name:       Desc.Full 'q' "qux"
+                , arg:        Just $ arg_ "QIZ"
+                , env:        Nothing
                 , repeatable: false
                 }
             ]
