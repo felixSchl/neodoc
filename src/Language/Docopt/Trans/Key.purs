@@ -15,7 +15,7 @@ import Language.Docopt.Argument (Argument(..)) as D
 newtype Key = Key { arg :: D.Argument }
 
 instance showKey :: Show Key where
-  show (Key { arg: (D.Option (O.Option o)) }) =
+  show (Key { arg: (D.Option o) }) =
     maybe "" (\c -> fromChar c ++ ", ") o.flag
       ++ maybe "" id o.name
   show (Key { arg: (D.Positional n _) }) = n
@@ -30,8 +30,8 @@ instance eqKey :: Eq Key where
     where
       go (D.Command    n _) (D.Command    n' _) = n == n'
       go (D.Positional n _) (D.Positional n' _) = n ^= n'
-      go (D.Option (O.Option { flag=f,  name=n  }))
-         (D.Option (O.Option { flag=f', name=n' }))
+      go (D.Option { flag=f,  name=n  })
+         (D.Option { flag=f', name=n' })
          = (f == f') && (n == n')
       go a b = a == b
 
@@ -50,7 +50,6 @@ toKeys (D.Positional n _) = [ "<" ++ Str.toLower n ++ ">"
 toKeys (D.Group _ _ _)    = []
 toKeys (D.EOA)            = ["--"]
 toKeys (D.Stdin)          = ["-"]
-toKeys (D.Option (O.Option o))
-                          = []
+toKeys (D.Option o)       = []
                           ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) o.flag
                           ++ maybe [] (\s -> [ "--" ++ s ]) o.name

@@ -549,12 +549,12 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           isSkippable o = D.isRepeatable o && (any (_ == o) tot)
 
           getEnvValue :: Env -> D.Argument -> Maybe Value
-          getEnvValue env (D.Option (O.Option o@{ env: Just k })) = do
+          getEnvValue env (D.Option (o@{ env: Just k })) = do
             StringValue <$> Env.lookup k env
           getEnvValue _ _ = Nothing
 
           getDefaultValue :: D.Argument -> Maybe Value
-          getDefaultValue (D.Option (O.Option o@{
+          getDefaultValue (D.Option (o@{
               arg: Just (O.Argument { default: Just v })
             })) = return if o.repeatable
                             then ArrayValue $ Value.intoArray v
@@ -564,11 +564,11 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           getEmptyValue :: D.Argument -> Maybe Value
           getEmptyValue = go
             where
-            go (D.Option (O.Option o@{ arg: Nothing }))
+            go (D.Option (o@{ arg: Nothing }))
               = return
                   $ if o.repeatable then ArrayValue []
                                     else BoolValue false
-            go (D.Option (O.Option o@{ arg: Just (O.Argument { optional: true }) }))
+            go (D.Option (o@{ arg: Just (O.Argument { optional: true }) }))
               = return
                   $ if o.repeatable then ArrayValue []
                                     else BoolValue false
@@ -687,7 +687,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       = terminate (LU.head (D.runBranch (LU.head bs)))
 
     -- Generate a parser for a `Option` argument
-    genParser x@(D.Option (O.Option o)) _ = (do
+    genParser x@(D.Option o) _ = (do
       do
         if o.repeatable then (some go) else (singleton <$> go)
       <* modifyDepth (_ + 1)

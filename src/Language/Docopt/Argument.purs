@@ -51,7 +51,7 @@ runBranch (Branch xs) = xs
 data Argument
   = Command     String IsRepeatable
   | Positional  String IsRepeatable
-  | Option      O.Option
+  | Option      O.OptionObj
   | Group       IsOptional (List Branch) IsRepeatable
   | EOA
   | Stdin
@@ -68,7 +68,12 @@ instance showArgument :: Show Argument where
   show (Command n r)    = intercalate " " [ "Command", show n, show r ]
   show (Positional n r) = intercalate " " [ "Positional", show n, show r ]
   show (Group o bs r)   = intercalate " " [ "Group", show o, show bs, show r ]
-  show (Option o)       = "Option " ++ show o
+  show (Option o)       = "Option { flag: "       <> show o.flag
+                              <> ", name: "       <> show o.name
+                              <> ", arg: "        <> show o.arg
+                              <> ", env: "        <> show o.env
+                              <> ", repeatable: " <> show o.repeatable
+                              <> "}"
 
 instance ordArgument :: Ord Argument where
   -- XXX: Implement a more efficient `compare` function
@@ -80,7 +85,13 @@ instance eqArgument :: Eq Argument where
   eq (Command n r)    (Command n' r')    = (n == n') && (r == r')
   eq (Positional n r) (Positional n' r') = (n ^= n') && (r == r')
   eq (Group o bs r)   (Group o' bs' r')  = (o == o') && (bs == bs') && (r == r')
-  eq (Option o)       (Option o')        = o == o'
+  eq (Option o)       (Option o')        = all id
+                                              [ o.flag       == o'.flag
+                                              , o.name       == o'.name
+                                              , o.arg        == o'.arg
+                                              , o.env        == o'.env
+                                              , o.repeatable == o'.repeatable
+                                              ]
   eq _                _                  = false
 
 prettyPrintBranch :: Branch -> String
@@ -122,21 +133,21 @@ isRepeatable (Command _ r)    = r
 isRepeatable _                = false
 
 setRepeatable :: Argument -> Boolean -> Argument
-setRepeatable (Option (O.Option o)) r = Option $ O.Option $ o { repeatable = r }
+setRepeatable (Option o) r            = Option $ o { repeatable = r }
 setRepeatable (Positional n _)      r = (Positional n r)
 setRepeatable (Command n _)         r = (Command n r)
 setRepeatable x                     _ = x
 
 setRepeatableOr :: Argument -> Boolean -> Argument
-setRepeatableOr (Option (O.Option o)) r
-  = Option $ O.Option $ o { repeatable = o.repeatable || r }
+setRepeatableOr (Option o) r
+  = Option $ o { repeatable = o.repeatable || r }
 setRepeatableOr (Positional n r) r' = (Positional n (r || r'))
-setRepeatableOr (Command n r) r' = (Command n (r || r'))
-setRepeatableOr x _ = x
+setRepeatableOr (Command n r)    r' = (Command n (r || r'))
+setRepeatableOr x                _  = x
 
 setRequired :: Argument -> Boolean -> Argument
 setRequired (Group _ bs r) o = Group (not o) bs r
-setRequired x _ = x
+setRequired x              _ = x
 
 hasDefault :: Argument -> Boolean
 hasDefault (Option o) = O.hasDefault o
@@ -147,12 +158,12 @@ takesArgument (Option o) = O.takesArgument o
 takesArgument _          = false
 
 getArgument :: Argument -> Maybe O.Argument
-getArgument (Option (O.Option o)) = o.arg
-getArgument _                     = Nothing
+getArgument (Option o) = o.arg
+getArgument _          = Nothing
 
 getEnvKey :: Argument -> Maybe String
-getEnvKey (Option (O.Option o)) = o.env
-getEnvKey _                     = Nothing
+getEnvKey (Option o) = o.env
+getEnvKey _          = Nothing
 
 hasEnvBacking :: Argument -> Env -> Boolean
 hasEnvBacking p env = maybe false id $ flip Env.member env <$> getEnvKey p
