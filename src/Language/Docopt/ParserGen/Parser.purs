@@ -57,10 +57,10 @@ import Language.Docopt.Argument (Argument(..), Branch(..), isFree, runBranch,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 hasEnvBacking, getArgument, hasDefault,
                                 isRepeatable, isFlag, setRequired) as D
+import Language.Docopt.Argument.Option as O
 import Language.Docopt.Usage (Usage, runUsage) as D
 import Language.Docopt.Env (Env ())
 import Language.Docopt.Env as Env
-import Language.Docopt.Option as O
 import Language.Docopt.Origin as Origin
 import Language.Docopt.Origin (Origin())
 import Language.Docopt.Value as Value

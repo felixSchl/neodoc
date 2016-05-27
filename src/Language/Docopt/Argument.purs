@@ -26,6 +26,7 @@ module Language.Docopt.Argument (
   ,         optE,  optER,  optE_,  optER_
   , loptE', loptE, loptER, loptE_, loptER_
   , soptE', soptE, soptER, soptE_, soptER_
+  , module OptionReexport
   ) where
 
 import Prelude
@@ -36,7 +37,9 @@ import Data.Function (on)
 import Data.String.Ext ((^=))
 import Data.String as String
 
-import Language.Docopt.Option as O
+import Language.Docopt.Argument.Option as O
+import Language.Docopt.Argument.Option (OptionObj)
+import Language.Docopt.Argument.Option (OptionObj) as OptionReexport
 import Language.Docopt.Env as Env
 import Language.Docopt.Env (Env())
 
@@ -51,7 +54,7 @@ runBranch (Branch xs) = xs
 data Argument
   = Command     String IsRepeatable
   | Positional  String IsRepeatable
-  | Option      O.OptionObj
+  | Option      OptionObj
   | Group       IsOptional (List Branch) IsRepeatable
   | EOA
   | Stdin

@@ -5,7 +5,7 @@ import Data.Maybe (Maybe(..))
 import Data.List (List(..), toList, length, fromList, singleton)
 import Language.Docopt.Value
 import Language.Docopt.Argument
-import qualified Language.Docopt.Option as O
+import qualified Language.Docopt.Argument.Option as O
 
 -- short hand to create a Command
 co :: String -> Argument

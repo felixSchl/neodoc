@@ -1,4 +1,4 @@
-module Language.Docopt.Option (
+module Language.Docopt.Argument.Option (
     Argument (..)
   , Flag ()
   , Name ()

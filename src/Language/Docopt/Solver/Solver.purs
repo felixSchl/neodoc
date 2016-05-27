@@ -8,7 +8,7 @@ import Data.Array as A
 import Data.String as S
 import Data.String.Unsafe as US
 import Language.Docopt.Argument as Arg
-import Language.Docopt.Option as O
+import Language.Docopt.Argument.Option as O
 import Language.Docopt.Parser.Desc as DE
 import Language.Docopt.Parser.Usage.Option as UO
 import Control.Alt ((<|>))
@@ -26,7 +26,7 @@ import Data.String (fromChar, fromCharArray, toCharArray, toUpper)
 import Data.String.Ext ((^=), endsWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
-import Language.Docopt.Argument (runBranch, Argument(..), Branch(..))
+import Language.Docopt.Argument (runBranch, Argument(..), Branch(..), OptionObj)
 import Language.Docopt.Errors (SolveError(..))
 import Language.Docopt.Parser.Desc (Desc)
 import Language.Docopt.Parser.Usage (Usage(..)) as U
@@ -224,7 +224,7 @@ solveBranch as ds = Branch <$> go as
           $ "Arguments mismatch for option --" ++ o.name ++ ": "
               ++ show n ++ " and " ++ show n'
 
-        matchDesc :: String -> Either SolveError O.OptionObj
+        matchDesc :: String -> Either SolveError OptionObj
         matchDesc n =
           case filter isMatch ds of
             xs | length xs > 1 -> fail
@@ -429,7 +429,7 @@ solveBranch as ds = Branch <$> go as
         -- | `isTrailing` indicates if this flag is the last flag
         -- | in it's stack of flags.
 
-        matchDesc :: Boolean -> Char -> Either SolveError O.OptionObj
+        matchDesc :: Boolean -> Char -> Either SolveError OptionObj
         matchDesc isTrailing f =
           case filter isMatch ds of
             xs | length xs > 1 -> fail
