@@ -15,7 +15,11 @@ import Data.String as Str
 import Data.Maybe (maybe)
 import Data.Either (Either(Left))
 
-type Docopt = { usage :: String, options :: List String }
+type Docopt = {
+  usage         :: String
+, options       :: List String
+, originalUsage :: String
+}
 
 section :: String -> Regex
 section name
@@ -38,8 +42,9 @@ scan text = do
               _          -> fail "Multiple usage sections found!"
 
   pure {
-    usage:   fixSection u
-  , options: fixSection <$> sections "options"
+    usage:         fixSection u
+  , options:       fixSection <$> sections "options"
+  , originalUsage: u
   }
 
   where

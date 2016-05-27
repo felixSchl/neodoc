@@ -73,7 +73,9 @@ parseDocopt docopt opts = do
   us  <- toUsageParseErr $ Usage.run doc.usage opts.smartOptions
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve us ds
-  pure $ { specification: prg , usage: doc.usage }
+  pure $ { specification: prg
+         , usage:         doc.originalUsage
+         }
 
 -- |
 -- | Apply the generated docopt parser to user input.

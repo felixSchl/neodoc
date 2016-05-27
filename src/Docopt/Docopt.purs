@@ -95,6 +95,4 @@ run helpText opts = do
           throwException $ error $ e
 
     help usage
-      = "Usage:\n"
-          <> (unlines $ ("  " <> _) <$> lines (dedent usage))
-          <> "\n"
+      = (unlines $ ("  " <> _) <$> lines (dedent usage)) <> "\n"
