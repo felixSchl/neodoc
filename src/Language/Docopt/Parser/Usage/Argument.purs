@@ -95,30 +95,35 @@ prettyPrintArg (EOA) = "--"
 prettyPrintArg (Stdin) = "-"
 prettyPrintArg (Reference r) = "[" <> show r <> " options...]"
 
+--------------------------------------------------------------------------------
+-- Short hand function to create arguments.
+-- XXX: Remove this
+--------------------------------------------------------------------------------
+
 ref :: String -> Argument
 ref = Reference
 
 -- short hand to create a short option node
-sopt :: Char -> Array Char -> O.Argument -> Argument
+sopt :: Char -> Array Char -> O.OptionArgumentObj -> Argument
 sopt f fs a = OptionStack $ O.sopt f fs a
 
 sopt_ :: Char -> Array Char -> Argument
 sopt_ f fs = OptionStack $ O.sopt_ f fs
 
-soptR :: Char -> Array Char -> O.Argument -> Argument
+soptR :: Char -> Array Char -> O.OptionArgumentObj -> Argument
 soptR f fs a = OptionStack $ O.soptR f fs a
 
 soptR_ :: Char -> Array Char -> Argument
 soptR_ f fs = OptionStack $ O.soptR_ f fs
 
 -- short hand to create a long option node
-lopt :: String -> O.Argument -> Argument
+lopt :: String -> O.OptionArgumentObj -> Argument
 lopt n a = Option $ O.lopt n a
 
 lopt_ :: String -> Argument
 lopt_ n = Option $ O.lopt_ n
 
-loptR :: String -> O.Argument -> Argument
+loptR :: String -> O.OptionArgumentObj -> Argument
 loptR n a = Option $ O.loptR n a
 
 loptR_ :: String -> Argument

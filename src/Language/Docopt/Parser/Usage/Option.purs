@@ -1,5 +1,5 @@
 module Language.Docopt.Parser.Usage.Option (
-    Argument ()
+    OptionArgumentObj ()
   , LOpt (..)
   , SOpt (..)
   , lopt', lopt, loptR, lopt_, loptR_
@@ -14,19 +14,19 @@ import Data.String (fromChar)
 import Data.Foldable (intercalate)
 import Data.List (toList)
 
-type Argument = { name     :: String
-                , optional :: Boolean }
+type OptionArgumentObj = { name     :: String
+                         , optional :: Boolean }
 
 newtype SOpt = SOpt {
   flag       :: Char
 , stack      :: Array Char
-, arg        :: Maybe Argument
+, arg        :: Maybe OptionArgumentObj
 , repeatable :: Boolean
 }
 
 newtype LOpt = LOpt {
   name       :: String
-, arg        :: Maybe Argument
+, arg        :: Maybe OptionArgumentObj
 , repeatable :: Boolean
 }
 
@@ -81,33 +81,38 @@ instance eqLOpt :: Eq LOpt
                                       ))
                                 )
 
+--------------------------------------------------------------------------------
+-- Short hand function to create options
+-- XXX: Remove this
+--------------------------------------------------------------------------------
+
 -- short hand to create a short option node
-sopt' :: Char -> Array Char -> Maybe Argument -> Boolean -> SOpt
+sopt' :: Char -> Array Char -> Maybe OptionArgumentObj -> Boolean -> SOpt
 sopt' f fs a r = SOpt { flag: f, stack: fs, arg: a, repeatable: r }
 
-sopt :: Char -> Array Char -> Argument -> SOpt
+sopt :: Char -> Array Char -> OptionArgumentObj -> SOpt
 sopt f fs a = sopt' f fs (pure a) false
 
 sopt_ :: Char -> Array Char -> SOpt
 sopt_ f fs = sopt' f fs Nothing false
 
-soptR :: Char -> Array Char -> Argument -> SOpt
+soptR :: Char -> Array Char -> OptionArgumentObj -> SOpt
 soptR f fs a = sopt' f fs (pure a) true
 
 soptR_ :: Char -> Array Char -> SOpt
 soptR_ f fs = sopt' f fs Nothing true
 
 -- short hand to create a long option node
-lopt' :: String -> Maybe Argument -> Boolean -> LOpt
+lopt' :: String -> Maybe OptionArgumentObj -> Boolean -> LOpt
 lopt' n a r = LOpt { name: n, arg: a, repeatable: r }
 
-lopt :: String -> Argument -> LOpt
+lopt :: String -> OptionArgumentObj -> LOpt
 lopt n a = lopt' n (pure a) false
 
 lopt_ :: String -> LOpt
 lopt_ n = lopt' n Nothing false
 
-loptR :: String -> Argument -> LOpt
+loptR :: String -> OptionArgumentObj -> LOpt
 loptR n a = lopt' n (pure a) true
 
 loptR_ :: String -> LOpt
