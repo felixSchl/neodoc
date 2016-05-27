@@ -155,7 +155,7 @@ prettyPrintOption opt
 
       arg = maybe "" id do
         a <- opt.arg
-        return $
+        pure $
           (if a.optional then "[" else "")
             <> "=" <> a.name
             <> (if a.optional then "]" else "")
@@ -166,7 +166,7 @@ prettyPrintOption opt
 
       env = maybe "" id do
         k <- opt.env
-        return $ " [env: " <> k <> "]"
+        pure $ " [env: " <> k <> "]"
 
 prettyPrintOptionArgument :: OptionArgumentObj -> String
 prettyPrintOptionArgument { optional: o, name: n, default: d }
@@ -222,7 +222,7 @@ descParser = markIndent do many desc <* L.eof
       L.angleName <|> L.shoutName
       repeatable <- P.option false $ L.tripleDot $> true
       descContent
-      return CommandDesc
+      pure CommandDesc
 
     optionDesc :: L.TokenParser Desc
     optionDesc = do
@@ -237,13 +237,13 @@ descParser = markIndent do many desc <* L.eof
          then P.fail $
           "Option " <> (show $ prettyPrintOption xopt)
                     <> " has multiple defaults!"
-         else return unit
+         else pure unit
 
       if (length envs > 1)
          then P.fail $
           "Option " <> (show $ prettyPrintOption xopt)
                     <> " has multiple environment mappings!"
-         else return unit
+         else pure unit
 
       let default = head defaults >>= id
           env     = head envs     >>= id
@@ -253,13 +253,13 @@ descParser = markIndent do many desc <* L.eof
           "Option " <> (show $ prettyPrintOption xopt)
                     <> " does not take arguments. "
                     <> "Cannot specify defaults."
-         else return unit
+         else pure unit
 
-      return $ OptionDesc $
+      pure $ OptionDesc $
         xopt { env = env
             , arg = do
                 arg <- xopt.arg
-                return $ arg {
+                pure $ arg {
                   default = default
                 }
             }
@@ -271,7 +271,7 @@ descParser = markIndent do many desc <* L.eof
           opt <- do
             opt <- L.sopt
             (guard $ (A.length opt.stack == 0)) P.<?> "No stacked options"
-            return { flag: opt.flag, arg: opt.arg }
+            pure { flag: opt.flag, arg: opt.arg }
 
           -- Grab the adjacent positional-looking argument
           -- in case the token did not have an explicit
@@ -279,17 +279,17 @@ descParser = markIndent do many desc <* L.eof
           arg <- maybe
                   (P.optionMaybe do
                     n <- L.shoutName <|> L.angleName
-                    return { name: n, optional: false }
+                    pure { name: n, optional: false }
                   )
-                  (return <<< Just)
+                  (pure <<< Just)
                   opt.arg
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          return $ { name: Flag opt.flag
+          pure $ { name: Flag opt.flag
                    , arg:  do
                        a <- arg
-                       return {
+                       pure {
                          name:     a.name
                        , optional: a.optional
                        , default:  Nothing
@@ -308,17 +308,17 @@ descParser = markIndent do many desc <* L.eof
           arg <- maybe
                   (P.optionMaybe do
                     n <- L.shoutName <|> L.angleName
-                    return { name: n, optional: false }
+                    pure { name: n, optional: false }
                   )
-                  (return <<< Just)
+                  (pure <<< Just)
                   opt.arg
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          return $ { name: Long opt.name
+          pure $ { name: Long opt.name
                     , arg:  do
                         a <- arg
-                        return {
+                        pure {
                           name:     a.name
                         , optional: a.optional
                         , default:  Nothing
@@ -350,9 +350,9 @@ descParser = markIndent do many desc <* L.eof
             -- fore make assumptions
             combine :: OptionObj -> OptionObj -> L.TokenParser OptionObj
             combine (x@{ name: Flag f }) (y@{ name: Long n }) = do
-              either P.fail return do
+              either P.fail pure do
                 arg <- combineArg x.arg y.arg
-                return $ {
+                pure $ {
                   name:       Full f n
                 , arg:        arg
                 , env:        Nothing -- No need to keep at this stage
@@ -360,14 +360,14 @@ descParser = markIndent do many desc <* L.eof
                 }
               where
                 combineArg (Just a) (Just a')
-                  | (a.name ^= a'.name) = return $ Just
+                  | (a.name ^= a'.name) = pure $ Just
                       $ { name:     a.name
                         , optional: a.optional || a'.optional
                         , default:  a.default <|> a'.default
                         }
-                combineArg Nothing  (Just b) = return (pure b)
-                combineArg (Just a) Nothing  = return (pure a)
-                combineArg Nothing Nothing   = return Nothing
+                combineArg Nothing  (Just b) = pure (pure b)
+                combineArg (Just a) Nothing  = pure (pure a)
+                combineArg Nothing Nothing   = pure Nothing
                 combineArg (Just a) (Just b) = Left $
                         "Option-arguments mismatch: "
                           <> (show $ prettyPrintOptionArgument a)

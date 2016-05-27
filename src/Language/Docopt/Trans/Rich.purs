@@ -71,7 +71,7 @@ reduce us env b vs =
                               else v.value
                     }
 
-      return $ (Tuple (key a)) <$> vs''''
+      pure $ (Tuple (key a)) <$> vs''''
 
     where
     isRelevant a = Map.member (key a) vm
@@ -86,7 +86,7 @@ reduce us env b vs =
                         if D.isFlag a || D.isCommand a
                           then case rv.value of
                             ArrayValue xs ->
-                              return
+                              pure
                                 $ IntValue (A.length $ flip A.filter xs \x ->
                                     case x of
                                         BoolValue b -> b
@@ -95,7 +95,7 @@ reduce us env b vs =
                             BoolValue b ->
                               if D.isRepeatable a
                                   then
-                                    return if b
+                                    pure if b
                                               then IntValue 1
                                               else IntValue 0
                                   else Nothing
@@ -146,7 +146,7 @@ reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
                     arg = do
                       a  <- o.arg  <|> o'.arg
                       a' <- o'.arg <|> o.arg
-                      return {
+                      pure {
                         name:     a.name
                       , default:  a.default  <|> a'.default
                       , optional: a.optional || a'.optional
@@ -162,7 +162,7 @@ reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
                     arg = do
                       a  <- o.arg  <|> o'.arg
                       a' <- o'.arg <|> o.arg
-                      return {
+                      pure {
                         name:     a.name
                       , default:  a.default  <|> a'.default
                       , optional: a.optional || a'.optional

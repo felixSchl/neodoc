@@ -34,10 +34,10 @@ scan :: String -> Either P.ParseError Docopt
 scan text = do
   u <- case sections "usage" of
               Nil        -> fail "No usage section found!"
-              Cons x Nil -> return x
+              Cons x Nil -> pure x
               _          -> fail "Multiple usage sections found!"
 
-  return {
+  pure {
     usage:   fixSection u
   , options: fixSection <$> sections "options"
   }

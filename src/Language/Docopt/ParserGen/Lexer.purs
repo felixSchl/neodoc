@@ -45,13 +45,13 @@ parseToken = do
     stdin = do
       P.char '-'
       P.eof
-      return $ Stdin
+      pure $ Stdin
 
     eoa :: P.Parser String Token
     eoa = do
       P.string "--"
       P.eof
-      return $ EOA empty
+      pure $ EOA empty
 
     -- | Parse a short option
     sopt :: P.Parser String Token
@@ -61,7 +61,7 @@ parseToken = do
       xs  <- A.many $ P.noneOf [ '=' ]
       arg <- P.optionMaybe arg
       P.eof
-      return $ SOpt x xs arg
+      pure $ SOpt x xs arg
 
     -- | Parse a long option
     lopt :: P.Parser String Token
@@ -87,19 +87,19 @@ parseToken = do
 lex :: (List String) -> Either P.ParseError (List PositionedToken)
 lex xs = go xs 1
   where
-    go Nil _ = return Nil
+    go Nil _ = pure Nil
     go (Cons x xs) n = do
       tok <- P.runParser x parseToken
       case tok of
         (EOA _) -> do
-          return $ singleton $ PositionedToken {
+          pure $ singleton $ PositionedToken {
             token:     EOA (D.StringValue <$> xs)
           , sourcePos: P.Position { line: 1, column: n }
           , source:    x
           }
         _ -> do
           toks <- go xs (n + 1)
-          return
+          pure
             $ singleton (PositionedToken {
                           token:     tok
                         , sourcePos: P.Position { line: 1, column: n }

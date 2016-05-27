@@ -103,7 +103,7 @@ parse s split = P.runParser s do
                   v <- if split then values
                                 else value
                   P.eof
-                  return v
+                  pure v
 
   where
     values = do
@@ -112,7 +112,7 @@ parse s split = P.runParser s do
       , some $ white
       ]
 
-      return $ case vs of
+      pure $ case vs of
             Cons x Nil -> x
             _          -> ArrayValue (fromList vs)
 
@@ -126,15 +126,15 @@ parse s split = P.runParser s do
     value = P.choice $ P.try <$> [ bool, number, quoted ]
 
     number = do
-      si <- P.option 1 (P.char '-' *> return (-1))
+      si <- P.option 1 (P.char '-' *> pure (-1))
       xs <- fromCharArray <$> A.some digit
       P.choice [
         FloatValue <<< ((Int.toNumber si) * _) <<< readFloat <$> do
           xss <- do
             P.char '.'
             fromCharArray <$> A.some digit
-          return $ xs <> "." <> xss
-      , return $ IntValue $ si * (fromJust $ Int.fromString xs)
+          pure $ xs <> "." <> xss
+      , pure $ IntValue $ si * (fromJust $ Int.fromString xs)
       ]
 
 
@@ -142,10 +142,10 @@ parse s split = P.runParser s do
       where
         true' = do
           P.choice $ P.try <<< P.string <$> [ "true", "True", "TRUE" ]
-          return $ BoolValue true
+          pure $ BoolValue true
         false' = do
           P.choice $ P.try <<< P.string <$> [ "false", "False", "FALSE" ]
-          return $ BoolValue false
+          pure $ BoolValue false
 
     quoted = StringValue <$> do
       fromCharArray <<< fromList <$> do

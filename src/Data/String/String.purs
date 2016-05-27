@@ -22,9 +22,9 @@ infixl 9 notUpperCaseEq as ^/=
 startsWith :: String -> String -> Boolean
 startsWith needle haystack = maybe false id do
   ix <- Str.indexOf needle haystack
-  return $ ix == 0
+  pure $ ix == 0
 
 endsWith :: String -> String -> Boolean
 endsWith needle haystack = maybe false id do
   ix <- Str.lastIndexOf needle haystack
-  return $ ix == (Str.length haystack - Str.length needle)
+  pure $ ix == (Str.length haystack - Str.length needle)

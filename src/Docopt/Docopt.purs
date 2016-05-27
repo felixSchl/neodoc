@@ -78,9 +78,9 @@ run :: forall e
     -> Options
     -> Eff (DocoptEff e) (StrMap Value)
 run d o = do
-  argv <- maybe (A.drop 2 <$> Process.argv) (return <<< id) o.argv
-  env  <- maybe Process.getEnv              (return <<< id) o.env
-  either onError return do
+  argv <- maybe (A.drop 2 <$> Process.argv) (pure <<< id) o.argv
+  env  <- maybe Process.getEnv              (pure <<< id) o.env
+  either onError pure do
           { specification, usage } <- parseDocopt d o.smartOptions
           lmap ((help usage) <> _) do
             evalDocopt specification env argv o.optionsFirst

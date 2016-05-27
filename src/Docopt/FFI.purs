@@ -86,11 +86,11 @@ run = mkFn2 go
           }
 
       result <- Docopt.run docopt opts
-      return $ rawValue <$> result
+      pure $ rawValue <$> result
 
       where
         toMaybe :: forall a b. Either a b -> Maybe b
-        toMaybe e = either (const Nothing) (return <<< id) e
+        toMaybe e = either (const Nothing) (pure <<< id) e
 
         readObject :: Foreign -> F (StrMap Foreign)
         readObject value | isObject value = pure $ unsafeFromForeign value

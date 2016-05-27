@@ -55,7 +55,7 @@ parseDocopt docopt smartOpts = do
   us  <- toUsageParseErr $ Usage.run doc.usage smartOpts
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve us ds
-  return $ { specification: prg , usage: doc.usage }
+  pure $ { specification: prg , usage: doc.usage }
 
 -- |
 -- | Apply the generated docopt parser to user input.
@@ -69,7 +69,7 @@ evalDocopt prg env argv optsFirst = do
   vs <- toUserParseErr argv
           $ G.runParser env argv
             $ G.genParser prg { optionsFirst: optsFirst }
-  return $ uncurry (T.reduce prg env) vs
+  pure $ uncurry (T.reduce prg env) vs
 
 -- |
 -- | Parse the docopt source, derive a parser and then

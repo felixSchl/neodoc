@@ -134,7 +134,7 @@ type GenOptionsObj = {
 -- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> Parser a
 token test = P.ParserT $ \(P.PState { input: toks, position: ppos }) ->
-  return $ case toks of
+  pure $ case toks of
     Cons (PositionedToken { token: tok }) xs ->
       case test tok of
         Just a ->
@@ -184,7 +184,7 @@ data OptParse = OptParse Value (Maybe Token) HasConsumedArg
 
 longOption :: O.Name -> (Maybe O.OptionArgumentObj) -> Parser Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
-  return $ case toks of
+  pure $ case toks of
     Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks npos e
@@ -215,9 +215,9 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     go (LOpt n' v) atok | (not isFlag) && (n' == n)
       = case v of
           Just s ->
-            return $ OptParse (Value.read s false) Nothing false
+            pure $ OptParse (Value.read s false) Nothing false
           _  -> case atok of
-            Just (Lit s) -> return $ OptParse (Value.read s false)  Nothing true
+            Just (Lit s) -> pure $ OptParse (Value.read s false)  Nothing true
             otherwise    ->
               if (fromMaybe true (_.optional <$> a))
                  then Right $ OptParse (BoolValue true) Nothing false
@@ -228,21 +228,21 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     go (LOpt n' v) _ | isFlag && (n' == n)
       = case v of
              Just _  -> Left $ "Option takes no argument: --" <> n'
-             Nothing -> return $ OptParse (BoolValue true) Nothing false
+             Nothing -> pure $ OptParse (BoolValue true) Nothing false
 
     -- case 3:
     -- The name is a substring of the input and no explicit argument has been
     -- provdided.
     go (LOpt n' Nothing) _ | not isFlag
       = case stripPrefix n n' of
-          Just s -> return $ OptParse (Value.read s false) Nothing false
+          Just s -> pure $ OptParse (Value.read s false) Nothing false
           _      -> Left "Invalid substring"
 
     go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
 
 shortOption :: Char -> (Maybe O.OptionArgumentObj) -> Parser Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
-  return $ case toks of
+  pure $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks pos e
@@ -276,9 +276,9 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     -- argument may have been passed.
     go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.null xs)
       = case v of
-          Just s    -> return $ OptParse (Value.read s false) Nothing false
+          Just s    -> pure $ OptParse (Value.read s false) Nothing false
           otherwise -> case atok of
-            Just (Lit s) -> return $ OptParse (Value.read s false) Nothing true
+            Just (Lit s) -> pure $ OptParse (Value.read s false) Nothing true
             otherwise    ->
               if (fromMaybe true (_.optional <$> a))
                  then Right $ OptParse (BoolValue true) Nothing false
@@ -290,7 +290,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
       = do
         let arg = fromCharArray xs <> maybe "" ("=" <> _) v
-        return $ OptParse (Value.read arg false)
+        pure $ OptParse (Value.read arg false)
                           Nothing
                           false
 
@@ -298,7 +298,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     -- The leading flag matches, there are stacked options, the option takes
     -- no argument and an explicit argument has not been provided.
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
-      = return $ OptParse (BoolValue true)
+      = pure $ OptParse (BoolValue true)
                           (Just $ SOpt (AU.head xs) (AU.tail xs) v)
                           false
 
@@ -308,7 +308,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
       = case v of
               Just _  -> Left $ "Option takes no argument: -" <> fromChar f'
-              Nothing -> return $ OptParse (BoolValue true)
+              Nothing -> pure $ OptParse (BoolValue true)
                                             Nothing
                                             false
 
@@ -316,7 +316,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
 
 eof :: Parser Unit
 eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
-  return $ case s of
+  pure $ case s of
     Nil -> { consumed: false, input: s, result: Right unit, position: pos }
     (Cons (PositionedToken {token: tok, source}) _) ->
       P.parseFailed s pos
@@ -388,25 +388,25 @@ genBranchesParser xs term genOpts canSkip
     case fatal of
          (Just e) -> do
             lift $ State.modify (_ {  fatal = Just e.result.error })
-            return
+            pure
               -- XXX: `i` and `pos` are wrong (
               $ P.parseFailed i pos (unParseError e.result.error).message
          otherwise -> do
           maybe'
             (\_ ->
               fromMaybe
-                (return do
+                (pure do
                   P.parseFailed i pos
                       "The impossible happened. Failure without error")
                 (do
                   es <- losers
-                  return case es of
+                  pure case es of
                     Cons e es | null es || not (null i) -> do
-                      return $ e { result = Left e.result.error }
-                    otherwise -> return $ P.parseFailed i pos ""
+                      pure $ e { result = Left e.result.error }
+                    otherwise -> pure $ P.parseFailed i pos ""
                 )
             )
-            (\r -> return $ r { result = Right r.result.value })
+            (\r -> pure $ r { result = Right r.result.value })
             winner
 
   where
@@ -426,8 +426,8 @@ genBranchesParser xs term genOpts canSkip
     flip fromMaybe
       (do
         e <- state.fatal
-        return
-          $ return
+        pure
+          $ pure
             $ Left
               -- XXX: use a huge depth for fatal errors to be bubbled
               --      up properly (be selected). Again, this is due to
@@ -435,7 +435,7 @@ genBranchesParser xs term genOpts canSkip
               --      non-fatal errors.
               $ o { result = { error: e, depth: 99999 } }
       )
-      (return $ bimap
+      (pure $ bimap
         (\e -> o { result = { error: e, depth: state.depth } })
         (\r -> o { result = { value: r, depth: state.depth } })
         o.result)
@@ -454,7 +454,7 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
               Pending p xs -> do
                 r  <- p
                 rs <- genExhaustiveParser (reverse xs) canSkip
-                return $ r <> rs
+                pure $ r <> rs
     )
     (foldM step (Free $ pure mempty) xs)
   where
@@ -464,14 +464,14 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
     genExhaustiveParser :: List D.Argument -- ^ The free arguments
                         -> Boolean         -- ^ Can we skip input via fallbacks?
                         -> Parser (List ValueMapping)
-    genExhaustiveParser Nil canSkip = return mempty
+    genExhaustiveParser Nil canSkip = pure mempty
     genExhaustiveParser ps  canSkip = do
       if debug
         then do
           traceA $ "genExhaustiveParser: "
                 <> (intercalate " " (D.prettyPrintArg <$> ps))
                 <> " - canSkip: " <>  show canSkip
-          else return unit
+          else pure unit
       draw ps (length ps) Nil
 
       where
@@ -504,7 +504,7 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
                         then draw pss (length pss) (p:tot)
                         else draw ps' (length ps') (p:tot)
 
-          return $ r <> r'
+          pure $ r <> r'
         ) <|> (defer \_ -> do
               state :: StateObj <- lift State.get
               case state.fatal of
@@ -532,7 +532,7 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
                     (getDefaultValue o <#> from Origin.Default)     <|>
                     (getEmptyValue   o <#> from Origin.Empty)
 
-                  return $ RichValue v {
+                  pure $ RichValue v {
                     value = if D.isRepeatable o
                                 then ArrayValue $ Value.intoArray v.value
                                 else v.value
@@ -545,13 +545,13 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
           if canSkip
              then do
               xs <- genExhaustiveParser missing false
-              return $ fallbacks <> xs
+              pure $ fallbacks <> xs
              else
               if (length missing > 0)
                 then P.fail $
                   "Expected option(s): "
                     <> intercalate ", " (D.prettyPrintArgNaked <$> missing)
-                else return fallbacks
+                else pure fallbacks
 
           where
           isSkippable (D.Group o bs _)
@@ -566,7 +566,7 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
           getDefaultValue :: D.Argument -> Maybe Value
           getDefaultValue (D.Option (o@{
               arg: Just { default: Just v }
-            })) = return if o.repeatable
+            })) = pure if o.repeatable
                             then ArrayValue $ Value.intoArray v
                             else v
           getDefaultValue _ = Nothing
@@ -575,20 +575,20 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
           getEmptyValue = go
             where
             go (D.Option (o@{ arg: Nothing }))
-              = return
+              = pure
                   $ if o.repeatable then ArrayValue []
                                     else BoolValue false
             go (D.Option (o@{ arg: Just { optional: true } }))
-              = return
+              = pure
                   $ if o.repeatable then ArrayValue []
                                     else BoolValue false
-            go (D.Positional _ r) | r = return $ ArrayValue []
-            go (D.Command _ r)    | r = return $ ArrayValue []
-            go (D.Stdin)              = return $ BoolValue false
-            go (D.EOA)                = return $ ArrayValue []
+            go (D.Positional _ r) | r = pure $ ArrayValue []
+            go (D.Command _ r)    | r = pure $ ArrayValue []
+            go (D.Stdin)              = pure $ BoolValue false
+            go (D.EOA)                = pure $ ArrayValue []
             go _                      = Nothing
 
-        draw _ _ _ = return mempty
+        draw _ _ _ = pure mempty
 
     step :: Acc (List ValueMapping)
          -> D.Argument
@@ -596,25 +596,25 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
 
     -- Options always transition to the `Pending state`
     step (Free p) x@(D.Option _)
-      = return $ Pending p (singleton x)
+      = pure $ Pending p (singleton x)
 
     -- "Free" groups always transition to the `Pending state`
     step (Free p) x@(D.Group _ _ _) | D.isFree x
-      = return $ Pending p (singleton x)
+      = pure $ Pending p (singleton x)
 
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
       r  <- p
       rs <- genParser x false
-      return $ r <> rs
+      pure $ r <> rs
 
     -- Options always keep accumulating
     step (Pending p xs) x@(D.Option _)
-      = return $ Pending p (x:xs)
+      = pure $ Pending p (x:xs)
 
     -- "Free" groups always keep accumulating
     step (Pending p xs) x@(D.Group _ _ _) | D.isFree x
-      = return $ Pending p (x:xs)
+      = pure $ Pending p (x:xs)
 
     -- Any non-options always leaves the pending state
     step (Pending p xs) y = Right $
@@ -622,7 +622,7 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
         r   <- p
         rs  <- genExhaustiveParser xs true
         rss <- genParser y true
-        return $ r <> rs <> rss
+        pure $ r <> rs <> rss
 
     -- Terminate the parser at the given argument and collect all subsequent
     -- values int an array ("options-first")
@@ -631,10 +631,10 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
       let rest = Tuple arg <<< (from Origin.Argv) <$> do
                   StringValue <<< Token.getSource <$> input
       P.ParserT \(P.PState { position: pos }) ->
-        return {
+        pure {
           consumed: true
         , input:    Nil
-        , result:   return rest
+        , result:   pure rest
         , position: pos
         }
 
@@ -651,7 +651,7 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
       ) <|> (P.fail $ "Expected " <> D.prettyPrintArg x <> butGot i)
         where go = do Tuple x <<< (from Origin.Argv) <$> (do
                         v <- command n
-                        return if r then ArrayValue $ Value.intoArray v
+                        pure if r then ArrayValue $ Value.intoArray v
                                     else v
                       )
                       <* modifyDepth (_ + 1)
@@ -659,7 +659,7 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) _ = do
       singleton <<< Tuple x <<< (from Origin.Argv) <$> (do
-        eoa <|> (return $ ArrayValue []) -- XXX: Fix type
+        eoa <|> (pure $ ArrayValue []) -- XXX: Fix type
         <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"--\""
 
@@ -682,7 +682,7 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
       ) <|> P.fail ("Expected " <> D.prettyPrintArg x <> butGot i)
         where go = do Tuple x <<< (from Origin.Argv) <$> (do
                         v <- positional n
-                        return if r then ArrayValue $ Value.intoArray v
+                        pure if r then ArrayValue $ Value.intoArray v
                                     else v
                         )
                       <* modifyDepth (_ + 1)
@@ -718,14 +718,14 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
                 then P.try do
                   Tuple x <<< (from Origin.Argv) <$> (do
                     v <- mkLoptParser o.name o.arg
-                    return if o.repeatable then ArrayValue $ Value.intoArray v
+                    pure if o.repeatable then ArrayValue $ Value.intoArray v
                                            else v
                   )
                 else if isSopt
                   then P.try do
                     Tuple x <<< (from Origin.Argv) <$> (do
                       v <- mkSoptParser o.flag o.arg
-                      return if o.repeatable then ArrayValue $ Value.intoArray v
+                      pure if o.repeatable then ArrayValue $ Value.intoArray v
                                             else v
                     )
                   else P.fail "long or short option") s
@@ -738,14 +738,14 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
                             "Option requires argument"
                             (unParseError e).message)) do
                               lift $ State.modify (_ { fatal = Just e })
-                    return o
-                  otherwise -> return o
+                    pure o
+                  otherwise -> pure o
 
-          isAnyLopt (LOpt _ _) = return true
-          isAnyLopt _          = return false
+          isAnyLopt (LOpt _ _) = pure true
+          isAnyLopt _          = pure false
 
-          isAnySopt (SOpt _ _ _) = return true
-          isAnySopt _            = return false
+          isAnySopt (SOpt _ _ _) = pure true
+          isAnySopt _            = pure false
 
           mkLoptParser (Just n) a = longOption n a
           mkLoptParser Nothing _  = P.fail "long name"
@@ -759,14 +759,14 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
       let mod = if optional then P.option mempty <<< P.try else \p -> p
        in mod go
       where
-        go | length bs == 0 = return mempty
+        go | length bs == 0 = pure mempty
         go = do
           x <- step
           if repeated && length (filter (snd >>> from Origin.Argv) x) > 0
              then do
-                xs <- go <|> return mempty
-                return $ x <> xs
-             else return x
+                xs <- go <|> pure mempty
+                pure $ x <> xs
+             else pure x
 
         from o (RichValue v) = v.origin == o
         step = snd <$> do
