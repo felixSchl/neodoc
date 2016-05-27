@@ -44,35 +44,38 @@ unParseError :: P.ParseError -> { message :: String
                                 , position :: P.Position }
 unParseError (P.ParseError e) = e
 
+-- | XXX: It would be great to provide a link here to the project's website!
 developerErrorMessage :: String
 developerErrorMessage = dedent """
-  This is likely an error with the program itself and not your fault.
-  Please raise this with the program's author.
+  This is an error with the program itself and not your fault.
+  Please bring this to the program author's attention.
 """
 
 prettyPrintDocoptError :: DocoptError -> String
 prettyPrintDocoptError (DocoptScanError err) =
-  "Failed to disect docopt text:\n"
-  ++ (unParseError err).message
-  ++ "\n"
-  ++ developerErrorMessage
+  "Failed to disect docopt text:"
+    <> "\n"
+    <> (unParseError err).message
+    <> "\n"
+    <> developerErrorMessage
 prettyPrintDocoptError (DocoptUsageParseError err) =
-  "Failed to parse the formal usage specification:\n"
-  ++ (unParseError err).message
-  ++ "\n"
-  ++ developerErrorMessage
+  "Failed to parse the formal usage specification:"
+    <> "\n"
+    <> (unParseError err).message
+    <> "\n"
+    <> developerErrorMessage
 prettyPrintDocoptError (DocoptDescParseError err) =
-  "Failed to parse the option descriptions:\n"
-  ++ (unParseError err).message
-  ++ "\n"
-  ++ developerErrorMessage
+  "Failed to parse the option descriptions:"
+    <> "\n"
+    <> (unParseError err).message
+    <> "\n"
+    <> developerErrorMessage
 prettyPrintDocoptError (DocoptSolveError (SolveError err)) =
-  "Incoherent specification:\n"
-  ++ err
-  ++ "\n"
-  ++ developerErrorMessage
+  "Incoherent specification:"
+    <> "\n"
+    <> err
+    <> "\n"
+    <> developerErrorMessage
 prettyPrintDocoptError
   (DocoptUserParseError
-    argv
-    (P.ParseError { message: message }))
-    = message
+    argv (P.ParseError { message: message })) = message

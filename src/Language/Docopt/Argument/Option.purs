@@ -59,14 +59,14 @@ eqOptionObj o o' = o.flag               == o'.flag
 
 newtype OptionArgument = OptionArgument OptionArgumentObj
 
-runOptionArgument :: OptionArgument -> OptionArgumentObj
-runOptionArgument (OptionArgument a) = a
+unOptionArgument :: OptionArgument -> OptionArgumentObj
+unOptionArgument (OptionArgument a) = a
 
 instance showOptionArgument :: Show OptionArgument where
-  show = showOptionArgumentObj <<< runOptionArgument
+  show = showOptionArgumentObj <<< unOptionArgument
 
 instance eqOptionArgument   :: Eq   OptionArgument where
-  eq   = eqOptionArgumentObj `on` runOptionArgument
+  eq   = eqOptionArgumentObj `on` unOptionArgument
 
 type OptionArgumentObj = { name     :: String
                    , default  :: Maybe Value

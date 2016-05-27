@@ -71,8 +71,11 @@ import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
                                         unPositionedToken, prettyPrintToken)
 import Data.String.Ext (startsWith)
 
+-- | Toggle debugging on/off during development
 debug :: Boolean
 debug = false
+
+
 
 -- | The value type the parser collects
 type RichValueObj = {
@@ -82,40 +85,41 @@ type RichValueObj = {
 
 newtype RichValue = RichValue RichValueObj
 
-instance showRichValue :: Show RichValue where
-  show (RichValue v) = "RichValue { origin: " ++ show v.origin
-                    ++ ", value: " ++ show v.value ++ "}"
-
-instance eqRichValue :: Eq RichValue where
-  eq (RichValue v) (RichValue v') = (v.origin == v'.origin) &&
-                                    (v.value == v'.value)
-
 unRichValue :: RichValue -> RichValueObj
 unRichValue (RichValue o) = o
 
+instance showRichValue :: Show RichValue where
+  show (RichValue v) = "(RichValue { origin: " <> show v.origin
+                               <> ", value: "  <> show v.value
+                               <> "})"
+
+instance eqRichValue :: Eq RichValue where
+  eq (RichValue v) (RichValue v') = v.origin == v'.origin
+                                 && v.value  == v'.value
+
 from :: Origin -> Value -> RichValue
 from o v = RichValue $ { value: v, origin: o }
-
-fromArgv :: Value -> RichValue
-fromArgv = from Origin.Argv
 
 -- | The output value mappings of arg -> val
 type ValueMapping = Tuple D.Argument RichValue
 
 -- | The stateful parser type
 type StateObj = { depth :: Int
-                , fatal :: Maybe P.ParseError }
+                , fatal :: Maybe P.ParseError
+                }
+
+-- | The CLI parser
 type Parser a = P.ParserT (List PositionedToken)
                           (ReaderT Env (State StateObj))
                           a
 
 initialState :: StateObj
 initialState = { depth: 0
-               , fatal: Nothing }
+               , fatal: Nothing
+               }
 
 modifyDepth :: (Int -> Int) -> Parser Unit
-modifyDepth f = do
-  lift (State.modify \s -> s { depth = f s.depth })
+modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
@@ -618,7 +622,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     -- values int an array ("options-first")
     terminate arg = do
       input <- getInput
-      let rest = Tuple arg <<< fromArgv <$> do
+      let rest = Tuple arg <<< (from Origin.Argv) <$> do
                   StringValue <<< Token.getSource <$> input
       P.ParserT \(P.PState { position: pos }) ->
         return {
@@ -639,7 +643,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       (do
         if r then (some go) else (singleton <$> go)
       ) <|> (P.fail $ "Expected " ++ D.prettyPrintArg x ++ butGot i)
-        where go = do Tuple x <<< fromArgv <$> (do
+        where go = do Tuple x <<< (from Origin.Argv) <$> (do
                         v <- command n
                         return if r then ArrayValue $ Value.intoArray v
                                     else v
@@ -648,14 +652,14 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) _ = do
-      singleton <<< Tuple x <<< fromArgv <$> (do
+      singleton <<< Tuple x <<< (from Origin.Argv) <$> (do
         eoa <|> (return $ ArrayValue []) -- XXX: Fix type
         <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"--\""
 
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) _ = do
-      singleton <<< Tuple x <<< fromArgv <$> (do
+      singleton <<< Tuple x <<< (from Origin.Argv) <$> (do
         stdin
         <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"-\""
@@ -670,7 +674,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       (do
         if r then (some go) else (singleton <$> go)
       ) <|> P.fail ("Expected " ++ D.prettyPrintArg x ++ butGot i)
-        where go = do Tuple x <<< fromArgv <$> (do
+        where go = do Tuple x <<< (from Origin.Argv) <$> (do
                         v <- positional n
                         return if r then ArrayValue $ Value.intoArray v
                                     else v
@@ -706,14 +710,14 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
             P.ParserT \s -> do
               o <- P.unParserT (if isLopt
                 then P.try do
-                  Tuple x <<< fromArgv <$> (do
+                  Tuple x <<< (from Origin.Argv) <$> (do
                     v <- mkLoptParser o.name o.arg
                     return if o.repeatable then ArrayValue $ Value.intoArray v
                                            else v
                   )
                 else if isSopt
                   then P.try do
-                    Tuple x <<< fromArgv <$> (do
+                    Tuple x <<< (from Origin.Argv) <$> (do
                       v <- mkSoptParser o.flag o.arg
                       return if o.repeatable then ArrayValue $ Value.intoArray v
                                             else v

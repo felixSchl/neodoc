@@ -13,6 +13,7 @@ module Language.Docopt.Parser.Desc (
 import Prelude
 import Data.Tuple (Tuple (Tuple))
 import Data.Functor (($>))
+import Data.Function (on)
 import Control.Lazy (defer)
 import Control.Bind ((>=>))
 import Control.Alt ((<|>))
@@ -85,14 +86,14 @@ eqOptionArgumentObj a a' = a.name     == a'.name
 
 newtype OptionArgument = OptionArgument OptionArgumentObj
 
-runOptionArgument :: OptionArgument -> OptionArgumentObj
-runOptionArgument (OptionArgument a) = a
+unOptionArgument :: OptionArgument -> OptionArgumentObj
+unOptionArgument (OptionArgument a) = a
 
 instance showOptionArgument :: Show OptionArgument where
-  show (OptionArgument a) = showOptionArgumentObj a
+  show = showOptionArgumentObj <<< unOptionArgument
 
 instance eqOptionArgument :: Eq OptionArgument where
-  eq (OptionArgument a) (OptionArgument a') = eqOptionArgumentObj a a'
+  eq = eqOptionArgumentObj `on` unOptionArgument
 
 getFlag :: Name -> Maybe Char
 getFlag (Flag f)   = pure f
