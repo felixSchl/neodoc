@@ -165,7 +165,7 @@ solveBranch as ds = Branch <$> go as
     solveArg (U.Reference r) _ = do
       return $ Unresolved r
 
-    solveArg (lopt@(U.Option (opt@(UO.LOpt o)))) adjArg = do
+    solveArg (U.Option o) adjArg = do
 
       -- Find a matching option description, if any.
       match <- matchDesc o.name
@@ -250,7 +250,7 @@ solveBranch as ds = Branch <$> go as
             isMatch _ = false
 
 
-    solveArg (U.OptionStack (opt@(UO.SOpt o))) adj
+    solveArg (U.OptionStack o) adj
       = fromSubsumption <|> fromAdjacentArgOrDefault
 
       where

@@ -125,18 +125,18 @@ usageParser smartOpts = do
 
       optf <- do
         case opt of
-              (Option (O.LOpt o)) | isNothing o.arg ->
+              (Option o) | isNothing o.arg ->
                 return $ \argName isArgOptional isRepeatable ->
-                  Option $ O.LOpt $ o {
+                  Option $ o {
                     arg = return {
                       name:     argName
                     , optional: isArgOptional
                     }
                   , repeatable = isRepeatable
                   }
-              (OptionStack (O.SOpt o)) | isNothing o.arg ->
+              (OptionStack o) | isNothing o.arg ->
                 return $ \argName isArgOptional isRepeatable ->
-                  OptionStack $ O.SOpt $ o {
+                  OptionStack $ o {
                     arg = return {
                       name:     argName
                     , optional: isArgOptional
