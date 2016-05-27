@@ -13,6 +13,7 @@ module Language.Docopt.ParserGen.Parser (
   , RichValue (..)
   , RichValueObj (..)
   , ValueMapping ()
+  , GenOptionsObj ()
   , unRichValue
   , from
   ) where
@@ -120,6 +121,11 @@ initialState = { depth: 0
 
 modifyDepth :: (Int -> Int) -> Parser Unit
 modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
+
+-- | The options for generating a parser
+type GenOptionsObj = {
+  optionsFirst :: Boolean
+}
 
 --------------------------------------------------------------------------------
 -- Input Token Parser ----------------------------------------------------------
@@ -323,30 +329,30 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 
 
 -- | Generate a parser for a single program usage.
-genUsageParser :: List D.Usage -- ^ The list of usage specs
-               -> Boolean      -- ^ Enable "options-first"
+genUsageParser :: List D.Usage  -- ^ The list of usage specs
+               -> GenOptionsObj -- ^ Generator options
                -> Parser (Tuple D.Branch (List ValueMapping))
-genUsageParser xs optsFirst = do
+genUsageParser xs genOpts = do
     genBranchesParser (concat $ D.runUsage <$> xs)
                       true
-                      optsFirst
+                      genOpts
                       true
 
 -- | Generate a parser that selects the best branch it parses and
 -- | fails if no branch was parsed.
 genBranchesParser :: List D.Branch -- ^ The branches to test
                   -> Boolean       -- ^ Expect EOF after each branch
-                  -> Boolean       -- ^ Enable "options-first"
+                  -> GenOptionsObj -- ^ Generator options
                   -> Boolean       -- ^ Can we skip input via fallbacks?
                   -> Parser (Tuple D.Branch (List ValueMapping))
-genBranchesParser xs term optsFirst canSkip
+genBranchesParser xs term genOpts canSkip
   = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
     env   :: Env      <- ask
     state :: StateObj <- lift State.get
 
     let
       ps = xs <#> \x -> (Tuple x) <$> do
-                          genBranchParser x optsFirst canSkip
+                          genBranchParser x genOpts canSkip
                             <* unless (not term) eof
       rs  = evalState (runReaderT (collect s ps) env) initialState
       rs' = reverse rs
@@ -435,11 +441,11 @@ genBranchesParser xs term optsFirst canSkip
         o.result)
 
 -- | Generate a parser for a single usage branch
-genBranchParser :: D.Branch  -- ^ The branch to match
-                -> Boolean   -- ^ Enable "options-first"
-                -> Boolean   -- ^ Can we skip input via fallbacks?
+genBranchParser :: D.Branch      -- ^ The branch to match
+                -> GenOptionsObj -- ^ Generator options
+                -> Boolean       -- ^ Can we skip input via fallbacks?
                 -> Parser (List ValueMapping)
-genBranchParser (D.Branch xs) optsFirst canSkip = do
+genBranchParser (D.Branch xs) genOpts canSkip = do
   modifyDepth (const 0) -- reset the depth counter
   either
     (\_   -> P.fail "Failed to generate parser")
@@ -665,7 +671,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       ) <|> P.fail "Expected \"-\""
 
     genParser x@(D.Positional n r) _
-      | r && optsFirst
+      | r && genOpts.optionsFirst
       = terminate x
 
     -- Generate a parser for a `Positional` argument
@@ -682,7 +688,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                       <* modifyDepth (_ + 1)
 
     genParser x@(D.Group optional bs r) _
-      | optsFirst && (length bs == 1) &&
+      | genOpts.optionsFirst && (length bs == 1) &&
         all (\(D.Branch xs) ->
           case xs of
             Cons (D.Positional n r') Nil -> r' || r
@@ -766,7 +772,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
         step = snd <$> do
                 genBranchesParser bs
                                   false
-                                  optsFirst
+                                  genOpts
                                   -- always allow skipping for non-free groups.
                                   (not (D.isFree x) || canSkip)
 

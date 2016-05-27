@@ -438,7 +438,9 @@ parserGenSpec = \_ -> describe "The parser generator" do
                 <$> runParser
                       env
                       argv
-                      (genParser prg false)
+                      (genParser prg {
+                        optionsFirst: false
+                      })
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->

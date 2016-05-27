@@ -66,7 +66,9 @@ evalDocopt  :: List D.Usage      -- ^ The program specification
             -> Boolean           -- ^ Enable "options-first"
             -> Either String (StrMap D.Value)
 evalDocopt prg env argv optsFirst = do
-  vs <- toUserParseErr argv $ G.runParser env argv (G.genParser prg optsFirst)
+  vs <- toUserParseErr argv
+          $ G.runParser env argv
+            $ G.genParser prg { optionsFirst: optsFirst }
   return $ uncurry (T.reduce prg env) vs
 
 -- |
