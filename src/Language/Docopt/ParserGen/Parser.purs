@@ -172,7 +172,7 @@ stdin = token go P.<?> "stdin flag"
 type HasConsumedArg = Boolean
 data OptParse = OptParse Value (Maybe Token) HasConsumedArg
 
-longOption :: O.Name -> (Maybe O.Argument) -> Parser Value
+longOption :: O.Name -> (Maybe O.ArgumentObj) -> Parser Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
@@ -209,7 +209,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
           _  -> case atok of
             Just (Lit s) -> return $ OptParse (Value.read s false)  Nothing true
             otherwise    ->
-              if (fromMaybe true (_.optional <<< O.runArgument <$> a))
+              if (fromMaybe true (_.optional <$> a))
                  then Right $ OptParse (BoolValue true) Nothing false
                  else Left  $ "Option requires argument: --" ++ n'
 
@@ -228,9 +228,9 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
           Just s -> return $ OptParse (Value.read s false) Nothing false
           _      -> Left "Invalid substring"
 
-    go a b = Left $ "Invalid token" ++ show a ++ " (input: " ++ show b ++ ")"
+    go a b = Left $ "Invalid token: " ++ show a ++ " (input: " ++ show b ++ ")"
 
-shortOption :: Char -> (Maybe O.Argument) -> Parser Value
+shortOption :: Char -> (Maybe O.ArgumentObj) -> Parser Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
   return $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->
@@ -270,7 +270,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
           otherwise -> case atok of
             Just (Lit s) -> return $ OptParse (Value.read s false) Nothing true
             otherwise    ->
-              if (fromMaybe true (_.optional <<< O.runArgument <$> a))
+              if (fromMaybe true (_.optional <$> a))
                  then Right $ OptParse (BoolValue true) Nothing false
                  else  Left $ "Option requires argument: -" ++ fromChar f'
 
@@ -302,7 +302,7 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
                                             Nothing
                                             false
 
-    go a b = Left $ "Invalid token" ++ show a ++ " (input: " ++ show b ++ ")"
+    go a b = Left $ "Invalid token: " ++ show a ++ " (input: " ++ show b ++ ")"
 
 eof :: Parser Unit
 eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
@@ -555,7 +555,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
 
           getDefaultValue :: D.Argument -> Maybe Value
           getDefaultValue (D.Option (o@{
-              arg: Just (O.Argument { default: Just v })
+              arg: Just { default: Just v }
             })) = return if o.repeatable
                             then ArrayValue $ Value.intoArray v
                             else v
@@ -568,7 +568,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
               = return
                   $ if o.repeatable then ArrayValue []
                                     else BoolValue false
-            go (D.Option (o@{ arg: Just (O.Argument { optional: true }) }))
+            go (D.Option (o@{ arg: Just { optional: true } }))
               = return
                   $ if o.repeatable then ArrayValue []
                                     else BoolValue false

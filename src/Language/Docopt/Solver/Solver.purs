@@ -114,7 +114,7 @@ solveBranch as ds = Branch <$> go as
                       = any isMatch (concat $ runBranch <$> bs)
                     isMatch _ = false
 
-                    convArg arg = O.Argument <<< DE.runArgument <$> arg
+                    convArg arg = DE.runArgument <$> arg
                 map args (Cons _ xs) = map args xs
                 map args _ = args
             expand' (Tuple args _) = args
@@ -190,7 +190,7 @@ solveBranch as ds = Branch <$> go as
           -- `isRepeated` flag should be inherited.
           let mr = do
                 guard (not o.repeatable)
-                matchedArg <- O.runArgument <$> match.arg
+                matchedArg <- match.arg
 
                 case adjArg of
                   Just (U.Positional n r) ->
@@ -317,7 +317,7 @@ solveBranch as ds = Branch <$> go as
                           $ Tuple (toCharArray (S.take (S.length fs - S.length a.name - 1) fs))
                                   { flag:       pure f
                                   , name:       DE.getName d.name
-                                  , arg:        pure $ O.Argument a
+                                  , arg:        pure a
                                   , env:        d.env
                                   , repeatable: o.repeatable
                                   }
@@ -392,7 +392,7 @@ solveBranch as ds = Branch <$> go as
               -- the `isRepeated` flag should be inherited.
               let mr = do
                     guard $ not match.repeatable
-                    arg' <- O.runArgument <$> match.arg
+                    arg' <- match.arg
                     case adj of
                       Just (U.Positional n r) ->
                         return $ r <$ guardArgs n arg'.name
@@ -472,34 +472,34 @@ solveBranch as ds = Branch <$> go as
     -- | description, returning the most complete argument known.
     resolveOptArg :: Maybe { name :: String, optional :: Boolean }
                   -> Maybe DE.Argument
-                  -> Either SolveError (Maybe O.Argument)
+                  -> Either SolveError (Maybe O.ArgumentObj)
 
     resolveOptArg (Just a) Nothing = do
-      return <<< pure $ O.Argument { name: a.name
-                                   , optional: a.optional
-                                   , default: Nothing }
+      return <<< pure $ { name: a.name
+                        , optional: a.optional
+                        , default: Nothing }
 
     resolveOptArg Nothing (Just (DE.Argument de)) = do
-      return <<< pure $ O.Argument { name:     de.name
-                                   , optional: de.optional
-                                   , default:  de.default }
+      return <<< pure $ { name:     de.name
+                        , optional: de.optional
+                        , default:  de.default }
 
     resolveOptArg (Just a) (Just (DE.Argument de)) = do
       return <<< pure
-        $ O.Argument  { name:     de.name
-                      , optional: de.optional || a.optional
-                      , default:  de.default
-                      }
+        $ { name:     de.name
+          , optional: de.optional || a.optional
+          , default:  de.default
+          }
 
     resolveOptArg _ _ = return Nothing
 
     convertArg :: Maybe { name :: String, optional :: Boolean }
-               -> Maybe O.Argument
+               -> Maybe O.ArgumentObj
     convertArg arg = do
       a <- arg
-      return $ O.Argument { name:     a.name
-                          , optional: a.optional
-                          , default:  Nothing }
+      return $ { name:     a.name
+               , optional: a.optional
+               , default:  Nothing }
 
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
 solveUsage (U.Usage _ bs) ds = Usage <$> do traverse (flip solveBranch ds) bs

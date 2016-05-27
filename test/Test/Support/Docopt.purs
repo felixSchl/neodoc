@@ -38,15 +38,17 @@ grr = gr false
 br :: (Array Argument) -> Branch
 br xs = Branch (toList xs)
 
-oa :: String -> Value -> O.Argument
-oa n v = O.Argument { name: n
-                    , optional: false
-                    , default: Just v }
+oa :: String -> Value -> O.ArgumentObj
+oa n v =  { name: n
+          , optional: false
+          , default: Just v
+          }
 
-oa_ :: String -> O.Argument
-oa_ n = O.Argument { name: n
-                   , optional: false
-                   , default: Nothing }
+oa_ :: String -> O.ArgumentObj
+oa_ n = { name:     n
+        , optional: false
+        , default:  Nothing
+        }
 
 -- short hand for values
 array = ArrayValue

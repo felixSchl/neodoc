@@ -141,13 +141,12 @@ reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
     expand arg = Map.singleton (key arg) arg
 
     resolveAcrossBranches :: D.Argument -> D.Argument -> D.Argument
-    resolveAcrossBranches (D.Option o)
-              (D.Option o')
+    resolveAcrossBranches (D.Option o) (D.Option o')
         = D.Option (o {
                     arg = do
-                      a  <- O.runArgument <$> (o.arg  <|> o'.arg)
-                      a' <- O.runArgument <$> (o'.arg <|> o.arg )
-                      return $ O.Argument {
+                      a  <- o.arg  <|> o'.arg
+                      a' <- o'.arg <|> o.arg
+                      return {
                         name:     a.name
                       , default:  a.default  <|> a'.default
                       , optional: a.optional || a'.optional
@@ -158,13 +157,12 @@ reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
                                                    D.isRepeatable b)
 
     resolveInSameBranch :: D.Argument -> D.Argument -> D.Argument
-    resolveInSameBranch (D.Option o)
-              (D.Option o')
+    resolveInSameBranch (D.Option o) (D.Option o')
         = D.Option (o {
                     arg = do
-                      a  <- O.runArgument <$> (o.arg  <|> o'.arg)
-                      a' <- O.runArgument <$> (o'.arg <|> o.arg )
-                      return $ O.Argument {
+                      a  <- o.arg  <|> o'.arg
+                      a' <- o'.arg <|> o.arg
+                      return {
                         name:     a.name
                       , default:  a.default  <|> a'.default
                       , optional: a.optional || a'.optional
