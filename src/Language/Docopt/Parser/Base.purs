@@ -105,4 +105,4 @@ string' :: forall m. (Monad m) => String -> P.ParserT String m String
 string' s = fromCharArray <$> A.foldM step [] (toCharArray s)
   where
     step acc x = do
-      (acc ++ _) <<< A.singleton <$> P.satisfy \c -> toLower c == toLower x
+      (acc <> _) <<< A.singleton <$> P.satisfy \c -> toLower c == toLower x

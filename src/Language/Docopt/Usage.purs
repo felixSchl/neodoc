@@ -18,7 +18,7 @@ runUsage :: Usage -> List Branch
 runUsage (Usage x) = x
 
 instance showUsage :: Show Usage where
-  show (Usage xs) = "Usage " ++ show (show <$> xs)
+  show (Usage xs) = "Usage " <> show (show <$> xs)
 
 instance eqUsage :: Eq Usage where
   eq (Usage xs) (Usage ys) = xs == ys

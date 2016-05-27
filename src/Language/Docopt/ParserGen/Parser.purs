@@ -156,13 +156,13 @@ eoa = token go P.<?> "--"
     go _        = Nothing
 
 command :: String -> Parser Value
-command n = token go P.<?> "command " ++ show n
+command n = token go P.<?> "command " <> show n
   where
     go (Lit s) | s == n = Just (BoolValue true)
     go _                = Nothing
 
 positional :: String -> Parser Value
-positional n = token go P.<?> "positional argument " ++ show n
+positional n = token go P.<?> "positional argument " <> show n
   where
     go (Lit v) = Just (Value.read v false)
     go _       = Nothing
@@ -193,7 +193,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                                           )
                                           newtok
                           rest   = if hasConsumedArg then LU.tail xs else xs
-                       in pushed ++ rest
+                       in pushed <> rest
           , result:   Right v
           , position: maybe pos
                             (_.sourcePos <<< unPositionedToken)
@@ -215,13 +215,13 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
             otherwise    ->
               if (fromMaybe true (_.optional <$> a))
                  then Right $ OptParse (BoolValue true) Nothing false
-                 else Left  $ "Option requires argument: --" ++ n'
+                 else Left  $ "Option requires argument: --" <> n'
 
     -- case 2:
     -- The name is an exact match and takes no argument
     go (LOpt n' v) _ | isFlag && (n' == n)
       = case v of
-             Just _  -> Left $ "Option takes no argument: --" ++ n'
+             Just _  -> Left $ "Option takes no argument: --" <> n'
              Nothing -> return $ OptParse (BoolValue true) Nothing false
 
     -- case 3:
@@ -232,7 +232,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
           Just s -> return $ OptParse (Value.read s false) Nothing false
           _      -> Left "Invalid substring"
 
-    go a b = Left $ "Invalid token: " ++ show a ++ " (input: " ++ show b ++ ")"
+    go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
 
 shortOption :: Char -> (Maybe O.OptionArgumentObj) -> Parser Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
@@ -250,11 +250,11 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
                                     $ PositionedToken
                                         { token:     v'
                                         , sourcePos: pos
-                                        , source:    "-" ++ String.drop 2 s
+                                        , source:    "-" <> String.drop 2 s
                                         })
                                 newtok
                 rest = if hasConsumedArg then LU.tail xs else xs
-              in pushed ++ rest
+              in pushed <> rest
           , result:   Right v
           , position: maybe pos
                             (_.sourcePos <<< unPositionedToken)
@@ -276,14 +276,14 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
             otherwise    ->
               if (fromMaybe true (_.optional <$> a))
                  then Right $ OptParse (BoolValue true) Nothing false
-                 else  Left $ "Option requires argument: -" ++ fromChar f'
+                 else  Left $ "Option requires argument: -" <> fromChar f'
 
     -- case 2:
     -- The leading flag matches, there are stacked options, a explicit
     -- argument may have been passed and the option takes an argument.
     go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
       = do
-        let arg = fromCharArray xs ++ maybe "" ("=" ++ _) v
+        let arg = fromCharArray xs <> maybe "" ("=" <> _) v
         return $ OptParse (Value.read arg false)
                           Nothing
                           false
@@ -301,12 +301,12 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     -- takes no argument - total consumption!
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
       = case v of
-              Just _  -> Left $ "Option takes no argument: -" ++ fromChar f'
+              Just _  -> Left $ "Option takes no argument: -" <> fromChar f'
               Nothing -> return $ OptParse (BoolValue true)
                                             Nothing
                                             false
 
-    go a b = Left $ "Invalid token: " ++ show a ++ " (input: " ++ show b ++ ")"
+    go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
 
 eof :: Parser Unit
 eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
@@ -315,11 +315,11 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
     (Cons (PositionedToken {token: tok, source}) _) ->
       P.parseFailed s pos
         $ case tok of
-              LOpt _ _   -> "Unmatched option: " ++ source
-              SOpt _ _ _ -> "Unmatched option: " ++ source
+              LOpt _ _   -> "Unmatched option: " <> source
+              SOpt _ _ _ -> "Unmatched option: " <> source
               EOA _      -> "Unmatched option: --"
               Stdin      -> "Unmatched option: -"
-              Lit _      -> "Unmatched command: " ++ source
+              Lit _      -> "Unmatched command: " <> source
 
 
 -- | Generate a parser for a single program usage.
@@ -448,7 +448,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
               Pending p xs -> do
                 r  <- p
                 rs <- genExhaustiveParser (reverse xs) canSkip
-                return $ r ++ rs
+                return $ r <> rs
     )
     (foldM step (Free $ pure mempty) xs)
   where
@@ -463,8 +463,8 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       if debug
         then do
           traceA $ "genExhaustiveParser: "
-                ++ (intercalate " " (D.prettyPrintArg <$> ps))
-                ++ " - canSkip: " ++  show canSkip
+                <> (intercalate " " (D.prettyPrintArg <$> ps))
+                <> " - canSkip: " <>  show canSkip
           else return unit
       draw ps (length ps) Nil
 
@@ -480,11 +480,11 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           when debug do
             i <- getInput
             traceA $
-              "draw: (" ++ (D.prettyPrintArg p) ++ ":"
-                        ++ (intercalate ":" (D.prettyPrintArg <$> ps'))
-                        ++  ") - n: " ++ show n
-                        ++ "from input: "
-                        ++ (intercalate " " (prettyPrintToken
+              "draw: (" <> (D.prettyPrintArg p) <> ":"
+                        <> (intercalate ":" (D.prettyPrintArg <$> ps'))
+                        <>  ") - n: " <> show n
+                        <> "from input: "
+                        <> (intercalate " " (prettyPrintToken
                                               <<< _.token
                                               <<< unPositionedToken <$> i))
 
@@ -498,13 +498,13 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                         then draw pss (length pss) (p:tot)
                         else draw ps' (length ps') (p:tot)
 
-          return $ r ++ r'
+          return $ r <> r'
         ) <|> (defer \_ -> do
               state :: StateObj <- lift State.get
               case state.fatal of
                 Just (P.ParseError { message }) -> do
                   P.fail message
-                otherwise -> draw (ps' ++ singleton p) (n - 1) tot
+                otherwise -> draw (ps' <> singleton p) (n - 1) tot
               )
 
         draw ps' n tot | (length ps' > 0) && (n < 0) = do
@@ -539,12 +539,12 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           if canSkip
              then do
               xs <- genExhaustiveParser missing false
-              return $ fallbacks ++ xs
+              return $ fallbacks <> xs
              else
               if (length missing > 0)
                 then P.fail $
                   "Expected option(s): "
-                    ++ intercalate ", " (D.prettyPrintArgNaked <$> missing)
+                    <> intercalate ", " (D.prettyPrintArgNaked <$> missing)
                 else return fallbacks
 
           where
@@ -600,7 +600,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     step (Free p) x = Right $ Free do
       r  <- p
       rs <- genParser x false
-      return $ r ++ rs
+      return $ r <> rs
 
     -- Options always keep accumulating
     step (Pending p xs) x@(D.Option _)
@@ -616,7 +616,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
         r   <- p
         rs  <- genExhaustiveParser xs true
         rss <- genParser y true
-        return $ r ++ rs ++ rss
+        return $ r <> rs <> rss
 
     -- Terminate the parser at the given argument and collect all subsequent
     -- values int an array ("options-first")
@@ -642,7 +642,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       i <- getInput
       (do
         if r then (some go) else (singleton <$> go)
-      ) <|> (P.fail $ "Expected " ++ D.prettyPrintArg x ++ butGot i)
+      ) <|> (P.fail $ "Expected " <> D.prettyPrintArg x <> butGot i)
         where go = do Tuple x <<< (from Origin.Argv) <$> (do
                         v <- command n
                         return if r then ArrayValue $ Value.intoArray v
@@ -673,7 +673,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
       i <- getInput
       (do
         if r then (some go) else (singleton <$> go)
-      ) <|> P.fail ("Expected " ++ D.prettyPrintArg x ++ butGot i)
+      ) <|> P.fail ("Expected " <> D.prettyPrintArg x <> butGot i)
         where go = do Tuple x <<< (from Origin.Argv) <$> (do
                         v <- positional n
                         return if r then ArrayValue $ Value.intoArray v
@@ -759,7 +759,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
           if repeated && length (filter (snd >>> from Origin.Argv) x) > 0
              then do
                 xs <- go <|> return mempty
-                return $ x ++ xs
+                return $ x <> xs
              else return x
 
         from o (RichValue v) = v.origin == o
@@ -771,7 +771,7 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
                                   (not (D.isFree x) || canSkip)
 
     butGot :: List PositionedToken -> String
-    butGot (Cons (PositionedToken { source }) _) = ", but got " ++ source
+    butGot (Cons (PositionedToken { source }) _) = ", but got " <> source
     butGot Nil                                   = ""
 
 unParseError :: P.ParseError -> { position :: P.Position, message :: String }

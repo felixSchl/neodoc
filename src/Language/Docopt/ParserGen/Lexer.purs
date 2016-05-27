@@ -104,4 +104,4 @@ lex xs = go xs 1
                           token:     tok
                         , sourcePos: P.Position { line: 1, column: n }
                         , source:    x
-                        }) ++ toks
+                        }) <> toks

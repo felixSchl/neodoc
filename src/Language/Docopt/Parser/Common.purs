@@ -19,7 +19,7 @@ import Text.Parsing.Parser.Pos (Position(..)) as P
 traceState :: TokenParser String
 traceState = do
   (st :: ParserState) <- lift get
-  return $ "(" ++ (show st.line) ++ "|" ++ (show st.indentation) ++ ")"
+  return $ "(" <> (show st.line) <> "|" <> (show st.indentation) <> ")"
 
 -- |
 -- Get the position of the token at the head of the stream.

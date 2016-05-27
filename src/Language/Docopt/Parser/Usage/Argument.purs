@@ -58,12 +58,12 @@ isCommand _             = false
 instance showArgument :: Show Argument where
   show (EOA)            = "--"
   show (Stdin)          = "-"
-  show (Reference r)    = "Reference " ++ r
-  show (Command n r)    = "Command " ++ n ++ show r
-  show (Positional n r) = "Positional " ++ n ++ " " ++ show r
-  show (Option o)       = "Option " ++ show o
-  show (OptionStack o)  = "OptionStack " ++ show o
-  show (Group n b o)    = "Group " ++ show n ++ " " ++ show b ++ " " ++ show o
+  show (Reference r)    = "Reference " <> r
+  show (Command n r)    = "Command " <> n <> show r
+  show (Positional n r) = "Positional " <> n <> " " <> show r
+  show (Option o)       = "Option " <> show o
+  show (OptionStack o)  = "OptionStack " <> show o
+  show (Group n b o)    = "Group " <> show n <> " " <> show b <> " " <> show o
 
 instance eqArgument :: Eq Argument where
   eq (Stdin)          (Stdin)            = true
@@ -81,19 +81,19 @@ prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
 
 prettyPrintArg :: Argument -> String
 prettyPrintArg (Command n r)
-  = n ++ if r then "..." else ""
+  = n <> if r then "..." else ""
 prettyPrintArg (Positional n r)
-  = n ++ if r then "..." else ""
+  = n <> if r then "..." else ""
 prettyPrintArg (Option o) = O.prettyPrintLOpt o
 prettyPrintArg (OptionStack o) = O.prettyPrintSOpt o
 prettyPrintArg (Group b xs r)
   =  (if b then "[" else "(")
-  ++ (intercalate " | " (prettyPrintBranch <$> xs))
-  ++ (if b then "]" else ")")
-  ++ (if r then "..." else "")
+  <> (intercalate " | " (prettyPrintBranch <$> xs))
+  <> (if b then "]" else ")")
+  <> (if r then "..." else "")
 prettyPrintArg (EOA) = "--"
 prettyPrintArg (Stdin) = "-"
-prettyPrintArg (Reference r) = "[" ++ show r ++ " options...]"
+prettyPrintArg (Reference r) = "[" <> show r <> " options...]"
 
 ref :: String -> Argument
 ref = Reference

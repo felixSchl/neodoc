@@ -47,8 +47,8 @@ data ResolveTo a b
   | Unresolved b
 
 instance showResolveTo :: (Show a, Show b) => Show (ResolveTo a b) where
-  show (Resolved   a) = "Resolved "   ++ show a
-  show (Unresolved b) = "Unresolved " ++ show b
+  show (Resolved   a) = "Resolved "   <> show a
+  show (Unresolved b) = "Unresolved " <> show b
 
 fail :: forall a. String -> Either SolveError a
 fail = Left <<< SolveError
@@ -137,9 +137,9 @@ solveBranch as ds = Branch <$> go as
     solveArgs (Cons x (Cons y xs)) = do
       m <- solveArg x (Just y)
       case m of
-           Resolved (Keep  zs) -> ((Resolved <$> zs) ++ _) <$> solveArgs (y:xs)
-           Resolved (Slurp zs) -> ((Resolved <$> zs) ++ _) <$> solveArgs xs
-           Unresolved a        -> ((singleton $ Unresolved a) ++ _)
+           Resolved (Keep  zs) -> ((Resolved <$> zs) <> _) <$> solveArgs (y:xs)
+           Resolved (Slurp zs) -> ((Resolved <$> zs) <> _) <$> solveArgs xs
+           Unresolved a        -> ((singleton $ Unresolved a) <> _)
                                     <$> solveArgs (y:xs)
 
     simpleResolve v = Right $ Resolved $ Keep $ singleton v
@@ -201,7 +201,7 @@ solveBranch as ds = Branch <$> go as
                       then
                         return $ fail
                           $ "Option-Argument specified in options-section missing"
-                            ++ " --" ++ o.name
+                            <> " --" <> o.name
                       else Nothing
 
           case mr of
@@ -220,14 +220,14 @@ solveBranch as ds = Branch <$> go as
         guardArgs :: String -> String -> Either SolveError Boolean
         guardArgs n n' | n ^= n' = return true
         guardArgs n n' = fail
-          $ "Arguments mismatch for option --" ++ o.name ++ ": "
-              ++ show n ++ " and " ++ show n'
+          $ "Arguments mismatch for option --" <> o.name <> ": "
+              <> show n <> " and " <> show n'
 
         matchDesc :: String -> Either SolveError O.OptionObj
         matchDesc n =
           case filter isMatch ds of
             xs | length xs > 1 -> fail
-              $ "Multiple option descriptions for option --" ++ n
+              $ "Multiple option descriptions for option --" <> n
             (Cons (DE.OptionDesc desc) Nil) -> do
               arg <- resolveOptArg o.arg desc.arg
               return $ { flag:       DE.getFlag desc.name
@@ -284,7 +284,7 @@ solveBranch as ds = Branch <$> go as
           --      the case. It would be an awkward user-facing error.
           if isJust o.arg
             then fail $ "Option stacks with explicit argument binding "
-                     ++ "may not be subsumed."
+                     <> "may not be subsumed."
             else pure unit
 
           let fs  = fromCharArray $ o.flag A.: o.stack
@@ -305,7 +305,7 @@ solveBranch as ds = Branch <$> go as
               -- the haystack needs to be modified, such that the
               -- the last (length a.name) characters are uppercased
               -- and hence compared case INSENSITIVELY.
-              let needle = toUpper $ fromChar f ++ a.name
+              let needle = toUpper $ fromChar f <> a.name
                   haystack = toUpper fs
 
               (Tuple fs o) <- if endsWith needle haystack
@@ -329,7 +329,7 @@ solveBranch as ds = Branch <$> go as
 
               return  $ Resolved
                       $ Keep
-                      $ (Option <$> toList cs) ++ (singleton $ Option o)
+                      $ (Option <$> toList cs) <> (singleton $ Option o)
 
 
             subsume _ _ = Nothing
@@ -382,7 +382,7 @@ solveBranch as ds = Branch <$> go as
               --       convenience to the user.
               return $ Resolved $ Keep
                     $ (toList matches)
-                      ++ (singleton $ Option match)
+                      <> (singleton $ Option match)
 
             Nothing ->
               -- Look ahead if any of the following arguments should be slurped.
@@ -402,26 +402,26 @@ solveBranch as ds = Branch <$> go as
                           then
                             return $ fail
                               $ "Option-Argument specified in options-section missing"
-                                ++ " -" ++ fromChar o.flag
+                                <> " -" <> fromChar o.flag
                           else Nothing
 
                in case mr of
                 Nothing -> do
                   return $ Resolved $ Keep
                     $ (toList matches)
-                      ++ (singleton $ Option match)
+                      <> (singleton $ Option match)
                 Just er -> do
                   r <- er
                   return $ Resolved $ Slurp
                     $ (toList matches)
-                      ++ (singleton
+                      <> (singleton
                             $ Option $ match { repeatable = r })
 
         guardArgs :: String -> String -> Either SolveError Boolean
         guardArgs n n' | n ^= n' = return true
         guardArgs n n' = fail
-          $ "Arguments mismatch for option -" ++ fromChar o.flag ++ ": "
-              ++ show n ++ " and " ++ show n'
+          $ "Arguments mismatch for option -" <> fromChar o.flag <> ": "
+              <> show n <> " and " <> show n'
 
 
         -- | Match a given flag with an option description.
@@ -433,7 +433,7 @@ solveBranch as ds = Branch <$> go as
           case filter isMatch ds of
             xs | length xs > 1 -> fail
                     $ "Multiple option descriptions for option -"
-                        ++ fromChar f
+                        <> fromChar f
 
             (Cons (DE.OptionDesc desc) Nil) -> do
               arg <- if isTrailing
@@ -441,8 +441,8 @@ solveBranch as ds = Branch <$> go as
                           else if isNothing desc.arg
                             then return Nothing
                             else fail
-                              $ "Stacked option -" ++ fromChar f
-                                  ++ " may not specify arguments"
+                              $ "Stacked option -" <> fromChar f
+                                  <> " may not specify arguments"
 
               return $ { flag:       DE.getFlag desc.name
                        , name:       DE.getName desc.name

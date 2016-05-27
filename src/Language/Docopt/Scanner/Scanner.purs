@@ -19,7 +19,7 @@ type Docopt = { usage :: String, options :: List String }
 
 section :: String -> Regex
 section name
-  = regex ("^([^\n]*" ++ name ++ "[^\n]*:(?:.*$)\n?(?:(?:[ \t].*)?(?:\n|$))*)")
+  = regex ("^([^\n]*" <> name <> "[^\n]*:(?:.*$)\n?(?:(?:[ \t].*)?(?:\n|$))*)")
           (Regex.parseFlags "gmi")
 
 fixSection :: String -> String

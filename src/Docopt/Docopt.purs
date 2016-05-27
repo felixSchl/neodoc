@@ -82,7 +82,7 @@ run d o = do
   env  <- maybe Process.getEnv              (return <<< id) o.env
   either onError return do
           { specification, usage } <- parseDocopt d o.smartOptions
-          lmap ((help usage) ++ _) do
+          lmap ((help usage) <> _) do
             evalDocopt specification env argv o.optionsFirst
 
   where
@@ -96,5 +96,5 @@ run d o = do
 
     help usage
       = "Usage:\n"
-          ++ (unlines $ ("  " ++ _) <$> lines (dedent usage))
-          ++ "\n"
+          <> (unlines $ ("  " <> _) <$> lines (dedent usage))
+          <> "\n"

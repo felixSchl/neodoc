@@ -16,8 +16,8 @@ newtype Key = Key { arg :: D.Argument }
 
 instance showKey :: Show Key where
   show (Key { arg: (D.Option o) }) =
-    maybe "" (\c -> fromChar c ++ ", ") o.flag
-      ++ maybe "" id o.name
+    maybe "" (\c -> fromChar c <> ", ") o.flag
+      <> maybe "" id o.name
   show (Key { arg: (D.Positional n _) }) = n
   show (Key { arg: (D.Command n _) }) = n
   show _ = "invalid" -- XXX
@@ -44,12 +44,12 @@ key arg = Key { arg: arg }
 -- | a mathed argument.
 toKeys :: D.Argument -> Array String
 toKeys (D.Command n _)    = [n]
-toKeys (D.Positional n _) = [ "<" ++ Str.toLower n ++ ">"
+toKeys (D.Positional n _) = [ "<" <> Str.toLower n <> ">"
                             , Str.toUpper n
                             ]
 toKeys (D.Group _ _ _)    = []
 toKeys (D.EOA)            = ["--"]
 toKeys (D.Stdin)          = ["-"]
 toKeys (D.Option o)       = []
-                          ++ maybe [] (\c -> [ "-"  ++ fromChar c ]) o.flag
-                          ++ maybe [] (\s -> [ "--" ++ s ]) o.name
+                          <> maybe [] (\c -> [ "-"  <> fromChar c ]) o.flag
+                          <> maybe [] (\s -> [ "--" <> s ]) o.name

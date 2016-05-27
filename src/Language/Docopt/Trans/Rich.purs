@@ -39,7 +39,7 @@ reduce :: List D.Usage       -- ^ the program specification
        -> List ValueMapping  -- ^ the parse result
        -> StrMap RichValue   -- ^ the output set of (arg => val)
 reduce us env b vs =
-  let vm = Map.fromFoldableWith (++) (rmap singleton <$>
+  let vm = Map.fromFoldableWith (<>) (rmap singleton <$>
                                             lmap key <$>
                                             reverse vs)
       m = applyValues vm $ reduceUsage (D.Usage (singleton b))
@@ -51,7 +51,7 @@ reduce us env b vs =
   mergeVals (RichValue v) (RichValue v') = RichValue $ {
     origin: fromJust $ maximum [ v.origin, v'.origin ]
   , value:  ArrayValue $ Value.intoArray v'.value
-                      ++ Value.intoArray v.value
+                      <> Value.intoArray v.value
   }
 
   applyValues :: Map Key (List RichValue) -> List D.Argument -> Map Key RichValue

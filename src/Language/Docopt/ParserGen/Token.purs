@@ -23,20 +23,20 @@ data Token
   | Lit String
 
 instance showToken :: Show Token where
-  show (LOpt s a)    = "LOpt " ++ show s ++ " " ++ show a
-  show (SOpt c cs a) = "SOpt " ++ show c ++ " " ++ show cs ++ " " ++ show a
-  show (Lit  s)      = "Lit "  ++ show s
-  show (EOA  xs)     = "EOA "  ++ show xs
+  show (LOpt s a)    = "LOpt " <> show s <> " " <> show a
+  show (SOpt c cs a) = "SOpt " <> show c <> " " <> show cs <> " " <> show a
+  show (Lit  s)      = "Lit "  <> show s
+  show (EOA  xs)     = "EOA "  <> show xs
   show (Stdin)       = "Stdin"
 
 prettyPrintToken :: Token -> String
 prettyPrintToken (Stdin) = "-"
-prettyPrintToken (EOA xs) = "-- " ++ intercalate " " (D.prettyPrintValue <$> xs)
+prettyPrintToken (EOA xs) = "-- " <> intercalate " " (D.prettyPrintValue <$> xs)
 prettyPrintToken (Lit s) = show s
-prettyPrintToken (LOpt n a) = "--" ++ n ++ arg
-  where arg = maybe "" ("=" ++ _) a
-prettyPrintToken (SOpt n s a) = "-"  ++ (fromCharArray (A.cons n s)) ++ arg
-  where arg = maybe "" ("=" ++ _) a
+prettyPrintToken (LOpt n a) = "--" <> n <> arg
+  where arg = maybe "" ("=" <> _) a
+prettyPrintToken (SOpt n s a) = "-"  <> (fromCharArray (A.cons n s)) <> arg
+  where arg = maybe "" ("=" <> _) a
 
 data PositionedToken = PositionedToken
   { sourcePos :: P.Position
@@ -55,6 +55,6 @@ getSource = unPositionedToken >>> _.source
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
-    (show tok) ++ " at " ++ (show pos)
+    (show tok) <> " at " <> (show pos)
 
 

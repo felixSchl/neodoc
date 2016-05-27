@@ -133,7 +133,7 @@ instance showContent  :: Show Content  where show = gShow
 instance eqName       :: Eq Name       where eq = gEq
 
 prettyPrintDesc :: Desc -> String
-prettyPrintDesc (OptionDesc opt) = "Option " ++ prettyPrintOption opt
+prettyPrintDesc (OptionDesc opt) = "Option " <> prettyPrintOption opt
 prettyPrintDesc (CommandDesc) = "Command"
 
 instance showDesc :: Show Desc where
@@ -157,21 +157,21 @@ prettyPrintOption opt
         a <- opt.arg
         return $
           (if a.optional then "[" else "")
-            ++ "=" ++ a.name
-            ++ (if a.optional then "]" else "")
-            ++ (if opt.repeatable then "..." else "")
-            ++ (maybe ""
-                      (\v -> "[default: " ++ prettyPrintValue v ++ "]")
+            <> "=" <> a.name
+            <> (if a.optional then "]" else "")
+            <> (if opt.repeatable then "..." else "")
+            <> (maybe ""
+                      (\v -> "[default: " <> prettyPrintValue v <> "]")
                       a.default)
 
       env = maybe "" id do
         k <- opt.env
-        return $ " [env: " ++ k ++ "]"
+        return $ " [env: " <> k <> "]"
 
 prettyPrintOptionArgument :: OptionArgumentObj -> String
 prettyPrintOptionArgument { optional: o, name: n, default: d }
-  = (if o then "[" else "") ++ n ++ (if o then "]" else "")
-    ++ maybe "" (\v -> " [default: " ++ (prettyPrintValue v) ++  "]") d
+  = (if o then "[" else "") <> n <> (if o then "]" else "")
+    <> maybe "" (\v -> " [default: " <> (prettyPrintValue v) <>  "]") d
 
 run :: String -> Either P.ParseError (List Desc)
 run = lexDescs >=> parse

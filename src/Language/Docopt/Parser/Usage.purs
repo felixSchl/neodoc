@@ -93,7 +93,7 @@ usageParser smartOpts = do
         e <- eoa
         modifyAt
           (length xs - 1)
-          (\as -> as ++ (singleton e))
+          (\as -> as <> (singleton e))
           xs
 
     maybeInParens p = do

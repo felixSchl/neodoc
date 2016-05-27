@@ -82,27 +82,27 @@ prettyPrintToken Colon             = show ':'
 prettyPrintToken Comma             = show ','
 prettyPrintToken TripleDot         = "..."
 prettyPrintToken DoubleDash        = "--"
-prettyPrintToken (Reference r)     = "Reference " ++ show r
-prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
-prettyPrintToken (Tag k v)         = "Tag "       ++ k ++ " "  ++ (show v)
-prettyPrintToken (Name      n)     = "Name "      ++ show n
-prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
-prettyPrintToken (AngleName n)     = "AngleName " ++ show n
+prettyPrintToken (Reference r)     = "Reference " <> show r
+prettyPrintToken (Garbage   c)     = "Garbage "   <> show c
+prettyPrintToken (Tag k v)         = "Tag "       <> k <> " "  <> (show v)
+prettyPrintToken (Name      n)     = "Name "      <> show n
+prettyPrintToken (ShoutName n)     = "ShoutName " <> show n
+prettyPrintToken (AngleName n)     = "AngleName " <> show n
 prettyPrintToken (LOpt n arg)
-  = "--" ++ n
-         ++ (fromMaybe "" do
+  = "--" <> n
+         <> (fromMaybe "" do
               a <- arg
               return $ if a.optional then "[" else ""
-                ++ a.name
-                ++ if a.optional then "]" else ""
+                <> a.name
+                <> if a.optional then "]" else ""
             )
 prettyPrintToken (SOpt n s arg)
-  = "-" ++ (fromCharArray (A.cons n s))
-        ++ (fromMaybe "" do
+  = "-" <> (fromCharArray (A.cons n s))
+        <> (fromMaybe "" do
               a <- arg
               return $ if a.optional then "[" else ""
-                ++ a.name
-                ++ if a.optional then "]" else ""
+                <> a.name
+                <> if a.optional then "]" else ""
             )
 
 data PositionedToken = PositionedToken
@@ -152,7 +152,7 @@ instance eqToken :: Eq Token where
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
-    (show tok) ++ " at " ++ (show pos)
+    (show tok) <> " at " <> (show pos)
 
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m = do
@@ -160,7 +160,7 @@ parseTokens m = do
   xs <- L.many $ parsePositionedToken m
   P.eof <|> void do
     i <- getInput
-    P.fail $ "Unexpected input: " ++ i
+    P.fail $ "Unexpected input: " <> i
   return xs
 
 parsePositionedToken :: Mode -> P.Parser String PositionedToken
@@ -506,7 +506,7 @@ name = token go P.<?> "name"
     go _        = Nothing
 
 tag :: String -> TokenParser String
-tag s = token go P.<?> ("tag: " ++ s)
+tag s = token go P.<?> ("tag: " <> s)
   where
     go (Tag k (Just v)) | k ^= s = Just v
     go _                         = Nothing

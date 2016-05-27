@@ -34,11 +34,11 @@ instance showSolveError :: Show SolveError where
   show = gShow
 
 instance showDocoptError :: Show DocoptError where
-  show (DocoptScanError        e) = "DocoptScanError "  ++ show e
-  show (DocoptUsageParseError  e) = "DocoptParseError " ++ show e
-  show (DocoptDescParseError   e) = "DocoptParseError " ++ show e
-  show (DocoptUserParseError _ e) = "DocoptParseError " ++ show e
-  show (DocoptSolveError       e) = "DocoptSolveError"  ++ show e
+  show (DocoptScanError        e) = "DocoptScanError "  <> show e
+  show (DocoptUsageParseError  e) = "DocoptParseError " <> show e
+  show (DocoptDescParseError   e) = "DocoptParseError " <> show e
+  show (DocoptUserParseError _ e) = "DocoptParseError " <> show e
+  show (DocoptSolveError       e) = "DocoptSolveError"  <> show e
 
 unParseError :: P.ParseError -> { message :: String
                                 , position :: P.Position }

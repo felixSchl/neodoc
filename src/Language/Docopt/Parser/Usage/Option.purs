@@ -32,16 +32,16 @@ newtype LOpt = LOpt {
 
 instance showSOpt :: Show SOpt where
   show (SOpt o)
-    = "SOpt { flag: " ++ show o.flag
-        ++ ", stack: " ++ show o.stack
-        ++ ", repeatable: " ++ show o.repeatable
-        ++ ", argument: " ++ (fromMaybe "Nothing" do
+    = "SOpt { flag: " <> show o.flag
+        <> ", stack: " <> show o.stack
+        <> ", repeatable: " <> show o.repeatable
+        <> ", argument: " <> (fromMaybe "Nothing" do
                                 a <- o.arg
-                                return $ "{ name: " ++ a.name
-                                      ++ ", optional: " ++ show a.optional
-                                      ++ "}"
+                                return $ "{ name: " <> a.name
+                                      <> ", optional: " <> show a.optional
+                                      <> "}"
                               )
-        ++ "}"
+        <> "}"
 
 instance eqSOpt :: Eq SOpt
   where eq (SOpt o) (SOpt o') = (o.flag       == o'.flag)
@@ -58,15 +58,15 @@ instance eqSOpt :: Eq SOpt
 
 instance showLOpt :: Show LOpt where
   show (LOpt o)
-    = "LOpt { name: " ++ o.name
-        ++ ", repeatable: " ++ show o.repeatable
-        ++ ", argument: " ++ (fromMaybe "Nothing" do
+    = "LOpt { name: " <> o.name
+        <> ", repeatable: " <> show o.repeatable
+        <> ", argument: " <> (fromMaybe "Nothing" do
                                 a <- o.arg
-                                return $ "{ name: " ++ a.name
-                                      ++ ", optional: " ++ show a.optional
-                                      ++ "}"
+                                return $ "{ name: " <> a.name
+                                      <> ", optional: " <> show a.optional
+                                      <> "}"
                               )
-        ++ "}"
+        <> "}"
 
 
 instance eqLOpt :: Eq LOpt
@@ -115,19 +115,19 @@ loptR_ n = lopt' n Nothing true
 
 prettyPrintLOpt :: LOpt -> String
 prettyPrintLOpt (LOpt o)
-  = "--" ++ o.name
-      ++ (maybe "" (\a ->
+  = "--" <> o.name
+      <> (maybe "" (\a ->
             (if a.optional then "[" else ""
-              ++ "=" ++ a.name
-              ++ if a.optional then "]" else "")) o.arg)
-      ++ if o.repeatable then "..." else ""
+              <> "=" <> a.name
+              <> if a.optional then "]" else "")) o.arg)
+      <> if o.repeatable then "..." else ""
 
 prettyPrintSOpt :: SOpt -> String
 prettyPrintSOpt (SOpt o)
-  = "-" ++ (fromChar o.flag)
-      ++ (intercalate "" $ fromChar <$> toList o.stack)
-      ++ (maybe "" (\a ->
+  = "-" <> (fromChar o.flag)
+      <> (intercalate "" $ fromChar <$> toList o.stack)
+      <> (maybe "" (\a ->
             (if a.optional then "[" else "")
-              ++ "=" ++ a.name
-              ++ (if a.optional then "]" else "")) o.arg)
-      ++ if o.repeatable then "..." else ""
+              <> "=" <> a.name
+              <> (if a.optional then "]" else "")) o.arg)
+      <> if o.repeatable then "..." else ""

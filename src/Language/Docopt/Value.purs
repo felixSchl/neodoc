@@ -35,11 +35,11 @@ data Value
 derive instance genericValue :: Generic Value
 
 instance showValue :: Show Value where
-  show (StringValue s) = "StringValue " ++ s
-  show (BoolValue   b) = "BoolValue "   ++ show b
-  show (ArrayValue xs) = "ArrayValue "  ++ show (show <$> xs)
-  show (IntValue    x) = "IntValue "    ++ show x
-  show (FloatValue  x) = "FloatValue "  ++ show x
+  show (StringValue s) = "StringValue " <> s
+  show (BoolValue   b) = "BoolValue "   <> show b
+  show (ArrayValue xs) = "ArrayValue "  <> show (show <$> xs)
+  show (IntValue    x) = "IntValue "    <> show x
+  show (FloatValue  x) = "FloatValue "  <> show x
 
 instance eqValue :: Eq Value where
   eq (StringValue s) (StringValue s') = s  == s'
@@ -133,7 +133,7 @@ parse s split = P.runParser s do
           xss <- do
             P.char '.'
             fromCharArray <$> A.some digit
-          return $ xs ++ "." ++ xss
+          return $ xs <> "." <> xss
       , return $ IntValue $ si * (fromJust $ Int.fromString xs)
       ]
 

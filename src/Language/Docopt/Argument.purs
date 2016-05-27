@@ -58,7 +58,7 @@ data Argument
   | Stdin
 
 instance showBranch :: Show Branch where
-  show (Branch xs) = "Branch " ++ show (show <$> xs)
+  show (Branch xs) = "Branch " <> show (show <$> xs)
 
 instance eqBranch :: Eq Branch where
   eq (Branch xs) (Branch xs') = (xs == xs')
@@ -94,12 +94,12 @@ prettyPrintBranch (Branch xs) = intercalate " " (prettyPrintArg <$> xs)
 prettyPrintArg :: Argument -> String
 prettyPrintArg (Stdin)          = "-"
 prettyPrintArg (EOA)            = "--"
-prettyPrintArg (Command name r) = name ++ (if r then "..." else "")
-prettyPrintArg (Positional n r) = name ++ (if r then "..." else "")
+prettyPrintArg (Command name r) = name <> (if r then "..." else "")
+prettyPrintArg (Positional n r) = name <> (if r then "..." else "")
   where
-    name = if String.toUpper n == n then n else "<" ++ n ++ ">"
+    name = if String.toUpper n == n then n else "<" <> n <> ">"
 prettyPrintArg (Option o)          = O.prettyPrintOption o
-prettyPrintArg (Group o bs r)      = open ++ inner ++ close ++ repetition
+prettyPrintArg (Group o bs r)      = open <> inner <> close <> repetition
   where
     open       = if o then "[" else "("
     close      = if o then "]" else ")"
@@ -112,10 +112,10 @@ prettyPrintBranchNaked (Branch xs) = intercalate " " (prettyPrintArgNaked <$> xs
 prettyPrintArgNaked :: Argument -> String
 prettyPrintArgNaked (Stdin)             = "-"
 prettyPrintArgNaked (EOA)               = "-- ARGS..."
-prettyPrintArgNaked (Command name r)    = name ++ (if r then "..." else "")
-prettyPrintArgNaked (Positional name r) = name ++ (if r then "..." else "")
+prettyPrintArgNaked (Command name r)    = name <> (if r then "..." else "")
+prettyPrintArgNaked (Positional name r) = name <> (if r then "..." else "")
 prettyPrintArgNaked (Option o)          = O.prettyPrintOptionNaked o
-prettyPrintArgNaked (Group o bs r)      = inner ++ repetition
+prettyPrintArgNaked (Group o bs r)      = inner <> repetition
   where
     inner      = intercalate " | " (prettyPrintBranchNaked <$> bs)
     repetition = if r then "..." else ""

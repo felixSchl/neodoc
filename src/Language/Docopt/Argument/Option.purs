@@ -107,30 +107,30 @@ isFlag _                                           = false
 
 prettyPrintOption :: OptionObj -> String
 prettyPrintOption o
-  = short ++ long ++ arg' ++ rep ++ default ++ env
+  = short <> long <> arg' <> rep <> default <> env
   where
-    short = maybe "" (\f -> "-" ++ (fromChar f)) o.flag
+    short = maybe "" (\f -> "-" <> (fromChar f)) o.flag
     long  = maybe "" (const ", ") (o.flag *> o.name)
-              ++ maybe "" ("--" ++ _) o.name
+              <> maybe "" ("--" <> _) o.name
     rep  = if o.repeatable then "..." else ""
     arg' = flip (maybe "") o.arg \({ name, optional }) ->
                 (if optional then "[" else "")
-                  ++ "=" ++ name
-                  ++ (if optional then "]" else "")
+                  <> "=" <> name
+                  <> (if optional then "]" else "")
     default = flip (maybe "") o.arg \({ default }) ->
                 flip (maybe "") default \v->
-                  " [default: " ++ (prettyPrintValue v) ++  "]"
-    env = flip (maybe "") o.env \k -> " [env: " ++ k ++ "]"
+                  " [default: " <> (prettyPrintValue v) <>  "]"
+    env = flip (maybe "") o.env \k -> " [env: " <> k <> "]"
 
 prettyPrintOptionNaked :: OptionObj -> String
 prettyPrintOptionNaked o
-  = short ++ long ++ arg' ++ rep
+  = short <> long <> arg' <> rep
   where
-    short = maybe "" (\f -> "-" ++ (fromChar f)) o.flag
+    short = maybe "" (\f -> "-" <> (fromChar f)) o.flag
     long  = maybe "" (const "|") (o.flag *> o.name)
-              ++ maybe "" ("--" ++ _) o.name
+              <> maybe "" ("--" <> _) o.name
     rep  = if o.repeatable then "..." else ""
-    arg' = flip (maybe "") o.arg \({ name }) -> "="  ++ name
+    arg' = flip (maybe "") o.arg \({ name }) -> "="  <> name
 
 --------------------------------------------------------------------------------
 -- Short hand option creation
