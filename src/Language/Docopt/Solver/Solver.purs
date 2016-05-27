@@ -27,8 +27,7 @@ import Language.Docopt.Argument as Arg
 import Language.Docopt.Argument.Option as O
 import Language.Docopt.Parser.Desc as DE
 import Language.Docopt.Parser.Usage.Option as UO
-import Language.Docopt.Argument ( runBranch, Argument(..), Branch(..), OptionObj
-                                , OptionArgumentObj)
+import Language.Docopt.Argument (runBranch, Argument(..), Branch(..))
 import Language.Docopt.Errors (SolveError(..))
 import Language.Docopt.Parser.Desc (Desc)
 import Language.Docopt.Parser.Usage (Usage(..)) as U
@@ -91,7 +90,7 @@ solveBranch as ds = Branch <$> go as
                             (singleton $ Branch $ singleton $ Option $
                                 { flag:       DE.getFlag opt.name
                                 , name:       DE.getName opt.name
-                                , arg:        convArg opt.arg
+                                , arg:        opt.arg
                                 , env:        opt.env
                                 , repeatable: false
                                 }
@@ -115,8 +114,6 @@ solveBranch as ds = Branch <$> go as
                     isMatch (Group _ bs _)
                       = any isMatch (concat $ runBranch <$> bs)
                     isMatch _ = false
-
-                    convArg arg = DE.runArgument <$> arg
                 map args (Cons _ xs) = map args xs
                 map args _ = args
             expand' (Tuple args _) = args
@@ -226,7 +223,7 @@ solveBranch as ds = Branch <$> go as
           $ "Arguments mismatch for option --" ++ o.name ++ ": "
               ++ show n ++ " and " ++ show n'
 
-        matchDesc :: String -> Either SolveError OptionObj
+        matchDesc :: String -> Either SolveError O.OptionObj
         matchDesc n =
           case filter isMatch ds of
             xs | length xs > 1 -> fail
@@ -303,7 +300,7 @@ solveBranch as ds = Branch <$> go as
                                                           Reference)
             subsume fs (DE.OptionDesc d) = do
               f <- DE.getFlag d.name
-              a <- DE.runArgument <$> d.arg
+              a <- d.arg
 
               -- the haystack needs to be modified, such that the
               -- the last (length a.name) characters are uppercased
@@ -431,7 +428,7 @@ solveBranch as ds = Branch <$> go as
         -- | `isTrailing` indicates if this flag is the last flag
         -- | in it's stack of flags.
 
-        matchDesc :: Boolean -> Char -> Either SolveError OptionObj
+        matchDesc :: Boolean -> Char -> Either SolveError O.OptionObj
         matchDesc isTrailing f =
           case filter isMatch ds of
             xs | length xs > 1 -> fail
@@ -473,20 +470,20 @@ solveBranch as ds = Branch <$> go as
     -- | Resolve an option's argument name against that given in the
     -- | description, returning the most complete argument known.
     resolveOptArg :: Maybe { name :: String, optional :: Boolean }
-                  -> Maybe DE.Argument
-                  -> Either SolveError (Maybe OptionArgumentObj)
+                  -> Maybe DE.OptionArgumentObj
+                  -> Either SolveError (Maybe O.OptionArgumentObj)
 
     resolveOptArg (Just a) Nothing = do
       return <<< pure $ { name: a.name
                         , optional: a.optional
                         , default: Nothing }
 
-    resolveOptArg Nothing (Just (DE.Argument de)) = do
+    resolveOptArg Nothing (Just de) = do
       return <<< pure $ { name:     de.name
                         , optional: de.optional
                         , default:  de.default }
 
-    resolveOptArg (Just a) (Just (DE.Argument de)) = do
+    resolveOptArg (Just a) (Just de) = do
       return <<< pure
         $ { name:     de.name
           , optional: de.optional || a.optional
@@ -496,7 +493,7 @@ solveBranch as ds = Branch <$> go as
     resolveOptArg _ _ = return Nothing
 
     convertArg :: Maybe { name :: String, optional :: Boolean }
-               -> Maybe OptionArgumentObj
+               -> Maybe O.OptionArgumentObj
     convertArg arg = do
       a <- arg
       return $ { name:     a.name

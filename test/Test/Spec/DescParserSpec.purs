@@ -15,6 +15,7 @@ import Language.Docopt.Value (Value(..))
 import Test.Spec (describe, it)
 import Test.Support (vliftEff)
 import Text.Wrap (dedent)
+import Test.Support.Desc as Desc
 
 newtype TestCase = TestCase { input :: String
                             , output :: Either String (Array Desc.Desc) }
@@ -139,7 +140,7 @@ descParserSpec = \_ ->
             ]
         , fail
               "-f=BAZ, --foo=qux"
-              "Arguments mismatch: \"BAZ\" and \"qux\""
+              "Option-arguments mismatch: \"BAZ\" and \"qux\""
         , pass (dedent
             -- if an option is indented past the start of the description
             -- block for the previous option, it's considered part of the

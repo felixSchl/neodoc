@@ -56,8 +56,7 @@ import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Language.Docopt.Argument (Argument(..), Branch(..), isFree, runBranch,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 hasEnvBacking, getArgument, hasDefault,
-                                isRepeatable, isFlag, setRequired,
-                                OptionArgumentObj()) as D
+                                isRepeatable, isFlag, setRequired) as D
 import Language.Docopt.Argument.Option as O
 import Language.Docopt.Usage (Usage, runUsage) as D
 import Language.Docopt.Env (Env ())
