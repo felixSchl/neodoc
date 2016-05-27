@@ -95,4 +95,4 @@ run helpText opts = do
           throwException $ error $ e
 
     help usage
-      = (unlines $ ("  " <> _) <$> lines (dedent usage)) <> "\n"
+      = dedent $ (unlines $ ("  " <> _) <$> lines (dedent usage)) <> "\n"
