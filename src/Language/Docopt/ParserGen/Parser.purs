@@ -56,7 +56,8 @@ import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Language.Docopt.Argument (Argument(..), Branch(..), isFree, runBranch,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 hasEnvBacking, getArgument, hasDefault,
-                                isRepeatable, isFlag, setRequired) as D
+                                isRepeatable, isFlag, setRequired,
+                                OptionArgumentObj()) as D
 import Language.Docopt.Argument.Option as O
 import Language.Docopt.Usage (Usage, runUsage) as D
 import Language.Docopt.Env (Env ())
@@ -172,7 +173,7 @@ stdin = token go P.<?> "stdin flag"
 type HasConsumedArg = Boolean
 data OptParse = OptParse Value (Maybe Token) HasConsumedArg
 
-longOption :: O.Name -> (Maybe O.ArgumentObj) -> Parser Value
+longOption :: O.Name -> (Maybe O.OptionArgumentObj) -> Parser Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   return $ case toks of
     Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
@@ -230,7 +231,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     go a b = Left $ "Invalid token: " ++ show a ++ " (input: " ++ show b ++ ")"
 
-shortOption :: Char -> (Maybe O.ArgumentObj) -> Parser Value
+shortOption :: Char -> (Maybe O.OptionArgumentObj) -> Parser Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
   return $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->
@@ -689,7 +690,9 @@ genBranchParser (D.Branch xs) optsFirst canSkip = do
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option o) _ = (do
       do
-        if o.repeatable then (some go) else (singleton <$> go)
+        if o.repeatable
+           then some          go
+           else singleton <$> go
       <* modifyDepth (_ + 1)
       )
         where

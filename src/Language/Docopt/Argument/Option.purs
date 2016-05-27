@@ -2,12 +2,11 @@ module Language.Docopt.Argument.Option (
     Flag ()
   , Name ()
   , OptionObj ()
-  , ArgumentObj ()
+  , OptionArgumentObj ()
   , IsOptional ()
   , IsRepeatable ()
   , showOptionObj
   , eqOptionObj
-  , isRepeatable
   , hasDefault
   , isFlag
   , takesArgument
@@ -38,7 +37,7 @@ type IsOptional   = Boolean
 
 type OptionObj =  { flag       :: Maybe Flag
                   , name       :: Maybe Name
-                  , arg        :: Maybe ArgumentObj
+                  , arg        :: Maybe OptionArgumentObj
                   , env        :: Maybe String
                   , repeatable :: IsRepeatable
                   }
@@ -46,7 +45,7 @@ type OptionObj =  { flag       :: Maybe Flag
 showOptionObj :: OptionObj -> String
 showOptionObj o = "{ flag: "       <> show o.flag
                <> ", name: "       <> show o.name
-               <> ", arg: "        <> show (Argument <$> o.arg)
+               <> ", arg: "        <> show (OptionArgument <$> o.arg)
                <> ", env: "        <> show o.env
                <> ", repeatable: " <> show o.repeatable
                <> "}"
@@ -56,32 +55,32 @@ eqOptionObj o o' = o.flag               == o'.flag
                 && o.name               == o'.name
                 && o.env                == o'.env
                 && o.repeatable         == o'.repeatable
-                && (Argument <$> o.arg) == (Argument <$> o'.arg)
+                && (OptionArgument <$> o.arg) == (OptionArgument <$> o'.arg)
 
-newtype Argument = Argument ArgumentObj
+newtype OptionArgument = OptionArgument OptionArgumentObj
 
-runArgument :: Argument -> ArgumentObj
-runArgument (Argument a) = a
+runOptionArgument :: OptionArgument -> OptionArgumentObj
+runOptionArgument (OptionArgument a) = a
 
-instance showArgument :: Show Argument where
-  show = showArgumentObj <<< runArgument
+instance showOptionArgument :: Show OptionArgument where
+  show = showOptionArgumentObj <<< runOptionArgument
 
-instance eqArgument   :: Eq   Argument where
-  eq   = eqArgumentObj `on` runArgument
+instance eqOptionArgument   :: Eq   OptionArgument where
+  eq   = eqOptionArgumentObj `on` runOptionArgument
 
-type ArgumentObj = { name     :: String
+type OptionArgumentObj = { name     :: String
                    , default  :: Maybe Value
                    , optional :: Boolean
                    }
 
-showArgumentObj :: ArgumentObj -> String
-showArgumentObj a = "{ name: "     <> show a.name
-                 <> ", default: "  <> show a.default
-                 <> ", optional: " <> show a.optional
-                 <> "}"
+showOptionArgumentObj :: OptionArgumentObj -> String
+showOptionArgumentObj a = "{ name: "     <> show a.name
+                       <> ", default: "  <> show a.default
+                       <> ", optional: " <> show a.optional
+                       <> "}"
 
-eqArgumentObj :: ArgumentObj -> ArgumentObj -> Boolean
-eqArgumentObj a a' = a.name     == a'.name
+eqOptionArgumentObj :: OptionArgumentObj -> OptionArgumentObj -> Boolean
+eqOptionArgumentObj a a' = a.name     == a'.name
                   && a.default  == a'.default
                   && a.optional == a'.optional
 
@@ -92,11 +91,6 @@ empty = { flag:       Nothing
         , env:        Nothing
         , repeatable: false
         }
-
-
--- TODO: Remove
-isRepeatable :: OptionObj -> Boolean
-isRepeatable o = o.repeatable
 
 hasDefault :: OptionObj -> Boolean
 hasDefault { arg: Just { default: Just _ } } = true
@@ -148,7 +142,7 @@ prettyPrintOptionNaked o
 opt'
   :: Maybe Flag
   -> Maybe Name
-  -> Maybe ArgumentObj
+  -> Maybe OptionArgumentObj
   -> Maybe String
   -> IsRepeatable
   -> OptionObj
@@ -160,10 +154,10 @@ opt' f n a e r = {
 , repeatable: r
 }
 
-opt :: Flag -> Name -> ArgumentObj -> OptionObj
+opt :: Flag -> Name -> OptionArgumentObj -> OptionObj
 opt f n a = opt' (Just f) (Just n) (Just a) Nothing false
 
-optR :: Flag -> Name -> ArgumentObj -> OptionObj
+optR :: Flag -> Name -> OptionArgumentObj -> OptionObj
 optR f n a = opt' (Just f) (Just n) (Just a) Nothing true
 
 opt_ :: Flag -> Name -> OptionObj
@@ -173,7 +167,7 @@ optR_ :: Flag -> Name -> OptionObj
 optR_ f n = opt' (Just f) (Just n) Nothing Nothing true
 
 -- short hand to create an Short-OptionObj argument
-sopt' :: Flag -> (Maybe ArgumentObj) -> IsRepeatable -> OptionObj
+sopt' :: Flag -> (Maybe OptionArgumentObj) -> IsRepeatable -> OptionObj
 sopt' f a r = {
   flag:       pure f
 , name:       Nothing
@@ -182,10 +176,10 @@ sopt' f a r = {
 , repeatable: r
 }
 
-sopt :: Flag -> ArgumentObj -> OptionObj
+sopt :: Flag -> OptionArgumentObj -> OptionObj
 sopt f a = sopt' f (Just a) false
 
-soptR :: Flag -> ArgumentObj -> OptionObj
+soptR :: Flag -> OptionArgumentObj -> OptionObj
 soptR f a = sopt' f (Just a) true
 
 sopt_ :: Flag -> OptionObj
@@ -195,7 +189,7 @@ soptR_ :: Flag -> OptionObj
 soptR_ f = sopt' f Nothing true
 
 -- short hand to create an Long-OptionObj argument
-lopt' :: Name -> (Maybe ArgumentObj) -> IsRepeatable -> OptionObj
+lopt' :: Name -> (Maybe OptionArgumentObj) -> IsRepeatable -> OptionObj
 lopt' n a r = {
   flag:       Nothing
 , name:       pure n
@@ -204,10 +198,10 @@ lopt' n a r = {
 , repeatable: r
 }
 
-lopt :: Name -> ArgumentObj -> OptionObj
+lopt :: Name -> OptionArgumentObj -> OptionObj
 lopt n a = lopt' n (Just a) false
 
-loptR :: Name -> ArgumentObj -> OptionObj
+loptR :: Name -> OptionArgumentObj -> OptionObj
 loptR n a = lopt' n (Just a) true
 
 lopt_ :: Name -> OptionObj
@@ -220,10 +214,10 @@ loptR_ n = lopt' n Nothing true
 -- Short hand option creation (with env tag)
 --------------------------------------------------------------------------------
 
-optE :: Flag -> Name -> ArgumentObj -> String -> OptionObj
+optE :: Flag -> Name -> OptionArgumentObj -> String -> OptionObj
 optE f n a e = opt' (Just f) (Just n) (Just a) (Just e) false
 
-optER :: Flag -> Name -> ArgumentObj -> String -> OptionObj
+optER :: Flag -> Name -> OptionArgumentObj -> String -> OptionObj
 optER f n a e = opt' (Just f) (Just n) (Just a) (Just e) true
 
 optE_ :: Flag -> Name -> String -> OptionObj
@@ -233,7 +227,7 @@ optER_ :: Flag -> Name -> String -> OptionObj
 optER_ f n e = opt' (Just f) (Just n) Nothing (Just e) true
 
 -- short hand to create an Short-OptionObj argument
-soptE' :: Flag -> (Maybe ArgumentObj) -> IsRepeatable -> String -> OptionObj
+soptE' :: Flag -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> OptionObj
 soptE' f a r e = {
   flag:       pure f
 , name:       Nothing
@@ -242,10 +236,10 @@ soptE' f a r e = {
 , repeatable: r
 }
 
-soptE :: Flag -> ArgumentObj -> String -> OptionObj
+soptE :: Flag -> OptionArgumentObj -> String -> OptionObj
 soptE f a e = soptE' f (Just a) false e
 
-soptER :: Flag -> ArgumentObj -> String -> OptionObj
+soptER :: Flag -> OptionArgumentObj -> String -> OptionObj
 soptER f a e = soptE' f (Just a) true e
 
 soptE_ :: Flag -> String -> OptionObj
@@ -255,7 +249,7 @@ soptER_ :: Flag -> String -> OptionObj
 soptER_ f e = soptE' f Nothing true e
 
 -- short hand to create an Long-OptionObj argument
-loptE' :: Name -> (Maybe ArgumentObj) -> IsRepeatable -> String -> OptionObj
+loptE' :: Name -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> OptionObj
 loptE' n a r e = {
   flag:       Nothing
 , name:       pure n
@@ -264,10 +258,10 @@ loptE' n a r e = {
 , repeatable: r
 }
 
-loptE :: Name -> ArgumentObj -> String -> OptionObj
+loptE :: Name -> OptionArgumentObj -> String -> OptionObj
 loptE n a e = loptE' n (Just a) false e
 
-loptER :: Name -> ArgumentObj -> String -> OptionObj
+loptER :: Name -> OptionArgumentObj -> String -> OptionObj
 loptER n a e = loptE' n (Just a) true e
 
 loptE_ :: Name -> String -> OptionObj

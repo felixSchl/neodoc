@@ -5,7 +5,6 @@ import Data.Maybe (Maybe(..))
 import Data.List (List(..), toList, length, fromList, singleton)
 import Language.Docopt.Value
 import Language.Docopt.Argument
-import qualified Language.Docopt.Argument.Option as O
 
 -- short hand to create a Command
 co :: String -> Argument
@@ -38,13 +37,13 @@ grr = gr false
 br :: (Array Argument) -> Branch
 br xs = Branch (toList xs)
 
-oa :: String -> Value -> O.ArgumentObj
+oa :: String -> Value -> OptionArgumentObj
 oa n v =  { name: n
           , optional: false
           , default: Just v
           }
 
-oa_ :: String -> O.ArgumentObj
+oa_ :: String -> OptionArgumentObj
 oa_ n = { name:     n
         , optional: false
         , default:  Nothing

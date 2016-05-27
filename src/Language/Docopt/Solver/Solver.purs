@@ -7,10 +7,6 @@ import Prelude
 import Data.Array as A
 import Data.String as S
 import Data.String.Unsafe as US
-import Language.Docopt.Argument as Arg
-import Language.Docopt.Argument.Option as O
-import Language.Docopt.Parser.Desc as DE
-import Language.Docopt.Parser.Usage.Option as UO
 import Control.Alt ((<|>))
 import Control.MonadPlus (guard)
 import Control.MonadPlus.Partial (mpartition)
@@ -26,7 +22,13 @@ import Data.String (fromChar, fromCharArray, toCharArray, toUpper)
 import Data.String.Ext ((^=), endsWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
-import Language.Docopt.Argument (runBranch, Argument(..), Branch(..), OptionObj)
+
+import Language.Docopt.Argument as Arg
+import Language.Docopt.Argument.Option as O
+import Language.Docopt.Parser.Desc as DE
+import Language.Docopt.Parser.Usage.Option as UO
+import Language.Docopt.Argument ( runBranch, Argument(..), Branch(..), OptionObj
+                                , OptionArgumentObj)
 import Language.Docopt.Errors (SolveError(..))
 import Language.Docopt.Parser.Desc (Desc)
 import Language.Docopt.Parser.Usage (Usage(..)) as U
@@ -472,7 +474,7 @@ solveBranch as ds = Branch <$> go as
     -- | description, returning the most complete argument known.
     resolveOptArg :: Maybe { name :: String, optional :: Boolean }
                   -> Maybe DE.Argument
-                  -> Either SolveError (Maybe O.ArgumentObj)
+                  -> Either SolveError (Maybe OptionArgumentObj)
 
     resolveOptArg (Just a) Nothing = do
       return <<< pure $ { name: a.name
@@ -494,7 +496,7 @@ solveBranch as ds = Branch <$> go as
     resolveOptArg _ _ = return Nothing
 
     convertArg :: Maybe { name :: String, optional :: Boolean }
-               -> Maybe O.ArgumentObj
+               -> Maybe OptionArgumentObj
     convertArg arg = do
       a <- arg
       return $ { name:     a.name
