@@ -77,17 +77,17 @@ run :: forall e
      . String
     -> Options
     -> Eff (DocoptEff e) (StrMap Value)
-run d o = do
-  argv <- maybe (A.drop 2 <$> Process.argv) (pure <<< id) o.argv
-  env  <- maybe Process.getEnv              (pure <<< id) o.env
+run helpText opts = do
+  argv <- maybe (A.drop 2 <$> Process.argv) (pure <<< id) opts.argv
+  env  <- maybe Process.getEnv              (pure <<< id) opts.env
   either onError pure do
-          { specification, usage } <- parseDocopt d o.smartOptions
+          { specification, usage } <- parseDocopt helpText opts
           lmap ((help usage) <> _) do
-            evalDocopt specification env argv o.optionsFirst
+            evalDocopt specification env argv opts
 
   where
     onError e = do
-      if not o.dontExit
+      if not opts.dontExit
         then do
           Console.log e
           Process.exit 1

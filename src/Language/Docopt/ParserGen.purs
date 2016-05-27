@@ -30,9 +30,10 @@ import Language.Docopt.ParserGen.Lexer (lex) as G
 type Result = Tuple D.Branch (List G.ValueMapping)
 
 -- | Generate a parser for a given program specification.
-genParser :: D.Program       -- ^ the program to generate a parser for
-          -> G.GenOptionsObj   -- ^ Generator opts
-          -> G.Parser Result -- ^ the generated parser
+genParser :: forall r
+           . D.Program         -- ^ the program to generate a parser for
+          -> G.GenOptionsObj r -- ^ Generator opts
+          -> G.Parser Result   -- ^ the generated parser
 genParser = G.genUsageParser
 
 -- | Run a parser against user input.

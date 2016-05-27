@@ -38,6 +38,22 @@ type Docopt = {
 , specification :: List D.Usage
 }
 
+type ParseOptsObj r = {
+  smartOptions :: Boolean
+  | r
+}
+
+type EvalOptsObj r = {
+  optionsFirst :: Boolean
+  | r
+}
+
+type Opts r = {
+  smartOptions :: Boolean
+, optionsFirst :: Boolean
+  | r
+}
+
 data Origin
   = Argv
   | Environment
@@ -47,12 +63,14 @@ data Origin
 -- | Parse the docopt text and produce a parser
 -- | that can be applied to user input.
 -- |
-parseDocopt :: String  -- ^ The docopt text
-            -> Boolean -- ^ Enable smart-options
-            -> Either String Docopt
-parseDocopt docopt smartOpts = do
+parseDocopt
+  :: forall r
+   .  String        -- ^ The docopt text
+  -> ParseOptsObj r -- ^ Parse options
+  -> Either String Docopt
+parseDocopt docopt opts = do
   doc <- toScanErr       $ Scanner.scan $ dedent docopt
-  us  <- toUsageParseErr $ Usage.run doc.usage smartOpts
+  us  <- toUsageParseErr $ Usage.run doc.usage opts.smartOptions
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve us ds
   pure $ { specification: prg , usage: doc.usage }
@@ -60,30 +78,33 @@ parseDocopt docopt smartOpts = do
 -- |
 -- | Apply the generated docopt parser to user input.
 -- |
-evalDocopt  :: List D.Usage      -- ^ The program specification
-            -> StrMap String     -- ^ The environment
-            -> Array String      -- ^ The user input
-            -> Boolean           -- ^ Enable "options-first"
-            -> Either String (StrMap D.Value)
-evalDocopt prg env argv optsFirst = do
+evalDocopt
+  :: forall r
+   . List D.Usage  -- ^ The program specification
+  -> StrMap String -- ^ The environment
+  -> Array String  -- ^ The user input
+  -> EvalOptsObj r -- ^ The eval opts
+  -> Either String (StrMap D.Value)
+evalDocopt prg env argv opts = do
   vs <- toUserParseErr argv
           $ G.runParser env argv
-            $ G.genParser prg { optionsFirst: optsFirst }
+            $ G.genParser prg opts
   pure $ uncurry (T.reduce prg env) vs
 
 -- |
 -- | Parse the docopt source, derive a parser and then
 -- | apply it to user input.
 -- |
-runDocopt :: String        -- ^ The docopt text
-          -> StrMap String -- ^ The environment
-          -> Array String  -- ^ The user input
-          -> Boolean       -- ^ Enable "options-first"
-          -> Boolean       -- ^ Enable "smart-options"
-          -> Either String (StrMap D.Value)
-runDocopt docopt env argv optsFirst smartOpts = do
-  { specification } <- parseDocopt docopt smartOpts
-  evalDocopt specification env argv optsFirst
+runDocopt
+  :: forall r
+   . String         -- ^ The docopt text
+  -> StrMap String  -- ^ The environment
+  -> Array String   -- ^ The user input
+  -> Opts r         -- ^ Parse and eval opts
+  -> Either String (StrMap D.Value)
+runDocopt docopt env argv opts = do
+  { specification } <- parseDocopt docopt opts
+  evalDocopt specification env argv opts
 
 toScanErr :: forall a. Either P.ParseError a -> Either String a
 toScanErr  = lmap (D.prettyPrintDocoptError <<< D.DocoptScanError)

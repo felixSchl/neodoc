@@ -208,8 +208,7 @@ genCompatSpec = do
               let result = runDocopt (dedent doc)
                                      (fromMaybe StrMap.empty options.env)
                                      argv
-                                     options.optionsFirst
-                                     options.smartOptions
+                                     options
               vliftEff $ case result of
                 Left e ->
                   either

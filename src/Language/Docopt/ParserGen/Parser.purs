@@ -123,8 +123,9 @@ modifyDepth :: (Int -> Int) -> Parser Unit
 modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
 
 -- | The options for generating a parser
-type GenOptionsObj = {
+type GenOptionsObj r = {
   optionsFirst :: Boolean
+  | r
 }
 
 --------------------------------------------------------------------------------
@@ -329,8 +330,9 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 
 
 -- | Generate a parser for a single program usage.
-genUsageParser :: List D.Usage  -- ^ The list of usage specs
-               -> GenOptionsObj -- ^ Generator options
+genUsageParser :: forall r
+                . List D.Usage    -- ^ The list of usage specs
+               -> GenOptionsObj r -- ^ Generator options
                -> Parser (Tuple D.Branch (List ValueMapping))
 genUsageParser xs genOpts = do
     genBranchesParser (concat $ D.runUsage <$> xs)
@@ -340,10 +342,11 @@ genUsageParser xs genOpts = do
 
 -- | Generate a parser that selects the best branch it parses and
 -- | fails if no branch was parsed.
-genBranchesParser :: List D.Branch -- ^ The branches to test
-                  -> Boolean       -- ^ Expect EOF after each branch
-                  -> GenOptionsObj -- ^ Generator options
-                  -> Boolean       -- ^ Can we skip input via fallbacks?
+genBranchesParser :: forall r
+                   . List D.Branch   -- ^ The branches to test
+                  -> Boolean         -- ^ Expect EOF after each branch
+                  -> GenOptionsObj r -- ^ Generator options
+                  -> Boolean         -- ^ Can we skip input via fallbacks?
                   -> Parser (Tuple D.Branch (List ValueMapping))
 genBranchesParser xs term genOpts canSkip
   = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
@@ -441,9 +444,10 @@ genBranchesParser xs term genOpts canSkip
         o.result)
 
 -- | Generate a parser for a single usage branch
-genBranchParser :: D.Branch      -- ^ The branch to match
-                -> GenOptionsObj -- ^ Generator options
-                -> Boolean       -- ^ Can we skip input via fallbacks?
+genBranchParser :: forall r
+                 . D.Branch        -- ^ The branch to match
+                -> GenOptionsObj r -- ^ Generator options
+                -> Boolean         -- ^ Can we skip input via fallbacks?
                 -> Parser (List ValueMapping)
 genBranchParser (D.Branch xs) genOpts canSkip = do
   modifyDepth (const 0) -- reset the depth counter
