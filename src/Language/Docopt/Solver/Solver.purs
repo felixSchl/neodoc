@@ -7,10 +7,6 @@ import Prelude
 import Data.Array as A
 import Data.String as S
 import Data.String.Unsafe as US
-import Language.Docopt.Argument as Arg
-import Language.Docopt.Option as O
-import Language.Docopt.Parser.Desc as DE
-import Language.Docopt.Parser.Usage.Option as UO
 import Control.Alt ((<|>))
 import Control.MonadPlus (guard)
 import Control.MonadPlus.Partial (mpartition)
@@ -26,6 +22,11 @@ import Data.String (fromChar, fromCharArray, toCharArray, toUpper)
 import Data.String.Ext ((^=), endsWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
+
+import Language.Docopt.Argument as Arg
+import Language.Docopt.Argument.Option as O
+import Language.Docopt.Parser.Desc as DE
+import Language.Docopt.Parser.Usage.Option as UO
 import Language.Docopt.Argument (runBranch, Argument(..), Branch(..))
 import Language.Docopt.Errors (SolveError(..))
 import Language.Docopt.Parser.Desc (Desc)
@@ -46,8 +47,8 @@ data ResolveTo a b
   | Unresolved b
 
 instance showResolveTo :: (Show a, Show b) => Show (ResolveTo a b) where
-  show (Resolved   a) = "Resolved "   ++ show a
-  show (Unresolved b) = "Unresolved " ++ show b
+  show (Resolved   a) = "Resolved "   <> show a
+  show (Unresolved b) = "Unresolved " <> show b
 
 fail :: forall a. String -> Either SolveError a
 fail = Left <<< SolveError
@@ -87,19 +88,18 @@ solveBranch as ds = Branch <$> go as
                       let converted = Group
                             true
                             (singleton $ Branch $ singleton $ Option $
-                              (O.Option {
-                                  flag:       DE.getFlag opt.name
+                                { flag:       DE.getFlag opt.name
                                 , name:       DE.getName opt.name
-                                , arg:        convArg opt.arg
+                                , arg:        opt.arg
                                 , env:        opt.env
                                 , repeatable: false
                                 }
-                              ))
+                            )
                             opt.repeatable
                        in map (converted:args) xs
 
                   where
-                    isMatch (Option (O.Option o))
+                    isMatch (Option o)
                       = if isJust (DE.getFlag opt.name) &&
                            isJust (o.flag)
                            then fromMaybe false do
@@ -114,8 +114,6 @@ solveBranch as ds = Branch <$> go as
                     isMatch (Group _ bs _)
                       = any isMatch (concat $ runBranch <$> bs)
                     isMatch _ = false
-
-                    convArg arg = O.Argument <<< DE.runArgument <$> arg
                 map args (Cons _ xs) = map args xs
                 map args _ = args
             expand' (Tuple args _) = args
@@ -129,19 +127,19 @@ solveBranch as ds = Branch <$> go as
     solveArgs :: U.Branch -> Either SolveError
                                     (List (ResolveTo Argument
                                                      Reference))
-    solveArgs Nil = return Nil
+    solveArgs Nil = pure Nil
     solveArgs (Cons x Nil) = do
       m <- solveArg x Nothing
-      return case m of
+      pure case m of
            Resolved (Slurp xs) -> Resolved <$> xs
            Resolved (Keep xs)  -> Resolved <$> xs
            Unresolved a        -> singleton $ Unresolved a
     solveArgs (Cons x (Cons y xs)) = do
       m <- solveArg x (Just y)
       case m of
-           Resolved (Keep  zs) -> ((Resolved <$> zs) ++ _) <$> solveArgs (y:xs)
-           Resolved (Slurp zs) -> ((Resolved <$> zs) ++ _) <$> solveArgs xs
-           Unresolved a        -> ((singleton $ Unresolved a) ++ _)
+           Resolved (Keep  zs) -> ((Resolved <$> zs) <> _) <$> solveArgs (y:xs)
+           Resolved (Slurp zs) -> ((Resolved <$> zs) <> _) <$> solveArgs xs
+           Unresolved a        -> ((singleton $ Unresolved a) <> _)
                                     <$> solveArgs (y:xs)
 
     simpleResolve v = Right $ Resolved $ Keep $ singleton v
@@ -165,12 +163,12 @@ solveBranch as ds = Branch <$> go as
           flip solveBranch ds `traverse` bs
 
     solveArg (U.Reference r) _ = do
-      return $ Unresolved r
+      pure $ Unresolved r
 
-    solveArg (lopt@(U.Option (opt@(UO.LOpt o)))) adjArg = do
+    solveArg (U.Option o) adjArg = do
 
       -- Find a matching option description, if any.
-      match <- O.runOption <$> matchDesc o.name
+      match <- matchDesc o.name
 
       -- Check to see if this option has an explicitly bound argument.
       -- In this case, a check to consume an adjacent arg must not take place.
@@ -179,10 +177,10 @@ solveBranch as ds = Branch <$> go as
           -- Note: There is no check to see if an explicit argument is
           --       the same as specified in the option descriptions for
           --       convenience to the user.
-          return  $ Resolved
+          pure  $ Resolved
                   $ Keep
                   $ singleton
-                  $ Option $ O.Option match
+                  $ Option match
 
         Nothing -> do
           -- Look ahead if any of the following arguments should be slurped.
@@ -191,55 +189,55 @@ solveBranch as ds = Branch <$> go as
           -- `isRepeated` flag should be inherited.
           let mr = do
                 guard (not o.repeatable)
-                matchedArg <- O.runArgument <$> match.arg
+                matchedArg <- match.arg
 
                 case adjArg of
                   Just (U.Positional n r) ->
-                    return $ r <$ guardArgs n matchedArg.name
+                    pure $ r <$ guardArgs n matchedArg.name
                   Just (U.Command n r) ->
-                    return $ r <$ guardArgs n matchedArg.name
+                    pure $ r <$ guardArgs n matchedArg.name
                   otherwise ->
                     if not (matchedArg.optional)
                       then
-                        return $ fail
+                        pure $ fail
                           $ "Option-Argument specified in options-section missing"
-                            ++ " --" ++ o.name
+                            <> " --" <> o.name
                       else Nothing
 
           case mr of
-            Nothing -> return $ Resolved
+            Nothing -> pure $ Resolved
                               $ Keep
                               $ singleton
-                              $ Option $ O.Option match
+                              $ Option match
             Just er -> do
               r <- er
-              return  $ Resolved
+              pure  $ Resolved
                       $ Slurp
                       $ singleton
-                      $ Option $ O.Option $ match { repeatable = r }
+                      $ Option $ match { repeatable = r }
 
       where
         guardArgs :: String -> String -> Either SolveError Boolean
-        guardArgs n n' | n ^= n' = return true
+        guardArgs n n' | n ^= n' = pure true
         guardArgs n n' = fail
-          $ "Arguments mismatch for option --" ++ o.name ++ ": "
-              ++ show n ++ " and " ++ show n'
+          $ "Arguments mismatch for option --" <> o.name <> ": "
+              <> show n <> " and " <> show n'
 
-        matchDesc :: String -> Either SolveError O.Option
+        matchDesc :: String -> Either SolveError O.OptionObj
         matchDesc n =
           case filter isMatch ds of
             xs | length xs > 1 -> fail
-              $ "Multiple option descriptions for option --" ++ n
+              $ "Multiple option descriptions for option --" <> n
             (Cons (DE.OptionDesc desc) Nil) -> do
               arg <- resolveOptArg o.arg desc.arg
-              return $ O.Option { flag:       DE.getFlag desc.name
-                                , name:       DE.getName desc.name
-                                , arg:        arg
-                                , env:        desc.env
-                                , repeatable: o.repeatable
-                                }
+              pure $ { flag:       DE.getFlag desc.name
+                       , name:       DE.getName desc.name
+                       , arg:        arg
+                       , env:        desc.env
+                       , repeatable: o.repeatable
+                       }
             -- default fallback: construct the option from itself alone
-            _ -> return $ O.Option
+            _ -> pure
                     $ { flag:       Nothing
                       , name:       pure n
                       , env:        Nothing
@@ -252,7 +250,7 @@ solveBranch as ds = Branch <$> go as
             isMatch _ = false
 
 
-    solveArg (U.OptionStack (opt@(UO.SOpt o))) adj
+    solveArg (U.OptionStack o) adj
       = fromSubsumption <|> fromAdjacentArgOrDefault
 
       where
@@ -269,7 +267,7 @@ solveBranch as ds = Branch <$> go as
         -- |    `-- the flag matches - case SENSITIVE
         -- |
         -- | Should this check yield a match, slice the matched
-        -- | string off the stack and return the remainder option
+        -- | string off the stack and pure the remainder option
         -- | stack (if any).
         -- |
         -- | The remaining options, must - in turn - be solved, too.
@@ -286,13 +284,13 @@ solveBranch as ds = Branch <$> go as
           --      the case. It would be an awkward user-facing error.
           if isJust o.arg
             then fail $ "Option stacks with explicit argument binding "
-                     ++ "may not be subsumed."
+                     <> "may not be subsumed."
             else pure unit
 
           let fs  = fromCharArray $ o.flag A.: o.stack
 
           maybe (fail "No description subsumed option")
-                return
+                pure
                 -- XXX: Purescript is not lazy, so this is too expensive.
                 --      We can just stop at the first `Just` value.
                 (head $ catMaybes $ subsume fs <$> ds)
@@ -302,27 +300,26 @@ solveBranch as ds = Branch <$> go as
                                                           Reference)
             subsume fs (DE.OptionDesc d) = do
               f <- DE.getFlag d.name
-              a <- DE.runArgument <$> d.arg
+              a <- d.arg
 
               -- the haystack needs to be modified, such that the
               -- the last (length a.name) characters are uppercased
               -- and hence compared case INSENSITIVELY.
-              let needle = toUpper $ fromChar f ++ a.name
+              let needle = toUpper $ fromChar f <> a.name
                   haystack = toUpper fs
 
               (Tuple fs o) <- if endsWith needle haystack
                 then
                   let ix = S.length haystack - S.length needle
                    in if US.charAt ix fs == f
-                        then return
+                        then pure
                           $ Tuple (toCharArray (S.take (S.length fs - S.length a.name - 1) fs))
-                                  (O.Option {
-                                    flag:       pure f
+                                  { flag:       pure f
                                   , name:       DE.getName d.name
-                                  , arg:        pure $ O.Argument a
+                                  , arg:        pure a
                                   , env:        d.env
                                   , repeatable: o.repeatable
-                                  })
+                                  }
                     else Nothing
                 else Nothing
 
@@ -330,9 +327,9 @@ solveBranch as ds = Branch <$> go as
                            (pure <<< id)
                            (matchDesc false `traverse` fs)
 
-              return  $ Resolved
+              pure  $ Resolved
                       $ Keep
-                      $ (Option <$> toList cs) ++ (singleton $ Option o)
+                      $ (Option <$> toList cs) <> (singleton $ Option o)
 
 
             subsume _ _ = Nothing
@@ -365,14 +362,14 @@ solveBranch as ds = Branch <$> go as
 
           -- (flag, ...flags) -> (...flags, flag)
           (Tuple fs f) <- do
-            return case A.last (o.stack) of
+            pure case A.last (o.stack) of
               Just f'  -> Tuple (o.flag A.: (fromJust $ A.init o.stack)) f'
               Nothing -> Tuple [] o.flag
 
           -- Look the trailing option up in the descriptions
           -- and combine it into the most complete option we
           -- can know about at this point.
-          match   <- O.runOption <$> matchDesc true f
+          match   <- matchDesc true f
           matches <- (Option <$> _) <$> (matchDesc false `traverse` fs)
 
           -- Check to see if this option has an explicitly bound argument.
@@ -383,9 +380,9 @@ solveBranch as ds = Branch <$> go as
               -- Note: There is no check to see if an explicit argument is
               --       the same as specified in the option descriptions for
               --       convenience to the user.
-              return $ Resolved $ Keep
+              pure $ Resolved $ Keep
                     $ (toList matches)
-                      ++ (singleton $ Option $ O.Option match)
+                      <> (singleton $ Option match)
 
             Nothing ->
               -- Look ahead if any of the following arguments should be slurped.
@@ -394,68 +391,68 @@ solveBranch as ds = Branch <$> go as
               -- the `isRepeated` flag should be inherited.
               let mr = do
                     guard $ not match.repeatable
-                    arg' <- O.runArgument <$> match.arg
+                    arg' <- match.arg
                     case adj of
                       Just (U.Positional n r) ->
-                        return $ r <$ guardArgs n arg'.name
+                        pure $ r <$ guardArgs n arg'.name
                       Just (U.Command n r) ->
-                        return $ r <$ guardArgs n arg'.name
+                        pure $ r <$ guardArgs n arg'.name
                       otherwise ->
                         if not (arg'.optional)
                           then
-                            return $ fail
+                            pure $ fail
                               $ "Option-Argument specified in options-section missing"
-                                ++ " -" ++ fromChar o.flag
+                                <> " -" <> fromChar o.flag
                           else Nothing
 
                in case mr of
                 Nothing -> do
-                  return $ Resolved $ Keep
+                  pure $ Resolved $ Keep
                     $ (toList matches)
-                      ++ (singleton $ Option $ O.Option match)
+                      <> (singleton $ Option match)
                 Just er -> do
                   r <- er
-                  return $ Resolved $ Slurp
+                  pure $ Resolved $ Slurp
                     $ (toList matches)
-                      ++ (singleton
-                            $ Option $ O.Option match { repeatable = r })
+                      <> (singleton
+                            $ Option $ match { repeatable = r })
 
         guardArgs :: String -> String -> Either SolveError Boolean
-        guardArgs n n' | n ^= n' = return true
+        guardArgs n n' | n ^= n' = pure true
         guardArgs n n' = fail
-          $ "Arguments mismatch for option -" ++ fromChar o.flag ++ ": "
-              ++ show n ++ " and " ++ show n'
+          $ "Arguments mismatch for option -" <> fromChar o.flag <> ": "
+              <> show n <> " and " <> show n'
 
 
         -- | Match a given flag with an option description.
         -- | `isTrailing` indicates if this flag is the last flag
         -- | in it's stack of flags.
 
-        matchDesc :: Boolean -> Char -> Either SolveError O.Option
+        matchDesc :: Boolean -> Char -> Either SolveError O.OptionObj
         matchDesc isTrailing f =
           case filter isMatch ds of
             xs | length xs > 1 -> fail
                     $ "Multiple option descriptions for option -"
-                        ++ fromChar f
+                        <> fromChar f
 
             (Cons (DE.OptionDesc desc) Nil) -> do
               arg <- if isTrailing
                           then resolveOptArg o.arg desc.arg
                           else if isNothing desc.arg
-                            then return Nothing
+                            then pure Nothing
                             else fail
-                              $ "Stacked option -" ++ fromChar f
-                                  ++ " may not specify arguments"
+                              $ "Stacked option -" <> fromChar f
+                                  <> " may not specify arguments"
 
-              return $ O.Option { flag:       DE.getFlag desc.name
-                                , name:       DE.getName desc.name
-                                , arg:        arg
-                                , env:        desc.env
-                                , repeatable: o.repeatable
-                                }
+              pure $ { flag:       DE.getFlag desc.name
+                       , name:       DE.getName desc.name
+                       , arg:        arg
+                       , env:        desc.env
+                       , repeatable: o.repeatable
+                       }
 
             -- default fallback: construct the option from itself alone
-            _ -> return $ O.Option
+            _ -> pure
                     $ { flag: pure f
                       , name: Nothing
                       , env:  Nothing
@@ -471,37 +468,37 @@ solveBranch as ds = Branch <$> go as
             isMatch _ = false
 
     -- | Resolve an option's argument name against that given in the
-    -- | description, returning the most complete argument known.
+    -- | description, pureing the most complete argument known.
     resolveOptArg :: Maybe { name :: String, optional :: Boolean }
-                  -> Maybe DE.Argument
-                  -> Either SolveError (Maybe O.Argument)
+                  -> Maybe DE.OptionArgumentObj
+                  -> Either SolveError (Maybe O.OptionArgumentObj)
 
     resolveOptArg (Just a) Nothing = do
-      return <<< pure $ O.Argument { name: a.name
-                                   , optional: a.optional
-                                   , default: Nothing }
+      pure <<< pure $ { name: a.name
+                        , optional: a.optional
+                        , default: Nothing }
 
-    resolveOptArg Nothing (Just (DE.Argument de)) = do
-      return <<< pure $ O.Argument { name:     de.name
-                                   , optional: de.optional
-                                   , default:  de.default }
+    resolveOptArg Nothing (Just de) = do
+      pure <<< pure $ { name:     de.name
+                        , optional: de.optional
+                        , default:  de.default }
 
-    resolveOptArg (Just a) (Just (DE.Argument de)) = do
-      return <<< pure
-        $ O.Argument  { name:     de.name
-                      , optional: de.optional || a.optional
-                      , default:  de.default
-                      }
+    resolveOptArg (Just a) (Just de) = do
+      pure <<< pure
+        $ { name:     de.name
+          , optional: de.optional || a.optional
+          , default:  de.default
+          }
 
-    resolveOptArg _ _ = return Nothing
+    resolveOptArg _ _ = pure Nothing
 
     convertArg :: Maybe { name :: String, optional :: Boolean }
-               -> Maybe O.Argument
+               -> Maybe O.OptionArgumentObj
     convertArg arg = do
       a <- arg
-      return $ O.Argument { name:     a.name
-                          , optional: a.optional
-                          , default:  Nothing }
+      pure $ { name:     a.name
+               , optional: a.optional
+               , default:  Nothing }
 
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
 solveUsage (U.Usage _ bs) ds = Usage <$> do traverse (flip solveBranch ds) bs

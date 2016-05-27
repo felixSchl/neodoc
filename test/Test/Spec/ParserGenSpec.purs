@@ -404,13 +404,13 @@ parserGenSpec = \_ -> describe "The parser generator" do
     describe (intercalate " | " $ prettyPrintBranch <<< D.br <$> bs) do
       for_ kases \(Case input env expected) ->
             let msg = either
-                  (\e -> "Should fail with \"" ++ e ++ "\"")
+                  (\e -> "Should fail with \"" <> e <> "\"")
                   prettyPrintOut
                   expected
                 premsg = if A.length input > 0
                             then intercalate " " input
                             else "(no input)"
-            in it (premsg ++ " -> " ++ msg) do
+            in it (premsg <> " -> " <> msg) do
                   vliftEff do
                     validate bs
                              input
@@ -420,12 +420,12 @@ parserGenSpec = \_ -> describe "The parser generator" do
     where
 
       prettyPrintOut :: StrMap Value -> String
-      prettyPrintOut m = "\n\t" ++ prettyPrintStrMap m
+      prettyPrintOut m = "\n\t" <> prettyPrintStrMap m
 
       prettyPrintStrMap :: StrMap Value -> String
       prettyPrintStrMap m = intercalate "\n\t" $
         StrMap.toList m <#> \(Tuple arg val) ->
-          arg ++ " => " ++ prettyPrintValue val
+          arg <> " => " <> prettyPrintValue val
 
       validate :: forall eff.  List (Array Argument)
                             -> Array String
@@ -438,7 +438,9 @@ parserGenSpec = \_ -> describe "The parser generator" do
                 <$> runParser
                       env
                       argv
-                      (genParser prg false)
+                      (genParser prg {
+                        optionsFirst: false
+                      })
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->
@@ -446,7 +448,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
               (\e' ->
                 if (msg /= e')
                   then throwException $ error $
-                    "Unexpected error:\n" ++ msg
+                    "Unexpected error:\n" <> msg
                   else return unit)
               (const $ throwException $ error $ show e)
               expected
@@ -454,14 +456,18 @@ parserGenSpec = \_ -> describe "The parser generator" do
             either
               (\e ->
                 throwException $ error $
-                  "Missing expected exception:\n"
-                    ++ show e
-                    ++ "\n\ninstead received output:\n"
-                    ++ prettyPrintOut r)
+                  "Missing expected exception:"
+                    <> "\n"
+                    <> show e
+                    <> "\n"
+                    <> "\n"
+                    <> "instead received output:"
+                    <> "\n"
+                    <> prettyPrintOut r)
               (\r' ->
                 if (r /= r')
                   then throwException $ error $
                     "Unexpected output:\n"
-                      ++ prettyPrintOut r
+                      <> prettyPrintOut r
                   else return unit)
               expected

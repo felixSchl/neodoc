@@ -19,14 +19,14 @@ import Text.Parsing.Parser.Pos (Position(..)) as P
 traceState :: TokenParser String
 traceState = do
   (st :: ParserState) <- lift get
-  return $ "(" ++ (show st.line) ++ "|" ++ (show st.indentation) ++ ")"
+  pure $ "(" <> (show st.line) <> "|" <> (show st.indentation) <> ")"
 
 -- |
 -- Get the position of the token at the head of the stream.
 --
 getTokenPosition :: TokenParser P.Position
 getTokenPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
-  return case s of
+  pure case s of
     Cons (PositionedToken { sourcePos: spos }) _ ->
       { input: s, result: Right spos, consumed: false, position: pos }
     _ ->
@@ -43,7 +43,7 @@ markIndent p = do
     lift $ modify \st -> ((st { indentation = pos }) :: ParserState)
     a <- p
     lift $ modify \st -> ((st { indentation = current }) :: ParserState)
-    return a
+    pure a
 
 -- |
 -- Mark the current line
@@ -56,7 +56,7 @@ markLine p = do
     lift $ modify \st -> ((st { line = pos }) :: ParserState)
     a <- p
     lift $ modify \st -> ((st { line = current }) :: ParserState)
-    return a
+    pure a
 
 -- |
 -- Mark a custom indentation level
@@ -67,7 +67,7 @@ markIndent' level p = do
   lift $ modify \st -> ((st { indentation = level }) :: ParserState)
   a <- p
   lift $ modify \st -> ((st { indentation = current }) :: ParserState)
-  return a
+  pure a
 
 -- |
 -- Check that the current identation level matches a predicate

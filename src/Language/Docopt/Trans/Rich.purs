@@ -22,7 +22,7 @@ import Control.Alt ((<|>))
 import Language.Docopt.Value (Value(..))
 import Language.Docopt.Value as Value
 import Language.Docopt.Usage (Usage(Usage), runUsage) as D
-import Language.Docopt.Option as O
+import Language.Docopt.Argument.Option as O
 import Language.Docopt.Env (Env)
 import Language.Docopt.Env as Env
 import Language.Docopt.Argument (Argument(..), Branch(..), isRepeatable,
@@ -39,7 +39,7 @@ reduce :: List D.Usage       -- ^ the program specification
        -> List ValueMapping  -- ^ the parse result
        -> StrMap RichValue   -- ^ the output set of (arg => val)
 reduce us env b vs =
-  let vm = Map.fromFoldableWith (++) (rmap singleton <$>
+  let vm = Map.fromFoldableWith (<>) (rmap singleton <$>
                                             lmap key <$>
                                             reverse vs)
       m = applyValues vm $ reduceUsage (D.Usage (singleton b))
@@ -51,7 +51,7 @@ reduce us env b vs =
   mergeVals (RichValue v) (RichValue v') = RichValue $ {
     origin: fromJust $ maximum [ v.origin, v'.origin ]
   , value:  ArrayValue $ Value.intoArray v'.value
-                      ++ Value.intoArray v.value
+                      <> Value.intoArray v.value
   }
 
   applyValues :: Map Key (List RichValue) -> List D.Argument -> Map Key RichValue
@@ -71,7 +71,7 @@ reduce us env b vs =
                               else v.value
                     }
 
-      return $ (Tuple (key a)) <$> vs''''
+      pure $ (Tuple (key a)) <$> vs''''
 
     where
     isRelevant a = Map.member (key a) vm
@@ -86,7 +86,7 @@ reduce us env b vs =
                         if D.isFlag a || D.isCommand a
                           then case rv.value of
                             ArrayValue xs ->
-                              return
+                              pure
                                 $ IntValue (A.length $ flip A.filter xs \x ->
                                     case x of
                                         BoolValue b -> b
@@ -95,7 +95,7 @@ reduce us env b vs =
                             BoolValue b ->
                               if D.isRepeatable a
                                   then
-                                    return if b
+                                    pure if b
                                               then IntValue 1
                                               else IntValue 0
                                   else Nothing
@@ -141,13 +141,12 @@ reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
     expand arg = Map.singleton (key arg) arg
 
     resolveAcrossBranches :: D.Argument -> D.Argument -> D.Argument
-    resolveAcrossBranches (D.Option (O.Option o))
-              (D.Option (O.Option o'))
-        = D.Option (O.Option o {
+    resolveAcrossBranches (D.Option o) (D.Option o')
+        = D.Option (o {
                     arg = do
-                      a  <- O.runArgument <$> (o.arg  <|> o'.arg)
-                      a' <- O.runArgument <$> (o'.arg <|> o.arg )
-                      return $ O.Argument {
+                      a  <- o.arg  <|> o'.arg
+                      a' <- o'.arg <|> o.arg
+                      pure {
                         name:     a.name
                       , default:  a.default  <|> a'.default
                       , optional: a.optional || a'.optional
@@ -158,13 +157,12 @@ reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
                                                    D.isRepeatable b)
 
     resolveInSameBranch :: D.Argument -> D.Argument -> D.Argument
-    resolveInSameBranch (D.Option (O.Option o))
-              (D.Option (O.Option o'))
-        = D.Option (O.Option o {
+    resolveInSameBranch (D.Option o) (D.Option o')
+        = D.Option (o {
                     arg = do
-                      a  <- O.runArgument <$> (o.arg  <|> o'.arg)
-                      a' <- O.runArgument <$> (o'.arg <|> o.arg )
-                      return $ O.Argument {
+                      a  <- o.arg  <|> o'.arg
+                      a' <- o'.arg <|> o.arg
+                      pure {
                         name:     a.name
                       , default:  a.default  <|> a'.default
                       , optional: a.optional || a'.optional

@@ -7,6 +7,7 @@ module Language.Docopt.Parser.Usage (
 
 import Prelude
 import Debug.Trace
+import Data.Functor (($>))
 import Language.Docopt.Parser.Lexer as L
 import Language.Docopt.Parser.Usage.Option as O
 import Language.Docopt.Parser.Usage.Usage as U
@@ -79,31 +80,31 @@ usageParser smartOpts = do
               many elem
             many elem
           many elem
-          return $ Just EOA
+          pure $ Just EOA
       , (do
           L.eof <|> (P.lookAhead $ lessIndented <|> sameIndent)
-          return Nothing
+          pure Nothing
         )
         -- XXX: We could show the last token that failed to be consumed, here
         <?> "End of usage line"
       ]
 
       -- Push the EOA onto the last branch (the most right branch)
-      return $ maybe xs id do
+      pure $ maybe xs id do
         e <- eoa
         modifyAt
           (length xs - 1)
-          (\as -> as ++ (singleton e))
+          (\as -> as <> (singleton e))
           xs
 
     maybeInParens p = do
       Tuple close v <- moreIndented *> do
         Tuple
-          <$> (P.optionMaybe $ P.choice [ L.lparen  *> return L.rparen
-                                        , L.lsquare *> return L.rsquare ])
+          <$> (P.optionMaybe $ P.choice [ L.lparen  *> pure L.rparen
+                                        , L.lsquare *> pure L.rsquare ])
           <*> p
       fromMaybe (pure unit) close
-      return v
+      pure v
 
     elem :: L.TokenParser Argument
     elem = defer \_ -> do
@@ -120,24 +121,24 @@ usageParser smartOpts = do
     trySmartOpt grp@(Group oo bs r) = fromMaybe grp $ do
       Tuple opt optarg <- case bs of
                               (Cons (Cons opt' (Cons arg' Nil)) Nil) ->
-                                return $ Tuple opt' arg'
+                                pure $ Tuple opt' arg'
                               otherwise -> Nothing
 
       optf <- do
         case opt of
-              (Option (O.LOpt o)) | isNothing o.arg ->
-                return $ \argName isArgOptional isRepeatable ->
-                  Option $ O.LOpt $ o {
-                    arg = return {
+              (Option o) | isNothing o.arg ->
+                pure $ \argName isArgOptional isRepeatable ->
+                  Option $ o {
+                    arg = pure {
                       name:     argName
                     , optional: isArgOptional
                     }
                   , repeatable = isRepeatable
                   }
-              (OptionStack (O.SOpt o)) | isNothing o.arg ->
-                return $ \argName isArgOptional isRepeatable ->
-                  OptionStack $ O.SOpt $ o {
-                    arg = return {
+              (OptionStack o) | isNothing o.arg ->
+                pure $ \argName isArgOptional isRepeatable ->
+                  OptionStack $ o {
+                    arg = pure {
                       name:     argName
                     , optional: isArgOptional
                     }
@@ -147,22 +148,22 @@ usageParser smartOpts = do
 
       (Tuple (Tuple name isRepeatable) isOptional) <- do
         case optarg of
-              (Positional n r') -> return $ tuple3 n (r' || r) false
-              (Command    n r') -> return $ tuple3 n (r' || r) false
+              (Positional n r') -> pure $ tuple3 n (r' || r) false
+              (Command    n r') -> pure $ tuple3 n (r' || r) false
               (Group o (Cons (Cons a Nil) Nil) r) ->
                 case a of
-                  (Positional n r') -> return $ tuple3 n (r' || r) o
-                  (Command    n r') -> return $ tuple3 n (r' || r) o
+                  (Positional n r') -> pure $ tuple3 n (r' || r) o
+                  (Command    n r') -> pure $ tuple3 n (r' || r) o
                   otherwise -> Nothing
               otherwise -> Nothing
-      return
+      pure
         $ Group oo
                 (singleton $ singleton (optf name isOptional isRepeatable))
                 r
     trySmartOpt x = x
 
     stdin :: L.TokenParser Argument
-    stdin = L.dash *> return Stdin
+    stdin = L.dash *> pure Stdin
 
     longOption :: L.TokenParser Argument
     longOption = Option <$> do
@@ -181,14 +182,12 @@ usageParser smartOpts = do
     reference = Reference <$> L.reference
 
     positional :: L.TokenParser Argument
-    positional = Positional
-      <$> (L.angleName <|> L.shoutName)
-      <*> repetition
+    positional = Positional <$> (L.angleName <|> L.shoutName)
+                            <*> repetition
 
     command :: L.TokenParser Argument
-    command = Command
-      <$> L.name
-      <*> repetition
+    command = Command <$> L.name
+                      <*> repetition
 
     group :: L.TokenParser Argument
     group = defer \_ -> P.choice [ reqGroup , optGroup ]
@@ -210,9 +209,9 @@ usageParser smartOpts = do
       <*> repetition
 
     repetition :: L.TokenParser Boolean
-    repetition = P.choice
-      [ P.try $ indented *> L.tripleDot *> return true
-      , return false ]
+    repetition = P.choice [ P.try $ indented *> L.tripleDot $> true
+                          , pure false
+                          ]
 
     program :: L.TokenParser String
     program = "Program name" <??> L.name

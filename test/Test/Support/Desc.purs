@@ -4,23 +4,26 @@ import Prelude
 import Data.Maybe (Maybe(..))
 
 import Language.Docopt.Value
-import Language.Docopt.Parser.Desc as Desc
+import Language.Docopt.Parser.Desc
 
-arg :: String -> Boolean -> Maybe Value -> Desc.Argument
-arg = Desc.argument
+arg :: String -> Boolean -> Maybe Value -> OptionArgumentObj
+arg = argument
 
-opt :: Desc.Name -> Maybe Desc.Argument -> Desc.Desc
-opt n a = Desc.OptionDesc { name:       n
-                          , arg:        a
-                          , env:        Nothing
-                          , repeatable: false
-                          }
+opt :: Name -> Maybe OptionArgumentObj -> Desc
+opt n a = OptionDesc { name:       n
+                     , arg:        a
+                     , env:        Nothing
+                     , repeatable: false
+                     }
 
-lname :: String -> Desc.Name
-lname = Desc.Long
+lname :: String -> Name
+lname = Long
 
-sname :: Char -> Desc.Name
-sname = Desc.Flag
+sname :: Char -> Name
+sname = Flag
 
-fname :: Char -> String -> Desc.Name
-fname = Desc.Full
+fname :: Char -> String -> Name
+fname = Full
+
+argument :: String -> Boolean -> Maybe Value -> OptionArgumentObj
+argument n o d = { name: n, default: d, optional: o }

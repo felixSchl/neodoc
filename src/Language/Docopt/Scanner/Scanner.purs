@@ -15,11 +15,15 @@ import Data.String as Str
 import Data.Maybe (maybe)
 import Data.Either (Either(Left))
 
-type Docopt = { usage :: String, options :: List String }
+type Docopt = {
+  usage         :: String
+, options       :: List String
+, originalUsage :: String
+}
 
 section :: String -> Regex
 section name
-  = regex ("^([^\n]*" ++ name ++ "[^\n]*:(?:.*$)\n?(?:(?:[ \t].*)?(?:\n|$))*)")
+  = regex ("^([^\n]*" <> name <> "[^\n]*:(?:.*$)\n?(?:(?:[ \t].*)?(?:\n|$))*)")
           (Regex.parseFlags "gmi")
 
 fixSection :: String -> String
@@ -34,12 +38,13 @@ scan :: String -> Either P.ParseError Docopt
 scan text = do
   u <- case sections "usage" of
               Nil        -> fail "No usage section found!"
-              Cons x Nil -> return x
+              Cons x Nil -> pure x
               _          -> fail "Multiple usage sections found!"
 
-  return {
-    usage:   fixSection u
-  , options: fixSection <$> sections "options"
+  pure {
+    usage:         fixSection u
+  , options:       fixSection <$> sections "options"
+  , originalUsage: u
   }
 
   where

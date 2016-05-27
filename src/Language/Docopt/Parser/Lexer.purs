@@ -82,27 +82,27 @@ prettyPrintToken Colon             = show ':'
 prettyPrintToken Comma             = show ','
 prettyPrintToken TripleDot         = "..."
 prettyPrintToken DoubleDash        = "--"
-prettyPrintToken (Reference r)     = "Reference " ++ show r
-prettyPrintToken (Garbage   c)     = "Garbage "   ++ show c
-prettyPrintToken (Tag k v)         = "Tag "       ++ k ++ " "  ++ (show v)
-prettyPrintToken (Name      n)     = "Name "      ++ show n
-prettyPrintToken (ShoutName n)     = "ShoutName " ++ show n
-prettyPrintToken (AngleName n)     = "AngleName " ++ show n
+prettyPrintToken (Reference r)     = "Reference " <> show r
+prettyPrintToken (Garbage   c)     = "Garbage "   <> show c
+prettyPrintToken (Tag k v)         = "Tag "       <> k <> " "  <> (show v)
+prettyPrintToken (Name      n)     = "Name "      <> show n
+prettyPrintToken (ShoutName n)     = "ShoutName " <> show n
+prettyPrintToken (AngleName n)     = "AngleName " <> show n
 prettyPrintToken (LOpt n arg)
-  = "--" ++ n
-         ++ (fromMaybe "" do
+  = "--" <> n
+         <> (fromMaybe "" do
               a <- arg
-              return $ if a.optional then "[" else ""
-                ++ a.name
-                ++ if a.optional then "]" else ""
+              pure $ if a.optional then "[" else ""
+                <> a.name
+                <> if a.optional then "]" else ""
             )
 prettyPrintToken (SOpt n s arg)
-  = "-" ++ (fromCharArray (A.cons n s))
-        ++ (fromMaybe "" do
+  = "-" <> (fromCharArray (A.cons n s))
+        <> (fromMaybe "" do
               a <- arg
-              return $ if a.optional then "[" else ""
-                ++ a.name
-                ++ if a.optional then "]" else ""
+              pure $ if a.optional then "[" else ""
+                <> a.name
+                <> if a.optional then "]" else ""
             )
 
 data PositionedToken = PositionedToken
@@ -132,7 +132,7 @@ instance eqToken :: Eq Token where
         || (fromMaybe false do
               a  <- arg
               a' <- arg'
-              return $ (a.name == a.name)
+              pure $ (a.name == a.name)
                     && (a.optional == a.optional)
             ))
   eq (SOpt n s arg)    (SOpt n' s' arg')
@@ -141,7 +141,7 @@ instance eqToken :: Eq Token where
         || (fromMaybe false do
               a  <- arg
               a' <- arg'
-              return $ (a.name == a.name)
+              pure $ (a.name == a.name)
                     && (a.optional == a.optional)
             ))
   eq (AngleName n)     (AngleName n')     = n == n'
@@ -152,7 +152,7 @@ instance eqToken :: Eq Token where
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos=pos, token=tok }) =
-    (show tok) ++ " at " ++ (show pos)
+    (show tok) <> " at " <> (show pos)
 
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m = do
@@ -160,14 +160,14 @@ parseTokens m = do
   xs <- L.many $ parsePositionedToken m
   P.eof <|> void do
     i <- getInput
-    P.fail $ "Unexpected input: " ++ i
-  return xs
+    P.fail $ "Unexpected input: " <> i
+  pure xs
 
 parsePositionedToken :: Mode -> P.Parser String PositionedToken
 parsePositionedToken m = P.try $ do
   pos <- getPosition
   tok <- parseToken m
-  return $ PositionedToken { sourcePos: pos, token: tok }
+  pure $ PositionedToken { sourcePos: pos, token: tok }
 
 parseToken :: Mode -> P.Parser String Token
 parseToken m = P.choice (P.try <$> A.concat [
@@ -217,7 +217,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     , void $ P.char ')'
     , void $ P.string "..."
     ])
-    return Dash
+    pure Dash
 
   _eoa :: P.Parser String Token
   _eoa = do
@@ -228,7 +228,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     , void $ P.char ']'
     , void $ P.char ')'
     ])
-    return DoubleDash
+    pure DoubleDash
 
   _reference :: P.Parser String Token
   _reference = Reference <$> do
@@ -263,10 +263,10 @@ parseToken m = P.choice (P.try <$> A.concat [
         many white
         v <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
         many white
-        return (Tag k (Just v))
+        pure (Tag k (Just v))
       withoutValue = do
         k <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
-        return (Tag k Nothing)
+        pure (Tag k Nothing)
 
   _shoutName :: P.Parser String String
   _shoutName = do
@@ -275,7 +275,7 @@ parseToken m = P.choice (P.try <$> A.concat [
         <$> upperAlpha
         <*> (A.many $ regex "[A-Z_-]")
     P.notFollowedBy lowerAlpha
-    return n
+    pure n
 
   _name :: P.Parser String String
   _name = do
@@ -287,7 +287,7 @@ parseToken m = P.choice (P.try <$> A.concat [
         , P.char '.' <* (P.notFollowedBy $ P.string "..")
         , P.oneOf [ '-', '_' ]
       ]
-    return $ fromCharArray (n A.: ns)
+    pure $ fromCharArray (n A.: ns)
 
   _angleName :: P.Parser String String
   _angleName = do
@@ -300,7 +300,7 @@ parseToken m = P.choice (P.try <$> A.concat [
       , P.try $ P.noneOf [ '<', '>' ]
       ]
     P.char '>'
-    return n
+    pure n
 
   _shortOption :: P.Parser String Token
   _shortOption = do
@@ -314,7 +314,7 @@ parseToken m = P.choice (P.try <$> A.concat [
       Just <$> do
         P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        return { name:     n
+        pure { name:     n
                , optional: false
                }
 
@@ -324,18 +324,18 @@ parseToken m = P.choice (P.try <$> A.concat [
         P.optional $ P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         P.char ']'
-        return { name:     n
+        pure { name:     n
                , optional: true
                }
 
       -- Case 3: Option<ARG>
     , Just <$> do
         n <- _angleName
-        return { name:     n
+        pure { name:     n
                , optional: false
                }
 
-    , return Nothing
+    , pure Nothing
     ]
 
     -- Ensure the argument is correctly bounded
@@ -348,7 +348,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     , void $ P.char ',' -- desc mode only
     ])
 
-    return $ SOpt x xs arg
+    pure $ SOpt x xs arg
 
   _longOption :: P.Parser String Token
   _longOption = do
@@ -368,7 +368,7 @@ parseToken m = P.choice (P.try <$> A.concat [
       Just <$> do
         P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        return { name:     n
+        pure { name:     n
                , optional: false
                }
 
@@ -378,11 +378,11 @@ parseToken m = P.choice (P.try <$> A.concat [
         P.optional $ P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         P.char ']'
-        return { name:     n
+        pure { name:     n
                , optional: true
                }
 
-    , return Nothing
+    , pure Nothing
     ]
 
     -- Ensure the argument is correctly bounded
@@ -395,7 +395,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     , void $ P.char ',' -- desc mode only
     ])
 
-    return $ LOpt name' arg
+    pure $ LOpt name' arg
 
   identStart :: P.Parser String Char
   identStart = alpha
@@ -412,7 +412,7 @@ type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
 -- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> TokenParser a
 token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
-  return $ case toks of
+  pure $ case toks of
     Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
       case test tok of
         Just a ->
@@ -506,7 +506,7 @@ name = token go P.<?> "name"
     go _        = Nothing
 
 tag :: String -> TokenParser String
-tag s = token go P.<?> ("tag: " ++ s)
+tag s = token go P.<?> ("tag: " <> s)
   where
     go (Tag k (Just v)) | k ^= s = Just v
     go _                         = Nothing
@@ -532,7 +532,7 @@ shoutName = token go P.<?> "NAME"
 -- | Return the next token's position w/o consuming anything
 nextTokPos :: TokenParser P.Position
 nextTokPos = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
-  return $ case toks of
+  pure $ case toks of
     Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
       { consumed: false
       , input: toks

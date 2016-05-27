@@ -25,7 +25,7 @@ debug x = traceShow x $ const $ pure unit
 -- | Return the current parser position
 getPosition :: forall a m. (Monad m) => P.ParserT a m P.Position
 getPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
-  return { input: s, result: Right pos, consumed: false, position: pos }
+  pure { input: s, result: Right pos, consumed: false, position: pos }
 
 sof :: forall a m. (Monad m) => P.ParserT a m Unit
 sof = do
@@ -36,14 +36,14 @@ sof = do
 getCol :: forall a m. (Monad m) => P.ParserT a m Int
 getCol = do
   P.Position { column: col } <- getPosition
-  return col
+  pure col
 
 -- | Return the current parser row
 -- | XXX: Use either `line` or `row` - not both!
 getRow :: forall a m. (Monad m) => P.ParserT a m Int
 getRow = do
   P.Position { line: row } <- getPosition
-  return row
+  pure row
 
 -- | Return the current parser row
 -- | XXX: Use either `line` or `row` - not both!
@@ -56,7 +56,7 @@ tryMaybe p = (Just <$> p) <|> (pure Nothing)
 -- | Return the current parser position
 getInput :: forall a m. (Monad m, Show a) => P.ParserT a m a
 getInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
-  return { input: s, result: Right s, consumed: false, position: pos }
+  pure { input: s, result: Right s, consumed: false, position: pos }
 
 traceInput :: forall a m. (Show a, Monad m) => P.ParserT a m Unit
 traceInput = getInput >>= debug
@@ -105,4 +105,4 @@ string' :: forall m. (Monad m) => String -> P.ParserT String m String
 string' s = fromCharArray <$> A.foldM step [] (toCharArray s)
   where
     step acc x = do
-      (acc ++ _) <<< A.singleton <$> P.satisfy \c -> toLower c == toLower x
+      (acc <> _) <<< A.singleton <$> P.satisfy \c -> toLower c == toLower x

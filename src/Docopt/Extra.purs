@@ -26,7 +26,7 @@ fromREADME :: forall e
 fromREADME f = do
   c <- readTextFile UTF8 f
   either (throwError <<< error <<< show)
-         return
+         pure
          (P.runParser c parser)
   where
     parser :: P.Parser String String

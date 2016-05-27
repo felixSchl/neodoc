@@ -36,7 +36,8 @@ import Data.Function (on)
 import Data.String.Ext ((^=))
 import Data.String as String
 
-import Language.Docopt.Option as O
+import Language.Docopt.Argument.Option as O
+import Language.Docopt.Argument.Option (OptionObj)
 import Language.Docopt.Env as Env
 import Language.Docopt.Env (Env())
 
@@ -51,13 +52,13 @@ runBranch (Branch xs) = xs
 data Argument
   = Command     String IsRepeatable
   | Positional  String IsRepeatable
-  | Option      O.Option
+  | Option      OptionObj
   | Group       IsOptional (List Branch) IsRepeatable
   | EOA
   | Stdin
 
 instance showBranch :: Show Branch where
-  show (Branch xs) = "Branch " ++ show (show <$> xs)
+  show (Branch xs) = "Branch " <> show (show <$> xs)
 
 instance eqBranch :: Eq Branch where
   eq (Branch xs) (Branch xs') = (xs == xs')
@@ -65,10 +66,14 @@ instance eqBranch :: Eq Branch where
 instance showArgument :: Show Argument where
   show (EOA)            = "EOA"
   show (Stdin)          = "Stdin"
-  show (Command n r)    = intercalate " " [ "Command", show n, show r ]
-  show (Positional n r) = intercalate " " [ "Positional", show n, show r ]
-  show (Group o bs r)   = intercalate " " [ "Group", show o, show bs, show r ]
-  show (Option o)       = "Option " ++ show o
+  show (Command n r)    = "Command " <> show n
+                              <> " " <> show r
+  show (Positional n r) = "Positional " <> show n
+                                 <> " " <> show r
+  show (Group o bs r)   = "Group " <> show o
+                            <> " " <> show bs
+                            <> " " <> show r
+  show (Option o)       = "Option " <> O.showOptionObj o
 
 instance ordArgument :: Ord Argument where
   -- XXX: Implement a more efficient `compare` function
@@ -80,7 +85,7 @@ instance eqArgument :: Eq Argument where
   eq (Command n r)    (Command n' r')    = (n == n') && (r == r')
   eq (Positional n r) (Positional n' r') = (n ^= n') && (r == r')
   eq (Group o bs r)   (Group o' bs' r')  = (o == o') && (bs == bs') && (r == r')
-  eq (Option o)       (Option o')        = o == o'
+  eq (Option o)       (Option o')        = O.eqOptionObj o o'
   eq _                _                  = false
 
 prettyPrintBranch :: Branch -> String
@@ -89,12 +94,12 @@ prettyPrintBranch (Branch xs) = intercalate " " (prettyPrintArg <$> xs)
 prettyPrintArg :: Argument -> String
 prettyPrintArg (Stdin)          = "-"
 prettyPrintArg (EOA)            = "--"
-prettyPrintArg (Command name r) = name ++ (if r then "..." else "")
-prettyPrintArg (Positional n r) = name ++ (if r then "..." else "")
+prettyPrintArg (Command name r) = name <> (if r then "..." else "")
+prettyPrintArg (Positional n r) = name <> (if r then "..." else "")
   where
-    name = if String.toUpper n == n then n else "<" ++ n ++ ">"
+    name = if String.toUpper n == n then n else "<" <> n <> ">"
 prettyPrintArg (Option o)          = O.prettyPrintOption o
-prettyPrintArg (Group o bs r)      = open ++ inner ++ close ++ repetition
+prettyPrintArg (Group o bs r)      = open <> inner <> close <> repetition
   where
     open       = if o then "[" else "("
     close      = if o then "]" else ")"
@@ -107,36 +112,36 @@ prettyPrintBranchNaked (Branch xs) = intercalate " " (prettyPrintArgNaked <$> xs
 prettyPrintArgNaked :: Argument -> String
 prettyPrintArgNaked (Stdin)             = "-"
 prettyPrintArgNaked (EOA)               = "-- ARGS..."
-prettyPrintArgNaked (Command name r)    = name ++ (if r then "..." else "")
-prettyPrintArgNaked (Positional name r) = name ++ (if r then "..." else "")
+prettyPrintArgNaked (Command name r)    = name <> (if r then "..." else "")
+prettyPrintArgNaked (Positional name r) = name <> (if r then "..." else "")
 prettyPrintArgNaked (Option o)          = O.prettyPrintOptionNaked o
-prettyPrintArgNaked (Group o bs r)      = inner ++ repetition
+prettyPrintArgNaked (Group o bs r)      = inner <> repetition
   where
     inner      = intercalate " | " (prettyPrintBranchNaked <$> bs)
     repetition = if r then "..." else ""
 
 isRepeatable :: Argument -> Boolean
-isRepeatable (Option o)       = O.isRepeatable o
+isRepeatable (Option o)       = o.repeatable
 isRepeatable (Positional _ r) = r
 isRepeatable (Command _ r)    = r
 isRepeatable _                = false
 
 setRepeatable :: Argument -> Boolean -> Argument
-setRepeatable (Option (O.Option o)) r = Option $ O.Option $ o { repeatable = r }
+setRepeatable (Option o) r            = Option $ o { repeatable = r }
 setRepeatable (Positional n _)      r = (Positional n r)
 setRepeatable (Command n _)         r = (Command n r)
 setRepeatable x                     _ = x
 
 setRepeatableOr :: Argument -> Boolean -> Argument
-setRepeatableOr (Option (O.Option o)) r
-  = Option $ O.Option $ o { repeatable = o.repeatable || r }
+setRepeatableOr (Option o) r
+  = Option $ o { repeatable = o.repeatable || r }
 setRepeatableOr (Positional n r) r' = (Positional n (r || r'))
-setRepeatableOr (Command n r) r' = (Command n (r || r'))
-setRepeatableOr x _ = x
+setRepeatableOr (Command n r)    r' = (Command n (r || r'))
+setRepeatableOr x                _  = x
 
 setRequired :: Argument -> Boolean -> Argument
 setRequired (Group _ bs r) o = Group (not o) bs r
-setRequired x _ = x
+setRequired x              _ = x
 
 hasDefault :: Argument -> Boolean
 hasDefault (Option o) = O.hasDefault o
@@ -146,13 +151,13 @@ takesArgument :: Argument -> Boolean
 takesArgument (Option o) = O.takesArgument o
 takesArgument _          = false
 
-getArgument :: Argument -> Maybe O.Argument
-getArgument (Option (O.Option o)) = o.arg
-getArgument _                     = Nothing
+getArgument :: Argument -> Maybe O.OptionArgumentObj
+getArgument (Option o) = o.arg
+getArgument _          = Nothing
 
 getEnvKey :: Argument -> Maybe String
-getEnvKey (Option (O.Option o)) = o.env
-getEnvKey _                     = Nothing
+getEnvKey (Option o) = o.env
+getEnvKey _          = Nothing
 
 hasEnvBacking :: Argument -> Env -> Boolean
 hasEnvBacking p env = maybe false id $ flip Env.member env <$> getEnvKey p
@@ -185,16 +190,16 @@ isFree _              = false
 -- short hand to create an Option argument
 opt' :: Maybe O.Flag
      -> Maybe O.Name
-     -> Maybe O.Argument
+     -> Maybe O.OptionArgumentObj
      -> Maybe String
      -> IsRepeatable
      -> Argument
 opt' f n a e r = Option $ O.opt' f n a e r
 
-opt :: O.Flag -> O.Name -> O.Argument -> Argument
+opt :: O.Flag -> O.Name -> O.OptionArgumentObj -> Argument
 opt f n a = Option $ O.opt f n a
 
-optR :: O.Flag -> O.Name -> O.Argument -> Argument
+optR :: O.Flag -> O.Name -> O.OptionArgumentObj -> Argument
 optR f n a = Option $ O.optR f n a
 
 opt_ :: O.Flag -> O.Name -> Argument
@@ -204,13 +209,13 @@ optR_ :: O.Flag -> O.Name -> Argument
 optR_ f n = Option $ O.optR_ f n
 
 -- short hand to create an Short-Option argument
-sopt' :: O.Flag -> (Maybe O.Argument) -> IsRepeatable -> Argument
+sopt' :: O.Flag -> (Maybe O.OptionArgumentObj) -> IsRepeatable -> Argument
 sopt' f a r = Option $ O.sopt' f a r
 
-sopt :: O.Flag -> O.Argument -> Argument
+sopt :: O.Flag -> O.OptionArgumentObj -> Argument
 sopt f a = Option $ O.sopt f a
 
-soptR :: O.Flag -> O.Argument -> Argument
+soptR :: O.Flag -> O.OptionArgumentObj -> Argument
 soptR f a = Option $ O.soptR f a
 
 sopt_ :: O.Flag -> Argument
@@ -220,13 +225,13 @@ soptR_ :: O.Flag -> Argument
 soptR_ f = Option $ O.soptR_ f
 
 -- short hand to create an Long-Option argument
-lopt' :: O.Name -> (Maybe O.Argument) -> IsRepeatable -> Argument
+lopt' :: O.Name -> (Maybe O.OptionArgumentObj) -> IsRepeatable -> Argument
 lopt' n a r = Option $ O.lopt' n a r
 
-lopt :: O.Name -> O.Argument -> Argument
+lopt :: O.Name -> O.OptionArgumentObj -> Argument
 lopt n a = Option $ O.lopt n a
 
-loptR :: O.Name -> O.Argument -> Argument
+loptR :: O.Name -> O.OptionArgumentObj -> Argument
 loptR n a = Option $ O.loptR n a
 
 lopt_ :: O.Name -> Argument
@@ -239,10 +244,10 @@ loptR_ n = Option $ O.loptR_ n
 -- Short hand option creation (with env tag)
 --------------------------------------------------------------------------------
 
-optE :: O.Flag -> O.Name -> O.Argument -> String -> Argument
+optE :: O.Flag -> O.Name -> O.OptionArgumentObj -> String -> Argument
 optE f n a e = Option $ O.optE f n a e
 
-optER :: O.Flag -> O.Name -> O.Argument -> String -> Argument
+optER :: O.Flag -> O.Name -> O.OptionArgumentObj -> String -> Argument
 optER f n a e = Option $ O.optER f n a e
 
 optE_ :: O.Flag -> O.Name -> String -> Argument
@@ -252,13 +257,13 @@ optER_ :: O.Flag -> O.Name -> String -> Argument
 optER_ f n e = Option $ O.optER_ f n e
 
 -- short hand to create an Short-Option argument
-soptE' :: O.Flag -> (Maybe O.Argument) -> IsRepeatable -> String -> Argument
+soptE' :: O.Flag -> (Maybe O.OptionArgumentObj) -> IsRepeatable -> String -> Argument
 soptE' f a r e = Option $ O.soptE' f a r e
 
-soptE :: O.Flag -> O.Argument -> String -> Argument
+soptE :: O.Flag -> O.OptionArgumentObj -> String -> Argument
 soptE f a e = Option $ O.soptE f a e
 
-soptER :: O.Flag -> O.Argument -> String -> Argument
+soptER :: O.Flag -> O.OptionArgumentObj -> String -> Argument
 soptER f a e = Option $ O.soptER f a e
 
 soptE_ :: O.Flag -> String -> Argument
@@ -268,13 +273,13 @@ soptER_ :: O.Flag -> String -> Argument
 soptER_ f e = Option $ O.soptER_ f e
 
 -- short hand to create an Long-Option argument
-loptE' :: O.Name -> (Maybe O.Argument) -> IsRepeatable -> String -> Argument
+loptE' :: O.Name -> (Maybe O.OptionArgumentObj) -> IsRepeatable -> String -> Argument
 loptE' n a r e = Option $ O.loptE' n a r e
 
-loptE :: O.Name -> O.Argument -> String -> Argument
+loptE :: O.Name -> O.OptionArgumentObj -> String -> Argument
 loptE n a e = Option $ O.loptE n a e
 
-loptER :: O.Name -> O.Argument -> String -> Argument
+loptER :: O.Name -> O.OptionArgumentObj -> String -> Argument
 loptER n a e = Option $ O.loptER n a e
 
 loptE_ :: O.Name -> String -> Argument
