@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+IFS=$'\n\t'
+cd "$(dirname "$0")"
+
+# Translate the compiled neodoc output to JS
+"./translate_to_python" > ./docopt_purs.py
+
+# Remove references to 'process', instead provide process.argv,
+# process.env throught options and wrap process.exit using `dontExit`.
+sed -i.bak "/.*u'process'.*/d" ./docopt_purs.py
+
+# Remove the top-level `module.exports`, since `module` is not defined.
+sed -i.bak "/.*u'module'.*/d" ./docopt_purs.py

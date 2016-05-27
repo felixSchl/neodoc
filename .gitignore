@@ -9,3 +9,8 @@ src/.webpack.js
 .pulp-cache
 package
 *.tgz
+
+tools/docopt_purs.py
+tools/Js2Py
+*.pyc
+*.bak
