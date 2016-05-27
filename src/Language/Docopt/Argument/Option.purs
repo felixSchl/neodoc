@@ -31,10 +31,10 @@ import Data.String (fromChar)
 
 import Language.Docopt.Value (Value(..), prettyPrintValue)
 
-type Flag = Char
-type Name = String
+type Flag         = Char
+type Name         = String
 type IsRepeatable = Boolean
-type IsOptional = Boolean
+type IsOptional   = Boolean
 
 type OptionObj =  { flag       :: Maybe Flag
                   , name       :: Maybe Name
@@ -140,6 +140,8 @@ prettyPrintOptionNaked o
 
 --------------------------------------------------------------------------------
 -- Short hand option creation
+--
+-- XXX: Remove this (!)
 --------------------------------------------------------------------------------
 
 -- short hand to create an Option argument
