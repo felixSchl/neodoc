@@ -22,8 +22,7 @@ import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
                                         getSource, prettyPrintToken,
                                         unPositionedToken) as G
 import Language.Docopt.ParserGen.Parser (Parser, genUsageParser,
-                                        RichValue(..), unRichValue,
-                                        from, initialState, ValueMapping(),
+                                        initialState, ValueMapping(),
                                         GenOptionsObj()) as G
 import Language.Docopt.ParserGen.Lexer (lex) as G
 

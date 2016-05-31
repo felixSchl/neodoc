@@ -10,12 +10,8 @@ module Language.Docopt.ParserGen.Parser (
   , initialState
   , Parser ()
   , StateObj ()
-  , RichValue (..)
-  , RichValueObj (..)
   , ValueMapping ()
   , GenOptionsObj ()
-  , unRichValue
-  , from
   ) where
 
 import Prelude
@@ -66,6 +62,8 @@ import Language.Docopt.Origin as Origin
 import Language.Docopt.Origin (Origin())
 import Language.Docopt.Value as Value
 import Language.Docopt.Value (Value(..))
+import Language.Docopt.RichValue (RichValue(..), unRichValue)
+import Language.Docopt.RichValue (from, setValue, getOrigin) as RValue
 import Language.Docopt.Parser.Base (getInput)
 import Language.Docopt.ParserGen.Token as Token
 import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
@@ -75,31 +73,6 @@ import Data.String.Ext (startsWith)
 -- | Toggle debugging on/off during development
 debug :: Boolean
 debug = false
-
-
-
--- | The value type the parser collects
-type RichValueObj = {
-  value  :: Value
-, origin :: Origin
-}
-
-newtype RichValue = RichValue RichValueObj
-
-unRichValue :: RichValue -> RichValueObj
-unRichValue (RichValue o) = o
-
-instance showRichValue :: Show RichValue where
-  show (RichValue v) = "(RichValue { origin: " <> show v.origin
-                               <> ", value: "  <> show v.value
-                               <> "})"
-
-instance eqRichValue :: Eq RichValue where
-  eq (RichValue v) (RichValue v') = v.origin == v'.origin
-                                 && v.value  == v'.value
-
-from :: Origin -> Value -> RichValue
-from o v = RichValue $ { value: v, origin: o }
 
 -- | The output value mappings of arg -> val
 type ValueMapping = Tuple D.Argument RichValue
@@ -527,19 +500,19 @@ genBranchParser xs genOpts canSkip = do
                 (Left o)
                 (Right <<< Tuple o)
                 do
-                  (RichValue v) <- do
+                  v <- unRichValue <$> do
                     -- only allow "skipping" - that is auto-filling - values
                     -- if we are either explicitly allowed to do so (i.e.
                     -- the `canSkip` flag is set) or if we consumed all input
                     guard (null i || canSkip || (length ps' < length ps))
-                    (getEnvValue env o <#> from Origin.Environment) <|>
-                    (getDefaultValue o <#> from Origin.Default)     <|>
-                    (getEmptyValue   o <#> from Origin.Empty)
+                    (getEnvValue env o <#> RValue.from Origin.Environment) <|>
+                    (getDefaultValue o <#> RValue.from Origin.Default)     <|>
+                    (getEmptyValue   o <#> RValue.from Origin.Empty)
 
                   pure $ RichValue v {
                     value = if D.isRepeatable o
-                                then ArrayValue $ Value.intoArray v.value
-                                else v.value
+                        then ArrayValue $ Value.intoArray v.value
+                        else v.value
                   }
 
             missing   = filter (\o -> not ((null i || canSkip) &&
@@ -632,7 +605,7 @@ genBranchParser xs genOpts canSkip = do
     -- values int an array ("options-first")
     terminate arg = do
       input <- getInput
-      let rest = Tuple arg <<< (from Origin.Argv) <$> do
+      let rest = Tuple arg <<< (RValue.from Origin.Argv) <$> do
                   StringValue <<< Token.getSource <$> input
       P.ParserT \(P.PState { position: pos }) ->
         pure {
@@ -653,7 +626,7 @@ genBranchParser xs genOpts canSkip = do
       (do
         if r then (some go) else (singleton <$> go)
       ) <|> (P.fail $ "Expected " <> D.prettyPrintArg x <> butGot i)
-        where go = do Tuple x <<< (from Origin.Argv) <$> (do
+        where go = do Tuple x <<< (RValue.from Origin.Argv) <$> (do
                         v <- command n
                         pure if r then ArrayValue $ Value.intoArray v
                                     else v
@@ -662,14 +635,14 @@ genBranchParser xs genOpts canSkip = do
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) _ = do
-      singleton <<< Tuple x <<< (from Origin.Argv) <$> (do
+      singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> (do
         eoa <|> (pure $ ArrayValue []) -- XXX: Fix type
         <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"--\""
 
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) _ = do
-      singleton <<< Tuple x <<< (from Origin.Argv) <$> (do
+      singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> (do
         stdin
         <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"-\""
@@ -684,7 +657,7 @@ genBranchParser xs genOpts canSkip = do
       (do
         if r then (some go) else (singleton <$> go)
       ) <|> P.fail ("Expected " <> D.prettyPrintArg x <> butGot i)
-        where go = do Tuple x <<< (from Origin.Argv) <$> (do
+        where go = do Tuple x <<< (RValue.from Origin.Argv) <$> (do
                         v <- positional n
                         pure if r then ArrayValue $ Value.intoArray v
                                     else v
@@ -720,14 +693,14 @@ genBranchParser xs genOpts canSkip = do
             P.ParserT \s -> do
               o <- P.unParserT (if isLopt
                 then P.try do
-                  Tuple x <<< (from Origin.Argv) <$> (do
+                  Tuple x <<< (RValue.from Origin.Argv) <$> (do
                     v <- mkLoptParser o.name o.arg
                     pure if o.repeatable then ArrayValue $ Value.intoArray v
                                            else v
                   )
                 else if isSopt
                   then P.try do
-                    Tuple x <<< (from Origin.Argv) <$> (do
+                    Tuple x <<< (RValue.from Origin.Argv) <$> (do
                       v <- mkSoptParser o.flag o.arg
                       pure if o.repeatable then ArrayValue $ Value.intoArray v
                                             else v
@@ -766,13 +739,13 @@ genBranchParser xs genOpts canSkip = do
         go | length bs == 0 = pure mempty
         go = do
           x <- step
-          if repeated && length (filter (snd >>> from Origin.Argv) x) > 0
+          if repeated && length (filter (snd >>> isFrom Origin.Argv) x) > 0
              then do
                 xs <- go <|> pure mempty
                 pure $ x <> xs
              else pure x
 
-        from o (RichValue v) = v.origin == o
+        isFrom o rv = RValue.getOrigin rv == o
         step = snd <$> do
                 genBranchesParser bs
                                   false
