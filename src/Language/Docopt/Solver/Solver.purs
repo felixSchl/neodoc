@@ -27,7 +27,7 @@ import Language.Docopt.Argument as Arg
 import Language.Docopt.Argument.Option as O
 import Language.Docopt.Parser.Desc as DE
 import Language.Docopt.Parser.Usage.Option as UO
-import Language.Docopt.Argument (runBranch, Argument(..), Branch(..))
+import Language.Docopt.Argument (Argument(..), Branch)
 import Language.Docopt.Errors (SolveError(..))
 import Language.Docopt.Parser.Desc (Desc)
 import Language.Docopt.Parser.Usage (Usage(..)) as U
@@ -56,7 +56,7 @@ fail = Left <<< SolveError
 solveBranch :: U.Branch                 -- ^ the usage branch
             -> List Desc                -- ^ the option descriptions
             -> Either SolveError Branch -- ^ the canonical usage branch
-solveBranch as ds = Branch <$> go as
+solveBranch as ds = go as
   where
     go :: U.Branch -> Either SolveError (List Argument)
     go us = do
@@ -87,7 +87,7 @@ solveBranch as ds = Branch <$> go as
                      else
                       let converted = Group
                             true
-                            (singleton $ Branch $ singleton $ Option $
+                            (singleton $ singleton $ Option $
                                 { flag:       DE.getFlag opt.name
                                 , name:       DE.getName opt.name
                                 , arg:        opt.arg
@@ -112,7 +112,7 @@ solveBranch as ds = Branch <$> go as
                                                <*> o.name
                                     else false
                     isMatch (Group _ bs _)
-                      = any isMatch (concat $ runBranch <$> bs)
+                      = any isMatch (concat bs)
                     isMatch _ = false
                 map args (Cons _ xs) = map args xs
                 map args _ = args

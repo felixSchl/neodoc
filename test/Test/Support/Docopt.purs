@@ -36,7 +36,7 @@ grr = gr false
 
 -- short hand to create a whole branch
 br :: (Array Argument) -> Branch
-br xs = Branch (toList xs)
+br xs = toList xs
 
 oa :: String -> Value -> O.OptionArgumentObj
 oa n v =  { name: n

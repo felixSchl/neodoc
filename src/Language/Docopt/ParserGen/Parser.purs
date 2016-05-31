@@ -54,7 +54,7 @@ import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), fail,
 import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>)) as P
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
 
-import Language.Docopt.Argument (Argument(..), Branch(..), isFree, runBranch,
+import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 hasEnvBacking, getArgument, hasDefault,
                                 isRepeatable, isFlag, setRequired) as D
@@ -449,7 +449,7 @@ genBranchParser :: forall r
                 -> GenOptionsObj r -- ^ Generator options
                 -> Boolean         -- ^ Can we skip input via fallbacks?
                 -> Parser (List ValueMapping)
-genBranchParser (D.Branch xs) genOpts canSkip = do
+genBranchParser xs genOpts canSkip = do
   modifyDepth (const 0) -- reset the depth counter
   either
     (\_   -> P.fail "Failed to generate parser")
@@ -559,7 +559,7 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
 
           where
           isSkippable (D.Group o bs _)
-              = o || (all (all isSkippable <<< D.runBranch) bs)
+              = o || (all (all isSkippable) bs)
           isSkippable o = D.isRepeatable o && (any (_ == o) tot)
 
           getEnvValue :: Env -> D.Argument -> Maybe Value
@@ -693,12 +693,12 @@ genBranchParser (D.Branch xs) genOpts canSkip = do
 
     genParser x@(D.Group optional bs r) _
       | genOpts.optionsFirst && (length bs == 1) &&
-        all (\(D.Branch xs) ->
+        all (\xs ->
           case xs of
             Cons (D.Positional n r') Nil -> r' || r
             _                            -> false
         ) bs
-      = terminate (LU.head (D.runBranch (LU.head bs)))
+      = terminate (LU.head (LU.head bs))
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option o) _ = (do

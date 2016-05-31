@@ -25,8 +25,8 @@ import Language.Docopt.Usage (Usage(Usage), runUsage) as D
 import Language.Docopt.Argument.Option as O
 import Language.Docopt.Env (Env)
 import Language.Docopt.Env as Env
-import Language.Docopt.Argument (Argument(..), Branch(..), isRepeatable,
-                                setRepeatable, runBranch, setRepeatableOr,
+import Language.Docopt.Argument (Argument(..), Branch(), isRepeatable,
+                                setRepeatable, setRepeatableOr,
                                 isCommand, isFlag) as D
 import Language.Docopt.ParserGen (ValueMapping, RichValue(..), unRichValue)
 import Language.Docopt.Origin as Origin
@@ -121,7 +121,7 @@ reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
                    -> List D.Branch
                    -> Map Key D.Argument
     reduceBranches r bs =
-      let ms = combine <<< (expand <$> _) <<< D.runBranch <$> bs
+      let ms = combine <<< (expand <$> _) <$> bs
       in foldl (Map.unionWith resolveAcrossBranches)
                 Map.empty
                 ((flip D.setRepeatableOr r <$> _) <$> ms)
@@ -133,10 +133,7 @@ reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
 
     expand :: D.Argument -> Map Key D.Argument
     expand (D.Group _ bs r) =
-      reduceBranches r
-        $ D.Branch <<< ((flip D.setRepeatableOr r) <$> _)
-                    <<< D.runBranch
-                    <$> bs
+      reduceBranches r $ ((flip D.setRepeatableOr r) <$> _) <$> bs
 
     expand arg = Map.singleton (key arg) arg
 

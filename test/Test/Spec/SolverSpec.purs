@@ -54,7 +54,7 @@ fail :: Array Desc -> String -> TestCase
 fail ds msg = TestCase { descs: ds, expected: Left msg }
 
 out :: Array (Array Argument) -> Usage
-out xss = Usage $ toList $ (\xs -> Branch $ toList xs) <$> xss
+out xss = Usage $ toList $ toList <$> xss
 
 u = U.usage "foo"
 

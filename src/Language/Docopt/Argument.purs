@@ -1,12 +1,11 @@
 module Language.Docopt.Argument (
     Argument (..)
-  , Branch (..)
+  , Branch ()
   , IsOptional ()
   , IsRepeatable ()
   , prettyPrintBranch
   , prettyPrintArg
   , prettyPrintArgNaked
-  , runBranch
   , isRepeatable
   , setRepeatable
   , setRequired
@@ -44,10 +43,7 @@ import Language.Docopt.Env (Env())
 type IsRepeatable = Boolean
 type IsOptional = Boolean
 
-newtype Branch = Branch (List Argument) -- XXX: Move to type alias
-
-runBranch :: Branch -> List Argument
-runBranch (Branch xs) = xs
+type Branch = List Argument
 
 data Argument
   = Command     String IsRepeatable
@@ -56,12 +52,6 @@ data Argument
   | Group       IsOptional (List Branch) IsRepeatable
   | EOA
   | Stdin
-
-instance showBranch :: Show Branch where
-  show (Branch xs) = "Branch " <> show (show <$> xs)
-
-instance eqBranch :: Eq Branch where
-  eq (Branch xs) (Branch xs') = (xs == xs')
 
 instance showArgument :: Show Argument where
   show (EOA)            = "EOA"
@@ -89,7 +79,7 @@ instance eqArgument :: Eq Argument where
   eq _                _                  = false
 
 prettyPrintBranch :: Branch -> String
-prettyPrintBranch (Branch xs) = intercalate " " (prettyPrintArg <$> xs)
+prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
 
 prettyPrintArg :: Argument -> String
 prettyPrintArg (Stdin)          = "-"
@@ -107,7 +97,7 @@ prettyPrintArg (Group o bs r)      = open <> inner <> close <> repetition
     repetition = if r then "..." else ""
 
 prettyPrintBranchNaked :: Branch -> String
-prettyPrintBranchNaked (Branch xs) = intercalate " " (prettyPrintArgNaked <$> xs)
+prettyPrintBranchNaked xs = intercalate " " (prettyPrintArgNaked <$> xs)
 
 prettyPrintArgNaked :: Argument -> String
 prettyPrintArgNaked (Stdin)             = "-"
@@ -180,7 +170,7 @@ isOption _          = false
 
 isFree :: Argument -> Boolean
 isFree (Option _)     = true
-isFree (Group _ bs _) = all (all isFree <<< runBranch) bs
+isFree (Group _ bs _) = all (all isFree) bs
 isFree _              = false
 
 --------------------------------------------------------------------------------
