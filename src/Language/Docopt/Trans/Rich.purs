@@ -22,7 +22,6 @@ import Control.Alt ((<|>))
 import Language.Docopt.Value (Value(..))
 import Language.Docopt.Value as Value
 import Language.Docopt.Usage (Usage(Usage), runUsage) as D
-import Language.Docopt.Argument.Option as O
 import Language.Docopt.Env (Env)
 import Language.Docopt.Env as Env
 import Language.Docopt.Argument (Argument(..), Branch(), isRepeatable,

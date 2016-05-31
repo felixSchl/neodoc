@@ -53,8 +53,9 @@ import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 hasEnvBacking, getArgument, hasDefault,
-                                isRepeatable, isFlag, setRequired) as D
-import Language.Docopt.Argument.Option as O
+                                isRepeatable, isFlag, setRequired,
+                                OptionArgumentObj()
+                                ) as D
 import Language.Docopt.Usage (Usage, runUsage) as D
 import Language.Docopt.Env (Env ())
 import Language.Docopt.Env as Env
@@ -156,7 +157,7 @@ stdin = token go P.<?> "stdin flag"
 type HasConsumedArg = Boolean
 data OptParse = OptParse Value (Maybe Token) HasConsumedArg
 
-longOption :: O.Name -> (Maybe O.OptionArgumentObj) -> Parser Value
+longOption :: String -> (Maybe D.OptionArgumentObj) -> Parser Value
 longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   pure $ case toks of
     Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
@@ -214,7 +215,7 @@ longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 
     go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
 
-shortOption :: Char -> (Maybe O.OptionArgumentObj) -> Parser Value
+shortOption :: Char -> (Maybe D.OptionArgumentObj) -> Parser Value
 shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
   pure $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->

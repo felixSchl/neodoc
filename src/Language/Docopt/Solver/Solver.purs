@@ -23,8 +23,8 @@ import Data.String.Ext ((^=), endsWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
 
-import Language.Docopt.Argument as Arg
-import Language.Docopt.Argument.Option as O
+import Language.Docopt.Argument
+import Language.Docopt.Argument (isFree) as Arg
 import Language.Docopt.Parser.Desc as DE
 import Language.Docopt.Parser.Usage.Option as UO
 import Language.Docopt.Argument (Argument(..), Branch)
@@ -227,7 +227,7 @@ solveBranch as ds = go as
           $ "Arguments mismatch for option --" <> o.name <> ": "
               <> show n <> " and " <> show n'
 
-        matchDesc :: String -> Either SolveError O.OptionObj
+        matchDesc :: String -> Either SolveError OptionObj
         matchDesc n =
           case filter isMatch ds of
             xs | length xs > 1 -> fail
@@ -432,7 +432,7 @@ solveBranch as ds = go as
         -- | `isTrailing` indicates if this flag is the last flag
         -- | in it's stack of flags.
 
-        matchDesc :: Boolean -> Char -> Either SolveError O.OptionObj
+        matchDesc :: Boolean -> Char -> Either SolveError OptionObj
         matchDesc isTrailing f =
           case filter isMatch ds of
             xs | length xs > 1 -> fail
@@ -475,7 +475,7 @@ solveBranch as ds = go as
     -- | description, pureing the most complete argument known.
     resolveOptArg :: Maybe { name :: String, optional :: Boolean }
                   -> Maybe DE.OptionArgumentObj
-                  -> Either SolveError (Maybe O.OptionArgumentObj)
+                  -> Either SolveError (Maybe OptionArgumentObj)
 
     resolveOptArg (Just a) Nothing = do
       pure <<< pure $ { name: a.name
@@ -497,7 +497,7 @@ solveBranch as ds = go as
     resolveOptArg _ _ = pure Nothing
 
     convertArg :: Maybe { name :: String, optional :: Boolean }
-               -> Maybe O.OptionArgumentObj
+               -> Maybe OptionArgumentObj
     convertArg arg = do
       a <- arg
       pure $ { name:     a.name

@@ -1,10 +1,6 @@
 module Language.Docopt.Argument.Option (
-    Flag ()
-  , Name ()
-  , OptionObj ()
+    OptionObj ()
   , OptionArgumentObj ()
-  , IsOptional ()
-  , IsRepeatable ()
   , showOptionObj
   , eqOptionObj
   , hasDefault
@@ -24,16 +20,11 @@ import Data.String (fromChar)
 
 import Language.Docopt.Value (Value(..), prettyPrintValue)
 
-type Flag         = Char
-type Name         = String
-type IsRepeatable = Boolean
-type IsOptional   = Boolean
-
-type OptionObj =  { flag       :: Maybe Flag
-                  , name       :: Maybe Name
+type OptionObj =  { flag       :: Maybe Char
+                  , name       :: Maybe String
                   , arg        :: Maybe OptionArgumentObj
                   , env        :: Maybe String
-                  , repeatable :: IsRepeatable
+                  , repeatable :: Boolean
                   }
 
 showOptionObj :: OptionObj -> String

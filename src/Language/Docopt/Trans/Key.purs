@@ -10,7 +10,6 @@ import Data.String (fromChar)
 import Data.String (toUpper, toLower) as Str
 import Data.Function (on)
 import Data.String.Ext ((^=))
-import Language.Docopt.Argument.Option as O
 import Language.Docopt.Argument (Argument(..)) as D
 newtype Key = Key { arg :: D.Argument }
 

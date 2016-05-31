@@ -5,12 +5,13 @@ import Data.Maybe
 import Data.List (List(..), toList, length, fromList, singleton)
 import Language.Docopt.Value
 import Language.Docopt.Argument
-import Language.Docopt.Argument.Option hiding (IsRepeatable)
+
+type IsRepeatable = Boolean
 
 -- short hand to create an Option argument
 opt'
-  :: Maybe Flag
-  -> Maybe Name
+  :: Maybe Char
+  -> Maybe String
   -> Maybe OptionArgumentObj
   -> Maybe String
   -> IsRepeatable
@@ -23,20 +24,20 @@ opt' f n a e r = Option {
 , repeatable: r
 }
 
-opt :: Flag -> Name -> OptionArgumentObj -> Argument
+opt :: Char -> String -> OptionArgumentObj -> Argument
 opt f n a = opt' (Just f) (Just n) (Just a) Nothing false
 
-optR :: Flag -> Name -> OptionArgumentObj -> Argument
+optR :: Char -> String -> OptionArgumentObj -> Argument
 optR f n a = opt' (Just f) (Just n) (Just a) Nothing true
 
-opt_ :: Flag -> Name -> Argument
+opt_ :: Char -> String -> Argument
 opt_ f n = opt' (Just f) (Just n) Nothing Nothing false
 
-optR_ :: Flag -> Name -> Argument
+optR_ :: Char -> String -> Argument
 optR_ f n = opt' (Just f) (Just n) Nothing Nothing true
 
 -- short hand to create an Short-Argument argument
-sopt' :: Flag -> (Maybe OptionArgumentObj) -> IsRepeatable -> Argument
+sopt' :: Char -> (Maybe OptionArgumentObj) -> IsRepeatable -> Argument
 sopt' f a r = Option {
   flag:       pure f
 , name:       Nothing
@@ -45,20 +46,20 @@ sopt' f a r = Option {
 , repeatable: r
 }
 
-sopt :: Flag -> OptionArgumentObj -> Argument
+sopt :: Char -> OptionArgumentObj -> Argument
 sopt f a = sopt' f (Just a) false
 
-soptR :: Flag -> OptionArgumentObj -> Argument
+soptR :: Char -> OptionArgumentObj -> Argument
 soptR f a = sopt' f (Just a) true
 
-sopt_ :: Flag -> Argument
+sopt_ :: Char -> Argument
 sopt_ f = sopt' f Nothing false
 
-soptR_ :: Flag -> Argument
+soptR_ :: Char -> Argument
 soptR_ f = sopt' f Nothing true
 
 -- short hand to create an Long-Argument argument
-lopt' :: Name -> (Maybe OptionArgumentObj) -> IsRepeatable -> Argument
+lopt' :: String -> (Maybe OptionArgumentObj) -> IsRepeatable -> Argument
 lopt' n a r = Option {
   flag:       Nothing
 , name:       pure n
@@ -67,36 +68,36 @@ lopt' n a r = Option {
 , repeatable: r
 }
 
-lopt :: Name -> OptionArgumentObj -> Argument
+lopt :: String -> OptionArgumentObj -> Argument
 lopt n a = lopt' n (Just a) false
 
-loptR :: Name -> OptionArgumentObj -> Argument
+loptR :: String -> OptionArgumentObj -> Argument
 loptR n a = lopt' n (Just a) true
 
-lopt_ :: Name -> Argument
+lopt_ :: String -> Argument
 lopt_ n = lopt' n Nothing false
 
-loptR_ :: Name -> Argument
+loptR_ :: String -> Argument
 loptR_ n = lopt' n Nothing true
 
 --------------------------------------------------------------------------------
 -- Short hand option creation (with env tag)
 --------------------------------------------------------------------------------
 
-optE :: Flag -> Name -> OptionArgumentObj -> String -> Argument
+optE :: Char -> String -> OptionArgumentObj -> String -> Argument
 optE f n a e = opt' (Just f) (Just n) (Just a) (Just e) false
 
-optER :: Flag -> Name -> OptionArgumentObj -> String -> Argument
+optER :: Char -> String -> OptionArgumentObj -> String -> Argument
 optER f n a e = opt' (Just f) (Just n) (Just a) (Just e) true
 
-optE_ :: Flag -> Name -> String -> Argument
+optE_ :: Char -> String -> String -> Argument
 optE_ f n e = opt' (Just f) (Just n) Nothing (Just e) false
 
-optER_ :: Flag -> Name -> String -> Argument
+optER_ :: Char -> String -> String -> Argument
 optER_ f n e = opt' (Just f) (Just n) Nothing (Just e) true
 
 -- short hand to create an Short-Argument argument
-soptE' :: Flag -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> Argument
+soptE' :: Char -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> Argument
 soptE' f a r e = Option {
   flag:       pure f
 , name:       Nothing
@@ -105,20 +106,20 @@ soptE' f a r e = Option {
 , repeatable: r
 }
 
-soptE :: Flag -> OptionArgumentObj -> String -> Argument
+soptE :: Char -> OptionArgumentObj -> String -> Argument
 soptE f a e = soptE' f (Just a) false e
 
-soptER :: Flag -> OptionArgumentObj -> String -> Argument
+soptER :: Char -> OptionArgumentObj -> String -> Argument
 soptER f a e = soptE' f (Just a) true e
 
-soptE_ :: Flag -> String -> Argument
+soptE_ :: Char -> String -> Argument
 soptE_ f e = soptE' f Nothing false e
 
-soptER_ :: Flag -> String -> Argument
+soptER_ :: Char -> String -> Argument
 soptER_ f e = soptE' f Nothing true e
 
 -- short hand to create an Long-Argument argument
-loptE' :: Name -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> Argument
+loptE' :: String -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> Argument
 loptE' n a r e = Option {
   flag:       Nothing
 , name:       pure n
@@ -127,16 +128,16 @@ loptE' n a r e = Option {
 , repeatable: r
 }
 
-loptE :: Name -> OptionArgumentObj -> String -> Argument
+loptE :: String -> OptionArgumentObj -> String -> Argument
 loptE n a e = loptE' n (Just a) false e
 
-loptER :: Name -> OptionArgumentObj -> String -> Argument
+loptER :: String -> OptionArgumentObj -> String -> Argument
 loptER n a e = loptE' n (Just a) true e
 
-loptE_ :: Name -> String -> Argument
+loptE_ :: String -> String -> Argument
 loptE_ n e = loptE' n Nothing false e
 
-loptER_ :: Name -> String -> Argument
+loptER_ :: String -> String -> Argument
 loptER_ n e = loptE' n Nothing true e
 
 -- short hand to create a Command

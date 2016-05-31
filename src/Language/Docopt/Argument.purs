@@ -1,8 +1,6 @@
 module Language.Docopt.Argument (
     Argument (..)
   , Branch ()
-  , IsOptional ()
-  , IsRepeatable ()
   , CommandObj ()
   , PositionalObj ()
   , GroupObj ()
@@ -22,6 +20,7 @@ module Language.Docopt.Argument (
   , isFlag
   , isCommand
   , isFree
+  , module OptionReexport
   ) where
 
 import Prelude
@@ -34,11 +33,10 @@ import Data.String as String
 
 import Language.Docopt.Argument.Option as O
 import Language.Docopt.Argument.Option (OptionObj)
+import Language.Docopt.Argument.Option hiding (hasDefault, isFlag, takesArgument
+                                              ) as OptionReexport
 import Language.Docopt.Env as Env
 import Language.Docopt.Env (Env())
-
-type IsRepeatable = Boolean
-type IsOptional = Boolean
 
 type Branch = List Argument
 
