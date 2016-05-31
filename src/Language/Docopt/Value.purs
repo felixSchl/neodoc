@@ -14,7 +14,7 @@ import Data.Generic (class Generic)
 import Data.Either (Either(), either)
 import Data.Maybe.Unsafe (fromJust)
 import Data.List (List(..), fromList, many, some)
-import Control.Apply ((*>))
+import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
 import Text.Parsing.Parser (ParseError, runParser) as P
 import Text.Parsing.Parser.Combinators (between, choice, try, sepBy1, option) as P
@@ -89,7 +89,7 @@ read :: String  -- ^ the input
 read s split = either (const $ StringValue s) id (parse s split)
 
 -- | Parse a string into a value
--- | Values can be command *AND* space separated:
+-- | Values can be comma *AND* space separated:
 -- |
 -- | a  b  c -> [ a, b, c ]
 -- | a, b, c -> [ a, b, c ]
@@ -99,11 +99,7 @@ read s split = either (const $ StringValue s) id (parse s split)
 parse :: String  -- ^ the input
       -> Boolean -- ^ allow splitting?
       -> Either P.ParseError Value
-parse s split = P.runParser s do
-                  v <- if split then values
-                                else value
-                  P.eof
-                  pure v
+parse s split = P.runParser s $ if split then values else value <* P.eof
 
   where
     values = do
