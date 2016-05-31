@@ -8,6 +8,7 @@ import Data.List (List(..), length, (!!), take, toList)
 import Language.Docopt
 import qualified Language.Docopt.Parser.Usage          as U
 import qualified Language.Docopt.Parser.Usage.Argument as U
+import qualified Language.Docopt.Parser.Usage.Option   as O
 import qualified Language.Docopt.Parser.Lexer          as Lexer
 import qualified Language.Docopt.Scanner               as Scanner
 import Language.Docopt.Parser.Base (debug)
@@ -26,3 +27,25 @@ gr xs r = U.Group false ls r
 go :: Array (Array U.Argument) -> Boolean -> U.Argument
 go xs r = U.Group true ls r
   where ls = toList <$> (toList xs)
+
+ref            = U.Reference
+eoa            = U.EOA
+stdin          = U.Stdin
+co n           = U.Command n false
+po n           = U.Positional n false
+poR n          = U.Positional n true
+po' n          = U.Positional n
+arg'  n o      = { name: n, optional: o }
+arg_  n        = arg' n true
+arg   n        = arg' n false
+
+sopt'  f fs a r = U.OptionStack { flag: f, stack: fs, arg: a, repeatable: r }
+sopt   f fs a   = sopt' f fs (pure a) false
+sopt_  f fs     = sopt' f fs Nothing false
+soptR  f fs a   = sopt' f fs (pure a) true
+soptR_ f fs     = sopt' f fs Nothing true
+lopt'  n    a r = U.Option { name: n, arg: a, repeatable: r }
+lopt   n    a   = lopt' n (pure a) false
+lopt_  n        = lopt' n Nothing false
+loptR  n    a   = lopt' n (pure a) true
+loptR_ n        = lopt' n Nothing true

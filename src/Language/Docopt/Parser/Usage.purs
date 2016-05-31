@@ -168,12 +168,21 @@ usageParser smartOpts = do
     longOption :: L.TokenParser Argument
     longOption = Option <$> do
       { name: name, arg: arg } <- L.lopt
-      O.lopt' name arg <$> repetition
+      r <- repetition
+      pure $  { name:       name
+              , arg:        arg
+              , repeatable: r
+              }
 
     shortOption :: L.TokenParser Argument
     shortOption = OptionStack <$> do
       { flag: flag, stack: stack, arg: arg } <- L.sopt
-      O.sopt' flag stack arg <$> repetition
+      r <- repetition
+      pure $  { flag:       flag
+              , stack:      stack
+              , arg:        arg
+              , repeatable: r
+              }
 
     option :: L.TokenParser Argument
     option = longOption <|> shortOption

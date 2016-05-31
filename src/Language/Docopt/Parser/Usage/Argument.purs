@@ -9,14 +9,6 @@ module Language.Docopt.Parser.Usage.Argument (
   , isCommand
   , prettyPrintArg
   , prettyPrintBranch
-  , sopt, sopt_, soptR, soptR_
-  , lopt, lopt_, loptR, loptR_
-  , eoa
-  , co
-  , po
-  , poR
-  , ref
-  , stdin
   ) where
 
 import Prelude
@@ -92,56 +84,3 @@ prettyPrintArg (Group b xs r)
   <> (intercalate " | " (prettyPrintBranch <$> xs))
   <> (if b then "]" else ")")
   <> (if r then "..." else "")
-
---------------------------------------------------------------------------------
--- Short hand function to create arguments.
--- XXX: Remove this
---------------------------------------------------------------------------------
-
-ref :: String -> Argument
-ref = Reference
-
--- short hand to create a short option node
-sopt :: Char -> Array Char -> O.OptionArgumentObj -> Argument
-sopt f fs a = OptionStack $ O.sopt f fs a
-
-sopt_ :: Char -> Array Char -> Argument
-sopt_ f fs = OptionStack $ O.sopt_ f fs
-
-soptR :: Char -> Array Char -> O.OptionArgumentObj -> Argument
-soptR f fs a = OptionStack $ O.soptR f fs a
-
-soptR_ :: Char -> Array Char -> Argument
-soptR_ f fs = OptionStack $ O.soptR_ f fs
-
--- short hand to create a long option node
-lopt :: String -> O.OptionArgumentObj -> Argument
-lopt n a = Option $ O.lopt n a
-
-lopt_ :: String -> Argument
-lopt_ n = Option $ O.lopt_ n
-
-loptR :: String -> O.OptionArgumentObj -> Argument
-loptR n a = Option $ O.loptR n a
-
-loptR_ :: String -> Argument
-loptR_ n = Option $ O.loptR_ n
-
--- short hand to create an end-of-argument marker
-eoa :: Argument
-eoa = EOA
-
--- short hand to create an stdin marker
-stdin :: Argument
-stdin = Stdin
-
--- short hand to create a command node
-co :: String -> Argument
-co n = Command n false
-
--- short hand to create a positional node
-po :: String -> Argument
-po n = Positional n false
-
-poR :: String -> Argument
-poR n = Positional n true
