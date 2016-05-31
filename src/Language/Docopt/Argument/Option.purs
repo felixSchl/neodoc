@@ -45,33 +45,29 @@ type OptionObj =  { flag       :: Maybe Flag
 showOptionObj :: OptionObj -> String
 showOptionObj o = "{ flag: "       <> show o.flag
                <> ", name: "       <> show o.name
-               <> ", arg: "        <> show (OptionArgument <$> o.arg)
+               <> ", arg: "        <> showArg o.arg
                <> ", env: "        <> show o.env
                <> ", repeatable: " <> show o.repeatable
                <> "}"
+  where
+    showArg (Just a) = showOptionArgumentObj a
+    showArg Nothing  = "Nothing"
 
 eqOptionObj :: OptionObj -> OptionObj -> Boolean
-eqOptionObj o o' = o.flag               == o'.flag
-                && o.name               == o'.name
-                && o.env                == o'.env
-                && o.repeatable         == o'.repeatable
-                && (OptionArgument <$> o.arg) == (OptionArgument <$> o'.arg)
-
-newtype OptionArgument = OptionArgument OptionArgumentObj
-
-unOptionArgument :: OptionArgument -> OptionArgumentObj
-unOptionArgument (OptionArgument a) = a
-
-instance showOptionArgument :: Show OptionArgument where
-  show = showOptionArgumentObj <<< unOptionArgument
-
-instance eqOptionArgument   :: Eq   OptionArgument where
-  eq   = eqOptionArgumentObj `on` unOptionArgument
+eqOptionObj o o' = o.flag       == o'.flag
+                && o.name       == o'.name
+                && o.env        == o'.env
+                && o.repeatable == o'.repeatable
+                && argsEqual o.arg o'.arg
+  where
+    argsEqual (Just a) (Just a') = eqOptionArgumentObj a a'
+    argsEqual Nothing Nothing    = true
+    argsEqual _ _                = false
 
 type OptionArgumentObj = { name     :: String
-                   , default  :: Maybe Value
-                   , optional :: Boolean
-                   }
+                         , default  :: Maybe Value
+                         , optional :: Boolean
+                         }
 
 showOptionArgumentObj :: OptionArgumentObj -> String
 showOptionArgumentObj a = "{ name: "     <> show a.name
