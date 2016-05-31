@@ -27,7 +27,7 @@ import Language.Docopt.Env as Env
 import Language.Docopt.Argument (Argument(..), Branch(), isRepeatable,
                                 setRepeatable, setRepeatableOr,
                                 isCommand, isFlag) as D
-import Language.Docopt.ParserGen (ValueMapping)
+import Language.Docopt.Compiler (ValueMapping)
 import Language.Docopt.RichValue (RichValue(..), unRichValue)
 import Language.Docopt.Origin as Origin
 import Language.Docopt.Origin (Origin())

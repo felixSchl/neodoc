@@ -1,5 +1,5 @@
-module Language.Docopt.ParserGen (
-    module Language.Docopt.ParserGen.Token
+module Language.Docopt.Compiler (
+    module Language.Docopt.Compiler.Token
   , genParser
   , runParser
   , Result ()
@@ -18,13 +18,13 @@ import Text.Parsing.Parser.Pos (initialPos) as P
 import Language.Docopt.Argument (Branch) as D
 import Language.Docopt.Usage (Program) as D
 import Language.Docopt.Env (Env) as D
-import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
+import Language.Docopt.Compiler.Token (PositionedToken(..), Token(..),
                                         getSource, prettyPrintToken,
                                         unPositionedToken) as G
-import Language.Docopt.ParserGen.Parser (Parser, genUsageParser,
+import Language.Docopt.Compiler.Parser (Parser, genUsageParser,
                                         initialState, ValueMapping(),
                                         GenOptionsObj()) as G
-import Language.Docopt.ParserGen.Lexer (lex) as G
+import Language.Docopt.Compiler.Lexer (lex) as G
 
 type Result = Tuple D.Branch (List G.ValueMapping)
 

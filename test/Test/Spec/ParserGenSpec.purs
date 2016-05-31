@@ -1,4 +1,4 @@
-module Test.Spec.ParserGenSpec (parserGenSpec) where
+module Test.Spec.CompilerSpec (parserGenSpec) where
 
 import Prelude
 import Debug.Trace
@@ -30,7 +30,7 @@ import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.Env (Env())
-import Language.Docopt.ParserGen (genParser, runParser)
+import Language.Docopt.Compiler (genParser, runParser)
 import Language.Docopt.Argument   as D
 import Language.Docopt.Env        as Env
 import Language.Docopt.Trans.Flat as T

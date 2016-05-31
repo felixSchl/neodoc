@@ -5,7 +5,7 @@
 -- |
 -- | ===
 
-module Language.Docopt.ParserGen.Parser (
+module Language.Docopt.Compiler.Parser (
     genUsageParser
   , initialState
   , Parser ()
@@ -66,8 +66,8 @@ import Language.Docopt.Value (Value(..))
 import Language.Docopt.RichValue (RichValue(..), unRichValue)
 import Language.Docopt.RichValue (from, setValue, getOrigin) as RValue
 import Language.Docopt.Parser.Base (getInput)
-import Language.Docopt.ParserGen.Token as Token
-import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..),
+import Language.Docopt.Compiler.Token as Token
+import Language.Docopt.Compiler.Token (PositionedToken(..), Token(..),
                                         unPositionedToken, prettyPrintToken)
 import Data.String.Ext (startsWith)
 

@@ -5,7 +5,7 @@
 -- |
 -- | ===
 
-module Language.Docopt.ParserGen.Lexer (
+module Language.Docopt.Compiler.Lexer (
   lex
   ) where
 
@@ -23,7 +23,7 @@ import Text.Parsing.Parser.Pos (Position(Position)) as P
 import Text.Parsing.Parser.String (eof, anyChar, char, oneOf, noneOf, string) as P
 import Data.Array as A
 import Control.Plus (empty)
-import Language.Docopt.ParserGen.Token (PositionedToken(..), Token(..))
+import Language.Docopt.Compiler.Token (PositionedToken(..), Token(..))
 import Language.Docopt.Parser.Base (space, alphaNum)
 import Language.Docopt.Value (Value(..)) as D
 

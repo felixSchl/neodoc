@@ -25,7 +25,7 @@ import Language.Docopt.Errors (Argv, DocoptError(..), SolveError(..),
                               developerErrorMessage, prettyPrintDocoptError
                               ) as D
 import Language.Docopt.Value (Value(..)) as D
-import Language.Docopt.ParserGen  as G
+import Language.Docopt.Compiler  as G
 import Language.Docopt.Trans.Flat as T
 
 import Language.Docopt.Scanner      as Scanner

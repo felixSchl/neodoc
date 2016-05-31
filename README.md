@@ -284,7 +284,7 @@ if (args['<command>'] === 'remote') {
   `+o`.
 * Provide warnings. This would mean a largish refactor to use either a custom
   monad, or the Writer monad, stacked on top of the Either monad.
-* Refactor `Language.Docopt.ParserGen.Parser.genBranchParser` to use manual
+* Refactor `Language.Docopt.Compiler.Parser.genBranchParser` to use manual
   recursive iteration, rather than a fold, like in `Language.Docopt.Solver`.
 * Rewrite recursive functions to be in tail position, using
   `purescript-tailrec` and consider trampolining using `purescript-free`.
