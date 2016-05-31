@@ -156,7 +156,7 @@ eoa = EOA
 
 -- short hand to create a group
 gr :: Boolean -> IsRepeatable -> (Array (Array Argument)) -> Argument
-gr b r xs = Group b (toList $ br <$> xs) r
+gr b r xs = Group { optional: b, branches: (toList $ br <$> xs), repeatable: r }
 
 -- short hand to create a optional group
 gro :: IsRepeatable -> (Array (Array Argument)) -> Argument

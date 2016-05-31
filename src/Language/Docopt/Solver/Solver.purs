@@ -85,9 +85,9 @@ solveBranch as ds = go as
                   if isJust (findIndex isMatch args)
                      then map args xs
                      else
-                      let converted = Group
-                            true
-                            (singleton $ singleton $ Option $
+                      let converted = Group {
+                            optional: true
+                          , branches: (singleton $ singleton $ Option $
                                 { flag:       DE.getFlag opt.name
                                 , name:       DE.getName opt.name
                                 , arg:        opt.arg
@@ -95,7 +95,8 @@ solveBranch as ds = go as
                                 , repeatable: false
                                 }
                             )
-                            opt.repeatable
+                          , repeatable: opt.repeatable
+                          }
                        in map (converted:args) xs
 
                   where
@@ -111,9 +112,8 @@ solveBranch as ds = go as
                                           (^=) <$> (DE.getName opt.name)
                                                <*> o.name
                                     else false
-                    isMatch (Group _ bs _)
-                      = any isMatch (concat bs)
-                    isMatch _ = false
+                    isMatch (Group grp) = any isMatch (concat grp.branches)
+                    isMatch _           = false
                 map args (Cons _ xs) = map args xs
                 map args _ = args
             expand' (Tuple args _) = args
@@ -159,8 +159,12 @@ solveBranch as ds = go as
 
     solveArg (U.Group o bs r) _
       = Resolved <<< Keep <<< singleton <$> do
-        flip (Group o) r <$> do
-          flip solveBranch ds `traverse` bs
+          branches <- flip solveBranch ds `traverse` bs
+          pure $ Group {
+            optional:   o
+          , repeatable: r
+          , branches:   branches
+          }
 
     solveArg (U.Reference r) _ = do
       pure $ Unresolved r

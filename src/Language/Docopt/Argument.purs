@@ -5,6 +5,7 @@ module Language.Docopt.Argument (
   , IsRepeatable ()
   , CommandObj ()
   , PositionalObj ()
+  , GroupObj ()
   , prettyPrintBranch
   , prettyPrintArg
   , prettyPrintArgNaked
@@ -41,31 +42,43 @@ type IsOptional = Boolean
 
 type Branch = List Argument
 
-type CommandObj = { name :: String
+type CommandObj = { name       :: String
                   , repeatable :: Boolean
                   }
 
 showCommandObj :: CommandObj -> String
 showCommandObj x
-  =  "{ name: " <> x.name
-  <> ", isRepeatable: " <> show x.repeatable
+  =  "{ name: "       <> x.name
+  <> ", repeatable: " <> show x.repeatable
   <> "}"
 
-type PositionalObj = { name :: String
+type PositionalObj = { name       :: String
                      , repeatable :: Boolean
                      }
 
 showPositionalObj :: CommandObj -> String
 showPositionalObj x
-  =  "{ name: " <> x.name
-  <> ", isRepeatable: " <> show x.repeatable
+  =  "{ name: "       <> x.name
+  <> ", repeatable: " <> show x.repeatable
+  <> "}"
+
+type GroupObj = { optional   :: Boolean
+                , branches   :: List Branch
+                , repeatable :: Boolean
+                }
+
+showGroupObj :: GroupObj -> String
+showGroupObj x
+  =  "{ optional: "   <> show x.optional
+  <> ", branches: "   <> show x.branches
+  <> ", repeatable: " <> show x.repeatable
   <> "}"
 
 data Argument
   = Command     CommandObj
   | Positional  PositionalObj
   | Option      OptionObj
-  | Group       IsOptional (List Branch) IsRepeatable
+  | Group       GroupObj
   | EOA
   | Stdin
 
@@ -74,9 +87,7 @@ instance showArgument :: Show Argument where
   show (Stdin)        = "Stdin"
   show (Command c)    = "Command "    <> showCommandObj c
   show (Positional p) = "Positional " <> showPositionalObj p
-  show (Group o bs r) = "Group " <> show o
-                          <> " " <> show bs
-                          <> " " <> show r
+  show (Group g)      = "Group "      <> showGroupObj g
   show (Option o)     = "Option " <> O.showOptionObj o
 
 instance ordArgument :: Ord Argument where
@@ -90,7 +101,9 @@ instance eqArgument :: Eq Argument where
                                        && (x.repeatable == x'.repeatable)
   eq (Positional x)   (Positional x')   = (x.name ^= x'.name)
                                        && (x.repeatable == x'.repeatable)
-  eq (Group o bs r)   (Group o' bs' r') = (o == o') && (bs == bs') && (r == r')
+  eq (Group g)        (Group g')        = (g.optional   == g'.optional)
+                                       && (g.branches   == g'.branches)
+                                       && (g.repeatable == g'.repeatable)
   eq (Option o)       (Option o')       = O.eqOptionObj o o'
   eq _                _                 = false
 
@@ -107,13 +120,13 @@ prettyPrintArg (Positional x) = name   <> (if x.repeatable then "..." else "")
     name = if String.toUpper x.name == x.name
               then x.name
               else "<" <> x.name <> ">"
-prettyPrintArg (Option o)     = O.prettyPrintOption o
-prettyPrintArg (Group o bs r) = open <> inner <> close <> repetition
+prettyPrintArg (Option o) = O.prettyPrintOption o
+prettyPrintArg (Group g)  = open <> inner <> close <> repetition
   where
-    open       = if o then "[" else "("
-    close      = if o then "]" else ")"
-    inner      = intercalate " | " (prettyPrintBranch <$> bs)
-    repetition = if r then "..." else ""
+    open       = if g.optional then "[" else "("
+    close      = if g.optional then "]" else ")"
+    inner      = intercalate " | " (prettyPrintBranch <$> g.branches)
+    repetition = if g.repeatable then "..." else ""
 
 prettyPrintBranchNaked :: Branch -> String
 prettyPrintBranchNaked xs = intercalate " " (prettyPrintArgNaked <$> xs)
@@ -124,10 +137,10 @@ prettyPrintArgNaked (EOA)          = "-- ARGS..."
 prettyPrintArgNaked (Command x)    = x.name <> (if x.repeatable then "..." else "")
 prettyPrintArgNaked (Positional x) = x.name <> (if x.repeatable then "..." else "")
 prettyPrintArgNaked (Option o)     = O.prettyPrintOptionNaked o
-prettyPrintArgNaked (Group o bs r) = inner <> repetition
+prettyPrintArgNaked (Group g)      = inner <> repetition
   where
-    inner      = intercalate " | " (prettyPrintBranchNaked <$> bs)
-    repetition = if r then "..." else ""
+    inner      = intercalate " | " (prettyPrintBranchNaked <$> g.branches)
+    repetition = if g.repeatable then "..." else ""
 
 isRepeatable :: Argument -> Boolean
 isRepeatable (Option x)     = x.repeatable
@@ -148,8 +161,8 @@ setRepeatableOr (Command x)    r  = Command    x { repeatable = x.repeatable || 
 setRepeatableOr x              _  = x
 
 setRequired :: Argument -> Boolean -> Argument
-setRequired (Group _ bs r) o = Group (not o) bs r
-setRequired x              _ = x
+setRequired (Group x) o = Group x { optional = not o }
+setRequired x         _ = x
 
 hasDefault :: Argument -> Boolean
 hasDefault (Option o) = O.hasDefault o
@@ -187,6 +200,6 @@ isOption (Option _) = true
 isOption _          = false
 
 isFree :: Argument -> Boolean
-isFree (Option _)     = true
-isFree (Group _ bs _) = all (all isFree) bs
-isFree _              = false
+isFree (Option _) = true
+isFree (Group g)  = all (all isFree) g.branches
+isFree _          = false

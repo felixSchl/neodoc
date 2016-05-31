@@ -531,8 +531,8 @@ genBranchParser xs genOpts canSkip = do
                 else pure fallbacks
 
           where
-          isSkippable (D.Group o bs _)
-              = o || (all (all isSkippable) bs)
+          isSkippable (D.Group grp)
+              = grp.optional || (all (all isSkippable) grp.branches)
           isSkippable o = D.isRepeatable o && (any (_ == o) tot)
 
           getEnvValue :: Env -> D.Argument -> Maybe Value
@@ -576,7 +576,7 @@ genBranchParser xs genOpts canSkip = do
       = pure $ Pending p (singleton x)
 
     -- "Free" groups always transition to the `Pending state`
-    step (Free p) x@(D.Group _ _ _) | D.isFree x
+    step (Free p) x@(D.Group _) | D.isFree x
       = pure $ Pending p (singleton x)
 
     -- Any other argument causes immediate evaluation
@@ -590,7 +590,7 @@ genBranchParser xs genOpts canSkip = do
       = pure $ Pending p (x:xs)
 
     -- "Free" groups always keep accumulating
-    step (Pending p xs) x@(D.Group _ _ _) | D.isFree x
+    step (Pending p xs) x@(D.Group _) | D.isFree x
       = pure $ Pending p (x:xs)
 
     -- Any non-options always leaves the pending state
@@ -666,14 +666,14 @@ genBranchParser xs genOpts canSkip = do
                         )
                       <* modifyDepth (_ + 1)
 
-    genParser x@(D.Group optional bs r) _
-      | genOpts.optionsFirst && (length bs == 1) &&
+    genParser x@(D.Group grp) _
+      | genOpts.optionsFirst && (length grp.branches == 1) &&
         all (\xs ->
           case xs of
-            Cons (D.Positional pos) Nil -> pos.repeatable || r
+            Cons (D.Positional pos) Nil -> pos.repeatable || grp.repeatable
             _                           -> false
-        ) bs
-      = terminate (LU.head (LU.head bs))
+        ) grp.branches
+      = terminate (LU.head (LU.head grp.branches))
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option o) _ = (do
@@ -734,22 +734,23 @@ genBranchParser xs genOpts canSkip = do
 
     -- Generate a parser for an argument `Group`
     -- The total score a group is the sum of all scores inside of it.
-    genParser x@(D.Group optional bs repeated) canSkip =
-      let mod = if optional then P.option mempty <<< P.try else \p -> p
+    genParser x@(D.Group grp) canSkip =
+      let mod = if grp.optional then P.option mempty <<< P.try else id
        in mod go
       where
-        go | length bs == 0 = pure mempty
+        go | length grp.branches == 0 = pure mempty
         go = do
           x <- step
-          if repeated && length (filter (snd >>> isFrom Origin.Argv) x) > 0
-             then do
+          if grp.repeatable
+            && length (filter (snd >>> isFrom Origin.Argv) x) > 0
+              then do
                 xs <- go <|> pure mempty
                 pure $ x <> xs
-             else pure x
+              else pure x
 
         isFrom o rv = RValue.getOrigin rv == o
         step = snd <$> do
-                genBranchesParser bs
+                genBranchesParser grp.branches
                                   false
                                   genOpts
                                   -- always allow skipping for non-free groups.

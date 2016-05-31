@@ -30,8 +30,8 @@ instance eqKey :: Eq Key where
     where
       go (D.Command    cmd) (D.Command    cmd') = cmd.name == cmd'.name
       go (D.Positional pos) (D.Positional pos') = pos.name ^= pos'.name
-      go (D.Option { flag=f,  name=n  })
-         (D.Option { flag=f', name=n' })
+      go (D.Option { flag = f,  name = n  })
+         (D.Option { flag = f', name = n' })
          = (f == f') && (n == n')
       go a b = a == b
 
@@ -47,7 +47,7 @@ toKeys (D.Command cmd)    = [cmd.name]
 toKeys (D.Positional pos) = [ "<" <> Str.toLower pos.name <> ">"
                             , Str.toUpper pos.name
                             ]
-toKeys (D.Group _ _ _)    = []
+toKeys (D.Group _)        = []
 toKeys (D.EOA)            = ["--"]
 toKeys (D.Stdin)          = ["-"]
 toKeys (D.Option o)       = []

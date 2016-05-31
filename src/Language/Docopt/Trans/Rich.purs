@@ -133,8 +133,10 @@ reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
                           xs
 
     expand :: D.Argument -> Map Key D.Argument
-    expand (D.Group _ bs r) =
-      reduceBranches r $ ((flip D.setRepeatableOr r) <$> _) <$> bs
+    expand (D.Group grp) =
+      reduceBranches grp.repeatable
+        $ ((flip D.setRepeatableOr grp.repeatable) <$> _)
+            <$> grp.branches
 
     expand arg = Map.singleton (key arg) arg
 
