@@ -54,7 +54,7 @@ type PositionalObj = { name       :: String
                      , repeatable :: Boolean
                      }
 
-showPositionalObj :: CommandObj -> String
+showPositionalObj :: PositionalObj -> String
 showPositionalObj x
   =  "{ name: "       <> x.name
   <> ", repeatable: " <> show x.repeatable

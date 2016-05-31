@@ -95,8 +95,8 @@ prettyPrintLOptObj o
       <> (maybe "" (\a ->
             (if a.optional then "[" else ""
               <> "=" <> a.name
-              <> if a.optional then "]" else "")) o.arg)
-      <> if o.repeatable then "..." else ""
+              <> (if a.optional then "]" else ""))) o.arg)
+      <> (if o.repeatable then "..." else "")
 
 prettyPrintSOptObj :: SOptObj -> String
 prettyPrintSOptObj o
@@ -106,4 +106,4 @@ prettyPrintSOptObj o
             (if a.optional then "[" else "")
               <> "=" <> a.name
               <> (if a.optional then "]" else "")) o.arg)
-      <> if o.repeatable then "..." else ""
+      <> (if o.repeatable then "..." else "")

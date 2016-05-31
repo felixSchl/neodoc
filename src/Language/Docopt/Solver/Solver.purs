@@ -152,10 +152,16 @@ solveBranch as ds = go as
               -> Maybe U.Argument
               -> Either SolveError (ResolveTo (Slurp Argument) Reference)
 
-    solveArg (U.EOA) _ = simpleResolve EOA
-    solveArg (U.Stdin) _ = simpleResolve Stdin
-    solveArg (U.Command n r) _ = simpleResolve $ Command { name: n, repeatable: r }
-    solveArg (U.Positional n r) _ = simpleResolve $ Positional { name: n, repeatable: r }
+    solveArg (U.EOA) _            = simpleResolve EOA
+    solveArg (U.Stdin) _          = simpleResolve Stdin
+    solveArg (U.Command cmd) _    = simpleResolve $ Command {
+                                      name:       cmd.name
+                                    , repeatable: cmd.repeatable
+                                    }
+    solveArg (U.Positional pos) _ = simpleResolve $ Positional {
+                                      name:       pos.name
+                                    , repeatable: pos.repeatable
+                                    }
 
     solveArg (U.Group o bs r) _
       = Resolved <<< Keep <<< singleton <$> do
@@ -196,10 +202,10 @@ solveBranch as ds = go as
                 matchedArg <- match.arg
 
                 case adjArg of
-                  Just (U.Positional n r) ->
-                    pure $ r <$ guardArgs n matchedArg.name
-                  Just (U.Command n r) ->
-                    pure $ r <$ guardArgs n matchedArg.name
+                  Just (U.Positional pos) ->
+                    pure $ pos.repeatable <$ guardArgs pos.name matchedArg.name
+                  Just (U.Command cmd) ->
+                    pure $ cmd.repeatable <$ guardArgs cmd.name matchedArg.name
                   otherwise ->
                     if not (matchedArg.optional)
                       then
@@ -397,10 +403,10 @@ solveBranch as ds = go as
                     guard $ not match.repeatable
                     arg' <- match.arg
                     case adj of
-                      Just (U.Positional n r) ->
-                        pure $ r <$ guardArgs n arg'.name
-                      Just (U.Command n r) ->
-                        pure $ r <$ guardArgs n arg'.name
+                      Just (U.Positional pos) ->
+                        pure $ pos.repeatable <$ guardArgs pos.name arg'.name
+                      Just (U.Command cmd) ->
+                        pure $ cmd.repeatable <$ guardArgs cmd.name arg'.name
                       otherwise ->
                         if not (arg'.optional)
                           then

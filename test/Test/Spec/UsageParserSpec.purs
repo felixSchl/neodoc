@@ -2,12 +2,13 @@ module Test.Spec.UsageParserSpec (usageParserSpec) where
 
 import Prelude
 import Debug.Trace
+import Control.Monad (when)
 import Control.Monad.Aff (liftEff')
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION(), error, throwException)
 import Control.Monad.Error.Class (throwError)
-import Data.List (List(..), length, (!!), take, toList)
+import Data.List (List(..), length, (!!), take, toList, singleton)
 import Data.Either (Either(..), isRight, isLeft, either)
 import Data.Either.Unsafe (fromLeft, fromRight)
 import Data.Maybe.Unsafe (fromJust)
@@ -32,14 +33,14 @@ import Test.Support (vliftEff, runMaybeEff, runEitherEff)
 
 data Expected a = F | P a
 
-sopt_ f fs r = (if r then U.soptR_ else U.sopt_) f fs
+sopt_ f fs   r = (if r then U.soptR_ else U.sopt_) f fs
 sopt  f fs a r = (if r then U.soptR else U.sopt) f fs a
-lopt_ f r = (if r then U.loptR_ else U.lopt_) f
-lopt  f a r = (if r then U.loptR else U.lopt) f a
-po    n r = (if r then U.poR else U.po) n
-arg'  n o = { name: n, optional: o }
-arg_  n = arg' n true
-arg   n = arg' n false
+lopt_ f      r = (if r then U.loptR_ else U.lopt_) f
+lopt  f    a r = (if r then U.loptR else U.lopt) f a
+po    n      r = (if r then U.poR else U.po) n
+arg'  n o      = { name: n, optional: o }
+arg_  n        = arg' n true
+arg   n        = arg' n false
 
 usageParserSpec = \_ ->
   describe "The usage parser" do
@@ -58,7 +59,7 @@ usageParserSpec = \_ ->
         assertEqual 1 (length usage)
         (U.Usage _ u) <- runMaybeEff $ usage !! 0
         g <- runMaybeEff $ u !! 0
-        flip assertEqual g (Cons (U.Command "bar" false) Nil)
+        flip assertEqual g (Cons (U.co "bar") Nil)
 
     -- Test positionals in various formats.
     -- Each entry is run for both singular and repeated version.
@@ -329,9 +330,13 @@ usageParserSpec = \_ ->
                     assertEqual 1 (length usage)
                     (U.Usage _ u) <- runMaybeEff $ usage !! 0
                     g <- runMaybeEff $ u !! 0
+                    let result = take 1 g
 
                     -- Assert output matches expected
-                    flip assertEqual (take 1 g) (Cons expected Nil)
+                    when (result /= (singleton expected)) do
+                      throwException $ error $
+                        "Unexpected output:\n"
+                          <> (U.prettyPrintUsage $ U.Usage "" (singleton result))
               _ -> do
                 it (input ++ " should fail") do
                 vliftEff do

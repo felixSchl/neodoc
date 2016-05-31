@@ -27,7 +27,7 @@ import Language.Docopt.Parser.Usage.Argument (Argument(..))
 import Language.Docopt.Parser.Usage.Usage (Usage(..))
 import Text.Parsing.Parser (ParseError) as P
 import Text.Parsing.Parser.Combinators (try, optional, choice, sepBy1, between,
-                                       optionMaybe, lookAhead) as P
+                                       optionMaybe, lookAhead, option) as P
 import Text.Parsing.Parser.Combinators ((<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(Position)) as P
 
@@ -148,12 +148,12 @@ usageParser smartOpts = do
 
       (Tuple (Tuple name isRepeatable) isOptional) <- do
         case optarg of
-              (Positional n r') -> pure $ tuple3 n (r' || r) false
-              (Command    n r') -> pure $ tuple3 n (r' || r) false
+              (Positional pos) -> pure $ tuple3 pos.name (pos.repeatable || r) false
+              (Command    cmd) -> pure $ tuple3 cmd.name (cmd.repeatable || r) false
               (Group o (Cons (Cons a Nil) Nil) r) ->
                 case a of
-                  (Positional n r') -> pure $ tuple3 n (r' || r) o
-                  (Command    n r') -> pure $ tuple3 n (r' || r) o
+                  (Positional pos) -> pure $ tuple3 pos.name (pos.repeatable || r) o
+                  (Command    cmd) -> pure $ tuple3 cmd.name (cmd.repeatable || r) o
                   otherwise -> Nothing
               otherwise -> Nothing
       pure
@@ -167,22 +167,22 @@ usageParser smartOpts = do
 
     longOption :: L.TokenParser Argument
     longOption = Option <$> do
-      { name: name, arg: arg } <- L.lopt
+      { name, arg } <- L.lopt
       r <- repetition
-      pure $  { name:       name
-              , arg:        arg
-              , repeatable: r
-              }
+      pure  { name:       name
+            , arg:        arg
+            , repeatable: r
+            }
 
     shortOption :: L.TokenParser Argument
     shortOption = OptionStack <$> do
-      { flag: flag, stack: stack, arg: arg } <- L.sopt
+      { flag, stack, arg } <- L.sopt
       r <- repetition
-      pure $  { flag:       flag
-              , stack:      stack
-              , arg:        arg
-              , repeatable: r
-              }
+      pure  { flag:       flag
+            , stack:      stack
+            , arg:        arg
+            , repeatable: r
+            }
 
     option :: L.TokenParser Argument
     option = longOption <|> shortOption
@@ -191,12 +191,16 @@ usageParser smartOpts = do
     reference = Reference <$> L.reference
 
     positional :: L.TokenParser Argument
-    positional = Positional <$> (L.angleName <|> L.shoutName)
-                            <*> repetition
+    positional = Positional <$> do
+      name <- (L.angleName <|> L.shoutName)
+      r    <- repetition
+      pure { name: name, repeatable: r }
 
     command :: L.TokenParser Argument
-    command = Command <$> L.name
-                      <*> repetition
+    command = Command <$> do
+      name <-  L.name
+      r    <- repetition
+      pure { name: name, repeatable: r }
 
     group :: L.TokenParser Argument
     group = defer \_ -> P.choice [ reqGroup , optGroup ]
@@ -218,9 +222,7 @@ usageParser smartOpts = do
       <*> repetition
 
     repetition :: L.TokenParser Boolean
-    repetition = P.choice [ P.try $ indented *> L.tripleDot $> true
-                          , pure false
-                          ]
+    repetition = P.option false (indented *> L.tripleDot $> true)
 
     program :: L.TokenParser String
     program = "Program name" <??> L.name

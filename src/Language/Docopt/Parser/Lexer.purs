@@ -71,23 +71,23 @@ data Token
   | DoubleDash
 
 prettyPrintToken :: Token -> String
-prettyPrintToken LParen            = show '('
-prettyPrintToken RParen            = show ')'
-prettyPrintToken LSquare           = show '['
-prettyPrintToken RSquare           = show ']'
-prettyPrintToken Dash              = show '-'
-prettyPrintToken VBar              = show '|'
-prettyPrintToken Newline           = show '\n'
-prettyPrintToken Colon             = show ':'
-prettyPrintToken Comma             = show ','
-prettyPrintToken TripleDot         = "..."
-prettyPrintToken DoubleDash        = "--"
-prettyPrintToken (Reference r)     = "Reference " <> show r
-prettyPrintToken (Garbage   c)     = "Garbage "   <> show c
-prettyPrintToken (Tag k v)         = "Tag "       <> k <> " "  <> (show v)
-prettyPrintToken (Name      n)     = "Name "      <> show n
-prettyPrintToken (ShoutName n)     = "ShoutName " <> show n
-prettyPrintToken (AngleName n)     = "AngleName " <> show n
+prettyPrintToken LParen        = show '('
+prettyPrintToken RParen        = show ')'
+prettyPrintToken LSquare       = show '['
+prettyPrintToken RSquare       = show ']'
+prettyPrintToken Dash          = show '-'
+prettyPrintToken VBar          = show '|'
+prettyPrintToken Newline       = show '\n'
+prettyPrintToken Colon         = show ':'
+prettyPrintToken Comma         = show ','
+prettyPrintToken TripleDot     = "..."
+prettyPrintToken DoubleDash    = "--"
+prettyPrintToken (Reference r) = "Reference " <> show r
+prettyPrintToken (Garbage   c) = "Garbage "   <> show c
+prettyPrintToken (Tag k v)     = "Tag "       <> k <> " "  <> (show v)
+prettyPrintToken (Name      n) = "Name "      <> show n
+prettyPrintToken (ShoutName n) = "ShoutName " <> show n
+prettyPrintToken (AngleName n) = "AngleName " <> show n
 prettyPrintToken (LOpt n arg)
   = "--" <> n
          <> (fromMaybe "" do

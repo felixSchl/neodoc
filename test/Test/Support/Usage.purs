@@ -28,16 +28,16 @@ go :: Array (Array U.Argument) -> Boolean -> U.Argument
 go xs r = U.Group true ls r
   where ls = toList <$> (toList xs)
 
-ref            = U.Reference
-eoa            = U.EOA
-stdin          = U.Stdin
-co n           = U.Command n false
-po n           = U.Positional n false
-poR n          = U.Positional n true
-po' n          = U.Positional n
-arg'  n o      = { name: n, optional: o }
-arg_  n        = arg' n true
-arg   n        = arg' n false
+ref       = U.Reference
+eoa       = U.EOA
+stdin     = U.Stdin
+co n      = U.Command { name: n, repeatable: false }
+po' n r   = U.Positional { name: n, repeatable: r }
+po n      = po' n false
+poR n     = po' n true
+arg'  n o = { name: n, optional: o }
+arg_  n   = arg' n true
+arg   n   = arg' n false
 
 sopt'  f fs a r = U.OptionStack { flag: f, stack: fs, arg: a, repeatable: r }
 sopt   f fs a   = sopt' f fs (pure a) false

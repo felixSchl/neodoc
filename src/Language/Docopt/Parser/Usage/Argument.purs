@@ -3,12 +3,15 @@ module Language.Docopt.Parser.Usage.Argument (
   , IsRepeatable ()
   , IsOptional ()
   , Branch ()
+  , CommandObj ()
+  , PositionalObj ()
   , isFree
   , isOption
   , isPositional
   , isCommand
   , prettyPrintArg
   , prettyPrintBranch
+  , module O
   ) where
 
 import Prelude
@@ -16,12 +19,40 @@ import Data.List (List())
 import Data.Foldable (intercalate, all)
 import Language.Docopt.Parser.Usage.Option as O
 
+type CommandObj = { name       :: String
+                  , repeatable :: Boolean
+                  }
+
+showCommandObj :: CommandObj -> String
+showCommandObj x
+  =  "{ name: "       <> x.name
+  <> ", repeatable: " <> show x.repeatable
+  <> "}"
+
+eqCommandObj :: CommandObj -> CommandObj -> Boolean
+eqCommandObj x x' = x.name       == x'.name
+                 && x.repeatable == x'.repeatable
+
+type PositionalObj = { name       :: String
+                     , repeatable :: Boolean
+                     }
+
+showPositionalObj :: PositionalObj  -> String
+showPositionalObj x
+  =  "{ name: "       <> x.name
+  <> ", repeatable: " <> show x.repeatable
+  <> "}"
+
+eqPositionalObj :: PositionalObj -> PositionalObj -> Boolean
+eqPositionalObj x x' = x.name       == x'.name
+                    && x.repeatable == x'.repeatable
+
 type IsRepeatable = Boolean
 type IsOptional = Boolean
 type Branch = List Argument
 data Argument
-  = Command     String IsRepeatable
-  | Positional  String IsRepeatable
+  = Command     CommandObj
+  | Positional  PositionalObj
   | Option      O.LOptObj
   | OptionStack O.SOptObj
   | Group       IsOptional (List Branch) IsRepeatable
@@ -40,19 +71,19 @@ isOption (OptionStack _) = true
 isOption _               = false
 
 isPositional :: Argument -> Boolean
-isPositional (Positional _ _) = true
-isPositional _                = false
+isPositional (Positional _) = true
+isPositional _              = false
 
 isCommand :: Argument -> Boolean
-isCommand (Command _ _) = true
-isCommand _             = false
+isCommand (Command _) = true
+isCommand _           = false
 
 instance showArgument :: Show Argument where
   show (EOA)            = "--"
   show (Stdin)          = "-"
   show (Reference r)    = "Reference "   <> r
-  show (Command n r)    = "Command "     <> n <> show r
-  show (Positional n r) = "Positional "  <> n <> " " <> show r
+  show (Command cmd)    = "Command "     <> showCommandObj cmd
+  show (Positional pos) = "Positional "  <> showPositionalObj pos
   show (Option o)       = "Option "      <> O.showLOptObj o
   show (OptionStack o)  = "OptionStack " <> O.showSOptObj o
   show (Group n b o)    = "Group "       <> show n <> " " <> show b <> " " <> show o
@@ -60,8 +91,8 @@ instance showArgument :: Show Argument where
 instance eqArgument :: Eq Argument where
   eq (Stdin)          (Stdin)            = true
   eq (EOA)            (EOA)              = true
-  eq (Command s r)    (Command s' r')    = (s == s') && (r == r')
-  eq (Positional s r) (Positional s' r') = (s == s') && (r == r')
+  eq (Command cmd)    (Command cmd')     = cmd `eqCommandObj` cmd'
+  eq (Positional pos) (Positional pos')  = pos `eqPositionalObj` pos'
   eq (Option o)       (Option o')        = o `O.eqLOptObj` o'
   eq (Group b xs r)   (Group b' xs' r')  = (b == b') && (xs == xs') && (r == r')
   eq (OptionStack o)  (OptionStack o')   = o `O.eqSOptObj` o'
@@ -72,8 +103,8 @@ prettyPrintBranch :: Branch -> String
 prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
 
 prettyPrintArg :: Argument -> String
-prettyPrintArg (Command n r)    = n <> if r then "..." else ""
-prettyPrintArg (Positional n r) = n <> if r then "..." else ""
+prettyPrintArg (Command cmd)    = cmd.name <> if cmd.repeatable then "..." else ""
+prettyPrintArg (Positional pos) = pos.name <> if pos.repeatable then "..." else ""
 prettyPrintArg (Option o)       = O.prettyPrintLOptObj o
 prettyPrintArg (OptionStack o)  = O.prettyPrintSOptObj o
 prettyPrintArg (EOA)            = "--"
