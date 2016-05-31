@@ -20,8 +20,9 @@ import Test.Assert.Simple
 
 import Test.Support (vliftEff, runEitherEff)
 import Test.Support.Usage as U
-import Test.Support.Docopt as D
 import Test.Support.Desc as DE
+import Test.Support.Docopt as D
+import Test.Support.Arguments
 
 import Language.Docopt.Errors
 import Language.Docopt.Argument
@@ -64,12 +65,12 @@ solverSpec = \_ ->
 
       test ([ u [ [ U.co "foo" ] ] ])
         [ pass  ([])
-                ([ out [ [ D.co "foo" ] ] ])
+                ([ out [ [ co "foo" ] ] ])
         ]
 
     , test ([ u [ [ U.poR "foo" ] ] ])
         [ pass  ([])
-                ([ out [ [ D.poR "foo" ] ] ])
+                ([ out [ [ poR "foo" ] ] ])
         ]
 
     , test ([ u [ [ U.loptR_ "foo" ] ] ])
@@ -77,7 +78,7 @@ solverSpec = \_ ->
                             (Just $ DE.arg "bar" false (Just (StringValue "qux")))
                 ])
                 ([ out [
-                    [ D.optR 'f' "foo" (D.oa "bar" (StringValue "qux")) ]
+                    [ optR 'f' "foo" (oa "bar" (StringValue "qux")) ]
                 ] ])
         ]
 
@@ -86,8 +87,8 @@ solverSpec = \_ ->
                             (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
                 ])
                 ([ out [
-                    [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
-                    , D.co "BAR"
+                    [ optR 'f' "foo" (oa "BAR" (StringValue "qux"))
+                    , co "BAR"
                     ]
                 ] ])
         ]
@@ -97,7 +98,7 @@ solverSpec = \_ ->
                             (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
                 ])
                 ([ out [
-                    [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
+                    [ optR 'f' "foo" (oa "BAR" (StringValue "qux")) ]
                 ] ])
         ]
 
@@ -106,17 +107,17 @@ solverSpec = \_ ->
                             (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
                 ])
                 ([ out [
-                    [ D.opt 'f' "foo" (D.oa "BAR" (StringValue "qux")) ]
+                    [ opt 'f' "foo" (oa "BAR" (StringValue "qux")) ]
                 ] ])
         ]
 
     , test ([ u [ [ U.loptR_ "foo", U.poR "BAR" ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
+                          (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
                 ])
                 ([ out [
-                    [ D.optR 'f' "foo" (D.oa "BAR" (StringValue "qux"))
-                    , D.poR "BAR"
+                    [ optR 'f' "foo" (oa "BAR" (StringValue "qux"))
+                    , poR "BAR"
                     ]
                 ] ])
         ]
@@ -126,10 +127,10 @@ solverSpec = \_ ->
                             (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ])
                 ([ out [
-                    [ D.soptR_ 'x'
-                    , D.soptR_ 'v'
-                    , D.soptR_ 'z'
-                    , D.optR 'f' "file" (D.oa "FILE" (StringValue "foo"))
+                    [ soptR_ 'x'
+                    , soptR_ 'v'
+                    , soptR_ 'z'
+                    , optR 'f' "file" (oa "FILE" (StringValue "foo"))
                     ]
                 ] ])
         ]
@@ -182,10 +183,10 @@ solverSpec = \_ ->
                             (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
                 ])
                 ([ out [
-                    [ D.soptR_ 'x'
-                    , D.soptR_ 'v'
-                    , D.soptR_ 'z'
-                    , D.optR 'f' "file" (D.oa "FILE" (StringValue "foo"))
+                    [ soptR_ 'x'
+                    , soptR_ 'v'
+                    , soptR_ 'z'
+                    , optR 'f' "file" (oa "FILE" (StringValue "foo"))
                     ]
                 ] ])
         ]
@@ -195,8 +196,8 @@ solverSpec = \_ ->
             [ DE.opt (DE.fname 'f' "file")
                      (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
             ]
-            [ out [ [ D.gro false [ [
-                D.opt 'f' "file" (D.oa "FILE" $ StringValue "foo")
+            [ out [ [ gro false [ [
+                opt 'f' "file" (oa "FILE" $ StringValue "foo")
             ] ] ] ] ]
         ]
     ]) runtest

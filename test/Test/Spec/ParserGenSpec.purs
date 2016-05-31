@@ -23,6 +23,7 @@ import Test.Spec (describe, it, Spec())
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
+import Test.Support.Arguments
 
 import Language.Docopt.Errors
 import Language.Docopt.Argument
@@ -82,7 +83,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
   -- Some options that will be used for these tests
   let testCases = [
       test
-        [ D.poR "qux" ]
+        [ poR "qux" ]
         [ pass
             [ "a", "b", "c" ]
             [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
@@ -96,7 +97,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.poR "qux", D.eoa ]
+        [ poR "qux", eoa ]
         [ pass
             [ "a", "b", "c", "--" ]
             [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
@@ -112,15 +113,15 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.grr false [] ]
+        [ grr false [] ]
         [ pass [] [] ]
 
     , test
-        [ D.gro false [] ]
+        [ gro false [] ]
         [ pass [] [] ]
 
     , test
-        [ D.opt 'h' "host" (D.oa "host[:port]"
+        [ opt 'h' "host" (oa "host[:port]"
                            (D.str "http://localhost:3000"))
         ]
         [ pass
@@ -131,7 +132,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.optE 'h' "host" (D.oa "FOO" (D.str "BAR")) "HOST" ]
+        [ optE 'h' "host" (oa "FOO" (D.str "BAR")) "HOST" ]
         [ pass'
             []
             [ "HOST" :> "HOME" ]
@@ -141,7 +142,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.grr false [[ D.opt 'i' "input" (D.oa_ "FILE") ]]
+        [ grr false [[ opt 'i' "input" (oa_ "FILE") ]]
         ]
         [ fail [] "Expected option(s): -i|--input=FILE"
         , pass
@@ -151,7 +152,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.grr false [[ D.opt 'i' "input" (D.oa_ "FILE") ]]
+        [ grr false [[ opt 'i' "input" (oa_ "FILE") ]]
         ]
         [ fail [] "Expected option(s): -i|--input=FILE"
         , pass
@@ -161,8 +162,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.grr false [[ D.opt 'i' "input" (D.oa_ "FILE") ]]
-        , D.opt 'o' "output" (D.oa_ "FILE")
+        [ grr false [[ opt 'i' "input" (oa_ "FILE") ]]
+        , opt 'o' "output" (oa_ "FILE")
         ]
         [ fail []
           $ "Expected option(s): -i|--input=FILE, -o|--output=FILE"
@@ -185,13 +186,13 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.grr false [[
-            D.grr false [[
-              D.opt 'i' "input" (D.oa_ "FILE")
+        [ grr false [[
+            grr false [[
+              opt 'i' "input" (oa_ "FILE")
             ]]
-          , D.optE 'r' "redirect" (D.oa_ "FILE") "QUX"
+          , optE 'r' "redirect" (oa_ "FILE") "QUX"
           ]]
-        , D.opt 'o' "output" (D.oa_ "FILE")
+        , opt 'o' "output" (oa_ "FILE")
         ]
         [ fail []
           $ "Expected option(s): -i|--input=FILE -r|--redirect=FILE, -o|--output=FILE"
@@ -228,11 +229,11 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.grr false [[
-            D.opt 'i' "input" (D.oa_ "FILE")
-          , D.po  "env"
+        [ grr false [[
+            opt 'i' "input" (oa_ "FILE")
+          , po  "env"
           ]]
-        , D.opt 'o' "output" (D.oa_ "FILE")
+        , opt 'o' "output" (oa_ "FILE")
         ]
         [ fail [] "Expected option(s): -i|--input=FILE"
           -- XXX: Would be cool to show the reason the group did not parse!
@@ -250,16 +251,16 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.optE 'o' "out" (D.oa_ "FOO") "FOO" ]
+        [ optE 'o' "out" (oa_ "FOO") "FOO" ]
         [ pass'
             []
-            [ "FOO" :> "BAR" ]
+            [ "FOO"    :> "BAR" ]
             [  "--out" :> D.str "BAR"
             ,  "-o"    :> D.str "BAR" ]
         ]
 
     , test
-        [ D.optE 'o' "out" (D.oa "FOO" (D.str "ADLER")) "FOO" ]
+        [ optE 'o' "out" (oa "FOO" (D.str "ADLER")) "FOO" ]
         [ pass'
             []
             [ "FOO" :> "BAR" ]
@@ -268,7 +269,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test'
-        [ [ D.sopt_ 'a' ], [ D.sopt_ 'b' ] ]
+        [ [ sopt_ 'a' ], [ sopt_ 'b' ] ]
         [ pass
             [ "-a" ]
             [ "-a" :> D.bool true ]
@@ -281,7 +282,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test'
-        [ [ D.co "a" ], [ D.co "b" ] ]
+        [ [ co "a" ], [ co "b" ] ]
         [ pass
             [ "a" ]
             [ "a" :> D.bool true ]
@@ -298,13 +299,13 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.co    "foo"
-        , D.opt_  'o' "out"
-        , D.optR_ 'q' "qux"
-        , D.opt   'b' "baz" (D.oa "BAZ" $ D.str "ax")
-        , D.opt_  'i' "input"
-        , D.optR  'f' "foo" (D.oa_ "FOZ")
-        , D.co     "baz"
+        [ co     "foo"
+        , opt_  'o' "out"
+        , optR_ 'q' "qux"
+        , opt   'b' "baz" (oa "BAZ" $ D.str "ax")
+        , opt_  'i' "input"
+        , optR  'f' "foo" (oa_ "FOZ")
+        , co    "baz"
         ]
         [ pass
             [ "foo", "--out", "--input", "--qux", "--foo=ox", "baz" ]
@@ -393,15 +394,15 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ D.gro false [[ D.co "foo" ]] ]
+        [ gro false [[ co "foo" ]] ]
         [ fail [ "goo" ] "Unmatched command: goo" ]
     , test
-        [ D.grr false [[ D.co "foo" ]] ]
+        [ grr false [[ co "foo" ]] ]
         [ fail [ "goo" ] "Expected foo, but got goo" ]
   ]
 
   for_ testCases \(Test bs kases) -> do
-    describe (intercalate " | " $ prettyPrintBranch <<< D.br <$> bs) do
+    describe (intercalate " | " $ prettyPrintBranch <<< br <$> bs) do
       for_ kases \(Case input env expected) ->
             let msg = either
                   (\e -> "Should fail with \"" <> e <> "\"")
@@ -433,7 +434,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                             -> Either String (StrMap Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate args argv env expected = do
-        let prg = singleton $ Usage $ D.br <$> args
+        let prg = singleton $ Usage $ br <$> args
             result = uncurry (T.reduce prg env)
                 <$> runParser
                       env
