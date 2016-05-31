@@ -3,6 +3,7 @@ module Language.Docopt.Parser.Usage.Argument (
   , IsRepeatable ()
   , IsOptional ()
   , Branch ()
+  , GroupObj ()
   , CommandObj ()
   , PositionalObj ()
   , isFree
@@ -47,6 +48,23 @@ eqPositionalObj :: PositionalObj -> PositionalObj -> Boolean
 eqPositionalObj x x' = x.name       == x'.name
                     && x.repeatable == x'.repeatable
 
+type GroupObj = { optional   :: Boolean
+                , branches   :: List Branch
+                , repeatable :: Boolean
+                }
+
+showGroupObj :: GroupObj -> String
+showGroupObj x
+  =  "{ optional: "   <> show x.optional
+  <> ", branches: "   <> show x.branches
+  <> ", repeatable: " <> show x.repeatable
+  <> "}"
+
+eqGroupObj :: GroupObj -> GroupObj -> Boolean
+eqGroupObj x x' = x.optional  == x'.optional
+              && x.branches   == x'.branches
+              && x.repeatable == x'.repeatable
+
 type IsRepeatable = Boolean
 type IsOptional = Boolean
 type Branch = List Argument
@@ -55,15 +73,15 @@ data Argument
   | Positional  PositionalObj
   | Option      O.LOptObj
   | OptionStack O.SOptObj
-  | Group       IsOptional (List Branch) IsRepeatable
+  | Group       GroupObj
   | EOA
   | Stdin
   | Reference String
 
 isFree :: Argument -> Boolean
-isFree (Option _)     = true
-isFree (Group _ bs _) = all (all isFree) bs
-isFree _              = false
+isFree (Option _)  = true
+isFree (Group grp) = all (all isFree) grp.branches
+isFree _           = false
 
 isOption :: Argument -> Boolean
 isOption (Option _)      = true
@@ -86,7 +104,7 @@ instance showArgument :: Show Argument where
   show (Positional pos) = "Positional "  <> showPositionalObj pos
   show (Option o)       = "Option "      <> O.showLOptObj o
   show (OptionStack o)  = "OptionStack " <> O.showSOptObj o
-  show (Group n b o)    = "Group "       <> show n <> " " <> show b <> " " <> show o
+  show (Group grp)      = "Group "       <> showGroupObj grp
 
 instance eqArgument :: Eq Argument where
   eq (Stdin)          (Stdin)            = true
@@ -94,7 +112,7 @@ instance eqArgument :: Eq Argument where
   eq (Command cmd)    (Command cmd')     = cmd `eqCommandObj` cmd'
   eq (Positional pos) (Positional pos')  = pos `eqPositionalObj` pos'
   eq (Option o)       (Option o')        = o `O.eqLOptObj` o'
-  eq (Group b xs r)   (Group b' xs' r')  = (b == b') && (xs == xs') && (r == r')
+  eq (Group grp)      (Group grp')       = grp `eqGroupObj` grp'
   eq (OptionStack o)  (OptionStack o')   = o `O.eqSOptObj` o'
   eq (Reference r)    (Reference r')     = r == r'
   eq _                _                  = false
@@ -110,8 +128,8 @@ prettyPrintArg (OptionStack o)  = O.prettyPrintSOptObj o
 prettyPrintArg (EOA)            = "--"
 prettyPrintArg (Stdin)          = "-"
 prettyPrintArg (Reference r)    = "[" <> show r <> " options...]"
-prettyPrintArg (Group b xs r)
-  =  (if b then "[" else "(")
-  <> (intercalate " | " (prettyPrintBranch <$> xs))
-  <> (if b then "]" else ")")
-  <> (if r then "..." else "")
+prettyPrintArg (Group grp)
+  =  (if grp.optional then "[" else "(")
+  <> (intercalate " | " (prettyPrintBranch <$> grp.branches))
+  <> (if grp.optional then "]" else ")")
+  <> (if grp.repeatable then "..." else "")

@@ -20,13 +20,17 @@ usage n xss = U.Usage n $ toList $ toList <$> xss
 
 -- short hand to create a required group node
 gr :: Array (Array U.Argument) -> Boolean -> U.Argument
-gr xs r = U.Group false ls r
-  where ls = toList <$> (toList xs)
+gr xs r = U.Group { optional:   false
+                  , branches:   toList <$> (toList xs)
+                  , repeatable: r
+                  }
 
 -- short hand to create a optional group node
 go :: Array (Array U.Argument) -> Boolean -> U.Argument
-go xs r = U.Group true ls r
-  where ls = toList <$> (toList xs)
+go xs r = U.Group { optional:   true
+                  , branches:   toList <$> (toList xs)
+                  , repeatable: r
+                  }
 
 ref       = U.Reference
 eoa       = U.EOA

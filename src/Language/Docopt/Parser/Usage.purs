@@ -118,8 +118,8 @@ usageParser smartOpts = do
         ] <?> "Option, Positional, Command, Group or Reference"
 
     trySmartOpt :: Argument -> Argument
-    trySmartOpt grp@(Group oo bs r) = fromMaybe grp $ do
-      Tuple opt optarg <- case bs of
+    trySmartOpt grp'@(Group grp) = fromMaybe grp' $ do
+      Tuple opt optarg <- case grp.branches of
                               (Cons (Cons opt' (Cons arg' Nil)) Nil) ->
                                 pure $ Tuple opt' arg'
                               otherwise -> Nothing
@@ -148,18 +148,30 @@ usageParser smartOpts = do
 
       (Tuple (Tuple name isRepeatable) isOptional) <- do
         case optarg of
-              (Positional pos) -> pure $ tuple3 pos.name (pos.repeatable || r) false
-              (Command    cmd) -> pure $ tuple3 cmd.name (cmd.repeatable || r) false
-              (Group o (Cons (Cons a Nil) Nil) r) ->
+              (Positional pos) ->
+                pure $ tuple3 pos.name
+                              (pos.repeatable || grp.repeatable)
+                              false
+              (Command cmd) ->
+                pure $ tuple3 cmd.name
+                              (cmd.repeatable || grp.repeatable)
+                              false
+              (Group (grp''@{ branches: Cons (Cons a Nil) Nil })) ->
                 case a of
-                  (Positional pos) -> pure $ tuple3 pos.name (pos.repeatable || r) o
-                  (Command    cmd) -> pure $ tuple3 cmd.name (cmd.repeatable || r) o
+                  (Positional pos) ->
+                    pure $ tuple3 pos.name
+                                  (pos.repeatable || grp''.repeatable)
+                                  grp''.optional
+                  (Command cmd) ->
+                    pure $ tuple3 cmd.name
+                                  (cmd.repeatable || grp''.repeatable)
+                                  grp''.optional
                   otherwise -> Nothing
               otherwise -> Nothing
-      pure
-        $ Group oo
-                (singleton $ singleton (optf name isOptional isRepeatable))
-                r
+
+      pure $ Group grp {
+        branches = singleton $ singleton (optf name isOptional isRepeatable)
+      }
     trySmartOpt x = x
 
     stdin :: L.TokenParser Argument
@@ -206,20 +218,22 @@ usageParser smartOpts = do
     group = defer \_ -> P.choice [ reqGroup , optGroup ]
 
     optGroup :: L.TokenParser Argument
-    optGroup = defer \_ -> Group true
-      <$> (P.between
-            (indented *> L.lsquare)
-            (L.rsquare)
-            ((some elem) `P.sepBy1` L.vbar))
-      <*> repetition
+    optGroup = defer \_ -> Group <$> do
+      branches <- P.between
+                    (indented *> L.lsquare)
+                    (L.rsquare)
+                    ((some elem) `P.sepBy1` L.vbar)
+      r <- repetition
+      pure { optional: true, branches: branches, repeatable: r }
 
     reqGroup :: L.TokenParser Argument
-    reqGroup = defer \_ -> Group false
-      <$> (P.between
-            (indented *> L.lparen)
-            (L.rparen)
-            ((some elem) `P.sepBy1` L.vbar))
-      <*> repetition
+    reqGroup = defer \_ -> Group <$> do
+      branches <- P.between
+                    (indented *> L.lparen)
+                    (L.rparen)
+                    ((some elem) `P.sepBy1` L.vbar)
+      r <- repetition
+      pure { optional: false, branches: branches, repeatable: r }
 
     repetition :: L.TokenParser Boolean
     repetition = P.option false (indented *> L.tripleDot $> true)

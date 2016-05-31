@@ -163,14 +163,10 @@ solveBranch as ds = go as
                                     , repeatable: pos.repeatable
                                     }
 
-    solveArg (U.Group o bs r) _
+    solveArg (U.Group grp) _
       = Resolved <<< Keep <<< singleton <$> do
-          branches <- flip solveBranch ds `traverse` bs
-          pure $ Group {
-            optional:   o
-          , repeatable: r
-          , branches:   branches
-          }
+          branches <- flip solveBranch ds `traverse` grp.branches
+          pure $ Group grp { branches = branches }
 
     solveArg (U.Reference r) _ = do
       pure $ Unresolved r
