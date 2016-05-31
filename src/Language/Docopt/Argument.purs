@@ -3,6 +3,8 @@ module Language.Docopt.Argument (
   , Branch ()
   , IsOptional ()
   , IsRepeatable ()
+  , CommandObj ()
+  , PositionalObj ()
   , prettyPrintBranch
   , prettyPrintArg
   , prettyPrintArgNaked
@@ -39,51 +41,74 @@ type IsOptional = Boolean
 
 type Branch = List Argument
 
+type CommandObj = { name :: String
+                  , repeatable :: Boolean
+                  }
+
+showCommandObj :: CommandObj -> String
+showCommandObj x
+  =  "{ name: " <> x.name
+  <> ", isRepeatable: " <> show x.repeatable
+  <> "}"
+
+type PositionalObj = { name :: String
+                     , repeatable :: Boolean
+                     }
+
+showPositionalObj :: CommandObj -> String
+showPositionalObj x
+  =  "{ name: " <> x.name
+  <> ", isRepeatable: " <> show x.repeatable
+  <> "}"
+
 data Argument
-  = Command     String IsRepeatable
-  | Positional  String IsRepeatable
+  = Command     CommandObj
+  | Positional  PositionalObj
   | Option      OptionObj
   | Group       IsOptional (List Branch) IsRepeatable
   | EOA
   | Stdin
 
 instance showArgument :: Show Argument where
-  show (EOA)            = "EOA"
-  show (Stdin)          = "Stdin"
-  show (Command n r)    = "Command " <> show n
-                              <> " " <> show r
-  show (Positional n r) = "Positional " <> show n
-                                 <> " " <> show r
-  show (Group o bs r)   = "Group " <> show o
-                            <> " " <> show bs
-                            <> " " <> show r
-  show (Option o)       = "Option " <> O.showOptionObj o
+  show (EOA)          = "EOA"
+  show (Stdin)        = "Stdin"
+  show (Command c)    = "Command "    <> showCommandObj c
+  show (Positional p) = "Positional " <> showPositionalObj p
+  show (Group o bs r) = "Group " <> show o
+                          <> " " <> show bs
+                          <> " " <> show r
+  show (Option o)     = "Option " <> O.showOptionObj o
 
 instance ordArgument :: Ord Argument where
   -- XXX: Implement a more efficient `compare` function
   compare = compare `on` show
 
 instance eqArgument :: Eq Argument where
-  eq (EOA)            (EOA)              = true
-  eq (Stdin)          (Stdin)            = true
-  eq (Command n r)    (Command n' r')    = (n == n') && (r == r')
-  eq (Positional n r) (Positional n' r') = (n ^= n') && (r == r')
-  eq (Group o bs r)   (Group o' bs' r')  = (o == o') && (bs == bs') && (r == r')
-  eq (Option o)       (Option o')        = O.eqOptionObj o o'
-  eq _                _                  = false
+  eq (EOA)            (EOA)             = true
+  eq (Stdin)          (Stdin)           = true
+  eq (Command x)      (Command x')      = (x.name == x'.name)
+                                       && (x.repeatable == x'.repeatable)
+  eq (Positional x)   (Positional x')   = (x.name ^= x'.name)
+                                       && (x.repeatable == x'.repeatable)
+  eq (Group o bs r)   (Group o' bs' r') = (o == o') && (bs == bs') && (r == r')
+  eq (Option o)       (Option o')       = O.eqOptionObj o o'
+  eq _                _                 = false
 
 prettyPrintBranch :: Branch -> String
 prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
 
 prettyPrintArg :: Argument -> String
-prettyPrintArg (Stdin)          = "-"
-prettyPrintArg (EOA)            = "--"
-prettyPrintArg (Command name r) = name <> (if r then "..." else "")
-prettyPrintArg (Positional n r) = name <> (if r then "..." else "")
+prettyPrintArg (Stdin)        = "-"
+prettyPrintArg (EOA)          = "--"
+prettyPrintArg (Command x)    = x.name <> (if x.repeatable then "..." else "")
+prettyPrintArg (Positional x) = name   <> (if x.repeatable then "..." else "")
   where
-    name = if String.toUpper n == n then n else "<" <> n <> ">"
-prettyPrintArg (Option o)          = O.prettyPrintOption o
-prettyPrintArg (Group o bs r)      = open <> inner <> close <> repetition
+    -- TODO: Capture the real name and avoid this hack!!
+    name = if String.toUpper x.name == x.name
+              then x.name
+              else "<" <> x.name <> ">"
+prettyPrintArg (Option o)     = O.prettyPrintOption o
+prettyPrintArg (Group o bs r) = open <> inner <> close <> repetition
   where
     open       = if o then "[" else "("
     close      = if o then "]" else ")"
@@ -94,34 +119,33 @@ prettyPrintBranchNaked :: Branch -> String
 prettyPrintBranchNaked xs = intercalate " " (prettyPrintArgNaked <$> xs)
 
 prettyPrintArgNaked :: Argument -> String
-prettyPrintArgNaked (Stdin)             = "-"
-prettyPrintArgNaked (EOA)               = "-- ARGS..."
-prettyPrintArgNaked (Command name r)    = name <> (if r then "..." else "")
-prettyPrintArgNaked (Positional name r) = name <> (if r then "..." else "")
-prettyPrintArgNaked (Option o)          = O.prettyPrintOptionNaked o
-prettyPrintArgNaked (Group o bs r)      = inner <> repetition
+prettyPrintArgNaked (Stdin)        = "-"
+prettyPrintArgNaked (EOA)          = "-- ARGS..."
+prettyPrintArgNaked (Command x)    = x.name <> (if x.repeatable then "..." else "")
+prettyPrintArgNaked (Positional x) = x.name <> (if x.repeatable then "..." else "")
+prettyPrintArgNaked (Option o)     = O.prettyPrintOptionNaked o
+prettyPrintArgNaked (Group o bs r) = inner <> repetition
   where
     inner      = intercalate " | " (prettyPrintBranchNaked <$> bs)
     repetition = if r then "..." else ""
 
 isRepeatable :: Argument -> Boolean
-isRepeatable (Option o)       = o.repeatable
-isRepeatable (Positional _ r) = r
-isRepeatable (Command _ r)    = r
-isRepeatable _                = false
+isRepeatable (Option x)     = x.repeatable
+isRepeatable (Positional x) = x.repeatable
+isRepeatable (Command x)    = x.repeatable
+isRepeatable _              = false
 
 setRepeatable :: Argument -> Boolean -> Argument
-setRepeatable (Option o) r            = Option $ o { repeatable = r }
-setRepeatable (Positional n _)      r = (Positional n r)
-setRepeatable (Command n _)         r = (Command n r)
-setRepeatable x                     _ = x
+setRepeatable (Option x)     r = Option     x { repeatable = r }
+setRepeatable (Positional x) r = Positional x { repeatable = r }
+setRepeatable (Command x)    r = Command    x { repeatable = r }
+setRepeatable x              _ = x
 
 setRepeatableOr :: Argument -> Boolean -> Argument
-setRepeatableOr (Option o) r
-  = Option $ o { repeatable = o.repeatable || r }
-setRepeatableOr (Positional n r) r' = (Positional n (r || r'))
-setRepeatableOr (Command n r)    r' = (Command n (r || r'))
-setRepeatableOr x                _  = x
+setRepeatableOr (Option x)     r  = Option     x { repeatable = x.repeatable || r }
+setRepeatableOr (Positional x) r  = Positional x { repeatable = x.repeatable || r }
+setRepeatableOr (Command x)    r  = Command    x { repeatable = x.repeatable || r }
+setRepeatableOr x              _  = x
 
 setRequired :: Argument -> Boolean -> Argument
 setRequired (Group _ bs r) o = Group (not o) bs r
@@ -151,12 +175,12 @@ isFlag (Option o) = O.isFlag o
 isFlag _          = false
 
 isCommand :: Argument -> Boolean
-isCommand (Command _ _) = true
-isCommand _             = false
+isCommand (Command _) = true
+isCommand _           = false
 
 isPositional :: Argument -> Boolean
-isPositional (Positional _ _) = true
-isPositional _                = false
+isPositional (Positional _) = true
+isPositional _              = false
 
 isOption :: Argument -> Boolean
 isOption (Option _) = true

@@ -154,8 +154,8 @@ solveBranch as ds = go as
 
     solveArg (U.EOA) _ = simpleResolve EOA
     solveArg (U.Stdin) _ = simpleResolve Stdin
-    solveArg (U.Command s r) _ = simpleResolve $ Command s r
-    solveArg (U.Positional s r) _ = simpleResolve $ Positional s r
+    solveArg (U.Command n r) _ = simpleResolve $ Command { name: n, repeatable: r }
+    solveArg (U.Positional n r) _ = simpleResolve $ Positional { name: n, repeatable: r }
 
     solveArg (U.Group o bs r) _
       = Resolved <<< Keep <<< singleton <$> do

@@ -559,11 +559,11 @@ genBranchParser xs genOpts canSkip = do
               = pure
                   $ if o.repeatable then ArrayValue []
                                     else BoolValue false
-            go (D.Positional _ r) | r = pure $ ArrayValue []
-            go (D.Command _ r)    | r = pure $ ArrayValue []
-            go (D.Stdin)              = pure $ BoolValue false
-            go (D.EOA)                = pure $ ArrayValue []
-            go _                      = Nothing
+            go (D.Stdin)                           = pure $ BoolValue false
+            go (D.EOA)                             = pure $ ArrayValue []
+            go (D.Positional pos) | pos.repeatable = pure $ ArrayValue []
+            go (D.Command cmd)    | cmd.repeatable = pure $ ArrayValue []
+            go _                                   = Nothing
 
         draw _ _ _ = pure mempty
 
@@ -621,15 +621,16 @@ genBranchParser xs genOpts canSkip = do
               -> Parser (List ValueMapping)
 
     -- Generate a parser for a `Command` argument
-    genParser x@(D.Command n r) _ = do
+    genParser x@(D.Command cmd) _ = do
       i <- getInput
       (do
-        if r then (some go) else (singleton <$> go)
+        if cmd.repeatable then (some go) else (singleton <$> go)
       ) <|> (P.fail $ "Expected " <> D.prettyPrintArg x <> butGot i)
         where go = do Tuple x <<< (RValue.from Origin.Argv) <$> (do
-                        v <- command n
-                        pure if r then ArrayValue $ Value.intoArray v
-                                    else v
+                        v <- command cmd.name
+                        pure if cmd.repeatable
+                                then ArrayValue $ Value.intoArray v
+                                else v
                       )
                       <* modifyDepth (_ + 1)
 
@@ -647,20 +648,21 @@ genBranchParser xs genOpts canSkip = do
         <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"-\""
 
-    genParser x@(D.Positional n r) _
-      | r && genOpts.optionsFirst
+    genParser x@(D.Positional pos) _
+      | pos.repeatable && genOpts.optionsFirst
       = terminate x
 
     -- Generate a parser for a `Positional` argument
-    genParser x@(D.Positional n r) _ = do
+    genParser x@(D.Positional pos) _ = do
       i <- getInput
       (do
-        if r then (some go) else (singleton <$> go)
+        if pos.repeatable then (some go) else (singleton <$> go)
       ) <|> P.fail ("Expected " <> D.prettyPrintArg x <> butGot i)
         where go = do Tuple x <<< (RValue.from Origin.Argv) <$> (do
-                        v <- positional n
-                        pure if r then ArrayValue $ Value.intoArray v
-                                    else v
+                        v <- positional pos.name
+                        pure if pos.repeatable
+                                then ArrayValue $ Value.intoArray v
+                                else v
                         )
                       <* modifyDepth (_ + 1)
 
@@ -668,8 +670,8 @@ genBranchParser xs genOpts canSkip = do
       | genOpts.optionsFirst && (length bs == 1) &&
         all (\xs ->
           case xs of
-            Cons (D.Positional n r') Nil -> r' || r
-            _                            -> false
+            Cons (D.Positional pos) Nil -> pos.repeatable || r
+            _                           -> false
         ) bs
       = terminate (LU.head (LU.head bs))
 

@@ -141,14 +141,14 @@ loptER_ n e = loptE' n Nothing true e
 
 -- short hand to create a Command
 co :: String -> Argument
-co n = Command n false
+co n = Command { name: n, repeatable: false }
 
 -- short hand to create a Positional argument
 po :: String -> Argument
-po n = Positional n false
+po n = Positional { name: n, repeatable: false }
 
 poR :: String -> Argument
-poR n = Positional n true
+poR n = Positional { name: n, repeatable: true }
 
 -- short hand to create a end-of-arguments marker
 eoa :: Argument

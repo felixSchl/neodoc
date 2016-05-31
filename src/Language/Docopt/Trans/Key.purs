@@ -18,8 +18,8 @@ instance showKey :: Show Key where
   show (Key { arg: (D.Option o) }) =
     maybe "" (\c -> fromChar c <> ", ") o.flag
       <> maybe "" id o.name
-  show (Key { arg: (D.Positional n _) }) = n
-  show (Key { arg: (D.Command n _) }) = n
+  show (Key { arg: (D.Positional pos) }) = pos.name
+  show (Key { arg: (D.Command cmd) }) = cmd.name
   show _ = "invalid" -- XXX
 
 instance ordKey :: Ord Key where
@@ -28,8 +28,8 @@ instance ordKey :: Ord Key where
 instance eqKey :: Eq Key where
   eq (Key { arg: arg0 }) (Key { arg: arg1 }) = go arg0 arg1
     where
-      go (D.Command    n _) (D.Command    n' _) = n == n'
-      go (D.Positional n _) (D.Positional n' _) = n ^= n'
+      go (D.Command    cmd) (D.Command    cmd') = cmd.name == cmd'.name
+      go (D.Positional pos) (D.Positional pos') = pos.name ^= pos'.name
       go (D.Option { flag=f,  name=n  })
          (D.Option { flag=f', name=n' })
          = (f == f') && (n == n')
@@ -43,9 +43,9 @@ key arg = Key { arg: arg }
 -- | This key is what the user will use to check the value of
 -- | a mathed argument.
 toKeys :: D.Argument -> Array String
-toKeys (D.Command n _)    = [n]
-toKeys (D.Positional n _) = [ "<" <> Str.toLower n <> ">"
-                            , Str.toUpper n
+toKeys (D.Command cmd)    = [cmd.name]
+toKeys (D.Positional pos) = [ "<" <> Str.toLower pos.name <> ">"
+                            , Str.toUpper pos.name
                             ]
 toKeys (D.Group _ _ _)    = []
 toKeys (D.EOA)            = ["--"]
