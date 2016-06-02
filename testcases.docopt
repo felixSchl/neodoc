@@ -406,8 +406,7 @@ $ prog -b
 
 r"""usage: prog <arg>"""
 $ prog 10
-{"<arg>": 10,
- "ARG": 10}
+{"<arg>": 10}
 
 $ prog 10 20
 "user-error"
@@ -418,8 +417,7 @@ $ prog
 
 r"""usage: prog [<arg>]"""
 $ prog 10
-{"<arg>": 10,
- "ARG": 10}
+{"<arg>": 10}
 
 $ prog 10 20
 "user-error"
@@ -430,8 +428,7 @@ $ prog
 
 r"""usage: prog <kind> <name> <type>"""
 $ prog 10 20 40
-{"<kind>": 10, "<name>": 20, "<type>": 40,
- "KIND": 10, "NAME": 20, "TYPE": 40}
+{"<kind>": 10, "<name>": 20, "<type>": 40}
 
 $ prog 10 20
 "user-error"
@@ -442,8 +439,7 @@ $ prog
 
 r"""usage: prog <kind> [<name> <type>]"""
 $ prog 10 20 40
-{"<kind>": 10, "<name>": 20, "<type>": 40,
- "KIND": 10, "NAME": 20, "TYPE": 40}
+{"<kind>": 10, "<name>": 20, "<type>": 40}
 
 $ prog 10 20
 # Original: {"<kind>": 10, "<name>": 20}
@@ -458,8 +454,7 @@ $ prog 10 20 40
 "user-error"
 
 $ prog 20 40
-{"<name>": 20, "<type>": 40,
- "NAME": 20, "TYPE": 40}
+{"<name>": 20, "<type>": 40}
 
 $ prog
 {}
@@ -472,11 +467,10 @@ options:
 
 """
 $ prog 10 --all
-{"--all": true, "<kind>": 10,
- "KIND": 10}
+{"--all": true, "<kind>": 10}
 
 $ prog 10
-{"<kind>": 10, "KIND": 10}
+{"<kind>": 10}
 
 $ prog
 "user-error"
@@ -484,7 +478,7 @@ $ prog
 
 r"""usage: prog [<name> <name>]"""
 $ prog 10 20
-{"<name>": [10, 20], "NAME": [10, 20]}
+{"<name>": [10, 20]}
 
 # Note: This is a deviation. The spec above says that
 #       it wants exactly *two* occurences of `<name>`.
@@ -503,10 +497,10 @@ $ prog
 # (See note above)
 r"""usage: prog [<name> [<name>]]"""
 $ prog 10 20
-{"<name>": [10, 20], "NAME": [10, 20]}
+{"<name>": [10, 20]}
 
 $ prog 10
-{"<name>": [10], "NAME": [10]}
+{"<name>": [10]}
 
 $ prog
 {}
@@ -514,7 +508,7 @@ $ prog
 
 r"""usage: prog [(<name> <name>)]"""
 $ prog 10 20
-{"<name>": [10, 20], "NAME": [10, 20]}
+{"<name>": [10, 20]}
 
 $ prog 10
 "user-error"
@@ -524,22 +518,20 @@ $ prog
 
 r"""usage: prog NAME..."""
 $ prog 10 20
-{"<name>": [10, 20],
- "NAME": [10, 20]}
+{"NAME": [10, 20]}
 
 $ prog 10
-{"<name>": [10],
- "NAME": [10]}
+{"NAME": [10]}
 
 $ prog
 "user-error"
 
 r"""usage: prog [NAME]..."""
 $ prog 10 20
-{"<name>": [10, 20], "NAME": [10, 20]}
+{"NAME": [10, 20]}
 
 $ prog 10
-{"<name>": [10], "NAME": [10]}
+{"NAME": [10]}
 
 $ prog
 {}
@@ -547,10 +539,10 @@ $ prog
 
 r"""usage: prog [NAME...]"""
 $ prog 10 20
-{"<name>": [10, 20], "NAME": [10, 20]}
+{"NAME": [10, 20]}
 
 $ prog 10
-{"<name>": [10], "NAME": [10]}
+{"NAME": [10]}
 
 $ prog
 {}
@@ -558,10 +550,10 @@ $ prog
 
 r"""usage: prog [NAME [NAME ...]]"""
 $ prog 10 20
-{"<name>": [10, 20], "NAME": [10, 20]}
+{"NAME": [10, 20]}
 
 $ prog 10
-{"<name>": [10], "NAME": [10]}
+{"NAME": [10]}
 
 $ prog
 {}
@@ -573,10 +565,10 @@ options: --foo
 
 """
 $ prog 10
-{"<name>": 10, "NAME": 10}
+{"NAME": 10}
 
 $ prog --foo 10
-{"--foo": true, "<name>": 10, "NAME": 10}
+{"--foo": true, "NAME": 10}
 
 $ prog --foo=10
 "user-error"
@@ -588,10 +580,10 @@ options: --bar
 
 """
 $ prog 10
-{"<name>": [10], "NAME": [10]}
+{"NAME": [10]}
 
 $ prog 10 20
-{"<name>": [10, 20], "NAME": [10, 20]}
+{"NAME": [10, 20]}
 
 $ prog --foo --bar
 {"--bar": true, "--foo": true}
@@ -621,9 +613,6 @@ $ prog ship Guardian move 150 300 --speed=20
  "<name>": "Guardian",
  "<x>": 150,
  "<y>": 300,
- "NAME": "Guardian",
- "X": 150,
- "Y": 300,
  "move": true,
  "ship": true}
 
@@ -781,13 +770,13 @@ Options:
 """
 
 $ prog arg
-{"<a>": "arg", "A": "arg"}
+{"A": "arg"}
 
 $ prog -v arg
-{"-v": true, "<a>": "arg", "A": "arg"}
+{"-v": true, "A": "arg"}
 
 $ prog -q arg
-{"-q": true, "<a>": "arg", "A": "arg"}
+{"-q": true, "A": "arg"}
 
 #
 # Test single dash
@@ -808,7 +797,7 @@ $ prog
 r"""usage: prog [NAME [NAME ...]]"""
 
 $ prog a b
-{"<name>": ["a", "b"], "NAME": ["a", "b"]}
+{"NAME": ["a", "b"]}
 
 $ prog
 {}
@@ -879,7 +868,7 @@ usage: prog
        prog <a> <b>
 """
 $ prog 1 2
-{"<a>": 1, "<b>": 2, "A": 1, "B": 2}
+{"<a>": 1, "<b>": 2}
 
 # Original: {"<a>": null, "<b>": null}
 $ prog
@@ -945,7 +934,6 @@ r"""usage: prog (go <direction> --speed=<km/h>)..."""
 $ prog  go left --speed=5  go right --speed=9
 {"--speed": [5, 9],
  "<direction>": ["left", "right"],
- "DIRECTION": ["left", "right"],
  "go": 2}
 
 
@@ -1013,8 +1001,7 @@ $ prog --xx=1 --yy=2
 
 r"""usage: prog [<input file>]"""
 $ prog f.txt
-{"<input file>": "f.txt",
- "INPUT FILE": "f.txt"} # XXX: Granted, this is awkward
+{"<input file>": "f.txt"}
 
 r"""usage: prog [--input=<file name>]..."""
 $ prog --input a.txt --input=b.txt
@@ -1132,7 +1119,6 @@ Options:
 
 $ prog ship new foo bar baz
 {"<name>": ["foo", "bar", "baz"],
- "NAME": ["foo", "bar", "baz"],
  "new": true,
  "ship": true}
 
@@ -1269,7 +1255,7 @@ Options:
 
 $ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
- "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+ "ARG": ["foo", "-0", "bar"]}
 
 r"""
 Usage: create_ec2.py -0 ARG [ARG]...
@@ -1280,7 +1266,7 @@ Options:
 
 $ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
- "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+ "ARG": ["foo", "-0", "bar"]}
 
 r"""
 Usage: create_ec2.py -0 ARG [ARG...]
@@ -1291,7 +1277,7 @@ Options:
 
 $ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
- "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+ "ARG": ["foo", "-0", "bar"]}
 
 r"""
 Usage: create_ec2.py -0 ARG [ARG...]...
@@ -1302,11 +1288,11 @@ Options:
 
 $ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
- "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+ "ARG": ["foo", "-0", "bar"]}
 
 $ prog/p foo -0 bar
 {"-0": 100, "--foo": 100,
- "ARG": ["foo", "-0", "bar"], "<arg>": ["foo", "-0", "bar"]}
+ "ARG": ["foo", "-0", "bar"]}
 
 r"""
 Usage: create_ec2.py [ARG...]...
@@ -1314,7 +1300,7 @@ Usage: create_ec2.py [ARG...]...
 """
 
 $ prog/p foo bar
-{"ARG": ["foo", "bar"], "<arg>": ["foo", "bar"]}
+{"ARG": ["foo", "bar"]}
 
 #
 # "options-first" with [options]
@@ -1328,10 +1314,10 @@ Options:
 """
 
 $ prog/p foo bar -0
-{"ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
+{"ARG": ["foo", "bar", "-0"]}
 
 $ prog/p -0
-{"ARG": ["-0"], "<arg>": ["-0"]}
+{"ARG": ["-0"]}
 
 r"""
 Usage: create_ec2.py [ARG...] [options]
@@ -1341,10 +1327,10 @@ Options:
 """
 
 $ prog/p foo bar -0
-{"ARG": ["foo", "bar", "-0"], "<arg>": ["foo", "bar", "-0"]}
+{"ARG": ["foo", "bar", "-0"]}
 
 $ prog/p -0
-{"ARG": ["-0"], "<arg>": ["-0"]}
+{"ARG": ["-0"]}
 
 
 r"""
@@ -1360,7 +1346,7 @@ $ prog -0
 
 # XXX: this returns superflous "-0" and "-1" in the output:
 $ prog/p -01
-{"ARG": ["-01"], "<arg>": ["-01"]}
+{"ARG": ["-01"]}
 
 #
 # Options-first fix for issue #21
@@ -1374,8 +1360,7 @@ $ prog/p
 {}
 
 $ prog/p bar -a -b -c
-{"ARGS": ["bar", "-a", "-b", "-c"],
- "<args>": ["bar", "-a", "-b", "-c"]}
+{"<args>": ["bar", "-a", "-b", "-c"]}
 
 r"""
 Usage: foo [<command> [<args>...]]
@@ -1385,8 +1370,7 @@ $ prog/p
 {}
 
 $ prog/p bar -a -b -c
-{"COMMAND": "bar", "<command>": "bar",
- "ARGS": ["-a", "-b", "-c"],
+{"<command>": "bar",
  "<args>": ["-a", "-b", "-c"]}
 
 #
@@ -1770,7 +1754,7 @@ $ prog --input 10
 "user-error"
 
 $ prog --input 10 20
-{ "-i": 10, "--input": 10, "<x>": 20, "X": 20 }
+{ "-i": 10, "--input": 10, "<x>": 20}
 
 #
 # Repeating parameterised options
@@ -1833,7 +1817,7 @@ Usage:
 """
 
 $ prog a b c
-{"Y": ["a", "b", "c"], "<y>": ["a", "b", "c"]}
+{"<y>": ["a", "b", "c"]}
 
 r"""
 Usage:
@@ -1841,7 +1825,7 @@ Usage:
 """
 
 $ prog a b c
-{"X": ["a", "b", "c"], "<x>": ["a", "b", "c"]}
+{"<x>": ["a", "b", "c"]}
 
 r"""
 Usage:
@@ -1849,7 +1833,7 @@ Usage:
 """
 
 $ prog a b c
-{"Y": ["a", "b", "c"], "<y>": ["a", "b", "c"]}
+{"<y>": ["a", "b", "c"]}
 
 r"""
 Usage:
@@ -1857,7 +1841,7 @@ Usage:
 """
 
 $ prog a b c
-{"Y": ["a", "b", "c"], "<y>": ["a", "b", "c"]}
+{"<y>": ["a", "b", "c"]}
 
 r"""
 Usage:
@@ -1865,7 +1849,7 @@ Usage:
 """
 
 $ prog a b c
-{"<x>": ["a", "b", "c"], "X": ["a", "b", "c"]}
+{"<x>": ["a", "b", "c"]}
 
 r"""
 Usage:
@@ -1873,7 +1857,7 @@ Usage:
 """
 
 $ prog a b c
-{"X": ["a", "b", "c"], "<x>": ["a", "b", "c"]}
+{"<x>": ["a", "b", "c"]}
 
 #
 # Issue #5
@@ -2592,7 +2576,7 @@ Usage: foo <command> [-f ARG] [-b ARG]
 """
 
 $ prog/s 123foo -f123foo -b=123foo
-{"<command>": "123foo", "COMMAND": "123foo",
+{"<command>": "123foo",
  "-f": "123foo", "-b": "123foo"}
 
 #
@@ -2796,7 +2780,7 @@ options:
 """
 
 $ prog --bar run
-{"--bar": true, "<command>": "run", "COMMAND": "run"}
+{"--bar": true, "<command>": "run"}
 
 $ prog --bar
 {"--bar": true}
@@ -2810,7 +2794,7 @@ options:
 """
 
 $ prog --bar run
-{"--bar": true, "<command>": "run", "COMMAND": "run"}
+{"--bar": true, "<command>": "run"}
 
 # ARG and '...' should be ignored since they are on different lines:
 r"""

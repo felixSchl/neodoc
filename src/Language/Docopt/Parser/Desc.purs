@@ -14,6 +14,7 @@ import Prelude
 import Data.Tuple (Tuple (Tuple))
 import Data.Functor (($>))
 import Data.Function (on)
+import Data.String as Str
 import Control.Lazy (defer)
 import Control.Bind ((>=>))
 import Control.Alt ((<|>))
@@ -25,7 +26,7 @@ import Text.Parsing.Parser.Combinators ((<?>), try, choice, lookAhead, manyTill,
                                         option, optionMaybe, notFollowedBy,
                                         (<??>)) as P
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(Nothing, Just), isJust, isNothing, maybe)
+import Data.Maybe (Maybe(Nothing, Just), isJust, isNothing, maybe, fromMaybe)
 import Data.Generic (class Generic, gEq, gShow)
 import Data.String (fromChar)
 import Data.Array as A
@@ -37,6 +38,18 @@ import Language.Docopt.Parser.Common (sameIndent, markIndent, indented,
 import Language.Docopt.Parser.Lexer (lexDescs)
 import Language.Docopt.Parser.Lexer as L
 import Language.Docopt.Value as Value
+
+-- XXX: This is duplicated from Solver.purs.
+--      Where should this live???
+posArgsEq :: String -> String -> Boolean
+posArgsEq = eq `on` (Str.toUpper <<< stripAngles)
+infixl 9 posArgsEq as ^=^
+
+stripAngles :: String -> String
+stripAngles = stripPrefix <<< stripSuffix
+  where
+  stripPrefix s = fromMaybe s (Str.stripPrefix "<" s)
+  stripSuffix s = fromMaybe s (Str.stripSuffix ">" s)
 
 data Desc
   = OptionDesc OptionObj
@@ -360,7 +373,7 @@ descParser = markIndent do many desc <* L.eof
                 }
               where
                 combineArg (Just a) (Just a')
-                  | (a.name ^= a'.name) = pure $ Just
+                  | (a.name ^=^ a'.name) = pure $ Just
                       $ { name:     a.name
                         , optional: a.optional || a'.optional
                         , default:  a.default <|> a'.default
