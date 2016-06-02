@@ -112,14 +112,9 @@ prettyPrintArg :: Argument -> String
 prettyPrintArg (Stdin)        = "-"
 prettyPrintArg (EOA)          = "--"
 prettyPrintArg (Command x)    = x.name <> (if x.repeatable then "..." else "")
-prettyPrintArg (Positional x) = name   <> (if x.repeatable then "..." else "")
-  where
-    -- TODO: Capture the real name and avoid this hack!!
-    name = if String.toUpper x.name == x.name
-              then x.name
-              else "<" <> x.name <> ">"
-prettyPrintArg (Option o) = O.prettyPrintOption o
-prettyPrintArg (Group g)  = open <> inner <> close <> repetition
+prettyPrintArg (Positional x) = x.name <> (if x.repeatable then "..." else "")
+prettyPrintArg (Option o)     = O.prettyPrintOption o
+prettyPrintArg (Group g)      = open <> inner <> close <> repetition
   where
     open       = if g.optional then "[" else "("
     close      = if g.optional then "]" else ")"

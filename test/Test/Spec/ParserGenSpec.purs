@@ -83,11 +83,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
   -- Some options that will be used for these tests
   let testCases = [
       test
-        [ poR "qux" ]
+        [ poR "<qux>" ]
         [ pass
             [ "a", "b", "c" ]
             [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
-            , "QUX"   :> D.array [ D.str "a", D.str "b", D.str "c" ]
             ]
         , fail [ "--foo", "baz" ]
             "Expected <qux>..., but got --foo"
@@ -97,17 +96,15 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
 
     , test
-        [ poR "qux", eoa ]
+        [ poR "<qux>", eoa ]
         [ pass
             [ "a", "b", "c", "--" ]
             [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
-            , "QUX"   :> D.array [ D.str "a", D.str "b", D.str "c" ]
             , "--"    :> D.array []
             ]
         , pass
             [ "a", "b", "c", "--", "--", "--" ]
             [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
-            , "QUX"   :> D.array [ D.str "a", D.str "b", D.str "c" ]
             , "--"    :> D.array [ D.str "--" , D.str "--" ]
             ]
         ]
@@ -231,7 +228,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
     , test
         [ grr false [[
             opt 'i' "input" (oa_ "FILE")
-          , po  "env"
+          , po  "<env>"
           ]]
         , opt 'o' "output" (oa_ "FILE")
         ]
@@ -242,7 +239,6 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "--input"  :> D.str "bar"
             , "-i"       :> D.str "bar"
             , "<env>"    :> D.str "x"
-            , "ENV"      :> D.str "x"
             , "--output" :> D.str "bar"
             , "-o"       :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:

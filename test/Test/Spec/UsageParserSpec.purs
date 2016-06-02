@@ -66,10 +66,10 @@ usageParserSpec = \_ ->
     describe "positionals" do
       runSingleArgumentTests
         [ pass "BAR"       $ po "BAR"
-        , pass "<foo-qux>" $ po "foo-qux"
-        , pass "<QUX>"     $ po "QUX"
-        , pass "<QuX>"     $ po "QuX"
-        , pass "<quux>"    $ po "quux"
+        , pass "<foo-qux>" $ po "<foo-qux>"
+        , pass "<QUX>"     $ po "<QUX>"
+        , pass "<QuX>"     $ po "<QuX>"
+        , pass "<quux>"    $ po "<quux>"
         ]
 
     -- Test long options in various formats.

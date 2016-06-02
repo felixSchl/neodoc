@@ -4,6 +4,7 @@
 module Language.Docopt.Solver where
 
 import Prelude
+import Debug.Trace
 import Data.Array as A
 import Data.String as S
 import Data.String.Unsafe as US
@@ -22,6 +23,7 @@ import Data.String (fromChar, fromCharArray, toCharArray, toUpper)
 import Data.String.Ext ((^=), endsWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
+import Data.String as Str
 
 import Language.Docopt.Argument
 import Language.Docopt.Argument (isFree) as Arg
@@ -45,6 +47,17 @@ data Slurp a
 data ResolveTo a b
   = Resolved   a
   | Unresolved b
+
+
+posArgsEq :: String -> String -> Boolean
+posArgsEq = eq `on` (Str.toUpper <<< stripAngles)
+infixl 9 posArgsEq as ^=^
+
+stripAngles :: String -> String
+stripAngles = stripPrefix <<< stripSuffix
+  where
+  stripPrefix s = fromMaybe s (Str.stripPrefix "<" s)
+  stripSuffix s = fromMaybe s (Str.stripSuffix ">" s)
 
 instance showResolveTo :: (Show a, Show b) => Show (ResolveTo a b) where
   show (Resolved   a) = "Resolved "   <> show a
@@ -224,7 +237,7 @@ solveBranch as ds = go as
 
       where
         guardArgs :: String -> String -> Either SolveError Boolean
-        guardArgs n n' | n ^= n' = pure true
+        guardArgs n n' | n ^=^ n' = pure true
         guardArgs n n' = fail
           $ "Arguments mismatch for option --" <> o.name <> ": "
               <> show n <> " and " <> show n'
@@ -311,15 +324,22 @@ solveBranch as ds = go as
               -- the haystack needs to be modified, such that the
               -- the last (length a.name) characters are uppercased
               -- and hence compared case INSENSITIVELY.
-              let needle = toUpper $ fromChar f <> a.name
-                  haystack = toUpper fs
+              let bareArgname = stripAngles a.name
+                  needle      = toUpper $ fromChar f <> bareArgname
+                  haystack    = toUpper fs
 
               (Tuple fs o) <- if endsWith needle haystack
                 then
                   let ix = S.length haystack - S.length needle
                    in if US.charAt ix fs == f
                         then pure
-                          $ Tuple (toCharArray (S.take (S.length fs - S.length a.name - 1) fs))
+                          $ Tuple (toCharArray
+                                    (S.take (S.length fs
+                                              - S.length bareArgname
+                                              - 1
+                                            ) fs
+                                    )
+                                  )
                                   { flag:       pure f
                                   , name:       DE.getName d.name
                                   , arg:        pure a
@@ -424,7 +444,7 @@ solveBranch as ds = go as
                             $ Option $ match { repeatable = r })
 
         guardArgs :: String -> String -> Either SolveError Boolean
-        guardArgs n n' | n ^= n' = pure true
+        guardArgs n n' | n ^=^ n' = pure true
         guardArgs n n' = fail
           $ "Arguments mismatch for option -" <> fromChar o.flag <> ": "
               <> show n <> " and " <> show n'

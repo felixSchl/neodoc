@@ -20,6 +20,9 @@ import Data.List (List())
 import Data.Foldable (intercalate, all)
 import Language.Docopt.Parser.Usage.Option as O
 
+-- A command argument is literal that must be matched exactly.
+-- It's value, if present must always be a boolean 'true' or any positive
+-- integer in case the command repeats.
 type CommandObj = { name       :: String
                   , repeatable :: Boolean
                   }
@@ -34,6 +37,7 @@ eqCommandObj :: CommandObj -> CommandObj -> Boolean
 eqCommandObj x x' = x.name       == x'.name
                  && x.repeatable == x'.repeatable
 
+-- A positional argument, e.g. '<foo-bar>' or w/o angles 'FOO-BAR'.
 type PositionalObj = { name       :: String
                      , repeatable :: Boolean
                      }
@@ -48,6 +52,10 @@ eqPositionalObj :: PositionalObj -> PositionalObj -> Boolean
 eqPositionalObj x x' = x.name       == x'.name
                     && x.repeatable == x'.repeatable
 
+-- A group of arguments. An explicitly grouped set of argument branches,
+-- where each branch is mutually exclusive from the branches around it,
+-- separated by a vertical bar '|'. Within each branch, a list of arguments
+-- is present (this is the recursive branch of the `Argument` ADT).
 type GroupObj = { optional   :: Boolean
                 , branches   :: List Branch
                 , repeatable :: Boolean

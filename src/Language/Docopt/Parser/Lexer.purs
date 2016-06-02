@@ -300,7 +300,7 @@ parseToken m = P.choice (P.try <$> A.concat [
       , P.try $ P.noneOf [ '<', '>' ]
       ]
     P.char '>'
-    pure n
+    pure $ "<" ++ n ++ ">"
 
   _shortOption :: P.Parser String Token
   _shortOption = do
@@ -314,9 +314,9 @@ parseToken m = P.choice (P.try <$> A.concat [
       Just <$> do
         P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        pure { name:     n
-               , optional: false
-               }
+        pure  { name:     n
+              , optional: false
+              }
 
       -- Case 2: Option[=ARG]
     , Just <$> do
@@ -324,16 +324,16 @@ parseToken m = P.choice (P.try <$> A.concat [
         P.optional $ P.char '='
         n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
         P.char ']'
-        pure { name:     n
-               , optional: true
-               }
+        pure  { name:     n
+              , optional: true
+              }
 
       -- Case 3: Option<ARG>
     , Just <$> do
         n <- _angleName
         pure { name:     n
-               , optional: false
-               }
+              , optional: false
+              }
 
     , pure Nothing
     ]

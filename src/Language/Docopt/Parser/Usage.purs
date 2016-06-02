@@ -204,7 +204,7 @@ usageParser smartOpts = do
 
     positional :: L.TokenParser Argument
     positional = Positional <$> do
-      name <- (L.angleName <|> L.shoutName)
+      name <- L.shoutName <|> L.angleName
       r    <- repetition
       pure { name: name, repeatable: r }
 

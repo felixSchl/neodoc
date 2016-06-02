@@ -18,8 +18,8 @@ instance showKey :: Show Key where
     maybe "" (\c -> fromChar c <> ", ") o.flag
       <> maybe "" id o.name
   show (Key { arg: (D.Positional pos) }) = pos.name
-  show (Key { arg: (D.Command cmd) }) = cmd.name
-  show _ = "invalid" -- XXX
+  show (Key { arg: (D.Command cmd) })    = cmd.name
+  show _                                 = "invalid" -- XXX
 
 instance ordKey :: Ord Key where
   compare = compare `on` show -- XXX
@@ -42,10 +42,8 @@ key arg = Key { arg: arg }
 -- | This key is what the user will use to check the value of
 -- | a mathed argument.
 toKeys :: D.Argument -> Array String
-toKeys (D.Command cmd)    = [cmd.name]
-toKeys (D.Positional pos) = [ "<" <> Str.toLower pos.name <> ">"
-                            , Str.toUpper pos.name
-                            ]
+toKeys (D.Command cmd)    = [ cmd.name ]
+toKeys (D.Positional pos) = [ pos.name ]
 toKeys (D.Group _)        = []
 toKeys (D.EOA)            = ["--"]
 toKeys (D.Stdin)          = ["-"]

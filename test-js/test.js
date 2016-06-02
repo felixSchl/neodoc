@@ -22,7 +22,6 @@ describe('neodoc', () => {
         .to.deep.equal({
           branch: true
         , '<branchname>': [ 'master' ]
-        , BRANCHNAME: [ 'master' ]
         , '-u': 'origin'
         , '--set-upstream-to': 'origin'
         });
