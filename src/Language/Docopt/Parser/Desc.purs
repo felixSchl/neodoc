@@ -17,10 +17,12 @@ import Data.Function (on)
 import Data.String as Str
 import Control.Lazy (defer)
 import Control.Bind ((>=>))
+import Control.Monad (when)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.MonadPlus (guard)
-import Data.List (List, (:), many, some, head, length, filter, catMaybes)
+import Data.List (List(..), (:), many, some, head, length, filter, catMaybes,
+                  reverse)
 import Text.Parsing.Parser (ParseError, fail) as P
 import Text.Parsing.Parser.Combinators ((<?>), try, choice, lookAhead, manyTill,
                                         option, optionMaybe, notFollowedBy,
@@ -193,8 +195,19 @@ parse :: (List L.PositionedToken) -> Either P.ParseError (List Desc)
 parse = flip L.runTokenParser descParser
 
 descParser :: L.TokenParser (List Desc)
-descParser = markIndent do many desc <* L.eof
+descParser = markIndent do
+  reverse <$> go Nil
+  <* L.eof
   where
+    go vs = do
+      v <- (Just <$> desc) <|> (descContent true $> Nothing)
+      case v of
+        Just v' -> go (v' : vs)
+        Nothing ->
+          P.choice [
+            desc >>= \v' -> go (v' : vs)
+          , pure vs
+          ]
 
     anyName :: L.TokenParser String
     anyName = L.angleName <|> L.shoutName <|> L.name
@@ -205,8 +218,8 @@ descParser = markIndent do many desc <* L.eof
                        , positionalsDesc
                        ]
 
-    descContent :: L.TokenParser (List Content)
-    descContent = do
+    descContent :: Boolean -> L.TokenParser (List Content)
+    descContent toplevel = do
       markIndent do
         catMaybes <$> (flip P.manyTill descEnd do
           P.choice $ P.try <$> [
@@ -221,7 +234,8 @@ descParser = markIndent do many desc <* L.eof
             L.eof
           , void $ P.lookAhead do
               L.newline
-              lessIndented
+              when (not toplevel)
+                lessIndented
               P.choice [
                 void L.sopt
               , void L.lopt
@@ -234,14 +248,14 @@ descParser = markIndent do many desc <* L.eof
     positionalsDesc = do
       L.angleName <|> L.shoutName
       repeatable <- P.option false $ L.tripleDot $> true
-      descContent
+      descContent false
       pure CommandDesc
 
     optionDesc :: L.TokenParser Desc
     optionDesc = do
 
       xopt        <- opt
-      description <- descContent
+      description <- descContent false
 
       let defaults = getDefaultValue <$> filter isDefaultTag description
           envs     = getEnvKey       <$> filter isEnvTag     description

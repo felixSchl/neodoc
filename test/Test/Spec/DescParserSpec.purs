@@ -142,6 +142,72 @@ descParserSpec = \_ ->
               "-f=BAZ, --foo=qux"
               "Option-arguments mismatch: \"BAZ\" and \"qux\""
         , pass (dedent
+          -- Fix #41
+          -- Should allow non-empty option sections that contain no options.
+          """
+          foo bar
+          """
+          ) []
+        , pass (dedent
+          -- Fix #41
+          -- Should allow non-empty option sections that contain no options.
+          """
+          foo bar
+          -f=BAZ, --foo=BAZ [default: 100]
+          -q=BAZ, --qux=BAZ [default: 200]
+          """
+          ) [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            , o { name:       Desc.Full 'q' "qux"
+                , arg:        Just $ arg "BAZ" (int 200)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
+        , pass (dedent
+          -- Fix #41
+          -- Should allow non-empty option sections that contain no options.
+          """
+          -f=BAZ, --foo=BAZ [default: 100]
+          foo bar
+          -q=BAZ, --qux=BAZ [default: 200]
+          """
+          ) [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            , o { name:       Desc.Full 'q' "qux"
+                , arg:        Just $ arg "BAZ" (int 200)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
+        , pass (dedent
+          -- Fix #41
+          -- Should allow non-empty option sections that contain no options.
+          """
+          foo bar
+          -f=BAZ, --foo=BAZ [default: 100]
+          foo bar
+          -q=BAZ, --qux=BAZ [default: 200]
+          foo bar
+          """
+          ) [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            , o { name:       Desc.Full 'q' "qux"
+                , arg:        Just $ arg "BAZ" (int 200)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
+        , pass (dedent
             -- if an option is indented past the start of the description
             -- block for the previous option, it's considered part of the
             -- description.
