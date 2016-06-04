@@ -46,7 +46,7 @@ newtype Test = Test {
 
 newtype Kase = Kase {
   out     :: Either String (List (Tuple String D.Value))
-, options :: Docopt.Options
+, options :: Docopt.Options {}
 }
 
 type Flags = {

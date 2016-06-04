@@ -7,6 +7,7 @@
 
 module Docopt (
     run
+  , parse
   , defaultOptions
   , DocoptEff ()
   , Options (..)
@@ -31,7 +32,7 @@ import Data.Array as A
 import Data.Bifunctor (lmap)
 import Data.List.WordsLines (lines, unlines)
 
-import Language.Docopt (parseDocopt, evalDocopt)
+import Language.Docopt (Specification(), parseDocopt, evalDocopt)
 import Language.Docopt.Value (Value())
 import Language.Docopt as D
 import Language.Docopt.Env (Env())
@@ -50,7 +51,13 @@ liftEffA = liftEff
 -- |
 -- | Options for a docopt run
 -- |
-type Options = {
+
+type ParseOptionsObj r = {
+  smartOptions :: Boolean     -- ^ parse singleton groups as opts if possible
+  | r
+}
+
+type Options r = {
   argv         :: Maybe Argv  -- ^ override argv. Defaults to `process.argv`
 , env          :: Maybe Env   -- ^ override env.  Defaults to `process.env`
 , optionsFirst :: Boolean     -- ^ enable "option-first"
@@ -58,7 +65,7 @@ type Options = {
 , smartOptions :: Boolean     -- ^ parse singleton groups as opts if possible
 }
 
-defaultOptions :: Options
+defaultOptions :: Options {}
 defaultOptions = {
   argv:         Nothing
 , env:          Nothing
@@ -68,14 +75,26 @@ defaultOptions = {
 }
 
 -- |
--- | Run docopt on the given docopt text.
+-- | Parse the docopt specification from the given help text.
+-- |
+parse :: forall e r
+       . String
+      -> ParseOptionsObj r
+      -> Eff (DocoptEff e) Specification
+parse helpText opts = do
+  either (throwException <<< error) pure do
+    { specification } <- parseDocopt helpText opts
+    pure specification
+
+-- |
+-- | Run docopt on the given help text.
 -- |
 -- | This either succeeds with the key/value mappings or fails with a
 -- | descriptive help message.
 -- |
-run :: forall e
+run :: forall e r
      . String
-    -> Options
+    -> Options r
     -> Eff (DocoptEff e) (StrMap Value)
 run helpText opts = do
   argv <- maybe (A.drop 2 <$> Process.argv) (pure <<< id) opts.argv

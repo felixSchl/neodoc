@@ -6,19 +6,22 @@
 -- | curried/uncurried as needed.
 -- |
 
-module Docopt.FFI (run) where
+module Docopt.FFI (run, parse) where
 
 import Prelude
 import Data.Function (Fn2, mkFn2)
-import Data.Maybe (Maybe(Nothing))
+import Data.Maybe (Maybe(Nothing), maybe)
+import Data.List (fromList)
 import Control.Monad.Eff (Eff())
 import Data.Either (Either(..), either)
 import Data.StrMap (StrMap())
 import Control.Bind ((=<<))
 import Control.Alt (alt)
-import Data.Foreign (readArray, typeOf) as F
+import Data.Foreign (readArray, typeOf, toForeign) as F
 import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign)
 import Data.Foreign.Class (readProp) as F
+import Language.Docopt.Usage (Usage(Usage))
+import Language.Docopt.Argument (Branch(), Argument(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 import Docopt as Docopt
@@ -39,13 +42,13 @@ foreign import isTruthy :: Foreign -> Boolean
 -- |
 -- | Run docopt from JS.
 -- |
-run :: forall e
-     .Fn2 String  -- ^ The docopt text
+run :: forall e.
+      Fn2 String  -- ^ The docopt text
           Foreign -- ^ The options (optional)
           (Eff (Docopt.DocoptEff e) (StrMap RawValue))
 run = mkFn2 go
   where
-    go docopt fopts = do
+    go helpText fopts = do
 
       let opts = Docopt.defaultOptions {
             -- override argv with a custom array
@@ -85,7 +88,7 @@ run = mkFn2 go
                               F.readProp "dontExit" fopts)
           }
 
-      result <- Docopt.run docopt opts
+      result <- Docopt.run helpText opts
       pure $ rawValue <$> result
 
       where
@@ -98,3 +101,58 @@ run = mkFn2 go
 
         isObject :: Foreign -> Boolean
         isObject f = F.typeOf f == "object"
+
+type Node = { type :: String }
+
+parse :: forall e.
+        Fn2 String  -- ^ The docopt text
+            Foreign -- ^ The options (optional)
+            (Eff (Docopt.DocoptEff e) (Array (Array (Array Foreign))))
+parse = mkFn2 go
+  where
+    go helpText opts = do
+      let opts' = Docopt.defaultOptions {
+            -- enable "smart-options" parsing. This causes singleton groups that
+            -- "look like" they are describing an option to expand to such an
+            -- option, e.g.: '[-o ARG]' becomes '[-o=ARG]'.
+            smartOptions = either (const Docopt.defaultOptions.smartOptions) id
+                            (isTruthy <$> do
+                              F.readProp "smartOptions" opts)
+          }
+      result <- Docopt.parse helpText opts'
+      pure $ fromList $ result <#> \(Usage branches) -> do
+        fromList $ convBranch <$> branches
+
+    convBranch :: Branch -> Array Foreign
+    convBranch args = fromList $ convArg <$> args
+
+    convArg :: Argument -> Foreign
+    convArg (EOA)          = F.toForeign { type: "EOA" }
+    convArg (Stdin)        = F.toForeign { type: "Stdin" }
+    convArg (Command x)    = F.toForeign { type: "Command", value: x }
+    convArg (Positional x) = F.toForeign { type: "Positional", value: x }
+    convArg (Group x)      = F.toForeign {
+      type: "Group"
+    , value: {
+        optional:   x.optional
+      , repeatable: x.repeatable
+      , branches:   (fromList $ convBranch <$> x.branches) :: Array (Array Foreign)
+      }
+    }
+    convArg (Option x)     = F.toForeign {
+      type: "Option"
+    , value: {
+        flag:       maybe undefined F.toForeign x.flag
+      , name:       maybe undefined F.toForeign x.name
+      , env:        maybe undefined F.toForeign x.env
+      , repeatable: x.repeatable
+      , arg:        maybe undefined (\a -> {
+                      name:     a.name
+                    , default:  maybe undefined F.toForeign a.default
+                    , optional: a.optional
+                    }) x.arg
+      }
+    }
+
+
+foreign import undefined :: forall a. a

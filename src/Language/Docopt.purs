@@ -8,6 +8,7 @@ module Language.Docopt (
     runDocopt
   , parseDocopt
   , evalDocopt
+  , Specification ()
   ) where
 
 import Prelude
@@ -20,11 +21,11 @@ import Data.Traversable (traverse)
 import Text.Parsing.Parser as P
 import Text.Wrap (dedent)
 
-import Language.Docopt.Usage (Usage(..)) as D
+import Language.Docopt.Usage (Usage()) as D
 import Language.Docopt.Errors (Argv, DocoptError(..), SolveError(..),
-                              developerErrorMessage, prettyPrintDocoptError
+                              prettyPrintDocoptError
                               ) as D
-import Language.Docopt.Value (Value(..)) as D
+import Language.Docopt.Value (Value()) as D
 import Language.Docopt.Compiler  as G
 import Language.Docopt.Trans.Flat as T
 
@@ -33,22 +34,24 @@ import Language.Docopt.Solver       as Solver
 import Language.Docopt.Parser.Usage as Usage
 import Language.Docopt.Parser.Desc  as Desc
 
+type Specification = List D.Usage
+
 type Docopt = {
   usage         :: String
-, specification :: List D.Usage
+, specification :: Specification
 }
 
-type ParseOptsObj r = {
+type ParseOptionsObj r = {
   smartOptions :: Boolean
   | r
 }
 
-type EvalOptsObj r = {
+type EvalOptionsObj r = {
   optionsFirst :: Boolean
   | r
 }
 
-type Opts r = {
+type Options r = {
   smartOptions :: Boolean
 , optionsFirst :: Boolean
   | r
@@ -65,8 +68,8 @@ data Origin
 -- |
 parseDocopt
   :: forall r
-   .  String        -- ^ The docopt text
-  -> ParseOptsObj r -- ^ Parse options
+   .  String           -- ^ The docopt text
+  -> ParseOptionsObj r -- ^ Parse options
   -> Either String Docopt
 parseDocopt docopt opts = do
   doc <- toScanErr       $ Scanner.scan $ dedent docopt
@@ -82,10 +85,10 @@ parseDocopt docopt opts = do
 -- |
 evalDocopt
   :: forall r
-   . List D.Usage  -- ^ The program specification
-  -> StrMap String -- ^ The environment
-  -> Array String  -- ^ The user input
-  -> EvalOptsObj r -- ^ The eval opts
+   . List D.Usage     -- ^ The program specification
+  -> StrMap String    -- ^ The environment
+  -> Array String     -- ^ The user input
+  -> EvalOptionsObj r -- ^ The eval opts
   -> Either String (StrMap D.Value)
 evalDocopt prg env argv opts = do
   vs <- toUserParseErr argv
@@ -102,7 +105,7 @@ runDocopt
    . String         -- ^ The docopt text
   -> StrMap String  -- ^ The environment
   -> Array String   -- ^ The user input
-  -> Opts r         -- ^ Parse and eval opts
+  -> Options r      -- ^ Parse and eval opts
   -> Either String (StrMap D.Value)
 runDocopt docopt env argv opts = do
   { specification } <- parseDocopt docopt opts

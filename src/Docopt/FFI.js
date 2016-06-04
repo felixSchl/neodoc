@@ -6,3 +6,5 @@
 exports.isTruthy = function (value) {
   return (value == true);
 };
+
+exports.undefined = undefined;
