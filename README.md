@@ -98,9 +98,18 @@ Options:
    argument, then collect the rest into an array, given the help indicates
    another, repeatable, positional argument, e.g. : `[options] <ommand>
    [<args>...]`
-* `opts.smartOptions` - Enable parsing groups that "look like" flags as such,
-  for example, parse `[-f ARG...]` as `[-f=ARG...]`
+* `opts.smartOptions` - Enable parsing groups that "look like" options as
+  options. For example: `[-f ARG...]` means `[-f=ARG...]`
 
+### neodoc.parse(docopt, opts)
+
+Parse the docopt specification. This is the canonical representation of the
+CLI as described by it's help text.
+
+Options:
+
+* `opts.smartOptions` - Enable parsing groups that "look like" options as
+  options. For example: `[-f ARG...]` means `[-f=ARG...]`
 
 ### Example
 
