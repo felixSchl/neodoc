@@ -304,9 +304,11 @@ parseToken m = P.choice (P.try <$> A.concat [
 
   _shortOption :: P.Parser String Token
   _shortOption = do
+    let validChar = alphaNum <|> P.oneOf [ '?' ]
+
     P.char '-'
-    x  <- alphaNum
-    xs <- A.many alphaNum
+    x  <- validChar
+    xs <- A.many validChar
 
     arg <- P.choice $ P.try <$> [
 
