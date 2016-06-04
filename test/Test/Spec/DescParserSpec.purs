@@ -102,6 +102,68 @@ descParserSpec = \_ ->
                 , repeatable: false
                 }
             ]
+        , pass ("-f=BAZ, --foo [default: 100]")
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
+        , pass ("--foo=BAZ, -f [default: 100]")
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
+        , pass ("--foo=BAZ, -f=BAZ [default: 100]")
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
+        , pass ("--foo=BAZ  -f=BAZ [default: 100]")
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
+        , pass ("--foo  -f=BAZ [default: 100]")
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
+        , pass ("--foo=BAZ  -f [default: 100]")
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
+
+        , fail  "-f=BAZ, -f=BAZ"
+                "Expected an optional long alias for -f, but got: -f"
+
+        , fail "--foo=BAZ, --foo=BAZ"
+                "Expected an optional short alias for --foo, but got: --foo"
+
+        , fail  "-f=BAZ -f=BAZ"
+                "Expected an optional long alias for -f, but got: -f"
+
+        , fail "--foo=BAZ --foo=BAZ"
+                "Expected an optional short alias for --foo, but got: --foo"
+
+        , pass ("-f, --foo=BAZ [default: 100]")
+            [ o { name:       Desc.Full 'f' "foo"
+                , arg:        Just $ arg "BAZ" (int 100)
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
         , pass (dedent
             """
             -f=BAZ, --foo=BAZ [default: 100]

@@ -12,6 +12,7 @@ module Language.Docopt.Parser.Desc (
 
 import Prelude
 import Data.Tuple (Tuple (Tuple))
+import Data.Tuple (swap) as Tuple
 import Data.Functor (($>))
 import Data.Function (on)
 import Data.String as Str
@@ -313,17 +314,17 @@ descParser = markIndent do
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          pure $ { name: Flag opt.flag
-                   , arg:  do
-                       a <- arg
-                       pure {
-                         name:     a.name
-                       , optional: a.optional
-                       , default:  Nothing
-                       }
-                   , env:        Nothing
-                   , repeatable: repeatable
-                   }
+          pure $  { name: Flag opt.flag
+                  , arg:  do
+                      a <- arg
+                      pure {
+                        name:     a.name
+                      , optional: a.optional
+                      , default:  Nothing
+                      }
+                  , env:        Nothing
+                  , repeatable: repeatable
+                  }
 
         long :: L.TokenParser OptionObj
         long = do
@@ -342,34 +343,43 @@ descParser = markIndent do
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          pure $ { name: Long opt.name
-                    , arg:  do
-                        a <- arg
-                        pure {
-                          name:     a.name
-                        , optional: a.optional
-                        , default:  Nothing
-                        }
-                    , env:        Nothing
-                    , repeatable: repeatable
-                    }
+          pure $  { name: Long opt.name
+                  , arg:  do
+                      a <- arg
+                      pure {
+                        name:     a.name
+                      , optional: a.optional
+                      , default:  Nothing
+                      }
+                  , env:        Nothing
+                  , repeatable: repeatable
+                  }
 
         opt :: L.TokenParser OptionObj
         opt = do
-          x <- P.optionMaybe short
-          y <- P.optionMaybe do
-            P.choice $ P.try <$> do
-              maybe [ long ]
-                    (const [ L.comma  *> many L.newline *> indented *> long
-                           , long
-                           ])
-                    x
+          let p = P.choice  [ Left  <$> short
+                            , Right <$> long
+                            ]
+          x <- p
+          y <- P.optionMaybe
+                $ P.choice  [ L.comma *> many L.newline *> indented *> p
+                            , p
+                            ]
 
           case Tuple x y of
-            Tuple (Just x) (Just y) -> combine x y
-            Tuple (Just x) Nothing  -> pure x
-            Tuple Nothing  (Just y) -> pure y
-            otherwise               -> P.fail "Expected options"
+            Tuple (Left s)  (Just (Right l)) -> combine s l
+            Tuple (Right l) (Just (Left s))  -> combine s l
+            Tuple (Left s)  Nothing          -> pure s
+            Tuple (Right l) Nothing          -> pure l
+            Tuple (Left { name: Flag f  })
+                  (Just (Left { name: Flag f' }))  -> P.fail $
+              "Expected an optional long alias for -"
+                <> fromChar f <> ", but got: -" <> fromChar f'
+            Tuple (Right { name: Long n  })
+                  (Just (Right { name: Long n' })) -> P.fail $
+              "Expected an optional short alias for --"
+                <> n <> ", but got: --" <> n'
+            otherwise -> P.fail "Expected options"
 
           where
             -- Combine two options into one. This function *does not* cover all
