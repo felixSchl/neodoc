@@ -74,17 +74,17 @@ descParserSpec = \_ ->
                 , env:        Nothing
                 , repeatable: false
                 } ]
-        , pass ("-f, --foo")
+        , pass ("-f, --foo...")
             [ o { name:       Desc.Full 'f' "foo"
                 , arg:        Nothing
                 , env:        Nothing
-                , repeatable: false
+                , repeatable: true
                 } ]
-        , pass ("-f=BAZ, --foo=BAZ")
+        , pass ("-f=BAZ, --foo=BAZ...")
             [ o { name:       Desc.Full 'f' "foo"
                 , arg:        Just $ arg_ "BAZ"
                 , env:        Nothing
-                , repeatable: false
+                , repeatable: true
                 }
             ]
           -- XXX: Indecisive here: Should this throw an error instead?

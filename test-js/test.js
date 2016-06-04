@@ -46,4 +46,53 @@ describe('neodoc', () => {
         });
     });
   });
+
+  describe('specification parsing', () => {
+    expect(neodoc.parse(`
+      Usage: foo <command> [options]
+      Options:
+        -f, --foo=BAR...
+      `
+    )).to.deep.equal(
+        [
+          [
+            [
+              {
+                "type": "Positional",
+                "value": {
+                  "name": "<command>",
+                  "repeatable": false
+                }
+              },
+              // each expanded [options] option gets it's own group i.o.t.
+              // indiciate that it's optional. Repeatability is indiciated on
+              // the group itself, rather than on the 'Option' node.
+              {
+                "type": "Group",
+                "value": {
+                  "optional": true,
+                  "repeatable": true,
+                  "branches":
+                    [
+                      [
+                        { "type": "Option",
+                          "value": {
+                            "flag": "f",
+                            "name": "foo",
+                            "repeatable": false,
+                            "arg": {
+                                "name": "BAR",
+                                "optional": false
+                            }
+                          }
+                        }
+                      ]
+                    ]
+                }
+              }
+            ]
+          ]
+        ]
+    );
+  });
 });
