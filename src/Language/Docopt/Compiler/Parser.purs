@@ -30,7 +30,7 @@ import Data.Traversable (traverse)
 import Control.Lazy (defer)
 import Control.Monad (when, unless)
 import Control.MonadPlus (guard)
-import Data.Foldable (all, intercalate, maximumBy, sum, any, for_, foldl)
+import Data.Foldable (all, intercalate, maximumBy, sum, any, for_, foldl, elem)
 import Data.String as String
 import Data.String (fromChar, fromCharArray, stripPrefix)
 import Data.List.Unsafe as LU
@@ -99,6 +99,7 @@ modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
 -- | The options for generating a parser
 type GenOptionsObj r = {
   optionsFirst :: Boolean
+, customEOA    :: Array String
   | r
 }
 
@@ -649,6 +650,7 @@ genBranchParser xs genOpts canSkip = do
         <* modifyDepth (_ + 1)
       ) <|> P.fail "Expected \"-\""
 
+    -- Terminate parsing at first positional argument
     genParser x@(D.Positional pos) _
       | pos.repeatable && genOpts.optionsFirst
       = terminate x
@@ -667,6 +669,7 @@ genBranchParser xs genOpts canSkip = do
                         )
                       <* modifyDepth (_ + 1)
 
+    -- Terminate at singleton groups that house only positionals.
     genParser x@(D.Group grp) _
       | genOpts.optionsFirst && (length grp.branches == 1) &&
         all (\xs ->
@@ -675,6 +678,14 @@ genBranchParser xs genOpts canSkip = do
             _                           -> false
         ) grp.branches
       = terminate (LU.head (LU.head grp.branches))
+
+    -- Generate a parser for a `Option` argument
+    genParser x@(D.Option o) _ | genOpts.optionsFirst &&
+      let names = A.catMaybes [ ("--" ++ _) <$> o.name
+                              , ("-"  ++ _) <<< fromChar <$> o.flag
+                              ]
+       in any (_ `elem` genOpts.customEOA) names
+      = terminate x
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option o) _ = (do

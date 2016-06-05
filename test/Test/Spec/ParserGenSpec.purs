@@ -5,7 +5,7 @@ import Debug.Trace
 import Data.Tuple (Tuple(..))
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Exception (EXCEPTION())
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Either (Either(..), either)
 import Data.List (List(..), toList, length, fromList, singleton)
 import Data.Map (Map(..))
@@ -36,42 +36,61 @@ import Language.Docopt.Env        as Env
 import Language.Docopt.Trans.Flat as T
 import Test.Support.Docopt        as D
 
-data Test = Test (List (Array Argument)) (Array Case)
-data Case = Case (Array String)
-                 (Array (Tuple String String))
-                 (Either String (StrMap Value))
+type Options =  { customEOA    :: Array String
+                , optionsFirst :: Boolean
+                }
+
+type Test = { spec  :: List (Array Argument)
+            , cases :: Array Case
+            }
+
+type Case = { argv     :: Array String
+            , env      :: Array (Tuple String String)
+            , expected :: Either String (StrMap Value)
+            , options  :: Maybe Options
+            }
 
 test :: Array Argument -- ^ The (flat) specification
      -> Array Case     -- ^ The array of test cases to cover
      -> Test
-test a = Test (singleton a)
+test a ks = { spec: singleton a, cases: ks }
 
 test' :: Array (Array Argument) -- ^ The specification
       -> Array Case             -- ^ The array of test cases to cover
       -> Test
-test' as = Test (toList as)
+test' a ks = { spec: toList a, cases: ks }
 
-pass :: Array String                  -- ^ ARGV
+pass ::  Maybe Options                -- ^ The options
+      -> Array String                 -- ^ ARGV
       -> (Array (Tuple String Value)) -- ^ The expected output
       -> Case
-pass i o = Case i [] (Right $ StrMap.fromList $ toList o)
+pass opts i o = { argv:     i
+                , env:      []
+                , options:  opts
+                , expected: Right $ StrMap.fromList $ toList o
+                }
 
-pass' :: Array String                  -- ^ ARGV
+pass' :: Maybe Options                 -- ^ The options
+      -> Array String                  -- ^ ARGV
       -> (Array (Tuple String String)) -- ^ The environment
       -> (Array (Tuple String Value))  -- ^ The expected output
       -> Case
-pass' i e o = Case i e (Right $ StrMap.fromList $ toList o)
+pass' opts i e o = { argv:     i
+                   , env:      e
+                   , options:  opts
+                   , expected: Right $ StrMap.fromList $ toList o
+                   }
 
 fail :: Array String -- ^ ARGV
       -> String      -- ^ The expected error message
       -> Case
-fail i e = Case i [] (Left e)
+fail i e = { argv: i, env: [],  expected: Left e, options: Nothing }
 
 fail' :: Array String                  -- ^ ARGV
       -> (Array (Tuple String String)) -- ^ The environment
       -> String                        -- ^ The expected error message
       -> Case
-fail' i e err = Case i e (Left err)
+fail' i e err = { argv: i, env: e, expected: Left err, options: Nothing }
 
 (:>) = Tuple
 infixr 0 :>
@@ -84,7 +103,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
   let testCases = [
       test
         [ poR "<qux>" ]
-        [ pass
+        [ pass Nothing
             [ "a", "b", "c" ]
             [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
             ]
@@ -97,12 +116,12 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
     , test
         [ poR "<qux>", eoa ]
-        [ pass
+        [ pass Nothing
             [ "a", "b", "c", "--" ]
             [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
             , "--"    :> D.array []
             ]
-        , pass
+        , pass Nothing
             [ "a", "b", "c", "--", "--", "--" ]
             [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
             , "--"    :> D.array [ D.str "--" , D.str "--" ]
@@ -111,17 +130,17 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
     , test
         [ grr false [] ]
-        [ pass [] [] ]
+        [ pass Nothing [] [] ]
 
     , test
         [ gro false [] ]
-        [ pass [] [] ]
+        [ pass Nothing [] [] ]
 
     , test
         [ opt 'h' "host" (oa "host[:port]"
                            (D.str "http://localhost:3000"))
         ]
-        [ pass
+        [ pass Nothing
             [ "-hhttp://localhost:5000" ]
             [ "-h"     :> D.str "http://localhost:5000"
             , "--host" :> D.str "http://localhost:5000"
@@ -130,7 +149,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
     , test
         [ optE 'h' "host" (oa "FOO" (D.str "BAR")) "HOST" ]
-        [ pass'
+        [ pass' Nothing
             []
             [ "HOST" :> "HOME" ]
             [ "-h"     :> D.str "HOME"
@@ -142,7 +161,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ grr false [[ opt 'i' "input" (oa_ "FILE") ]]
         ]
         [ fail [] "Expected option(s): -i|--input=FILE"
-        , pass
+        , pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
             , "--input" :> D.str "bar" ]
@@ -152,7 +171,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ grr false [[ opt 'i' "input" (oa_ "FILE") ]]
         ]
         [ fail [] "Expected option(s): -i|--input=FILE"
-        , pass
+        , pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
             , "--input" :> D.str "bar" ]
@@ -168,14 +187,16 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , fail [ "-i", "bar" ]
           $ "Expected option(s): -o|--output=FILE"
 
-        , pass [ "-i", "bar", "-o", "bar" ]
+        , pass Nothing
+            [ "-i", "bar", "-o", "bar" ]
             [ "--input"  :> D.str "bar"
             , "-i"       :> D.str "bar"
             , "--output" :> D.str "bar"
             , "-o"       :> D.str "bar" ]
 
           -- group should be interchangable if it's only of options:
-        , pass [ "-o", "bar", "-i", "bar" ]
+        , pass Nothing
+            [ "-o", "bar", "-i", "bar" ]
             [ "--input"  :> D.str "bar"
             , "-i"       :> D.str "bar"
             , "--output" :> D.str "bar"
@@ -197,7 +218,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , fail [ "-i", "bar", "-r", "bar" ]
             "Expected option(s): -o|--output=FILE"
 
-        , pass [ "-i", "bar", "-r", "bar", "-o", "bar" ]
+        , pass Nothing
+            [ "-i", "bar", "-r", "bar", "-o", "bar" ]
             [ "--input"    :> D.str "bar"
             , "-i"         :> D.str "bar"
             , "--redirect" :> D.str "bar"
@@ -206,7 +228,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-o"         :> D.str "bar" ]
 
           -- group should be interchangable if it's only of options:
-        , pass [ "-o", "bar", "-r", "bar", "-i", "bar" ]
+        , pass Nothing
+            [ "-o", "bar", "-r", "bar", "-i", "bar" ]
             [ "--input"    :> D.str "bar"
             , "-i"         :> D.str "bar"
             , "--redirect" :> D.str "bar"
@@ -214,7 +237,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "--output"   :> D.str "bar"
             , "-o"         :> D.str "bar" ]
 
-        , pass'
+        , pass' Nothing
             [ "-o", "bar", "-i", "bar" ]
             [ "QUX" :> "BAR" ]
             [ "--input"    :> D.str "bar"
@@ -235,7 +258,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ fail [] "Expected option(s): -i|--input=FILE"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail [ "-i", "bar" ] "Expected <env>"
-        , pass [ "-i", "bar", "x", "-o", "bar" ]
+        , pass Nothing
+            [ "-i", "bar", "x", "-o", "bar" ]
             [ "--input"  :> D.str "bar"
             , "-i"       :> D.str "bar"
             , "<env>"    :> D.str "x"
@@ -248,7 +272,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
     , test
         [ optE 'o' "out" (oa_ "FOO") "FOO" ]
-        [ pass'
+        [ pass' Nothing
             []
             [ "FOO"    :> "BAR" ]
             [  "--out" :> D.str "BAR"
@@ -257,7 +281,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
     , test
         [ optE 'o' "out" (oa "FOO" (D.str "ADLER")) "FOO" ]
-        [ pass'
+        [ pass' Nothing
             []
             [ "FOO" :> "BAR" ]
             [  "--out" :> D.str "BAR"
@@ -266,23 +290,23 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
     , test'
         [ [ sopt_ 'a' ], [ sopt_ 'b' ] ]
-        [ pass
+        [ pass Nothing
             [ "-a" ]
             [ "-a" :> D.bool true ]
-        , pass
+        , pass Nothing
             [ "-b" ]
             [ "-b" :> D.bool true ]
-        , pass
+        , pass Nothing
             []
             []
         ]
 
     , test'
         [ [ co "a" ], [ co "b" ] ]
-        [ pass
+        [ pass Nothing
             [ "a" ]
             [ "a" :> D.bool true ]
-        , pass
+        , pass Nothing
             [ "b" ]
             [ "b" :> D.bool true ]
         , fail
@@ -303,7 +327,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , optR  'f' "foo" (oa_ "FOZ")
         , co    "baz"
         ]
-        [ pass
+        [ pass Nothing
             [ "foo", "--out", "--input", "--qux", "--foo=ox", "baz" ]
             [ "foo"     :> D.bool true
             , "--out"   :> D.bool true
@@ -319,7 +343,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-b"      :> D.str "ax"
             ]
 
-        , pass
+        , pass Nothing
             [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
             [ "foo"     :> D.bool true
             , "--out"   :> D.bool true
@@ -335,7 +359,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "baz"     :> D.bool true
             ]
 
-        , pass
+        , pass Nothing
             [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
             [ "foo"     :> D.bool true
             , "--qux"   :> D.int 2
@@ -351,7 +375,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "baz"     :> D.bool true
             ]
 
-        , pass
+        , pass Nothing
             [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
             [ "foo"     :> D.bool true
             , "--baz"   :> D.str "ax"
@@ -365,7 +389,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "baz"     :> D.bool true
             ]
 
-        , pass
+        , pass Nothing
             [ "foo", "-o", "-i", "-bax", "-f=ox", "baz" ]
             [ "foo"     :> D.bool true
             , "--out"   :> D.bool true
@@ -397,21 +421,21 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ fail [ "goo" ] "Expected foo, but got goo" ]
   ]
 
-  for_ testCases \(Test bs kases) -> do
-    describe (intercalate " | " $ prettyPrintBranch <<< br <$> bs) do
-      for_ kases \(Case input env expected) ->
-            let msg = either
-                  (\e -> "Should fail with \"" <> e <> "\"")
-                  prettyPrintOut
-                  expected
-                premsg = if A.length input > 0
-                            then intercalate " " input
+  for_ testCases \(({ spec, cases })) -> do
+    describe (intercalate " | " $ prettyPrintBranch <<< br <$> spec) do
+      for_ cases \(({ argv, env, expected, options })) ->
+            let msg = either (\e -> "Should fail with \"" <> e <> "\"")
+                              prettyPrintOut
+                              expected
+                premsg = if A.length argv > 0
+                            then intercalate " " argv
                             else "(no input)"
             in it (premsg <> " -> " <> msg) do
                   vliftEff do
-                    validate bs
-                             input
+                    validate spec
+                             argv
                              (Env.fromFoldable env)
+                             options
                              expected
 
     where
@@ -427,17 +451,19 @@ parserGenSpec = \_ -> describe "The parser generator" do
       validate :: forall eff.  List (Array Argument)
                             -> Array String
                             -> Env
+                            -> Maybe Options
                             -> Either String (StrMap Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
-      validate args argv env expected = do
+      validate args argv env options expected = do
         let prg = singleton $ Usage $ br <$> args
             result = uncurry (T.reduce prg env)
                 <$> runParser
                       env
                       argv
-                      (genParser prg {
+                      (genParser prg (fromMaybe {
                         optionsFirst: false
-                      })
+                      , customEOA:    []
+                      } options))
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->

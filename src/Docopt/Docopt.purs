@@ -58,11 +58,12 @@ type ParseOptionsObj r = {
 }
 
 type Options r = {
-  argv         :: Maybe Argv  -- ^ override argv. Defaults to `process.argv`
-, env          :: Maybe Env   -- ^ override env.  Defaults to `process.env`
-, optionsFirst :: Boolean     -- ^ enable "option-first"
-, dontExit     :: Boolean     -- ^ don't exit the process upon failure
-, smartOptions :: Boolean     -- ^ parse singleton groups as opts if possible
+  argv         :: Maybe Argv   -- ^ override argv. Defaults to `process.argv`
+, env          :: Maybe Env    -- ^ override env.  Defaults to `process.env`
+, optionsFirst :: Boolean      -- ^ enable "option-first"
+, dontExit     :: Boolean      -- ^ don't exit the process upon failure
+, smartOptions :: Boolean      -- ^ parse singleton groups as opts if possible
+, customEOA    :: Array String -- ^ stop parsing at these custom EOA markers
 }
 
 defaultOptions :: Options {}
@@ -72,6 +73,7 @@ defaultOptions = {
 , optionsFirst: false
 , dontExit:     false
 , smartOptions: false
+, customEOA:    []
 }
 
 -- |

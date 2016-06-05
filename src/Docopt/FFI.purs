@@ -10,15 +10,17 @@ module Docopt.FFI (run, parse) where
 
 import Prelude
 import Data.Function (Fn2, mkFn2)
-import Data.Maybe (Maybe(Nothing), maybe)
+import Data.Maybe (Maybe(Nothing), maybe, fromMaybe)
 import Data.List (fromList)
+import Data.Array (singleton) as Array
 import Control.Monad.Eff (Eff())
 import Data.Either (Either(..), either)
 import Data.StrMap (StrMap())
 import Control.Bind ((=<<))
-import Control.Alt (alt)
-import Data.Foreign (readArray, typeOf, toForeign) as F
-import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign)
+import Control.Alt (alt, (<|>))
+import Data.Foreign (readArray, readString, typeOf, toForeign) as F
+import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign,
+                    toForeign)
 import Data.Foreign.Class (readProp) as F
 import Language.Docopt.Usage (Usage(Usage))
 import Language.Docopt.Argument (Branch(), Argument(..))
@@ -79,6 +81,14 @@ run = mkFn2 go
           , smartOptions = either (const Docopt.defaultOptions.smartOptions) id
                             (isTruthy <$> do
                               F.readProp "smartOptions" fopts)
+
+            -- stop parsing at these custom EOA markers. This allows any option
+            -- to terminate a parse and collect all subsequent args.
+          , customEOA = fromMaybe Docopt.defaultOptions.customEOA do
+              toMaybe do
+                p <- F.readProp "customEOA" fopts
+                unsafeCoerce (F.readArray p) <|> do
+                  Array.singleton <$> F.readString p
 
             -- don't exit the process upon failure. By default, neodoc will
             -- exit the program if an error occured, right after printing the
