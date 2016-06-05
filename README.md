@@ -100,6 +100,8 @@ Options:
    [<args>...]`
 * `opts.smartOptions` - Enable parsing groups that "look like" options as
   options. For example: `[-f ARG...]` means `[-f=ARG...]`
+* `opts.stopAt` - Stop parsing at the given options, i.e. `[ -n ]`. It's value
+  will be the rest of argv.
 
 ### neodoc.parse(docopt, opts)
 
@@ -241,7 +243,7 @@ if (args['<command>'] === 'remote') {
 * [x] Provide seamless interface to be called from JS
 * [x] Read arguments from env vars
 * [x] Implement special arguments
-    * [x] `--` (end of args) not yet implemented
+    * [x] `--` (end of args)
     * [x] `-` (stdin)
     * [x] `[options]`
 
