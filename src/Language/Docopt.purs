@@ -48,14 +48,14 @@ type ParseOptionsObj r = {
 
 type EvalOptionsObj r = {
   optionsFirst :: Boolean
-, customEOA    :: Array String
+, stopAt       :: Array String
   | r
 }
 
 type Options r = {
   smartOptions :: Boolean
 , optionsFirst :: Boolean
-, customEOA    :: Array String
+, stopAt       :: Array String
   | r
 }
 

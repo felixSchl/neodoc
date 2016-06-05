@@ -37,7 +37,7 @@ import Language.Docopt.Env        as Env
 import Language.Docopt.Trans.Flat as T
 import Test.Support.Docopt        as D
 
-type Options =  { customEOA    :: Array String
+type Options =  { stopAt       :: Array String
                 , optionsFirst :: Boolean
                 }
 
@@ -439,13 +439,13 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n
         """
         [ pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "true", "false" ]
@@ -459,13 +459,13 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n...
         """
         [ pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "true", "false" ]
@@ -479,13 +479,13 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n[=FOO]
         """
         [ pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "true", "false" ]
@@ -499,13 +499,13 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n[=FOO]...
         """
         [ pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "true", "false" ]
@@ -519,21 +519,21 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n, --noop
         """
         [ pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
             [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
             , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { customEOA: [ "--noop" ]
+            (Just { stopAt: [ "--noop" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
             [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
             , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { customEOA: [ "-n", "--noop" ]
+            (Just { stopAt: [ "-n", "--noop" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
@@ -548,7 +548,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n ARC
         """
         [ pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
@@ -562,7 +562,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n ARC
         """
         [ pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
@@ -576,7 +576,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n ARC
         """
         [ pass
-            (Just { customEOA: [ "-n" ]
+            (Just { stopAt: [ "-n" ]
                   , optionsFirst: true
                   })
             [ "-n", "-a", "-b", "-c" ]
@@ -626,7 +626,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                       argv
                       (genParser spec (fromMaybe {
                         optionsFirst: false
-                      , customEOA:    []
+                      , stopAt:       []
                       } options))
 
         case result of

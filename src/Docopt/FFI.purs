@@ -84,9 +84,9 @@ run = mkFn2 go
 
             -- stop parsing at these custom EOA markers. This allows any option
             -- to terminate a parse and collect all subsequent args.
-          , customEOA = fromMaybe Docopt.defaultOptions.customEOA do
+          , stopAt = fromMaybe Docopt.defaultOptions.stopAt do
               toMaybe do
-                p <- F.readProp "customEOA" fopts
+                p <- F.readProp "stopAt" fopts
                 unsafeCoerce (F.readArray p) <|> do
                   Array.singleton <$> F.readString p
 

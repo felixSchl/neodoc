@@ -100,7 +100,7 @@ modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
 -- | The options for generating a parser
 type GenOptionsObj r = {
   optionsFirst :: Boolean
-, customEOA    :: Array String
+, stopAt       :: Array String
   | r
 }
 
@@ -688,7 +688,7 @@ genBranchParser xs genOpts canSkip = do
       let names = A.catMaybes [ ("--" ++ _) <$> o.name
                               , ("-"  ++ _) <<< fromChar <$> o.flag
                               ]
-       in any (_ `elem` genOpts.customEOA) names
+       in any (_ `elem` genOpts.stopAt) names
       = terminate x false
 
     -- Generate a parser for a `Option` argument

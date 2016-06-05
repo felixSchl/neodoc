@@ -63,7 +63,7 @@ type Options r = {
 , optionsFirst :: Boolean      -- ^ enable "option-first"
 , dontExit     :: Boolean      -- ^ don't exit the process upon failure
 , smartOptions :: Boolean      -- ^ parse singleton groups as opts if possible
-, customEOA    :: Array String -- ^ stop parsing at these custom EOA markers
+, stopAt       :: Array String -- ^ stop parsing at these custom EOA markers
 }
 
 defaultOptions :: Options {}
@@ -73,7 +73,7 @@ defaultOptions = {
 , optionsFirst: false
 , dontExit:     false
 , smartOptions: false
-, customEOA:    []
+, stopAt:       []
 }
 
 -- |

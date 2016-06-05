@@ -128,7 +128,7 @@ parseUniversalDocoptTests = do
                       , env:          return env
                       , dontExit:     true
                       , smartOptions: flags.smartOptions
-                      , customEOA:    []
+                      , stopAt:       []
                       }
                     }
 
