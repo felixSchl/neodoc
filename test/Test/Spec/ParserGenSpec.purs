@@ -456,6 +456,66 @@ parserGenSpec = \_ -> describe "The parser generator" do
         """
         Usage: prog [options]
         options:
+          -n...
+        """
+        [ pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        , pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "true", "false" ]
+            [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n[=FOO]
+        """
+        [ pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        , pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "true", "false" ]
+            [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n[=FOO]...
+        """
+        [ pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        , pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "true", "false" ]
+            [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
           -n, --noop
         """
         [ pass
@@ -484,6 +544,34 @@ parserGenSpec = \_ -> describe "The parser generator" do
     , test
         """
         Usage: prog [options]
+        options:
+          -n ARC
+        """
+        [ pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog ((((foo|bar)|qux)|wux)|-n ARC)
+        options:
+          -n ARC
+        """
+        [ pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog ((((foo|bar)|-n ARC)|wux))
         options:
           -n ARC
         """
