@@ -24,7 +24,8 @@ import Data.Bifunctor
 import Data.Either (Either(..), either, isRight)
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
 import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
-                  some, filter, head, fromList, sortBy, groupBy, last, null)
+                  some, filter, head, fromList, sortBy, groupBy, last, null,
+                  tail)
 import Control.Alt ((<|>))
 import Data.Traversable (traverse)
 import Control.Lazy (defer)
@@ -605,10 +606,13 @@ genBranchParser xs genOpts canSkip = do
 
     -- Terminate the parser at the given argument and collect all subsequent
     -- values int an array ("options-first")
-    terminate arg = do
+    terminate arg includeSelf = do
       input <- getInput
       let rest = Tuple arg <<< (RValue.from Origin.Argv) <$> do
-                  StringValue <<< Token.getSource <$> input
+                  StringValue <<< Token.getSource <$> do
+                    if includeSelf
+                       then input
+                       else fromMaybe Nil (tail input)
       P.ParserT \(P.PState { position: pos }) ->
         pure {
           consumed: true
@@ -653,7 +657,7 @@ genBranchParser xs genOpts canSkip = do
     -- Terminate parsing at first positional argument
     genParser x@(D.Positional pos) _
       | pos.repeatable && genOpts.optionsFirst
-      = terminate x
+      = terminate x true
 
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional pos) _ = do
@@ -677,7 +681,7 @@ genBranchParser xs genOpts canSkip = do
             Cons (D.Positional pos) Nil -> pos.repeatable || grp.repeatable
             _                           -> false
         ) grp.branches
-      = terminate (LU.head (LU.head grp.branches))
+      = terminate (LU.head (LU.head grp.branches)) true
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option o) _ | genOpts.optionsFirst &&
@@ -685,7 +689,7 @@ genBranchParser xs genOpts canSkip = do
                               , ("-"  ++ _) <<< fromChar <$> o.flag
                               ]
        in any (_ `elem` genOpts.customEOA) names
-      = terminate x
+      = terminate x false
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option o) _ = (do

@@ -16,10 +16,10 @@ import Data.Map (Map())
 import Data.StrMap as StrMap
 import Data.StrMap (StrMap())
 import Data.Bifunctor (rmap, lmap)
-import Data.Foldable (foldl, maximum)
+import Data.Foldable (foldl, maximum, all)
 import Control.Alt ((<|>))
 
-import Language.Docopt.Value (Value(..))
+import Language.Docopt.Value (Value(..), isBoolValue)
 import Language.Docopt.Value as Value
 import Language.Docopt.Usage (Usage(Usage), runUsage) as D
 import Language.Docopt.Env (Env)
@@ -85,13 +85,15 @@ reduce us env b vs =
                   let v = fromMaybe rv.value do
                         if D.isFlag a || D.isCommand a
                           then case rv.value of
-                            ArrayValue xs ->
-                              pure
-                                $ IntValue (A.length $ flip A.filter xs \x ->
-                                    case x of
-                                        BoolValue b -> b
-                                        _           -> false
+                            ArrayValue xs -> pure
+                              if all isBoolValue xs
+                                then
+                                  IntValue (A.length $ flip A.filter xs \x ->
+                                      case x of
+                                          BoolValue b -> b
+                                          _           -> false
                                   )
+                                else ArrayValue xs
                             BoolValue b ->
                               if D.isRepeatable a
                                   then

@@ -431,6 +431,69 @@ parserGenSpec = \_ -> describe "The parser generator" do
         usage: prog (foo)
         """
         [ fail [ "goo" ] "Expected foo, but got goo" ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n
+        """
+        [ pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        , pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "true", "false" ]
+            [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n, --noop
+        """
+        [ pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
+            , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        , pass
+            (Just { customEOA: [ "--noop" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
+            , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        , pass
+            (Just { customEOA: [ "-n", "--noop" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
+            , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n ARC
+        """
+        [ pass
+            (Just { customEOA: [ "-n" ]
+                  , optionsFirst: true
+                  })
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        ]
   ]
 
   for_ testCases \(({ help, cases })) -> do
