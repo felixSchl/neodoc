@@ -688,8 +688,8 @@ genBranchParser xs genOpts canSkip = do
         ) grp.branches
       = terminate (LU.head (LU.head grp.branches)) true
 
-    -- Generate a parser for a `Option` argument
-    genParser x@(D.Option o) _ | genOpts.optionsFirst &&
+    -- Terminate at option if part of 'stopAt'
+    genParser x@(D.Option o) _ |
       let names = A.catMaybes [ ("--" ++ _) <$> o.name
                               , ("-"  ++ _) <<< fromChar <$> o.flag
                               ]
