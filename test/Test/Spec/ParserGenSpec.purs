@@ -326,7 +326,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
     , test
         """
-        usage: prog foo -io -q... -b=BAZ -f=FOZ... baz
+        usage: prog foo -io [-q]... -b=BAZ -f=FOZ... baz
         options:
           -i, --input
           -o, --out
@@ -549,7 +549,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         """
         [ pass
             (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
+                  , optionsFirst: false
                   })
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
@@ -557,7 +557,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
     , test
         """
-        Usage: prog ((((foo|bar)|qux)|wux)|-n ARC)
+        Usage: prog ((((foo|bar)|qux)|wux)|-n ARC) ARGS...
         options:
           -n ARC
         """
@@ -577,7 +577,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         """
         [ pass
             (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
+                  , optionsFirst: false
                   })
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
