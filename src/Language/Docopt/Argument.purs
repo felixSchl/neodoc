@@ -139,6 +139,7 @@ isRepeatable :: Argument -> Boolean
 isRepeatable (Option x)     = x.repeatable
 isRepeatable (Positional x) = x.repeatable
 isRepeatable (Command x)    = x.repeatable
+isRepeatable (Group x)      = x.repeatable
 isRepeatable _              = false
 
 setRepeatable :: Argument -> Boolean -> Argument

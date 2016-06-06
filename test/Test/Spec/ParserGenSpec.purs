@@ -582,6 +582,27 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         ]
+
+    , test
+        """
+        Usage: prog [-i] [-q]...
+        """
+        [ pass
+            Nothing
+            [ "-q", "-i", "-q" ]
+            [ "-i" :> D.bool true
+            , "-q" :> D.int 2 ]
+        , pass
+            Nothing
+            [ "-i", "-q", "-q" ]
+            [ "-i" :> D.bool true
+            , "-q" :> D.int 2 ]
+        , pass
+            Nothing
+            [ "-q", "-q", "-i" ]
+            [ "-i" :> D.bool true
+            , "-q" :> D.int 2 ]
+        ]
   ]
 
   for_ testCases \(({ help, cases })) -> do

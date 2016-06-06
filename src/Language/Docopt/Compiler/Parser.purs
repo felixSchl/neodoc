@@ -477,19 +477,24 @@ genBranchParser xs genOpts canSkip = do
           -- Generate the parser for the argument `p`. For groups, temporarily
           -- set the required flag to "true", such that it will fail and we have
           -- a chance to retry as part of the exhaustive parsing mechanism
-          r <- P.try $ genParser (D.setRequired p true) (n <= 1)
+          r <- P.try $ genParser (D.setRequired p true) false
 
           r' <- P.try do
-                  if D.isRepeatable p
-                        then draw pss (length pss) (p:tot)
+                  if (D.isRepeatable p &&
+                      length (filter (snd >>> isFrom Origin.Argv) r) > 0)
+                        then do
+                          -- Make successive matches of this repeated
+                          -- group optional.
+                          draw ((D.setRequired p false):ps')
+                                (length pss)
+                                (p:tot)
                         else draw ps' (length ps') (p:tot)
 
           pure $ r <> r'
         ) <|> (defer \_ -> do
               state :: StateObj <- lift State.get
               case state.fatal of
-                Just (P.ParseError { message }) -> do
-                  P.fail message
+                Just (P.ParseError { message }) -> P.fail message
                 otherwise -> draw (ps' <> singleton p) (n - 1) tot
               )
 
@@ -523,10 +528,10 @@ genBranchParser xs genOpts canSkip = do
             fallbacks = mrights vs
 
           if canSkip
-             then do
+            then do
               xs <- genExhaustiveParser missing false
               pure $ fallbacks <> xs
-             else
+            else
               if (length missing > 0)
                 then P.fail $
                   "Expected option(s): "
@@ -749,7 +754,6 @@ genBranchParser xs genOpts canSkip = do
           mkSoptParser Nothing _  = P.fail "flag"
 
     -- Generate a parser for an argument `Group`
-    -- The total score a group is the sum of all scores inside of it.
     genParser x@(D.Group grp) canSkip =
       let mod = if grp.optional then P.option mempty <<< P.try else id
        in mod go
@@ -764,7 +768,6 @@ genBranchParser xs genOpts canSkip = do
                 pure $ x <> xs
               else pure x
 
-        isFrom o rv = RValue.getOrigin rv == o
         step = snd <$> do
                 genBranchesParser grp.branches
                                   false
@@ -775,6 +778,9 @@ genBranchParser xs genOpts canSkip = do
     butGot :: List PositionedToken -> String
     butGot (Cons (PositionedToken { source }) _) = ", but got " <> source
     butGot Nil                                   = ""
+
+    isFrom :: Origin -> RichValue -> Boolean
+    isFrom o rv = RValue.getOrigin rv == o
 
 unParseError :: P.ParseError -> { position :: P.Position, message :: String }
 unParseError (P.ParseError e) = e
