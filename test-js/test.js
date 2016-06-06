@@ -21,9 +21,18 @@ describe('neodoc', () => {
       expect(git('branch -u origin master'))
         .to.deep.equal({
           branch: true
-        , '<branchname>': [ 'master' ]
+        , '<branchname>': 'master'
         , '-u': 'origin'
         , '--set-upstream-to': 'origin'
+        });
+    });
+
+    it('git branch -D master development', () => {
+      expect(git('branch -D master development'))
+        .to.deep.equal({
+          branch: true
+        , '<branchname>': [ 'master', 'development' ]
+        , '-D': true
         });
     });
 
@@ -48,51 +57,55 @@ describe('neodoc', () => {
   });
 
   describe('specification parsing', () => {
-    expect(neodoc.parse(`
-      Usage: foo <command> [options]
-      Options:
-        -f, --foo=BAR...
-      `
-    )).to.deep.equal(
-        [
+    it ('should return the spec in regular JS', () => {
+      expect(neodoc.parse(`
+        Usage: foo <command> [options]
+        Options:
+          -f, --foo=BAR...
+        `
+      )).to.deep.equal(
           [
             [
-              {
-                "type": "Positional",
-                "value": {
-                  "name": "<command>",
-                  "repeatable": false
-                }
-              },
-              // each expanded [options] option gets it's own group i.o.t.
-              // indiciate that it's optional. Repeatability is indiciated on
-              // the group itself, rather than on the 'Option' node.
-              {
-                "type": "Group",
-                "value": {
-                  "optional": true,
-                  "repeatable": true,
-                  "branches":
-                    [
+              [
+                {
+                  "type": "Positional",
+                  "value": {
+                    "name": "<command>",
+                    "repeatable": false
+                  }
+                },
+                // each expanded [options] option gets it's own group i.o.t.
+                // indiciate that it's optional. Repeatability is indiciated on
+                // the group itself, rather than on the 'Option' node.
+                {
+                  "type": "Group",
+                  "value": {
+                    "optional": true,
+                    "repeatable": true,
+                    "branches":
                       [
-                        { "type": "Option",
-                          "value": {
-                            "flag": "f",
-                            "name": "foo",
-                            "repeatable": false,
-                            "arg": {
-                                "name": "BAR",
-                                "optional": false
+                        [
+                          { "type": "Option",
+                            "value": {
+                              "flag": "f",
+                              "name": "foo",
+                              "repeatable": false,
+                              "env": undefined,
+                              "arg": {
+                                  "name": "BAR",
+                                  "default": undefined,
+                                  "optional": false
+                              }
                             }
                           }
-                        }
+                        ]
                       ]
-                    ]
+                  }
                 }
-              }
+              ]
             ]
           ]
-        ]
-    );
+      );
+    })
   });
 });
