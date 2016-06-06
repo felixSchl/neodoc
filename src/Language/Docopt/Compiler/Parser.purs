@@ -26,6 +26,7 @@ import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
 import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
                   some, filter, head, fromList, sortBy, groupBy, last, null,
                   tail)
+import Data.List.Lazy (take, repeat, fromList) as LL
 import Control.Alt ((<|>))
 import Data.Traversable (traverse)
 import Control.Lazy (defer)
@@ -315,6 +316,7 @@ genUsageParser xs genOpts = do
                       true
                       genOpts
                       true
+                      0
 
 -- | Generate a parser that selects the best branch it parses and
 -- | fails if no branch was parsed.
@@ -323,15 +325,16 @@ genBranchesParser :: forall r
                   -> Boolean         -- ^ Expect EOF after each branch
                   -> GenOptionsObj r -- ^ Generator options
                   -> Boolean         -- ^ Can we skip input via fallbacks?
+                  -> Int             -- ^ The current recursive depth
                   -> Parser (Tuple D.Branch (List ValueMapping))
-genBranchesParser xs term genOpts canSkip
+genBranchesParser xs term genOpts canSkip recDepth
   = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
     env   :: Env      <- ask
     state :: StateObj <- lift State.get
 
     let
       ps = xs <#> \x -> (Tuple x) <$> do
-                          genBranchParser x genOpts canSkip
+                          genBranchParser x genOpts canSkip recDepth
                             <* unless (not term) eof
       rs  = evalState (runReaderT (collect s ps) env) initialState
       rs' = reverse rs
@@ -424,8 +427,9 @@ genBranchParser :: forall r
                  . D.Branch        -- ^ The branch to match
                 -> GenOptionsObj r -- ^ Generator options
                 -> Boolean         -- ^ Can we skip input via fallbacks?
+                -> Int             -- ^ The current recursive depth
                 -> Parser (List ValueMapping)
-genBranchParser xs genOpts canSkip = do
+genBranchParser xs genOpts canSkip recDepth = do
   modifyDepth (const 0) -- reset the depth counter
   either
     (\_   -> P.fail "Failed to generate parser")
@@ -446,12 +450,13 @@ genBranchParser xs genOpts canSkip = do
                         -> Parser (List ValueMapping)
     genExhaustiveParser Nil canSkip = pure mempty
     genExhaustiveParser ps  canSkip = do
-      if debug
-        then do
-          traceA $ "genExhaustiveParser: "
+      when debug do
+        pure unit -- prevent early execution of code below. PS bug?
+        traceA $
+          indentation <>
+          "genExhaustiveParser: "
                 <> (intercalate " " (D.prettyPrintArg <$> ps))
                 <> " - canSkip: " <>  show canSkip
-          else pure unit
       draw ps (length ps) Nil
 
       where
@@ -464,12 +469,14 @@ genBranchParser xs genOpts canSkip = do
 
         draw pss@(Cons p ps') n tot | n >= 0 = (do
           when debug do
+            pure unit -- prevent early execution of code below. PS bug?
             i <- getInput
             traceA $
+              indentation <>
               "draw: (" <> (D.prettyPrintArg p) <> ":"
                         <> (intercalate ":" (D.prettyPrintArg <$> ps'))
                         <>  ") - n: " <> show n
-                        <> "from input: "
+                        <> " from input: "
                         <> (intercalate " " (prettyPrintToken
                                               <<< _.token
                                               <<< unPositionedToken <$> i))
@@ -633,6 +640,7 @@ genBranchParser xs genOpts canSkip = do
 
     -- Generate a parser for a `Command` argument
     genParser x@(D.Command cmd) _ = do
+      debugParsing x
       i <- getInput
       (do
         if cmd.repeatable then (some go) else (singleton <$> go)
@@ -647,6 +655,7 @@ genBranchParser xs genOpts canSkip = do
 
     -- Generate a parser for a `EOA` argument
     genParser x@(D.EOA) _ = do
+      debugParsing x
       singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> (do
         eoa <|> (pure $ ArrayValue []) -- XXX: Fix type
         <* modifyDepth (_ + 1)
@@ -654,6 +663,7 @@ genBranchParser xs genOpts canSkip = do
 
     -- Generate a parser for a `Stdin` argument
     genParser x@(D.Stdin) _ = do
+      debugParsing x
       singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> (do
         stdin
         <* modifyDepth (_ + 1)
@@ -666,6 +676,7 @@ genBranchParser xs genOpts canSkip = do
 
     -- Generate a parser for a `Positional` argument
     genParser x@(D.Positional pos) _ = do
+      debugParsing x
       i <- getInput
       (do
         if pos.repeatable then (some go) else (singleton <$> go)
@@ -698,6 +709,7 @@ genBranchParser xs genOpts canSkip = do
 
     -- Generate a parser for a `Option` argument
     genParser x@(D.Option o) _ = (do
+      debugParsing x
       do
         if o.repeatable
            then some          go
@@ -754,9 +766,11 @@ genBranchParser xs genOpts canSkip = do
           mkSoptParser Nothing _  = P.fail "flag"
 
     -- Generate a parser for an argument `Group`
-    genParser x@(D.Group grp) canSkip =
-      let mod = if grp.optional then P.option mempty <<< P.try else id
-       in mod go
+    genParser x@(D.Group grp) canSkip = do
+      debugParsing x
+      if grp.optional
+        then P.option mempty $ P.try go
+        else go
       where
         go | length grp.branches == 0 = pure mempty
         go = do
@@ -774,6 +788,7 @@ genBranchParser xs genOpts canSkip = do
                                   genOpts
                                   -- always allow skipping for non-free groups.
                                   (not (D.isFree x) || canSkip)
+                                  (recDepth + 1)
 
     butGot :: List PositionedToken -> String
     butGot (Cons (PositionedToken { source }) _) = ", but got " <> source
@@ -781,6 +796,15 @@ genBranchParser xs genOpts canSkip = do
 
     isFrom :: Origin -> RichValue -> Boolean
     isFrom o rv = RValue.getOrigin rv == o
+
+    debugParsing x = when debug do
+      pure unit -- prevent early execution of code below. PS bug?
+      traceA $
+        indentation <>
+        "Parsing: " <> D.prettyPrintArg x
+
+    indentation :: String
+    indentation = fromCharArray $ LL.fromList $ LL.take (recDepth * 2) $ LL.repeat ' '
 
 unParseError :: P.ParseError -> { position :: P.Position, message :: String }
 unParseError (P.ParseError e) = e
