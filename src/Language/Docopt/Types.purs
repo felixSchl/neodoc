@@ -40,7 +40,8 @@ instance showDocoptError :: Show DocoptError where
   show (DocoptUserParseError _ e) = "DocoptParseError " <> show e
   show (DocoptSolveError       e) = "DocoptSolveError"  <> show e
 
-unParseError :: P.ParseError -> { message :: String
+unParseError :: P.ParseError -> { message  :: String
+                                , fatal    :: Boolean
                                 , position :: P.Position }
 unParseError (P.ParseError e) = e
 

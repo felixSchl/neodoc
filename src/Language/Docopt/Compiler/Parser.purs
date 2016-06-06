@@ -48,7 +48,7 @@ import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), fail,
-                            parseFailed, unParserT) as P
+                            parseFailedFatal, parseFailed, unParserT, fatal) as P
 import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>)) as P
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
 
@@ -81,9 +81,7 @@ debug = false
 type ValueMapping = Tuple D.Argument RichValue
 
 -- | The stateful parser type
-type StateObj = { depth :: Int
-                , fatal :: Maybe P.ParseError
-                }
+type StateObj = { depth :: Int }
 
 -- | The CLI parser
 type Parser a = P.ParserT (List PositionedToken)
@@ -91,9 +89,7 @@ type Parser a = P.ParserT (List PositionedToken)
                           a
 
 initialState :: StateObj
-initialState = { depth: 0
-               , fatal: Nothing
-               }
+initialState = { depth: 0 }
 
 modifyDepth :: (Int -> Int) -> Parser Unit
 modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
@@ -359,68 +355,45 @@ genBranchesParser xs term genOpts canSkip recDepth
                          (sortBy (compare `on` (_.depth <<< _.result))
                                  failures)
 
-      -- check losers first for any fatal errors
-      fatal =
-          head $ flip filter failures \e ->
-            let msg = (unParseError e.result.error).message
-             in (startsWith "Option takes no argument" msg) ||
-                (startsWith "Option requires argument" msg)
+      fatal = last $ filter (\x ->
+                let err = unParseError (x.result.error)
+                 in err.fatal
+                ) failures
 
-
-    case fatal of
-         (Just e) -> do
-            lift $ State.modify (_ {  fatal = Just e.result.error })
-            pure
-              -- XXX: `i` and `pos` are wrong (
-              $ P.parseFailed i pos (unParseError e.result.error).message
-         otherwise -> do
-          maybe'
-            (\_ ->
-              fromMaybe
-                (pure do
-                  P.parseFailed i pos
-                      "The impossible happened. Failure without error")
-                (do
-                  es <- losers
-                  pure case es of
-                    Cons e es | null es || not (null i) -> do
-                      pure $ e { result = Left e.result.error }
-                    otherwise -> pure $ P.parseFailed i pos ""
-                )
-            )
-            (\r -> pure $ r { result = Right r.result.value })
-            winner
+    maybe
+      (do
+        maybe'
+          (\_ ->
+            fromMaybe
+              (pure do
+                P.parseFailed i pos
+                    "The impossible happened. Failure without error")
+              (do
+                es <- losers
+                pure case es of
+                  Cons e es | null es || not (null i) -> do
+                    pure $ e { result = Left e.result.error }
+                  otherwise -> pure $ P.parseFailed i pos ""
+              )
+          )
+          (\r -> pure $ r { result = Right r.result.value })
+          winner
+      )
+      (\x ->
+        let err = unParseError (x.result.error)
+         in pure $ P.parseFailedFatal i pos err.message
+      )
+      fatal
 
   where
   fixMessage m = m
   collect s ps = ps `flip traverse` \p -> do
-
     o                 <- P.unParserT p s
     state :: StateObj <- lift State.get
-
-    -- If any parse encountered a fatal error, fail with that error.
-    -- XXX: this approach is pragmatic and works around not being able to catch
-    --      errors in purescript-parsing. Ideally, this would not be needed.
-    --      Also, using "o" is actually misleading here as it claims the error
-    --      happened at a different location as to where it actually
-    --      did. This has no impact atm on the way neodoc works, but is
-    --      something to keep in mind.
-    flip fromMaybe
-      (do
-        e <- state.fatal
-        pure
-          $ pure
-            $ Left
-              -- XXX: use a huge depth for fatal errors to be bubbled
-              --      up properly (be selected). Again, this is due to
-              --      insufficient control over handling fatal vs.
-              --      non-fatal errors.
-              $ o { result = { error: e, depth: 99999 } }
-      )
-      (pure $ bimap
-        (\e -> o { result = { error: e, depth: state.depth } })
-        (\r -> o { result = { value: r, depth: state.depth } })
-        o.result)
+    pure $ bimap
+      (\e -> o { result = { error: e, depth: state.depth } })
+      (\r -> o { result = { value: r, depth: state.depth } })
+      o.result
 
 -- | Generate a parser for a single usage branch
 genBranchParser :: forall r
@@ -498,12 +471,7 @@ genBranchParser xs genOpts canSkip recDepth = do
                         else draw ps' (length ps') (p:tot)
 
           pure $ r <> r'
-        ) <|> (defer \_ -> do
-              state :: StateObj <- lift State.get
-              case state.fatal of
-                Just (P.ParseError { message }) -> P.fail message
-                otherwise -> draw (ps' <> singleton p) (n - 1) tot
-              )
+        ) <|> (defer \_ -> draw (ps' <> singleton p) (n - 1) tot)
 
         draw ps' n tot | (length ps' > 0) && (n < 0) = do
           env :: StrMap String <- lift ask
@@ -743,14 +711,20 @@ genBranchParser xs genOpts canSkip recDepth = do
                   else P.fail "long or short option") s
               case o.result of
                   (Left e) -> do
-                    when ((startsWith
+                    let err = unParseError e
+                    if ((startsWith
                             "Option takes no argument"
-                            (unParseError e).message)
+                            err.message)
                        || (startsWith
                             "Option requires argument"
-                            (unParseError e).message)) do
-                              lift $ State.modify (_ { fatal = Just e })
-                    pure o
+                            err.message))
+                      then do
+                        pure $ o {
+                          result = Left $ P.ParseError $ err {
+                            fatal = true
+                          }
+                        }
+                      else pure o
                   otherwise -> pure o
 
           isAnyLopt (LOpt _ _) = pure true
@@ -806,5 +780,5 @@ genBranchParser xs genOpts canSkip recDepth = do
     indentation :: String
     indentation = fromCharArray $ LL.fromList $ LL.take (recDepth * 2) $ LL.repeat ' '
 
-unParseError :: P.ParseError -> { position :: P.Position, message :: String }
+unParseError :: P.ParseError -> { position :: P.Position, message :: String, fatal :: Boolean }
 unParseError (P.ParseError e) = e

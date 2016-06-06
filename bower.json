@@ -13,7 +13,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "purescript-parsing": "~0.8.0",
+    "purescript-parsing": "felixSchl/purescript-parsing#feature/fatal-errors",
     "purescript-debug": "~0.1.3",
     "purescript-console": "~0.1.1",
     "purescript-generics": "~0.7.2",

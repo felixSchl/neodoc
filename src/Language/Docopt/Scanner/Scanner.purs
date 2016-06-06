@@ -48,7 +48,8 @@ scan text = do
   }
 
   where
-    fail msg = Left $ P.ParseError { message: msg
+    fail msg = Left $ P.ParseError { message:  msg
+                                   , fatal:    true
                                    , position: P.initialPos }
 
     sections n = maybe Nil

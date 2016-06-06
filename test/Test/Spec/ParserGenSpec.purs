@@ -4,6 +4,7 @@ import Prelude
 import Debug.Trace
 import Data.Tuple (Tuple(..))
 import Control.Monad.Eff (Eff())
+import Control.Monad (when)
 import Control.Monad.Eff.Exception (EXCEPTION())
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Either (Either(..), either)
@@ -37,12 +38,21 @@ import Language.Docopt.Env        as Env
 import Language.Docopt.Trans.Flat as T
 import Test.Support.Docopt        as D
 
+-- hack to easily isolate tests
+isolate :: Boolean
+isolate = false
+
 type Options =  { stopAt       :: Array String
                 , optionsFirst :: Boolean
+                , smartOptions :: Boolean
                 }
+
+defaultOptions :: Options
+defaultOptions = { stopAt: [], optionsFirst: false, smartOptions: true }
 
 type Test = { help  :: String
             , cases :: Array Case
+            , skip  :: Boolean -- hack to easily isolate tests
             }
 
 type Case = { argv     :: Array String
@@ -54,7 +64,13 @@ type Case = { argv     :: Array String
 test :: String     -- ^ The help text
      -> Array Case -- ^ The array of test cases to cover
      -> Test
-test help ks = { help: help, cases: ks }
+test help ks = { help: help, cases: ks, skip: isolate }
+
+-- hack to easily isolate tests
+test2 :: String    -- ^ The help text
+      -> Array Case -- ^ The array of test cases to cover
+      -> Test
+test2 help ks = { help: help, cases: ks, skip: false }
 
 pass ::  Maybe Options                -- ^ The options
       -> Array String                 -- ^ ARGV
@@ -439,15 +455,17 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n
         """
         [ pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "true", "false" ]
             [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
         ]
@@ -459,15 +477,17 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n...
         """
         [ pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "true", "false" ]
             [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
         ]
@@ -479,15 +499,17 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n[=FOO]
         """
         [ pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "true", "false" ]
             [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
         ]
@@ -499,15 +521,17 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n[=FOO]...
         """
         [ pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "true", "false" ]
             [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
         ]
@@ -519,23 +543,26 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n, --noop
         """
         [ pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
             , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { stopAt: [ "--noop" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "--noop" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
             , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         , pass
-            (Just { stopAt: [ "-n", "--noop" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n", "--noop" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
             , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
@@ -548,9 +575,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n ARC
         """
         [ pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: false
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         ]
@@ -562,9 +590,24 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n ARC
         """
         [ pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: true
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+        ]
+
+    , test2
+        """
+        Usage: prog [-n ARG]
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt       = [ "-n" ]
+                    , optionsFirst = true
+                    , smartOptions = false
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         ]
@@ -576,9 +619,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -n ARC
         """
         [ pass
-            (Just { stopAt: [ "-n" ]
-                  , optionsFirst: false
-                  })
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
             [ "-n", "-a", "-b", "-c" ]
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         ]
@@ -605,24 +649,25 @@ parserGenSpec = \_ -> describe "The parser generator" do
         ]
   ]
 
-  for_ testCases \(({ help, cases })) -> do
-    describe help do
-      for_ cases \(({ argv, env, expected, options })) ->
-            let msg = either (\e -> "Should fail with \"" <> e <> "\"")
-                              prettyPrintOut
+  for_ testCases \(({ help, cases, skip })) -> do
+    when (not skip) do
+      describe help do
+        for_ cases \(({ argv, env, expected, options })) ->
+              let msg = either (\e -> "Should fail with \"" <> e <> "\"")
+                                prettyPrintOut
+                                expected
+                  premsg = if A.length argv > 0
+                              then intercalate " " argv
+                              else "(no input)"
+              in it (premsg <> " -> " <> msg) do
+                    vliftEff do
+                      { specification } <- runEitherEff do
+                        parseDocopt help (fromMaybe defaultOptions options)
+                      validate (specification)
+                              argv
+                              (Env.fromFoldable env)
+                              options
                               expected
-                premsg = if A.length argv > 0
-                            then intercalate " " argv
-                            else "(no input)"
-            in it (premsg <> " -> " <> msg) do
-                  vliftEff do
-                    { specification } <- runEitherEff do
-                      parseDocopt help { smartOptions: true }
-                    validate (specification)
-                             argv
-                             (Env.fromFoldable env)
-                             options
-                             expected
 
     where
 
@@ -645,10 +690,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                 <$> runParser
                       env
                       argv
-                      (genParser spec (fromMaybe {
-                        optionsFirst: false
-                      , stopAt:       []
-                      } options))
+                      (genParser spec (fromMaybe defaultOptions options))
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->
