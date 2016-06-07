@@ -15,6 +15,7 @@ module Language.Docopt.Compiler.Parser (
   ) where
 
 import Prelude
+import Control.Monad.RWS (RWS(), evalRWS)
 import Control.Plus (empty)
 import Control.Bind ((=<<))
 import Debug.Trace
@@ -41,8 +42,6 @@ import Data.Array.Unsafe as AU
 import Data.Monoid (class Monoid, mempty)
 import Data.Tuple (Tuple(..), fst, snd)
 import Control.Monad.Reader (ask)
-import Control.Monad.Reader.Trans (ReaderT(), runReaderT)
-import Control.Monad.State (State, evalState)
 import Control.Monad.State as State
 import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
@@ -85,7 +84,7 @@ type StateObj = { depth :: Int }
 
 -- | The CLI parser
 type Parser a = P.ParserT (List PositionedToken)
-                          (ReaderT Env (State StateObj))
+                          (RWS Env Unit StateObj)
                           a
 
 initialState :: StateObj
@@ -326,13 +325,13 @@ genBranchesParser :: forall r
 genBranchesParser xs term genOpts canSkip recDepth
   = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
     env   :: Env      <- ask
-    state :: StateObj <- lift State.get
+    state :: StateObj <- State.get
 
     let
       ps = xs <#> \x -> (Tuple x) <$> do
                           genBranchParser x genOpts canSkip recDepth
                             <* unless (not term) eof
-      rs  = evalState (runReaderT (collect s ps) env) initialState
+      rs  = fst $ evalRWS (collect s ps) env initialState
       rs' = reverse rs
 
       -- Evaluate the winning candidates, if any.
@@ -389,7 +388,7 @@ genBranchesParser xs term genOpts canSkip recDepth
   fixMessage m = m
   collect s ps = ps `flip traverse` \p -> do
     o                 <- P.unParserT p s
-    state :: StateObj <- lift State.get
+    state :: StateObj <- State.get
     pure $ bimap
       (\e -> o { result = { error: e, depth: state.depth } })
       (\r -> o { result = { value: r, depth: state.depth } })

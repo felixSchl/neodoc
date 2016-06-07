@@ -9,7 +9,8 @@ module Language.Docopt.Compiler (
 import Prelude
 import Data.List (List(), toList)
 import Data.Either (Either())
-import Data.Tuple (Tuple)
+import Data.Tuple (Tuple(), fst)
+import Control.Monad.RWS (RWS(), evalRWS)
 import Control.Monad.Reader.Trans (runReaderT)
 import Control.Monad.State (evalState)
 import Text.Parsing.Parser (ParseError, PState(PState), runParserT) as P
@@ -42,7 +43,7 @@ runParser :: D.Env                      -- ^ the user input
           -> Either P.ParseError Result -- ^ the parsed output
 runParser env argv p = do
   toks <- G.lex (toList argv)
-  evalState (runReaderT (go toks p) env) G.initialState
+  fst $ evalRWS (go toks p) env G.initialState
   where go i = P.runParserT (P.PState { input: i
                                       , position: P.initialPos
                                       })
