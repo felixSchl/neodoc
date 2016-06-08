@@ -6,12 +6,12 @@
 -- | ===
 
 module Language.Docopt.Compiler.Parser (
-    genUsageParser
+    spec
   , initialState
   , Parser ()
   , StateObj ()
   , ValueMapping ()
-  , GenOptionsObj ()
+  , Options ()
   ) where
 
 import Prelude
@@ -94,7 +94,7 @@ modifyDepth :: (Int -> Int) -> Parser Unit
 modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
 
 -- | The options for generating a parser
-type GenOptionsObj r = {
+type Options r = {
   optionsFirst :: Boolean
 , stopAt       :: Array String
   | r
@@ -301,35 +301,35 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
               Lit _      -> "Unmatched command: " <> source
 
 
--- | Generate a parser for a single program usage.
-genUsageParser :: forall r
-                . List D.Usage    -- ^ The list of usage specs
-               -> GenOptionsObj r -- ^ Generator options
-               -> Parser (Tuple D.Branch (List ValueMapping))
-genUsageParser xs genOpts = do
-    genBranchesParser (concat $ D.runUsage <$> xs)
-                      true
-                      genOpts
-                      true
-                      0
+-- | Generate a parser for a program specification.
+spec :: forall r
+     . List D.Usage -- ^ The list of usage branches
+    -> Options r    -- ^ Generator options
+    -> Parser (Tuple D.Branch (List ValueMapping))
+spec xs options = do
+    branchesP (concat $ D.runUsage <$> xs)
+              true
+              options
+              true
+              0
 
 -- | Generate a parser that selects the best branch it parses and
 -- | fails if no branch was parsed.
-genBranchesParser :: forall r
+branchesP :: forall r
                    . List D.Branch   -- ^ The branches to test
                   -> Boolean         -- ^ Expect EOF after each branch
-                  -> GenOptionsObj r -- ^ Generator options
+                  -> Options r       -- ^ Generator options
                   -> Boolean         -- ^ Can we skip input via fallbacks?
                   -> Int             -- ^ The current recursive depth
                   -> Parser (Tuple D.Branch (List ValueMapping))
-genBranchesParser xs term genOpts canSkip recDepth
+branchesP xs term options canSkip recDepth
   = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
     env   :: Env      <- ask
     state :: StateObj <- State.get
 
     let
       ps = xs <#> \x -> (Tuple x) <$> do
-                          genBranchParser x genOpts canSkip recDepth
+                          branchP x options canSkip recDepth
                             <* unless (not term) eof
       rs  = fst $ evalRWS (collect s ps) env initialState
       rs' = reverse rs
@@ -395,13 +395,13 @@ genBranchesParser xs term genOpts canSkip recDepth
       o.result
 
 -- | Generate a parser for a single usage branch
-genBranchParser :: forall r
-                 . D.Branch        -- ^ The branch to match
-                -> GenOptionsObj r -- ^ Generator options
-                -> Boolean         -- ^ Can we skip input via fallbacks?
-                -> Int             -- ^ The current recursive depth
+branchP :: forall r
+                 . D.Branch  -- ^ The branch to match
+                -> Options r -- ^ Generator options
+                -> Boolean   -- ^ Can we skip input via fallbacks?
+                -> Int       -- ^ The current recursive depth
                 -> Parser (List ValueMapping)
-genBranchParser xs genOpts canSkip recDepth = do
+branchP xs options canSkip recDepth = do
   modifyDepth (const 0) -- reset the depth counter
   either
     (\_   -> P.fail "Failed to generate parser")
@@ -456,7 +456,7 @@ genBranchParser xs genOpts canSkip recDepth = do
           -- Generate the parser for the argument `p`. For groups, temporarily
           -- set the required flag to "true", such that it will fail and we have
           -- a chance to retry as part of the exhaustive parsing mechanism
-          r <- P.try $ genParser (D.setRequired p true) false
+          r <- P.try $ argP (D.setRequired p true) false
 
           r' <- P.try do
                   if (D.isRepeatable p &&
@@ -564,7 +564,7 @@ genBranchParser xs genOpts canSkip recDepth = do
     -- Any other argument causes immediate evaluation
     step (Free p) x = Right $ Free do
       r  <- p
-      rs <- genParser x false
+      rs <- argP x false
       pure $ r <> rs
 
     -- Options always keep accumulating
@@ -580,7 +580,7 @@ genBranchParser xs genOpts canSkip recDepth = do
       Free do
         r   <- p
         rs  <- genExhaustiveParser xs true
-        rss <- genParser y true
+        rss <- argP y true
         pure $ r <> rs <> rss
 
     -- Terminate the parser at the given argument and collect all subsequent
@@ -601,12 +601,12 @@ genBranchParser xs genOpts canSkip recDepth = do
         }
 
     -- Parser generator for a single `Argument`
-    genParser :: D.Argument -- ^ The argument to generate a parser for
+    argP :: D.Argument -- ^ The argument to generate a parser for
               -> Boolean    -- ^ Can we skip input via fallbacks?
               -> Parser (List ValueMapping)
 
     -- Generate a parser for a `Command` argument
-    genParser x@(D.Command cmd) _ = do
+    argP x@(D.Command cmd) _ = do
       debugParsing x
       i <- getInput
       (do
@@ -621,7 +621,7 @@ genBranchParser xs genOpts canSkip recDepth = do
                       <* modifyDepth (_ + 1)
 
     -- Generate a parser for a `EOA` argument
-    genParser x@(D.EOA) _ = do
+    argP x@(D.EOA) _ = do
       debugParsing x
       singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> (do
         eoa <|> (pure $ ArrayValue []) -- XXX: Fix type
@@ -629,7 +629,7 @@ genBranchParser xs genOpts canSkip recDepth = do
       ) <|> P.fail "Expected \"--\""
 
     -- Generate a parser for a `Stdin` argument
-    genParser x@(D.Stdin) _ = do
+    argP x@(D.Stdin) _ = do
       debugParsing x
       singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> (do
         stdin
@@ -637,12 +637,12 @@ genBranchParser xs genOpts canSkip recDepth = do
       ) <|> P.fail "Expected \"-\""
 
     -- Terminate parsing at first positional argument
-    genParser x@(D.Positional pos) _
-      | pos.repeatable && genOpts.optionsFirst
+    argP x@(D.Positional pos) _
+      | pos.repeatable && options.optionsFirst
       = terminate x true
 
     -- Generate a parser for a `Positional` argument
-    genParser x@(D.Positional pos) _ = do
+    argP x@(D.Positional pos) _ = do
       debugParsing x
       i <- getInput
       (do
@@ -657,8 +657,8 @@ genBranchParser xs genOpts canSkip recDepth = do
                       <* modifyDepth (_ + 1)
 
     -- Terminate at singleton groups that house only positionals.
-    genParser x@(D.Group grp) _
-      | genOpts.optionsFirst && (length grp.branches == 1) &&
+    argP x@(D.Group grp) _
+      | options.optionsFirst && (length grp.branches == 1) &&
         all (\xs ->
           case xs of
             Cons (D.Positional pos) Nil -> pos.repeatable || grp.repeatable
@@ -667,15 +667,15 @@ genBranchParser xs genOpts canSkip recDepth = do
       = terminate (LU.head (LU.head grp.branches)) true
 
     -- Terminate at option if part of 'stopAt'
-    genParser x@(D.Option o) _ |
+    argP x@(D.Option o) _ |
       let names = A.catMaybes [ ("--" ++ _) <$> o.name
                               , ("-"  ++ _) <<< fromChar <$> o.flag
                               ]
-       in any (_ `elem` genOpts.stopAt) names
+       in any (_ `elem` options.stopAt) names
       = terminate x false
 
     -- Generate a parser for a `Option` argument
-    genParser x@(D.Option o) _ = (do
+    argP x@(D.Option o) _ = (do
       debugParsing x
       do
         if o.repeatable
@@ -739,7 +739,7 @@ genBranchParser xs genOpts canSkip recDepth = do
           mkSoptParser Nothing _  = P.fail "flag"
 
     -- Generate a parser for an argument `Group`
-    genParser x@(D.Group grp) canSkip = do
+    argP x@(D.Group grp) canSkip = do
       debugParsing x
       if grp.optional
         then P.option mempty $ P.try go
@@ -756,12 +756,12 @@ genBranchParser xs genOpts canSkip recDepth = do
               else pure x
 
         step = snd <$> do
-                genBranchesParser grp.branches
-                                  false
-                                  genOpts
-                                  -- always allow skipping for non-free groups.
-                                  (not (D.isFree x) || canSkip)
-                                  (recDepth + 1)
+                branchesP grp.branches
+                          false
+                          options
+                          -- always allow skipping for non-free groups.
+                          (not (D.isFree x) || canSkip)
+                          (recDepth + 1)
 
     butGot :: List PositionedToken -> String
     butGot (Cons (PositionedToken { source }) _) = ", but got " <> source

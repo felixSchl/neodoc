@@ -32,7 +32,7 @@ import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.Env (Env())
-import Language.Docopt.Compiler (genParser, runParser)
+import Language.Docopt.Compiler (run) as Compiler
 import Language.Docopt.Argument   as D
 import Language.Docopt.Env        as Env
 import Language.Docopt.Trans.Flat as T
@@ -686,11 +686,11 @@ parserGenSpec = \_ -> describe "The parser generator" do
                             -> Either String (StrMap Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate spec argv env options expected = do
-        let result = uncurry (T.reduce spec env)
-                <$> runParser
-                      env
-                      argv
-                      (genParser spec (fromMaybe defaultOptions options))
+        let result = uncurry (T.reduce spec env) <$> do
+                      Compiler.run spec
+                                   env
+                                   argv
+                                   (fromMaybe defaultOptions options)
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->
