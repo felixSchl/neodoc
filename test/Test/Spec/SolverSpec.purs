@@ -178,6 +178,7 @@ solverSpec = \_ ->
                 ])
                 "Stacked option -f may not specify arguments"
         ]
+
     , test ([ u [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
         [ pass  ([ DE.opt (DE.fname 'f' "file")
                             (Just $ DE.arg "FILE" false (Just (StringValue "foo")))

@@ -7,10 +7,11 @@ module Language.Docopt.RichValue (
 , setOrigin
 , getValue
 , getOrigin
+, prettyPrintRichValue
 ) where
 
 import Prelude
-import Language.Docopt.Value (Value())
+import Language.Docopt.Value (Value(), prettyPrintValue)
 import Language.Docopt.Origin (Origin())
 
 -- | The value type the parser collects
@@ -48,3 +49,7 @@ instance eqRichValue :: Eq RichValue where
 from :: Origin -> Value -> RichValue
 from o v = RichValue $ { value: v, origin: o }
 
+prettyPrintRichValue :: RichValue -> String
+prettyPrintRichValue (RichValue v) = prettyPrintValue v.value
+                                      <> " "
+                                      <> "(" <> show v.origin <> ")"

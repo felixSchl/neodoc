@@ -17,9 +17,12 @@ module Language.Docopt.Argument (
   , takesArgument
   , getArgument
   , isOption
+  , isGroup
   , isFlag
   , isCommand
   , isFree
+  , eqTypes
+  , isOptional
   , module OptionReexport
   ) where
 
@@ -105,6 +108,19 @@ instance eqArgument :: Eq Argument where
   eq (Option o)       (Option o')       = O.eqOptionObj o o'
   eq _                _                 = false
 
+eqTypes :: Argument -> Argument -> Boolean
+eqTypes (EOA)          (EOA)            = true
+eqTypes (Stdin)        (Stdin)          = true
+eqTypes (Command _)    (Command _)      = true
+eqTypes (Positional _) (Positional _)   = true
+eqTypes (Group _)      (Group _)        = true
+eqTypes (Option _)     (Option _)       = true
+eqTypes _              _                = false
+
+isOptional :: Argument -> Boolean
+isOptional (Group g) = g.optional
+isOptional _         = false
+
 prettyPrintBranch :: Branch -> String
 prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
 
@@ -189,11 +205,15 @@ isPositional :: Argument -> Boolean
 isPositional (Positional _) = true
 isPositional _              = false
 
+isGroup :: Argument -> Boolean
+isGroup (Group _) = true
+isGroup _         = false
+
 isOption :: Argument -> Boolean
 isOption (Option _) = true
 isOption _          = false
 
 isFree :: Argument -> Boolean
 isFree (Option _) = true
-isFree (Group g)  = all (all isFree) g.branches
+isFree (Group g)  = true -- all (all isFree) g.branches
 isFree _          = false

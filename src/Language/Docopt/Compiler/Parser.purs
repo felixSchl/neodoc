@@ -17,19 +17,18 @@ module Language.Docopt.Compiler.Parser (
 import Prelude
 import Control.Monad.RWS (RWS(), evalRWS)
 import Control.Plus (empty)
-import Control.Bind ((=<<))
 import Debug.Trace
 import Control.Apply ((<*), (*>))
 import Data.Function (on)
-import Data.Bifunctor
-import Data.Either (Either(..), either, isRight)
+import Data.Bifunctor (bimap, lmap, rmap)
+import Data.Either (Either(Right, Left))
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
-import Data.List (List(..), foldM, reverse, singleton, concat, length, (:),
+import Data.List (List(..), reverse, singleton, concat, length, (:),
                   some, filter, head, fromList, sortBy, groupBy, last, null,
-                  tail)
+                  tail, many)
 import Data.List.Lazy (take, repeat, fromList) as LL
 import Control.Alt ((<|>))
-import Data.Traversable (traverse)
+import Data.Traversable (traverse, for)
 import Control.Lazy (defer)
 import Control.Monad (when, unless)
 import Control.MonadPlus (guard)
@@ -48,14 +47,13 @@ import Control.Monad.Trans (lift)
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), fail,
                             parseFailedFatal, parseFailed, unParserT, fatal) as P
-import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>)) as P
-import Text.Parsing.Parser.Pos (Position, initialPos) as P
+import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>), choice) as P
+import Text.Parsing.Parser.Pos (Position) as P
 
 import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 prettyPrintArg, prettyPrintArgNaked,
-                                hasEnvBacking, getArgument, hasDefault,
-                                isRepeatable, isFlag, setRequired,
-                                OptionArgumentObj()
+                                isRepeatable, OptionArgumentObj(),
+                                setRequired, isOptional, isGroup
                                 ) as D
 import Language.Docopt.Usage (Usage, runUsage) as D
 import Language.Docopt.Env (Env ())
@@ -64,10 +62,10 @@ import Language.Docopt.Origin as Origin
 import Language.Docopt.Origin (Origin())
 import Language.Docopt.Value as Value
 import Language.Docopt.Value (Value(..))
-import Language.Docopt.RichValue (RichValue(..), unRichValue)
-import Language.Docopt.RichValue (from, setValue, getOrigin) as RValue
+import Language.Docopt.RichValue (RichValue(..), unRichValue, prettyPrintRichValue)
+import Language.Docopt.RichValue (from, getOrigin) as RValue
 import Language.Docopt.Parser.Base (getInput)
-import Language.Docopt.Compiler.Token as Token
+import Language.Docopt.Compiler.Token (getSource) as Token
 import Language.Docopt.Compiler.Token (PositionedToken(..), Token(..),
                                         unPositionedToken, prettyPrintToken)
 import Data.String.Ext (startsWith)
@@ -80,7 +78,7 @@ debug = false
 type ValueMapping = Tuple D.Argument RichValue
 
 -- | The stateful parser type
-type StateObj = { depth :: Int }
+type StateObj = { depth :: Int, done :: Boolean }
 
 -- | The CLI parser
 type Parser a = P.ParserT (List PositionedToken)
@@ -88,10 +86,13 @@ type Parser a = P.ParserT (List PositionedToken)
                           a
 
 initialState :: StateObj
-initialState = { depth: 0 }
+initialState = { depth: 0, done: false }
 
 modifyDepth :: (Int -> Int) -> Parser Unit
 modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
+
+markDone :: Parser Unit
+markDone = lift (State.modify \s -> s { done = true })
 
 -- | The options for generating a parser
 type Options r = {
@@ -124,10 +125,6 @@ token test = P.ParserT $ \(P.PState { input: toks, position: ppos }) ->
         Nothing -> P.parseFailed toks ppos "a better error message!"
     _ -> P.parseFailed toks ppos "Expected token, met EOF"
 
-data Acc a
-  = Free (Parser a)
-  | Pending (Parser a) (List D.Argument)
-
 eoa :: Parser Value
 eoa = token go P.<?> "--"
   where
@@ -147,7 +144,7 @@ positional n = token go P.<?> "positional argument " <> show n
     go _       = Nothing
 
 stdin :: Parser Value
-stdin = token go P.<?> "stdin flag"
+stdin = token go P.<?> "-"
   where
     go Stdin = Just (BoolValue true)
     go _     = Nothing
@@ -300,65 +297,445 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
               Stdin      -> "Unmatched option: -"
               Lit _      -> "Unmatched command: " <> source
 
-
--- | Generate a parser for a program specification.
-spec :: forall r
-     . List D.Usage -- ^ The list of usage branches
-    -> Options r    -- ^ Generator options
-    -> Parser (Tuple D.Branch (List ValueMapping))
+-- | Parse user input against a program specification.
+spec
+  :: forall r
+   . List D.Usage -- ^ the list of usage branches
+  -> Options r    -- ^ generator options
+  -> Parser (Tuple D.Branch (List ValueMapping))
 spec xs options = do
-    branchesP (concat $ D.runUsage <$> xs)
-              true
-              options
-              true
-              0
+  let
+    -- Create a parser for each usage line.
+    parsers
+      = (concat $ D.runUsage <$> xs) <#> \branch -> do
+          vs <- exhaustP options true false 0 branch
+          pure (Tuple branch vs)
+          <* eof
 
--- | Generate a parser that selects the best branch it parses and
--- | fails if no branch was parsed.
-branchesP :: forall r
-                   . List D.Branch   -- ^ The branches to test
-                  -> Boolean         -- ^ Expect EOF after each branch
-                  -> Options r       -- ^ Generator options
-                  -> Boolean         -- ^ Can we skip input via fallbacks?
-                  -> Int             -- ^ The current recursive depth
-                  -> Parser (Tuple D.Branch (List ValueMapping))
-branchesP xs term options canSkip recDepth
-  = P.ParserT \(s@(P.PState { input: i, position: pos })) -> do
+  -- Evaluate the parsers, selecting the result with the most
+  -- non-substituted values.
+  evalParsers parsers \(Tuple _ vs) ->
+    sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+
+-- Parse a list of arguments.
+-- Take care of clumping free vs. non-free (fixed) arguments.
+exhaustP
+  :: forall r
+   . Options r       -- ^ generator options
+  -> Boolean         -- ^ can we skip using fallback values?
+  -> Boolean         -- ^ are we currently skipping using fallback values?
+  -> Int             -- ^ recursive level
+  -> List D.Argument -- ^ the list of arguments to parse
+  -> Parser (List ValueMapping)
+exhaustP options skippable isSkipping l xs = do
+  _debug \_->
+       "exhaustP: "     <> (intercalate " " $ D.prettyPrintArg <$> xs)
+    <> ", skippable: "  <> show skippable
+    <> ", isSkipping: " <> show isSkipping
+
+  concat <$>
+    for (clump xs)
+        (clumpP options
+                skippable
+                isSkipping
+                l)
+
+  where
+  _debug s = if debug
+                then traceA $ indentation <> (s unit)
+                else pure unit
+  indentation :: String
+  indentation = fromCharArray $ LL.fromList $ LL.take (l * 4) $ LL.repeat ' '
+
+data Clump a = Free a | Fixed a
+
+instance showClump :: (Show a) => Show (Clump a) where
+  show (Fixed a) = "Fixed " <> show a
+  show (Free  a) = "Free "  <> show a
+
+isFree :: forall a. Clump a -> Boolean
+isFree (Free _) = true
+isFree _        = false
+
+prettyPrintArgClump :: Clump (List D.Argument) -> String
+prettyPrintArgClump (Fixed xs) = "Fixed " <> (intercalate " " $ D.prettyPrintArg <$> xs)
+prettyPrintArgClump (Free  xs) = "Free "  <> (intercalate " " $ D.prettyPrintArg <$> xs)
+
+-- Clump together arguments to aid parsing "invisible" subgroups, where
+-- arguments may appear in any order, for example. "Fixed" argument lists
+-- are parsed in fixed order, whereas "Free" argument lists, can be parsed in
+-- any order.
+clump
+  :: List D.Argument -- ^ the list of arguments to clump
+  -> List (Clump (List D.Argument))
+clump xs = reverse $ foldl go Nil xs
+  where
+  go (Nil) x = pure $ (if D.isFree x then Free else Fixed) $ singleton x
+  go   (Cons (Free a)  zs) x | D.isFree x = (Free (a ++ (singleton x))) : zs
+  go u@(Cons (Free _)   _) x = (Fixed $ singleton x) : u
+  go u@(Cons (Fixed _)  _) x | D.isFree x = (Free $ singleton x): u
+  go   (Cons (Fixed a) zs) x = (Fixed (a ++ (singleton x))) : zs
+
+data Required a = Required a | Optional a
+
+unRequired :: forall a. Required a -> a
+unRequired (Required a) = a
+unRequired (Optional a) = a
+
+isRequired :: forall a. Required a -> Boolean
+isRequired (Required _) = true
+isRequired _            = false
+
+toOptional :: forall a. Required a -> Required a
+toOptional (Required a) = Optional a
+toOptional (Optional a) = Optional a
+
+prettyPrintRequiredArg :: Required D.Argument -> String
+prettyPrintRequiredArg (Required x) = "Required " <> D.prettyPrintArg x
+prettyPrintRequiredArg (Optional x) = "Optional " <> D.prettyPrintArg x
+
+-- Parse a clump of arguments.
+clumpP
+  :: forall r
+   . Options r               -- ^ the parsing options
+  -> Boolean                 -- ^ can we skip using fallback values?
+  -> Boolean                 -- ^ are we currently skipping using fallback values?
+  -> Int                     -- ^ recursive level
+  -> Clump (List D.Argument) -- ^ the clumps of arguments to parse.
+  -> Parser (List ValueMapping)
+clumpP options skippable isSkipping l c = do
+
+  i <- getInput
+  _debug \_->
+       "parsing clump: " <> prettyPrintArgClump c
+    <> ", skippable: "   <> show skippable
+    <> ", isSkipping: "  <> show isSkipping
+    <> ", input: "       <> show (intercalate " " $ Token.getSource <$> i)
+
+  go skippable isSkipping l c
+  where
+  go _         _          l (Fixed xs) = concat <$> for xs (argP' options false false l)
+  go skippable isSkipping l (Free  xs) = draw (Required <$> xs) (length xs)
+    where
+
+    draw :: List (Required D.Argument) -> Int -> Parser (List ValueMapping)
+
+    -- Recursively apply each argument parser.
+    -- Should an argument be repeatable, try parsing any adjacent matches
+    -- repeatedly (NOTE: this could interfere with `argP`'s repetition handling?)
+    draw xss@(Cons x xs) n | n >= 0 = (do
+
+      i <- getInput
+      _debug \_->
+           "draw: "         <> (intercalate " " $ prettyPrintRequiredArg <$> xss)
+        <> ", n: "          <> show n
+        <> ", skippable: "  <> show skippable
+        <> ", isSkipping: " <> show isSkipping
+        <> ", input: "      <> show (intercalate " " $ Token.getSource <$> i)
+
+      -- Try parsing the argument 'x'. If 'x' fails, enqueue it for a later try.
+      -- Should 'x' fail and should 'x' be skippable (i.e. it defines a default
+      -- value or is backed by an environment variable), substitute x.
+      -- For groups, temporarily set the required flag to "true", such that it
+      -- will fail and we have a chance to retry as part of the exhaustive
+      -- parsing mechanism.
+
+      let
+        arg = unRequired x
+        mod = if isRequired x then id else P.option Nil
+
+      -- parse the next argument. failure will cause the argument to be put at
+      -- the back of the queue and the number of retries to be cut down by one.
+      vs <- P.try do
+              mod do
+                argP' options     -- the parsing options
+                      isSkipping  -- propagate the 'isSkipping' property
+                      false       -- reset 'isSkipping' to false
+                      (l + 1)     -- increase the recursive level
+                      (D.setRequired arg true)
+
+      _debug \_->
+        "draw: matched: " <> (intercalate ", " $
+          (vs) <#> \(Tuple k v) ->
+            D.prettyPrintArg k <> " => " <> prettyPrintRichValue v
+        )
+
+      vss <- P.try do
+        if (D.isRepeatable arg &&
+          length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
+            then do
+              _debug \_->
+                "draw: repeating as optional: "
+                  <> D.prettyPrintArg arg
+              -- Make successive matches of this repeated group optional.
+              draw (xs <> pure (toOptional x)) (length xss)
+            else draw xs (length xs)
+
+      _debug \_->
+        "draw: matched (2): " <> (intercalate ", " $
+          (vs <> vss) <#> \(Tuple k v) ->
+            D.prettyPrintArg k <> " => " <> prettyPrintRichValue v
+        )
+
+      pure (vs <> vss)
+    ) <|> (defer \_ -> do
+      _debug \_->
+           "draw: failure"
+        <> ", requeueing: "  <> prettyPrintRequiredArg x
+      draw (xs <> singleton x) (n - 1)
+    )
+
+    -- All options have been matched (or have failed to be matched) at least
+    -- once by now. See where we're at - is there any required option that was
+    -- not matched at all?
+    draw xss n | (length xss > 0) && (n < 0) = do
+
+      i <- getInput
+      _debug \_->
+           "draw: edge-case"
+        <> ", left-over: "  <> (intercalate " " $ prettyPrintRequiredArg <$> xss)
+        <> ", n: "          <> show n
+        <> ", skippable: "  <> show skippable
+        <> ", isSkipping: " <> show isSkipping
+        <> ", input: "      <> show (intercalate " " $ Token.getSource <$> i)
+
+      env <- lift ask
+
+      let
+        vs = xss <#> \x -> do
+          let arg = unRequired x
+          maybe
+            (Left x)
+            (Right <<< Tuple x)
+            do
+              v <- unRichValue <$> getFallbackValue env arg
+              pure $ RichValue v {
+                value = if D.isRepeatable arg
+                    then ArrayValue $ Value.intoArray v.value
+                    else v.value
+              }
+        missing = filter (\x ->
+          let arg = unRequired x
+           in isRequired x &&
+              -- This may look very counter-intuitive, yet getting fallback
+              -- values for entire groups is not possible and not logical.
+              -- If a group that is allowed to be omitted fails, there won't
+              -- be any values to fall back onto.
+              not (D.isGroup arg && D.isOptional arg)
+        ) (mlefts vs)
+        fallbacks = mrights vs
+
+      _debug \_->
+           "draw: missing:" <> (intercalate " " $ prettyPrintRequiredArg <$> missing)
+
+      if isSkipping && length missing > 0
+        then
+          P.fail $
+            "Expected "
+              <> intercalate ", "
+                  (D.prettyPrintArgNaked <<< unRequired <$> missing)
+        else
+          if skippable || null i
+            then do
+              if not isSkipping
+                then exhaustP options true true l (unRequired <$> xss)
+                else pure ((unRequired `lmap` _) <$> fallbacks)
+            else
+              P.fail $
+                "Expected "
+                  <> intercalate ", "
+                      (D.prettyPrintArgNaked <<< unRequired <$> xss)
+
+    draw _ _ = pure Nil
+
+  _debug s = if debug
+                then traceA $ indentation <> (s unit)
+                else pure unit
+  indentation :: String
+  indentation = fromCharArray $ LL.fromList $ LL.take (l * 4) $ LL.repeat ' '
+
+-- Parse a single argument from argv.
+argP'
+  :: forall r
+   . Options r
+  -> Boolean    -- ^ can we skip using fallback values?
+  -> Boolean    -- ^ are we currently skipping using fallback values?
+  -> Int        -- ^ recursive level
+  -> D.Argument -- ^ the argument to parse
+  -> Parser (List ValueMapping)
+argP' options skippable isSkipping l x = do
+  state :: StateObj <- lift State.get
+  if state.done
+     then pure Nil
+     else argP options skippable isSkipping l x
+
+-- Parse a single argument from argv.
+argP
+  :: forall r
+   . Options r
+  -> Boolean    -- ^ can we skip using fallback values?
+  -> Boolean    -- ^ are we currently skipping using fallback values?
+  -> Int        -- ^ recursive level
+  -> D.Argument -- ^ the argument to parse
+  -> Parser (List ValueMapping)
+
+-- Terminate at singleton groups that house only positionals.
+argP options _ _ _ x@(D.Group (grp@{ branches: Cons branch Nil }))
+  | options.optionsFirst &&
+      case branch of
+        Cons (D.Positional pos) Nil -> pos.repeatable || grp.repeatable
+        _                           -> false
+  = terminate (LU.head branch) true
+
+-- Terminate at option if part of 'stopAt'
+argP options _ _ _ x@(D.Option o) |
+  let names = A.catMaybes [ ("--" ++ _) <$> o.name
+                          , ("-"  ++ _) <<< fromChar <$> o.flag
+                          ]
+    in any (_ `elem` options.stopAt) names
+  = terminate x false
+
+-- The recursive branch of the argv argument parser.
+-- For groups, each branch is run and analyzed.
+argP options skippable isSkipping l g@(D.Group grp) = do
+  -- Create a parser for each branch in the group
+  let parsers = exhaustP options skippable isSkipping l <$> grp.branches
+
+  -- Evaluate the parsers, selecting the result with the most
+  -- non-substituted values.
+  vs <- (if grp.optional then P.option Nil else id) do
+    evalParsers parsers (\vs ->
+      sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+    )
+
+  vss <- if (grp.repeatable &&
+          length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
+            then loop Nil
+            else pure Nil
+
+  pure $ vs <> vss
+
+  where
+    loop acc = do
+      vs <- argP' options skippable isSkipping l (D.Group grp {  optional = true })
+      if (length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
+        then loop $ acc <> vs
+        else pure acc
+
+argP options _ _ _ x@(D.Positional pos)
+  | pos.repeatable && options.optionsFirst = terminate x true
+
+-- The non-recursive branch of the argv argument parser.
+-- All of these parsers consume one or more adjacent arguments from argv.
+argP _ _ _ _ x = getInput >>= \i -> (
+  (if D.isRepeatable x then some else liftM1 singleton) do
+    Tuple x <<< (RValue.from Origin.Argv) <$> do
+      P.ParserT \s -> do
+        o <- P.unParserT (go x) s
+
+        -- Check error messages for fatal errors.
+        -- XXX: This should also change.
+        case o.result of
+          (Left e) -> do
+            let err = unParseError e
+            if ((startsWith "Option takes no argument" err.message)
+             || (startsWith "Option requires argument" err.message))
+              then do
+                pure $ o {
+                  result = Left $ P.ParseError $ err {
+                    fatal = true
+                  }
+                }
+              else pure o
+          otherwise -> pure o
+    <* modifyDepth (_ + 1)
+  ) <|> P.fail ("Expected " <> D.prettyPrintArg x <> butGot i)
+
+  where
+  go (D.Positional pos) = positional pos.name
+  go (D.Command    cmd) = command    cmd.name
+  go (D.Stdin         ) = stdin
+  go (D.EOA           ) = eoa <|> (pure $ ArrayValue [])
+  go (D.Option       o) = do
+    -- Perform a pre-cursory test in order to capture relevant error
+    -- messags which would otherwise be overriden (e.g. a meaningful
+    -- error message when trying to match a LOpt against a LOpt would
+    -- be overridden by a meaningless try to match a SOpt against a
+    -- a LOpt).
+    isLoptAhead <- P.option false (P.lookAhead $ P.try $ token isAnyLopt)
+    isSoptAhead <- P.option false (P.lookAhead $ P.try $ token isAnySopt)
+
+    case o.name of
+      Just n  | isLoptAhead -> longOption n o.arg
+      otherwise ->
+        case o.flag of
+          Just c | isSoptAhead -> shortOption c o.arg
+          otherwise -> do
+            P.fail "Expected long or short option"
+    where
+    isAnyLopt (LOpt _ _)   = pure true
+    isAnyLopt _            = pure false
+    isAnySopt (SOpt _ _ _) = pure true
+    isAnySopt _            = pure false
+
+  butGot (Cons (PositionedToken { source }) _) = ", but got " <> source
+  butGot Nil                                   = ""
+
+-- Evaluate multiple parsers, producing a new parser that chooses the best
+-- succeeding match or none.
+evalParsers
+  :: forall a b
+   . (Show a, Ord b)
+  => List (Parser a)
+  -> (a -> b)
+  -> Parser a
+evalParsers parsers p = do
+  P.ParserT \(pState@(P.PState { input: i, position: pos })) -> do
     env   :: Env      <- ask
     state :: StateObj <- State.get
 
     let
-      ps = xs <#> \x -> (Tuple x) <$> do
-                          branchP x options canSkip recDepth
-                            <* unless (not term) eof
-      rs  = fst $ evalRWS (collect s ps) env initialState
-      rs' = reverse rs
+      -- Run each parser in the underlying monad and capture any errors
+      -- that occur as well as the result. This essentially circumvents
+      -- `ParserT`'s bind instance.
+      collect = for parsers \parser -> do
+        -- reset the depth for every branch
+        o <- P.unParserT (modifyDepth (const 0) *> parser) pState
+        state' :: StateObj <- State.get
+        pure $ bimap
+          (\e -> o { result = { error: e, depth: state'.depth + state.depth } })
+          (\r -> o { result = { value: r, depth: state'.depth + state.depth } })
+          o.result
 
-      -- Evaluate the winning candidates, if any.
-      -- First, sort the positive results by their depth, then group consecutive
-      -- elements, take the highest element and sort the inner values by their
-      -- fallback score.
-      winner =
-          maximumBy (compare `on`
-                      (((_.origin <<< unRichValue <<< snd) <$> _) <<< snd
-                        <<< _.value <<< _.result)) =<< do
-                          last $ groupBy (eq `on` (_.depth <<< _.result))
-                                  (sortBy (compare `on` (_.depth <<< _.result))
-                                          (mrights rs'))
+      -- Evaluate the parsers.
+      results    = fst $ evalRWS collect env initialState
+      successes  = mrights results
+      successes' = reverse successes
+      failures   = mlefts results
 
-      failures = mlefts rs
+      -- Evaluate any failed parses
+      losers = last
+        $ groupBy (eq `on` (_.depth <<< _.result))
+                  (sortBy (compare `on` (_.depth <<< _.result))
+                          failures)
 
-      -- Evaluate the losing candidates, if any.
-      losers =
-          last $ groupBy (eq `on` (_.depth <<< _.result))
-                         (sortBy (compare `on` (_.depth <<< _.result))
-                                 failures)
+      -- Check for any fatal errors. These must take priority!
+      -- The first fatal error to occur takes priority.
+      fatal = head
+        $ filter (\x -> _.fatal $ unParseError (x.result.error))
+                  failures
 
-      fatal = last $ filter (\x ->
-                let err = unParseError (x.result.error)
-                 in err.fatal
-                ) failures
+      -- Evaluate any winning candidates.
+      -- First, sort the results by their depth, then group consecutive
+      -- elements, take the highest element and sort the inner values by using
+      -- the user provided function.
+      winner = do
+        x <- last $ groupBy (eq `on` (_.depth <<< _.result))
+                        (sortBy (compare `on` (_.depth <<< _.result))
+                                successes')
+        maximumBy (compare `on` (\y -> p y.result.value)) x
 
+    -- Finally, evaluate the results!
     maybe
       (do
         maybe'
@@ -384,400 +761,65 @@ branchesP xs term options canSkip recDepth
       )
       fatal
 
-  where
-  fixMessage m = m
-  collect s ps = ps `flip traverse` \p -> do
-    o                 <- P.unParserT p s
-    state :: StateObj <- State.get
-    pure $ bimap
-      (\e -> o { result = { error: e, depth: state.depth } })
-      (\r -> o { result = { value: r, depth: state.depth } })
-      o.result
-
--- | Generate a parser for a single usage branch
-branchP :: forall r
-                 . D.Branch  -- ^ The branch to match
-                -> Options r -- ^ Generator options
-                -> Boolean   -- ^ Can we skip input via fallbacks?
-                -> Int       -- ^ The current recursive depth
-                -> Parser (List ValueMapping)
-branchP xs options canSkip recDepth = do
-  modifyDepth (const 0) -- reset the depth counter
-  either
-    (\_   -> P.fail "Failed to generate parser")
-    (\acc -> case acc of
-              Free p       -> p
-              Pending p xs -> do
-                r  <- p
-                rs <- genExhaustiveParser (reverse xs) canSkip
-                pure $ r <> rs
-    )
-    (foldM step (Free $ pure mempty) xs)
-  where
-
-    -- Given a list of arguments, try parse them all in any order.
-    -- The only requirement is that all input is consumed in the end.
-    genExhaustiveParser :: List D.Argument -- ^ The free arguments
-                        -> Boolean         -- ^ Can we skip input via fallbacks?
-                        -> Parser (List ValueMapping)
-    genExhaustiveParser Nil canSkip = pure mempty
-    genExhaustiveParser ps  canSkip = do
-      when debug do
-        pure unit -- prevent early execution of code below. PS bug?
-        traceA $
-          indentation <>
-          "genExhaustiveParser: "
-                <> (intercalate " " (D.prettyPrintArg <$> ps))
-                <> " - canSkip: " <>  show canSkip
-      draw ps (length ps) Nil
-
-      where
-        -- iterate over `ps` until a match `x` is found, then, recursively
-        -- apply `draw` until the parser fails, with a modified `ps`.
-        draw :: List D.Argument -- ^ the arguments to parse
-             -> Int             -- ^ the number of options left to parse
-             -> List D.Argument -- ^ the unique arguments parsed
-             -> Parser (List ValueMapping)
-
-        draw pss@(Cons p ps') n tot | n >= 0 = (do
-          when debug do
-            pure unit -- prevent early execution of code below. PS bug?
-            i <- getInput
-            traceA $
-              indentation <>
-              "draw: (" <> (D.prettyPrintArg p) <> ":"
-                        <> (intercalate ":" (D.prettyPrintArg <$> ps'))
-                        <>  ") - n: " <> show n
-                        <> " from input: "
-                        <> (intercalate " " (prettyPrintToken
-                                              <<< _.token
-                                              <<< unPositionedToken <$> i))
-
-          -- Generate the parser for the argument `p`. For groups, temporarily
-          -- set the required flag to "true", such that it will fail and we have
-          -- a chance to retry as part of the exhaustive parsing mechanism
-          r <- P.try $ argP (D.setRequired p true) false
-
-          r' <- P.try do
-                  if (D.isRepeatable p &&
-                      length (filter (snd >>> isFrom Origin.Argv) r) > 0)
-                        then do
-                          -- Make successive matches of this repeated
-                          -- group optional.
-                          draw ((D.setRequired p false):ps')
-                                (length pss)
-                                (p:tot)
-                        else draw ps' (length ps') (p:tot)
-
-          pure $ r <> r'
-        ) <|> (defer \_ -> draw (ps' <> singleton p) (n - 1) tot)
-
-        draw ps' n tot | (length ps' > 0) && (n < 0) = do
-          env :: StrMap String <- lift ask
-
-          i <- getInput
-          let
-            vs = ps' <#> \o ->
-              maybe
-                (Left o)
-                (Right <<< Tuple o)
-                do
-                  v <- unRichValue <$> do
-                    -- only allow "skipping" - that is auto-filling - values
-                    -- if we are either explicitly allowed to do so (i.e.
-                    -- the `canSkip` flag is set) or if we consumed all input
-                    guard (null i || canSkip || (length ps' < length ps))
-                    (getEnvValue env o <#> RValue.from Origin.Environment) <|>
-                    (getDefaultValue o <#> RValue.from Origin.Default)     <|>
-                    (getEmptyValue   o <#> RValue.from Origin.Empty)
-
-                  pure $ RichValue v {
-                    value = if D.isRepeatable o
-                        then ArrayValue $ Value.intoArray v.value
-                        else v.value
-                  }
-
-            missing   = filter (\o -> not ((null i || canSkip) &&
-                                  isSkippable o)) (mlefts vs)
-            fallbacks = mrights vs
-
-          if canSkip
-            then do
-              xs <- genExhaustiveParser missing false
-              pure $ fallbacks <> xs
-            else
-              if (length missing > 0)
-                then P.fail $
-                  "Expected option(s): "
-                    <> intercalate ", " (D.prettyPrintArgNaked <$> missing)
-                else pure fallbacks
-
-          where
-          isSkippable (D.Group grp)
-              = grp.optional || (all (all isSkippable) grp.branches)
-          isSkippable o = D.isRepeatable o && (any (_ == o) tot)
-
-          getEnvValue :: Env -> D.Argument -> Maybe Value
-          getEnvValue env (D.Option (o@{ env: Just k })) = do
-            StringValue <$> Env.lookup k env
-          getEnvValue _ _ = Nothing
-
-          getDefaultValue :: D.Argument -> Maybe Value
-          getDefaultValue (D.Option (o@{
-              arg: Just { default: Just v }
-            })) = pure if o.repeatable
-                            then ArrayValue $ Value.intoArray v
-                            else v
-          getDefaultValue _ = Nothing
-
-          getEmptyValue :: D.Argument -> Maybe Value
-          getEmptyValue = go
-            where
-            go (D.Option (o@{ arg: Nothing }))
-              = pure
-                  $ if o.repeatable then ArrayValue []
-                                    else BoolValue false
-            go (D.Option (o@{ arg: Just { optional: true } }))
-              = pure
-                  $ if o.repeatable then ArrayValue []
-                                    else BoolValue false
-            go (D.Stdin)                           = pure $ BoolValue false
-            go (D.EOA)                             = pure $ ArrayValue []
-            go (D.Positional pos) | pos.repeatable = pure $ ArrayValue []
-            go (D.Command cmd)    | cmd.repeatable = pure $ ArrayValue []
-            go _                                   = Nothing
-
-        draw _ _ _ = pure mempty
-
-    step :: Acc (List ValueMapping)
-         -> D.Argument
-         -> Either P.ParseError (Acc (List ValueMapping))
-
-    -- Options always transition to the `Pending state`
-    step (Free p) x@(D.Option _)
-      = pure $ Pending p (singleton x)
-
-    -- "Free" groups always transition to the `Pending state`
-    step (Free p) x@(D.Group _) | D.isFree x
-      = pure $ Pending p (singleton x)
-
-    -- Any other argument causes immediate evaluation
-    step (Free p) x = Right $ Free do
-      r  <- p
-      rs <- argP x false
-      pure $ r <> rs
-
-    -- Options always keep accumulating
-    step (Pending p xs) x@(D.Option _)
-      = pure $ Pending p (x:xs)
-
-    -- "Free" groups always keep accumulating
-    step (Pending p xs) x@(D.Group _) | D.isFree x
-      = pure $ Pending p (x:xs)
-
-    -- Any non-options always leaves the pending state
-    step (Pending p xs) y = Right $
-      Free do
-        r   <- p
-        rs  <- genExhaustiveParser xs true
-        rss <- argP y true
-        pure $ r <> rs <> rss
-
-    -- Terminate the parser at the given argument and collect all subsequent
-    -- values int an array ("options-first")
-    terminate arg includeSelf = do
-      input <- getInput
-      let rest = Tuple arg <<< (RValue.from Origin.Argv) <$> do
-                  StringValue <<< Token.getSource <$> do
-                    if includeSelf
+ -- Terminate the parser at the given argument and collect all subsequent
+-- values int an array ("options-first")
+terminate :: D.Argument -> Boolean -> Parser (List ValueMapping)
+terminate arg includeSelf = do
+  input <- getInput
+  let rest = Tuple arg <<< (RValue.from Origin.Argv) <$> do
+                StringValue <<< Token.getSource <$>
+                  if includeSelf
                        then input
                        else fromMaybe Nil (tail input)
-      P.ParserT \(P.PState { position: pos }) ->
-        pure {
-          consumed: true
-        , input:    Nil
-        , result:   pure rest
-        , position: pos
-        }
+  markDone
+  modifyDepth (const 99999)
+  P.ParserT \(P.PState { position: pos }) ->
+    pure {
+      consumed: true
+    , input:    Nil
+    , result:   pure rest
+    , position: pos
+    }
 
-    -- Parser generator for a single `Argument`
-    argP :: D.Argument -- ^ The argument to generate a parser for
-              -> Boolean    -- ^ Can we skip input via fallbacks?
-              -> Parser (List ValueMapping)
+-- Find a fallback value for the given argument.
+getFallbackValue :: Env -> D.Argument -> Maybe RichValue
+getFallbackValue env x = do
+  (fromEnv     x <#> RValue.from Origin.Environment) <|>
+  (fromDefault x <#> RValue.from Origin.Default)     <|>
+  (empty       x <#> RValue.from Origin.Empty)
 
-    -- Generate a parser for a `Command` argument
-    argP x@(D.Command cmd) _ = do
-      debugParsing x
-      i <- getInput
-      (do
-        if cmd.repeatable then (some go) else (singleton <$> go)
-      ) <|> (P.fail $ "Expected " <> D.prettyPrintArg x <> butGot i)
-        where go = do Tuple x <<< (RValue.from Origin.Argv) <$> (do
-                        v <- command cmd.name
-                        pure if cmd.repeatable
-                                then ArrayValue $ Value.intoArray v
-                                else v
-                      )
-                      <* modifyDepth (_ + 1)
+  where
+  fromEnv :: D.Argument -> Maybe Value
+  fromEnv (D.Option (o@{ env: Just k })) = StringValue <$> Env.lookup k env
+  fromEnv _                              = Nothing
 
-    -- Generate a parser for a `EOA` argument
-    argP x@(D.EOA) _ = do
-      debugParsing x
-      singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> (do
-        eoa <|> (pure $ ArrayValue []) -- XXX: Fix type
-        <* modifyDepth (_ + 1)
-      ) <|> P.fail "Expected \"--\""
+  fromDefault :: D.Argument -> Maybe Value
+  fromDefault (D.Option (o@{ arg: Just { default: Just v } }))
+    = pure if o.repeatable
+              then ArrayValue $ Value.intoArray v
+              else v
+  fromDefault _ = Nothing
 
-    -- Generate a parser for a `Stdin` argument
-    argP x@(D.Stdin) _ = do
-      debugParsing x
-      singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> (do
-        stdin
-        <* modifyDepth (_ + 1)
-      ) <|> P.fail "Expected \"-\""
+  empty :: D.Argument -> Maybe Value
+  empty = go
+    where
+    go (D.Option (o@{ arg: Nothing }))
+      = pure
+          $ if o.repeatable then ArrayValue []
+                            else BoolValue false
+    go (D.Option (o@{ arg: Just { optional: true } }))
+      = pure
+          $ if o.repeatable then ArrayValue []
+                            else BoolValue false
+    go (D.Stdin)                           = pure $ BoolValue false
+    go (D.EOA)                             = pure $ ArrayValue []
+    go (D.Positional pos) | pos.repeatable = pure $ ArrayValue []
+    go (D.Command cmd)    | cmd.repeatable = pure $ ArrayValue []
+    go _                                   = Nothing
 
-    -- Terminate parsing at first positional argument
-    argP x@(D.Positional pos) _
-      | pos.repeatable && options.optionsFirst
-      = terminate x true
 
-    -- Generate a parser for a `Positional` argument
-    argP x@(D.Positional pos) _ = do
-      debugParsing x
-      i <- getInput
-      (do
-        if pos.repeatable then (some go) else (singleton <$> go)
-      ) <|> P.fail ("Expected " <> D.prettyPrintArg x <> butGot i)
-        where go = do Tuple x <<< (RValue.from Origin.Argv) <$> (do
-                        v <- positional pos.name
-                        pure if pos.repeatable
-                                then ArrayValue $ Value.intoArray v
-                                else v
-                        )
-                      <* modifyDepth (_ + 1)
-
-    -- Terminate at singleton groups that house only positionals.
-    argP x@(D.Group grp) _
-      | options.optionsFirst && (length grp.branches == 1) &&
-        all (\xs ->
-          case xs of
-            Cons (D.Positional pos) Nil -> pos.repeatable || grp.repeatable
-            _                           -> false
-        ) grp.branches
-      = terminate (LU.head (LU.head grp.branches)) true
-
-    -- Terminate at option if part of 'stopAt'
-    argP x@(D.Option o) _ |
-      let names = A.catMaybes [ ("--" ++ _) <$> o.name
-                              , ("-"  ++ _) <<< fromChar <$> o.flag
-                              ]
-       in any (_ `elem` options.stopAt) names
-      = terminate x false
-
-    -- Generate a parser for a `Option` argument
-    argP x@(D.Option o) _ = (do
-      debugParsing x
-      do
-        if o.repeatable
-           then some          go
-           else singleton <$> go
-      <* modifyDepth (_ + 1)
-      )
-        where
-          go = do
-            -- Perform a pre-cursory test in order to capture relevant error
-            -- messags which would otherwise be overriden (e.g. a meaningful
-            -- error message when trying to match a LOpt against a LOpt would
-            -- be overridden by a meaningless try to match a SOpt against a
-            -- a LOpt).
-            isLopt <- P.option false (P.lookAhead $ P.try $ token isAnyLopt)
-            isSopt <- P.option false (P.lookAhead $ P.try $ token isAnySopt)
-            P.ParserT \s -> do
-              o <- P.unParserT (if isLopt
-                then P.try do
-                  Tuple x <<< (RValue.from Origin.Argv) <$> (do
-                    v <- mkLoptParser o.name o.arg
-                    pure if o.repeatable then ArrayValue $ Value.intoArray v
-                                           else v
-                  )
-                else if isSopt
-                  then P.try do
-                    Tuple x <<< (RValue.from Origin.Argv) <$> (do
-                      v <- mkSoptParser o.flag o.arg
-                      pure if o.repeatable then ArrayValue $ Value.intoArray v
-                                            else v
-                    )
-                  else P.fail "long or short option") s
-              case o.result of
-                  (Left e) -> do
-                    let err = unParseError e
-                    if ((startsWith
-                            "Option takes no argument"
-                            err.message)
-                       || (startsWith
-                            "Option requires argument"
-                            err.message))
-                      then do
-                        pure $ o {
-                          result = Left $ P.ParseError $ err {
-                            fatal = true
-                          }
-                        }
-                      else pure o
-                  otherwise -> pure o
-
-          isAnyLopt (LOpt _ _) = pure true
-          isAnyLopt _          = pure false
-
-          isAnySopt (SOpt _ _ _) = pure true
-          isAnySopt _            = pure false
-
-          mkLoptParser (Just n) a = longOption n a
-          mkLoptParser Nothing _  = P.fail "long name"
-
-          mkSoptParser (Just f) a = shortOption f a
-          mkSoptParser Nothing _  = P.fail "flag"
-
-    -- Generate a parser for an argument `Group`
-    argP x@(D.Group grp) canSkip = do
-      debugParsing x
-      if grp.optional
-        then P.option mempty $ P.try go
-        else go
-      where
-        go | length grp.branches == 0 = pure mempty
-        go = do
-          x <- step
-          if grp.repeatable
-            && length (filter (snd >>> isFrom Origin.Argv) x) > 0
-              then do
-                xs <- go <|> pure mempty
-                pure $ x <> xs
-              else pure x
-
-        step = snd <$> do
-                branchesP grp.branches
-                          false
-                          options
-                          -- always allow skipping for non-free groups.
-                          (not (D.isFree x) || canSkip)
-                          (recDepth + 1)
-
-    butGot :: List PositionedToken -> String
-    butGot (Cons (PositionedToken { source }) _) = ", but got " <> source
-    butGot Nil                                   = ""
-
-    isFrom :: Origin -> RichValue -> Boolean
-    isFrom o rv = RValue.getOrigin rv == o
-
-    debugParsing x = when debug do
-      pure unit -- prevent early execution of code below. PS bug?
-      traceA $
-        indentation <>
-        "Parsing: " <> D.prettyPrintArg x
-
-    indentation :: String
-    indentation = fromCharArray $ LL.fromList $ LL.take (recDepth * 2) $ LL.repeat ' '
+isFrom :: Origin -> RichValue -> Boolean
+isFrom o rv = o == RValue.getOrigin rv
 
 unParseError :: P.ParseError -> { position :: P.Position, message :: String, fatal :: Boolean }
 unParseError (P.ParseError e) = e

@@ -353,10 +353,14 @@ solveBranch as ds = go as
                            (pure <<< id)
                            (matchDesc false `traverse` fs)
 
-              pure  $ Resolved
-                      $ Keep
-                      $ (Option <$> toList cs) <> (singleton $ Option o)
+              -- set the same repeatability flag for each stacked option as
+              -- indicated by trailing option.
+              let cs' = flip setRepeatable o.repeatable <$> do
+                          Option <$> toList cs
 
+              pure  $ Resolved
+                    $ Keep
+                    $ cs' <> (singleton $ Option o)
 
             subsume _ _ = Nothing
 
@@ -423,23 +427,22 @@ solveBranch as ds = go as
                         pure $ pos.repeatable <$ guardArgs pos.name arg'.name
                       Just (U.Command cmd) ->
                         pure $ cmd.repeatable <$ guardArgs cmd.name arg'.name
-                      otherwise ->
-                        if not (arg'.optional)
-                          then
-                            pure $ fail
-                              $ "Option-Argument specified in options-section missing"
-                                <> " -" <> fromChar o.flag
-                          else Nothing
+                      otherwise -> Nothing
 
                in case mr of
                 Nothing -> do
-                  pure $ Resolved $ Keep
-                    $ (toList matches)
-                      <> (singleton $ Option match)
+                  if not (fromMaybe true $ (_.optional <$> match.arg))
+                    then fail
+                        $ "Option-Argument specified in options-section missing"
+                          <> " -" <> fromChar f
+                    else do
+                      pure $ Resolved $ Keep
+                        $ (toList matches)
+                          <> (singleton $ Option match)
                 Just er -> do
                   r <- er
                   pure $ Resolved $ Slurp
-                    $ (toList matches)
+                    $ (flip setRepeatable r <$> toList matches)
                       <> (singleton
                             $ Option $ match { repeatable = r })
 

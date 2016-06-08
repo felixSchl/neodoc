@@ -1,5 +1,6 @@
 module Language.Docopt.Origin (
-  Origin(..)
+    Origin(..)
+  , weight
   ) where
 
 import Prelude
@@ -12,9 +13,9 @@ data Origin
   | Empty
 
 weight :: Origin -> Int
-weight Argv        = 3
-weight Environment = 2
-weight Default     = 1
+weight Argv        = 30000
+weight Environment = 20000
+weight Default     = 10000
 weight Empty       = 0
 
 instance showOrigin :: Show Origin where

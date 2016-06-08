@@ -34,9 +34,9 @@ type Options r = {
 
 run
   :: forall r
-   . D.Program    -- ^ the user input
+   . D.Program    -- ^ the specification
   -> D.Env        -- ^ the environment
-  -> Array String -- ^ the program parser
+  -> Array String -- ^ the user input
   -> Options r
   -> Either P.ParseError Result
 run spec env argv options = do

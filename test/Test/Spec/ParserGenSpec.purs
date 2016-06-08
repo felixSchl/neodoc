@@ -175,7 +175,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         options:
           -i, --input FILE
         """
-        [ fail [] "Expected option(s): -i|--input=FILE"
+        [ fail [] "Expected -i|--input=FILE"
         , pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -190,10 +190,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
         """
         [ fail []
-          $ "Expected option(s): -i|--input=FILE, -o|--output=FILE"
+          $ "Expected -i|--input=FILE, -o|--output=FILE"
 
         , fail [ "-i", "bar" ]
-          $ "Expected option(s): -o|--output=FILE"
+          $ "Expected -o|--output=FILE"
 
         , pass Nothing
             [ "-i", "bar", "-o", "bar" ]
@@ -220,10 +220,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -r, --redirect FILE [env: QUX]
         """
         [ fail []
-          $ "Expected option(s): -i|--input=FILE -r|--redirect=FILE, -o|--output=FILE"
+          $ "Expected -i|--input=FILE -r|--redirect=FILE, -o|--output=FILE"
 
         , fail [ "-i", "bar", "-r", "bar" ]
-            "Expected option(s): -o|--output=FILE"
+            "Expected -o|--output=FILE"
 
         , pass Nothing
             [ "-i", "bar", "-r", "bar", "-o", "bar" ]
@@ -263,7 +263,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE
         """
-        [ fail [] "Expected option(s): -i|--input=FILE"
+        [ fail [] "Expected -i|--input=FILE"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail [ "-i", "bar" ] "Expected <env>"
         , pass Nothing
@@ -275,7 +275,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-o"       :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail [ "-o", "bar", "x", "-i", "bar" ]
-            "Expected option(s): -i|--input=FILE"
+            "Expected -i|--input=FILE"
         ]
 
     , test
@@ -430,10 +430,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
         , fail
             [ "foo" ]
-            "Expected option(s): -f|--foo=FOZ..."
+            "Expected -f|--foo=FOZ..."
         , fail
             [ "foo", "-o", "-i", "-bax" ]
-            "Expected option(s): -f|--foo=FOZ..."
+            "Expected -f|--foo=FOZ..."
         ]
 
     , test
@@ -598,7 +598,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         ]
 
-    , test2
+    , test
         """
         Usage: prog [-n ARG]
         """
@@ -646,6 +646,79 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "-q", "-q", "-i" ]
             [ "-i" :> D.bool true
             , "-q" :> D.int 2 ]
+        ]
+
+    , test
+        """
+        usage: prog (-a | -b)... (-d | -e)...
+        """
+        [ pass
+            Nothing
+            [ "-a", "-d" ]
+            [ "-a" :> D.int 1
+            , "-d" :> D.int 1 ]
+        , pass
+            Nothing
+            [ "-a", "-a", "-d" ]
+            [ "-a" :> D.int 2
+            , "-d" :> D.int 1 ]
+        , pass
+            Nothing
+            [ "-a", "-a", "-d", "-d" ]
+            [ "-a" :> D.int 2
+            , "-d" :> D.int 2 ]
+        , pass
+            Nothing
+            [ "-a", "-d", "-a", "-a", "-d", "-a" ]
+            [ "-a" :> D.int 4
+            , "-d" :> D.int 2 ]
+        , pass
+            Nothing
+            [ "-a", "-b" ]
+            [ "-a" :> D.int 1
+            , "-b" :> D.int 1 ]
+        ]
+
+    , test
+        """
+        usage: prog foo --foo... --bar...
+           or: prog <env>...
+        """
+        [ pass
+            Nothing
+            [ "100", "200" ]
+            [ "<env>" :> D.array [ D.int 100, D.int 200 ] ]
+        , pass
+            Nothing
+            [ "foo", "--foo", "--foo" ]
+            [ "foo"   :> D.bool true
+            , "--foo" :> D.int 2 ]
+        , pass
+            Nothing
+            [ "foo", "--foo", "--bar", "--foo" ]
+            [ "foo"   :> D.bool true
+            , "--foo" :> D.int 2
+            , "--bar" :> D.int 1 ]
+        ]
+
+    , test
+        """
+        usage: prog [<foo> <bar>]
+           or: prog foo
+        """
+        [ pass
+          Nothing
+          [ "foo", "bar" ]
+          [ "<foo>" :> D.str "foo"
+          , "<bar>" :> D.str "bar" ]
+        , pass
+          Nothing
+          []
+          []
+        , pass
+          Nothing
+          [ "foo" ]
+          [ "foo" :> D.bool true ]
         ]
   ]
 
