@@ -15,8 +15,8 @@ newtype Key = Key { arg :: D.Argument }
 
 instance showKey :: Show Key where
   show (Key { arg: (D.Option o) }) =
-    maybe "" (\c -> fromChar c <> ", ") o.flag
-      <> maybe "" id o.name
+    maybe "" (\c -> "-"  <> fromChar c <> ", ") o.flag <>
+    maybe "" (\n -> "--" <> n)                  o.name
   show (Key { arg: (D.Positional pos) }) = pos.name
   show (Key { arg: (D.Command cmd) })    = cmd.name
   show _                                 = "invalid" -- XXX
