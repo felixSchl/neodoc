@@ -215,5 +215,5 @@ isOption _          = false
 
 isFree :: Argument -> Boolean
 isFree (Option _) = true
-isFree (Group g)  = true -- all (all isFree) g.branches
+isFree (Group g)  = all (all isFree) g.branches
 isFree _          = false

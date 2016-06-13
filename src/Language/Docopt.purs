@@ -6,6 +6,7 @@
 
 module Language.Docopt (
     runDocopt
+  , preparseDocopt
   , parseDocopt
   , evalDocopt
   , Specification ()
@@ -63,6 +64,23 @@ data Origin
   = Argv
   | Environment
   | Default
+
+-- |
+-- | Parse the docopt text and produce a parser
+-- | that can be applied to user input.
+-- |
+preparseDocopt
+  :: forall r
+   .  String           -- ^ The docopt text
+  -> ParseOptionsObj r -- ^ Parse options
+  -> Either String { usages       :: List Usage.Usage
+                   , descriptions :: List Desc.Desc
+                   }
+preparseDocopt docopt options = do
+  doc <- toScanErr       $ Scanner.scan $ dedent docopt
+  us  <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
+  ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
+  pure { descriptions: ds, usages: us }
 
 -- |
 -- | Parse the docopt text and produce a parser

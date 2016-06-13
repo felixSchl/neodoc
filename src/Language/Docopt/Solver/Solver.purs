@@ -16,7 +16,8 @@ import Data.Either (Either(..), either)
 import Data.Foldable (any)
 import Data.Function (on)
 import Data.Functor ((<$))
-import Data.List (findIndex, groupBy, List(..), length, filter, singleton, toList, catMaybes, head, (:), concat)
+import Data.List (findIndex, groupBy, List(..), length, filter, singleton,
+                  toList, catMaybes, head, (:), concat, reverse)
 import Data.Maybe (fromMaybe, Maybe(Nothing, Just), isNothing, maybe, isJust)
 import Data.Maybe.Unsafe (fromJust)
 import Data.String (fromChar, fromCharArray, toCharArray, toUpper)
@@ -72,68 +73,87 @@ solveBranch :: U.Branch                 -- ^ the usage branch
 solveBranch as ds = go as
   where
     go :: U.Branch -> Either SolveError (List Argument)
-    go us = do
-      concat <<< expand <<< partition <<< groupFree <$> solveArgs us
+    go args = do
+      solved <- solveArgs args
+      pure do
+        clump <- groupFree solved
+        case partition clump of
+          Tuple surroundingArgs _ -> do
+            x <- clump
+            case x of
+              Resolved x   -> pure x
+              Unresolved _ -> expand ds surroundingArgs
+
       where
+        groupFree
+          :: List (ResolveTo Argument Reference)
+          -> List (List (ResolveTo Argument Reference))
         groupFree = groupBy (eq `on` isFree)
-        partition xs = f <$> (mpartition isResolved <$> xs)
-          where f = bimap (_ <#> \a -> case a of
-                            (Resolved x) -> x
-                            otherwise    -> undefined
+
+        partition
+          :: forall a b
+           . List (ResolveTo a b)
+          -> Tuple (List a) (List b)
+        partition = f <<< mpartition isResolved
+          where f = bimap (\x -> concat $ x <#> \a -> case a of
+                            (Resolved x) -> pure x
+                            otherwise    -> Nil
                           )
-                          (_ <#> \a -> case a of
-                            (Unresolved x) -> x
-                            otherwise      -> undefined
+                          (\x -> concat $ x <#> \a -> case a of
+                            (Unresolved x) -> pure x
+                            otherwise      -> Nil
                           )
 
-        expand = (expand' <$> _)
+        expand
+          :: List Desc
+          -> List Argument
+          -> List Argument
+        expand ds surroundingArgs = reverse $ go ds surroundingArgs Nil
           where
-            -- Resolve references for [options] (references)
-            expand' (Tuple args' refs) | length refs > 0 = map args' ds
-              where
-                map args (Cons (DE.OptionDesc opt) xs) =
-                  -- Assuming description and usage have already been merged,
-                  -- find all options that are not present in the surrounding
-                  -- "free" area and add them.
-                  if isJust (findIndex isMatch args)
-                     then map args xs
-                     else
-                      let converted = Group {
-                            optional: true
-                          , branches: (singleton $ singleton $ Option $
-                                { flag:       DE.getFlag opt.name
-                                , name:       DE.getName opt.name
-                                , arg:        opt.arg
-                                , env:        opt.env
-                                , repeatable: false
-                                }
-                            )
-                          , repeatable: opt.repeatable
-                          }
-                       in map (converted:args) xs
+          go (Cons (x@(DE.OptionDesc opt)) xs) surroundingArgs acc = do
+            -- Assuming description and usage have already been merged,
+            -- find all options that are not present in the surrounding
+            -- "free" area and add them.
+            if isJust (findIndex isMatch surroundingArgs)
+                then go xs surroundingArgs acc
+                else
+                  let z = Group {
+                          optional: true
+                        , branches: (singleton $ singleton $ Option $
+                              { flag:       DE.getFlag opt.name
+                              , name:       DE.getName opt.name
+                              , arg:        opt.arg
+                              , env:        opt.env
+                              , repeatable: false
+                              }
+                          )
+                        , repeatable: opt.repeatable
+                        }
+                  in go xs (z:surroundingArgs) (z:acc)
+            where
+              isMatch (Option o)
+                = if isJust (DE.getFlag opt.name) &&
+                      isJust (o.flag)
+                      then fromMaybe false do
+                            eq <$> (DE.getFlag opt.name)
+                                <*> o.flag
+                      else if isJust (DE.getName opt.name) &&
+                              isJust (o.name)
+                              then fromMaybe false do
+                                    (^=) <$> (DE.getName opt.name)
+                                          <*> o.name
+                              else false
+              isMatch (Group grp) = any isMatch (concat grp.branches)
+              isMatch _           = false
 
-                  where
-                    isMatch (Option o)
-                      = if isJust (DE.getFlag opt.name) &&
-                           isJust (o.flag)
-                           then fromMaybe false do
-                                  eq <$> (DE.getFlag opt.name)
-                                     <*> o.flag
-                            else if isJust (DE.getName opt.name) &&
-                                    isJust (o.name)
-                                    then fromMaybe false do
-                                          (^=) <$> (DE.getName opt.name)
-                                               <*> o.name
-                                    else false
-                    isMatch (Group grp) = any isMatch (concat grp.branches)
-                    isMatch _           = false
-                map args (Cons _ xs) = map args xs
-                map args _ = args
-            expand' (Tuple args _) = args
+          go (Cons _ xs) surroundingArgs acc = go xs surroundingArgs acc
+          go _ _ acc = acc
 
+        isFree :: forall b . ResolveTo Argument b -> Boolean
         isFree (Resolved a)   = Arg.isFree a
         isFree (Unresolved _) = true
 
+        isResolved :: forall a b . ResolveTo a b -> Boolean
         isResolved (Resolved _) = true
         isResolved _            = false
 
@@ -215,19 +235,20 @@ solveBranch as ds = go as
                     pure $ pos.repeatable <$ guardArgs pos.name matchedArg.name
                   Just (U.Command cmd) ->
                     pure $ cmd.repeatable <$ guardArgs cmd.name matchedArg.name
-                  otherwise ->
-                    if not (matchedArg.optional)
-                      then
-                        pure $ fail
-                          $ "Option-Argument specified in options-section missing"
-                            <> " --" <> o.name
-                      else Nothing
+                  otherwise -> Nothing
 
           case mr of
-            Nothing -> pure $ Resolved
-                              $ Keep
-                              $ singleton
-                              $ Option match
+            Nothing -> do
+              if not (fromMaybe true $ (_.optional <$> match.arg))
+                 then do
+                    fail
+                      $ "Option-Argument specified in options-section missing"
+                        <> " --" <> o.name
+                  else
+                    pure  $ Resolved
+                          $ Keep
+                          $ singleton
+                          $ Option match
             Just er -> do
               r <- er
               pure  $ Resolved

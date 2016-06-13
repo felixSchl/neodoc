@@ -8,6 +8,7 @@ import Control.Apply ((*>))
 import Data.List (List(..), toList)
 import Control.Plus (empty)
 import Data.Foldable (intercalate, for_)
+import Data.Traversable (for)
 import Control.Monad.Eff.Exception (error, throwException)
 import qualified Data.Array as A
 import Data.Maybe (Maybe(..), maybe)
@@ -24,6 +25,7 @@ import Test.Support.Desc as DE
 import Test.Support.Docopt as D
 import Test.Support.Arguments
 
+import Language.Docopt (preparseDocopt)
 import Language.Docopt.Errors
 import Language.Docopt.Argument
 import Language.Docopt.Value
@@ -39,168 +41,218 @@ import Language.Docopt.Scanner (scan)
 import Language.Docopt.Parser.Lexer (lex)
 import Text.Wrap (dedent)
 
-newtype TestSuite = TestSuite { usages :: Array U.Usage
-                              , cases  :: Array TestCase
+newtype TestSuite = TestSuite { help  :: String
+                              , cases :: Array TestCase
                               }
-newtype TestCase = TestCase { descs    :: Array Desc
-                            , expected :: Either String (Array Usage) }
+newtype TestCase = TestCase { expected :: Either String (Array (Array Argument))
+                            , desctext :: String
+                            }
 
-test :: Array U.Usage -> Array TestCase -> TestSuite
-test us cs = TestSuite { usages: us, cases: cs }
+test :: String -> Array TestCase -> TestSuite
+test help cs = TestSuite { help: help, cases: cs }
 
-pass :: Array Desc -> Array Usage -> TestCase
-pass ds as = TestCase { descs: ds, expected: Right as }
+pass :: String -> Array (Array Argument) -> TestCase
+pass text as = TestCase { expected: Right as, desctext: text  }
 
-fail :: Array Desc -> String -> TestCase
-fail ds msg = TestCase { descs: ds, expected: Left msg }
-
-out :: Array (Array Argument) -> Usage
-out xss = Usage $ toList $ toList <$> xss
-
-u = U.usage "foo"
+fail :: String -> String -> TestCase
+fail text msg = TestCase { expected: Left msg, desctext: text }
 
 solverSpec = \_ ->
   describe "The solver" do
-    (flip traverseWithIndex_) (toList [
+    for_ (toList [
 
-      test ([ u [ [ U.co "foo" ] ] ])
-        [ pass  ([])
-                ([ out [ [ co "foo" ] ] ])
+      test "Usage: prog foo"
+        [ pass "" [ [ co "foo" ] ] ]
+
+    , test "Usage: prog <prog>..."
+        [ pass "" [ [ poR "<prog>" ] ] ]
+
+    , test
+        "Usage: prog --foo..."
+        [ fail
+            "options: -f --foo=bar [default: qux]"
+            "Option-Argument specified in options-section missing --foo"
         ]
 
-    , test ([ u [ [ U.poR "foo" ] ] ])
-        [ pass  ([])
-                ([ out [ [ poR "foo" ] ] ])
+    , test
+        "Usage: prog --foo... BAR"
+        [ fail
+            "options: -f --foo=BAR [default: qux]"
+            "Option-Argument specified in options-section missing --foo"
         ]
 
-    , test ([ u [ [ U.loptR_ "foo" ] ] ])
-        [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "bar" false (Just (StringValue "qux")))
-                ])
-                ([ out [
-                    [ optR 'f' "foo" (oa "bar" (StringValue "qux")) ]
-                ] ])
+    , test
+        "Usage: prog -f... BAR"
+        [ fail
+            "options: -f --foo=BAR [default: qux]"
+            "Option-Argument specified in options-section missing -f"
         ]
 
-    , test ([ u [ [ U.loptR_ "foo", U.co "BAR" ] ] ])
-        [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
-                ])
-                ([ out [
-                    [ optR 'f' "foo" (oa "BAR" (StringValue "qux"))
-                    , co "BAR"
-                    ]
-                ] ])
+    , test
+        "Usage: prog --foo BAR..."
+        [ pass
+            "options: -f --foo=BAR [default: qux]"
+            [ [ optR 'f' "foo" (oa "BAR" (D.str "qux")) ] ]
         ]
 
-    , test ([ u [ [ U.lopt_ "foo", U.poR "BAR" ] ] ])
-        [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
-                ])
-                ([ out [
-                    [ optR 'f' "foo" (oa "BAR" (StringValue "qux")) ]
-                ] ])
+    , test
+        "Usage: prog --foo BAR"
+        [ pass
+            "options: -f --foo=BAR [default: qux]"
+            [ [ opt 'f' "foo" (oa "BAR" (D.str "qux")) ] ]
         ]
 
-    , test ([ u [ [ U.lopt_ "foo", U.po "BAR" ] ] ])
-        [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                            (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
-                ])
-                ([ out [
-                    [ opt 'f' "foo" (oa "BAR" (StringValue "qux")) ]
-                ] ])
+    , test
+        "Usage: prog --foo... BAR..."
+        [ fail
+            "options: -f --foo=BAR [default: qux]"
+            "Option-Argument specified in options-section missing --foo"
         ]
 
-    , test ([ u [ [ U.loptR_ "foo", U.poR "BAR" ] ] ])
-        [ pass  ([ DE.opt (DE.fname 'f' "foo")
-                          (Just $ DE.arg "BAR" false (Just (StringValue "qux")))
-                ])
-                ([ out [
-                    [ optR 'f' "foo" (oa "BAR" (StringValue "qux"))
-                    , poR "BAR"
-                    ]
-                ] ])
+    , test
+        "Usage: prog -f... BAR..."
+        [ fail
+            "options: -f --foo=BAR [default: qux]"
+            "Option-Argument specified in options-section missing -f"
         ]
 
-    , test ([ u [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
-        [ pass  ([ DE.opt (DE.fname 'f' "file")
-                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                ])
-                ([ out [
-                    [ soptR_ 'x'
-                    , soptR_ 'v'
-                    , soptR_ 'z'
-                    , optR 'f' "file" (oa "FILE" (StringValue "foo"))
-                    ]
-                ] ])
+    , test
+        "Usage: prog -xvzfFILE..."
+        [ pass
+            "options: -f --file=FILE  [default: foo]"
+            [ [ soptR_ 'x'
+              , soptR_ 'v'
+              , soptR_ 'z'
+              , optR 'f' "file" (oa "FILE" (D.str "foo"))
+            ] ]
         ]
 
-    , test ([ u [ [ U.lopt_ "file", U.poR "FILE" ] ] ])
-        [ fail  [ DE.opt (DE.fname 'f' "file")
-                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                , DE.opt (DE.fname 'f' "file")
-                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                ]
-                "Multiple option descriptions for option --file"
+    , test
+        "Usage: prog -xvzf FILE..."
+        [ pass
+            "options: -f --file=FILE  [default: foo]"
+            [ [ soptR_ 'x'
+              , soptR_ 'v'
+              , soptR_ 'z'
+              , optR 'f' "file" (oa "FILE" (D.str "foo"))
+            ] ]
         ]
 
-    , test ([ u [ [ U.sopt_ 'f' [], U.poR "FILE" ] ] ])
-        [ fail  [ DE.opt (DE.fname 'f' "file")
-                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                , DE.opt (DE.fname 'f' "file")
-                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                ]
-                "Multiple option descriptions for option -f"
+    , test
+        "Usage: prog --file FILE..."
+        [ fail
+            """
+            options:
+              -f --file=FILE  [default: foo]
+              -f --file=FILE  [default: foo]
+            """
+            "Multiple option descriptions for option --file"
         ]
 
-    , test ([ u [ [ U.lopt_ "file", U.poR "FILE" ] ] ])
-        [ fail  [ DE.opt (DE.fname 'f' "file")
-                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                , DE.opt (DE.fname 'f' "file")
-                           (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                ]
-                "Multiple option descriptions for option --file"
+    , test
+        "Usage: prog -f FILE..."
+        [ fail
+            """
+            options:
+              -f --file=FILE  [default: foo]
+              -f --file=FILE  [default: foo]
+            """
+            "Multiple option descriptions for option -f"
         ]
 
-    , test ([ u [ [ U.soptR_ 'f' ['x'] ] ] ])
-        [ fail  ([ DE.opt (DE.fname 'f' "file")
-                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                ])
-                "Stacked option -f may not specify arguments"
+    , test
+        "Usage: prog --file FILE..."
+        [ fail
+            """
+            options:
+              -f --file=FILE  [default: foo]
+              -f --file=FILE  [default: foo]
+            """
+            "Multiple option descriptions for option --file"
+        ]
+
+    , test
+        "Usage: prog -fx..."
+        [ fail
+            "options: -f --file=FILE  [default: foo]"
+            "Stacked option -f may not specify arguments"
         ]
 
       -- Note: `f` should not adopt `file` as it's full name since it's in an
       -- option stack and not in trailing position (therefore cannot inherit the
       -- description's argument, rendering it an unfit candidate)
-    , test ([ u [ [ U.soptR_ 'f' ['v', 'z', 'x'] ] ] ])
-        [ fail  ([ DE.opt (DE.fname 'f' "file")
-                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                ])
-                "Stacked option -f may not specify arguments"
+    , test
+        "Usage: prog -fvzx..."
+        [ fail
+            "options: -f --file=FILE  [default: foo]"
+            "Stacked option -f may not specify arguments"
         ]
 
-    , test ([ u [ [ U.soptR_ 'x' ['v', 'z', 'f'] ] ] ])
-        [ pass  ([ DE.opt (DE.fname 'f' "file")
-                            (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-                ])
-                ([ out [
-                    [ soptR_ 'x'
-                    , soptR_ 'v'
-                    , soptR_ 'z'
-                    , optR 'f' "file" (oa "FILE" (StringValue "foo"))
-                    ]
-                ] ])
-        ]
-
-    , test ([ u [ [ U.Reference "" ] ] ])
+    , test
+        "Usage: prog -xvzf FILE..."
         [ pass
-            [ DE.opt (DE.fname 'f' "file")
-                     (Just $ DE.arg "FILE" false (Just (StringValue "foo")))
-            ]
-            [ out [ [ gro false [ [
-                opt 'f' "file" (oa "FILE" $ StringValue "foo")
-            ] ] ] ] ]
+            "options: -f --file=FILE  [default: foo]"
+            [ [ soptR_ 'x'
+            , soptR_ 'v'
+            , soptR_ 'z'
+            , optR 'f' "file" (oa "FILE" (StringValue "foo"))
+            ] ]
         ]
+
+    , test
+        "Usage: prog -xvzf..."
+        [ fail
+            "options: -f --file=FILE  [default: foo]"
+            "Option-Argument specified in options-section missing -f"
+        ]
+
+    , test
+        "Usage: prog [options]"
+        [ pass
+            "options: -f --file=FILE [default: foo]"
+            [ [ gro false [ [
+                  opt 'f' "file" (oa "FILE" $ StringValue "foo")
+            ] ] ] ]
+
+        -- newline treatment for option alias in the description:
+        -- the aliases may be separated by commas, in which case the alias may
+        -- appear on a new line. If the comma is ommitted, the association won't
+        -- take place
+        , pass
+            """
+            options:
+              -f,
+              --foo
+            """
+            [ [ gro false [ [
+                  opt_ 'f' "foo"
+            ] ] ] ]
+
+        , pass
+            """
+            options:
+              -f
+              --foo
+            """
+            [ [ gro false [ [ sopt_ 'f'   ] ]
+              , gro false [ [ lopt_ "foo" ] ]
+            ] ]
+
+        , pass
+            """
+            options:
+              --foo
+                  ARG
+                  ...
+              -q
+                  ARG
+                  ...
+            """
+            [ [ gro false [ [ lopt_ "foo" ] ]
+              , gro false [ [ sopt_ 'q'   ] ]
+            ] ]
+        ]
+
     ]) runtest
 
   where
@@ -210,47 +262,42 @@ solverSpec = \_ ->
       intercalate "\n" (("  " ++ ) <$>
         (prettyPrintUsage <$> as))
 
-    runtest n (TestSuite { usages, cases }) = do
-      describe
-        ("\nUsage:\n" ++ intercalate "\n" (("  " ++) <$>
-          (U.prettyPrintUsage <$> usages))) do
-        (flip traverseWithIndex_) (toList cases)
-          \j (TestCase { descs, expected }) -> do
-            describe
-              ("\nOptions:\n" ++ intercalate "\n" (("  " ++) <$>
-                (DE.prettyPrintDesc <$> descs))) do
-              it (
-                either
-                  (\msg -> "Should fail with:\n" ++ msg)
-                  (\as  -> "Should resolve to:\n" ++ prettyPrintOutput (toList as))
-                  expected
-              ) do
-                vliftEff do
-                  evaltest
-                    (solve (toList usages) (toList descs))
-                    (toList <$> expected)
+    runtest (TestSuite { help, cases }) = do
+      for_ cases \(TestCase { expected, desctext }) -> do
+        describe ("\n" <> help <> "\n" <> dedent desctext) do
+          it (
+            either
+              (\msg  -> "Should fail with:\n" ++ msg)
+              (\args -> "Should resolve to:\n"
+                  <> (intercalate "\n" (
+                      ("Usage: prog " <> _)
+                        <$> (intercalate " " <<< (prettyPrintArg <$> _))
+                              <$> args)))
+              expected
+          ) do
+            vliftEff do
+              { usages, descriptions } <- runEitherEff do
+                (preparseDocopt
+                  (help <> "\n" <> dedent desctext)
+                  { smartOptions: false })
+              evaltest
+                (solve usages descriptions)
+                (expected)
 
     evaltest (Right output) (Right expected)
-      = if output == (toList expected)
+      = if output == (pure $ Usage $ toList $ toList <$> expected)
             then return unit
             else throwException $ error $
-              "Unexpected output:\n" ++ prettyPrintOutput output
+              "Unexpected output:\n\n" <> prettyPrintOutput output
 
     evaltest (Right output) (Left _)
       = throwException $ error $
-          "Missing exception! Got:\n" ++ prettyPrintOutput output
+          "Missing exception! Got:\n\n" <> prettyPrintOutput output
 
     evaltest (Left (SolveError err)) (Left expected)
       = if err == expected
             then return unit
             else throwException $ error $
-              "Unexpected error:\n" ++ err
+              "Unexpected error:\n\n" <> err
 
     evaltest (Left err) _ = throwException $ error $ show err
-
-    traverseWithIndex_ :: forall a b m. (Applicative m) => (Int -> a -> m b)
-                                                        -> (List a)
-                                                        -> m Unit
-    traverseWithIndex_ f xs = go xs 0
-        where go Nil _         = return unit
-              go (Cons x xs) i = f i x *> go xs (i + 1)
