@@ -4,7 +4,7 @@ import Prelude
 import Data.Maybe (Maybe(..))
 
 import Language.Docopt.Value
-import Language.Docopt.Parser.Desc
+import Language.Docopt.SpecParser.Desc
 
 arg :: String -> Boolean -> Maybe Value -> OptionArgumentObj
 arg = argument

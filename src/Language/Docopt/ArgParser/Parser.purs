@@ -64,7 +64,7 @@ import Language.Docopt.Value as Value
 import Language.Docopt.Value (Value(..))
 import Language.Docopt.RichValue (RichValue(..), unRichValue, prettyPrintRichValue)
 import Language.Docopt.RichValue (from, getOrigin) as RValue
-import Language.Docopt.Parser.Base (getInput)
+import Language.Docopt.SpecParser.Base (getInput)
 import Language.Docopt.ArgParser.Token (getSource) as Token
 import Language.Docopt.ArgParser.Token (PositionedToken(..), Token(..),
                                         unPositionedToken, prettyPrintToken)

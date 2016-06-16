@@ -31,14 +31,14 @@ import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.Solver (solve)
-import Language.Docopt.Parser.Desc (Desc())
+import Language.Docopt.SpecParser.Desc (Desc())
 import Language.Docopt.Argument as D
 import Test.Support.Docopt      as D
-import Language.Docopt.Parser.Usage.Argument as U
-import Language.Docopt.Parser.Usage          as U
-import Language.Docopt.Parser.Desc           as DE
+import Language.Docopt.SpecParser.Usage.Argument as U
+import Language.Docopt.SpecParser.Usage          as U
+import Language.Docopt.SpecParser.Desc           as DE
 import Language.Docopt.Scanner (scan)
-import Language.Docopt.Parser.Lexer (lex)
+import Language.Docopt.SpecParser.Lexer (lex)
 import Text.Wrap (dedent)
 
 newtype TestSuite = TestSuite { help  :: String

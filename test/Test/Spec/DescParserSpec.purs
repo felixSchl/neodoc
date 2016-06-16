@@ -1,8 +1,8 @@
 module Test.Spec.DescParserSpec (descParserSpec) where
 
 import Prelude
-import Language.Docopt.Parser.Desc as Desc
-import Language.Docopt.Parser.Lexer as Lexer
+import Language.Docopt.SpecParser.Desc as Desc
+import Language.Docopt.SpecParser.Lexer as Lexer
 import Text.Parsing.Parser as P
 import Control.Bind ((=<<))
 import Control.Monad.Eff.Exception (error, throwException)

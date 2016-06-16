@@ -37,7 +37,7 @@ import Data.String.Argv as Argv
 import Docopt as Docopt
 import Language.Docopt (runDocopt)
 import Language.Docopt.Value (Value(..), prettyPrintValue) as D
-import Language.Docopt.Parser.Base (space, digit, alpha, upperAlpha, getInput)
+import Language.Docopt.SpecParser.Base (space, digit, alpha, upperAlpha, getInput)
 
 newtype Test = Test {
   doc   :: String

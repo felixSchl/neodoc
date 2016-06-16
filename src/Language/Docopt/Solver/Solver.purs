@@ -28,13 +28,13 @@ import Data.String as Str
 
 import Language.Docopt.Argument
 import Language.Docopt.Argument (isFree) as Arg
-import Language.Docopt.Parser.Desc as DE
-import Language.Docopt.Parser.Usage.Option as UO
+import Language.Docopt.SpecParser.Desc as DE
+import Language.Docopt.SpecParser.Usage.Option as UO
 import Language.Docopt.Argument (Argument(..), Branch)
 import Language.Docopt.Errors (SolveError(..))
-import Language.Docopt.Parser.Desc (Desc)
-import Language.Docopt.Parser.Usage (Usage(..)) as U
-import Language.Docopt.Parser.Usage.Argument (Branch, Argument(..)) as U
+import Language.Docopt.SpecParser.Desc (Desc)
+import Language.Docopt.SpecParser.Usage (Usage(..)) as U
+import Language.Docopt.SpecParser.Usage.Argument (Branch, Argument(..)) as U
 import Language.Docopt.Usage (Usage(..))
 
 foreign import undefined :: forall a. a

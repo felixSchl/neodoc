@@ -26,7 +26,7 @@ import Text.Parsing.Parser.String (eof, anyChar, char, oneOf, noneOf, string) as
 import Data.Array as A
 import Control.Plus (empty)
 import Language.Docopt.ArgParser.Token (PositionedToken(..), Token(..))
-import Language.Docopt.Parser.Base (space, alphaNum)
+import Language.Docopt.SpecParser.Base (space, alphaNum)
 import Language.Docopt.Value (Value(..)) as D
 
 type Options r = {

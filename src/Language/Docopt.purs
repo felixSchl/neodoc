@@ -32,8 +32,8 @@ import Language.Docopt.Trans.Flat as T
 
 import Language.Docopt.Scanner      as Scanner
 import Language.Docopt.Solver       as Solver
-import Language.Docopt.Parser.Usage as Usage
-import Language.Docopt.Parser.Desc  as Desc
+import Language.Docopt.SpecParser.Usage as Usage
+import Language.Docopt.SpecParser.Desc  as Desc
 
 type Specification = List D.Usage
 
