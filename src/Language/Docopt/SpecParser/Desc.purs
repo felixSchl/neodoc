@@ -1,4 +1,4 @@
-module Language.Docopt.Parser.Desc (
+module Language.Docopt.SpecParser.Desc (
     Desc (..)
   , Name (..)
   , OptionObj ()
@@ -36,10 +36,10 @@ import Data.Array as A
 import Data.String.Ext ((^=))
 
 import Language.Docopt.Value (Value, prettyPrintValue)
-import Language.Docopt.Parser.Common (sameIndent, markIndent, indented,
+import Language.Docopt.SpecParser.Common (sameIndent, markIndent, indented,
                                      moreIndented, lessIndented)
-import Language.Docopt.Parser.Lexer (lexDescs)
-import Language.Docopt.Parser.Lexer as L
+import Language.Docopt.SpecParser.Lexer (lexDescs)
+import Language.Docopt.SpecParser.Lexer as L
 import Language.Docopt.Value as Value
 
 -- XXX: This is duplicated from Solver.purs.

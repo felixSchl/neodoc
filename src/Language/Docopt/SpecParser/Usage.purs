@@ -1,4 +1,4 @@
-module Language.Docopt.Parser.Usage (
+module Language.Docopt.SpecParser.Usage (
     usageParser
   , run
   , parse
@@ -8,9 +8,9 @@ module Language.Docopt.Parser.Usage (
 import Prelude
 import Debug.Trace
 import Data.Functor (($>))
-import Language.Docopt.Parser.Lexer as L
-import Language.Docopt.Parser.Usage.Option as O
-import Language.Docopt.Parser.Usage.Usage as U
+import Language.Docopt.SpecParser.Lexer as L
+import Language.Docopt.SpecParser.Usage.Option as O
+import Language.Docopt.SpecParser.Usage.Usage as U
 import Control.Alt ((<|>))
 import Control.Apply ((<*), (*>))
 import Control.Bind ((=<<))
@@ -21,10 +21,10 @@ import Data.List (List(..), many, some, singleton, length, modifyAt)
 import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
 import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested (tuple3)
-import Language.Docopt.Parser.Common (markIndent', markLine, indented,
+import Language.Docopt.SpecParser.Common (markIndent', markLine, indented,
                                      sameIndent, lessIndented, moreIndented)
-import Language.Docopt.Parser.Usage.Argument (Argument(..))
-import Language.Docopt.Parser.Usage.Usage (Usage(..))
+import Language.Docopt.SpecParser.Usage.Argument (Argument(..))
+import Language.Docopt.SpecParser.Usage.Usage (Usage(..))
 import Text.Parsing.Parser (ParseError) as P
 import Text.Parsing.Parser.Combinators (try, optional, choice, sepBy1, between,
                                        optionMaybe, lookAhead, option) as P

@@ -1,4 +1,4 @@
-module Test.Spec.CompilerSpec (parserGenSpec) where
+module Test.Spec.ArgParserSpec (parserGenSpec) where
 
 import Prelude
 import Debug.Trace
@@ -32,7 +32,7 @@ import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.Env (Env())
-import Language.Docopt.Compiler (genParser, runParser)
+import Language.Docopt.ArgParser (run) as ArgParser
 import Language.Docopt.Argument   as D
 import Language.Docopt.Env        as Env
 import Language.Docopt.Trans.Flat as T
@@ -93,35 +93,36 @@ pass' opts i e o = { argv:     i
                    , expected: Right $ StrMap.fromList $ toList o
                    }
 
-fail :: Array String -- ^ ARGV
-      -> String      -- ^ The expected error message
+fail  :: Maybe Options -- ^ The options
+      -> Array String  -- ^ ARGV
+      -> String        -- ^ The expected error message
       -> Case
-fail i e = { argv: i, env: [],  expected: Left e, options: Nothing }
-
-fail' :: Array String                  -- ^ ARGV
-      -> (Array (Tuple String String)) -- ^ The environment
-      -> String                        -- ^ The expected error message
-      -> Case
-fail' i e err = { argv: i, env: e, expected: Left err, options: Nothing }
+fail o i e = { argv: i, env: [],  expected: Left e, options: o }
 
 (:>) = Tuple
 infixr 0 :>
+
+data TestArgs = TestRequired | TestOptional | TestNone
 
 parserGenSpec = \_ -> describe "The parser generator" do
   it "" do
     pure unit
 
   -- Some options that will be used for these tests
-  let testCases = [
+  let
+    testCases = ([
       test
         "usage: prog <qux>..."
         [ pass Nothing
             [ "a", "b", "c" ]
             [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
             ]
-        , fail [ "--foo", "baz" ]
+        , fail
+            Nothing
+            [ "--foo", "baz" ]
             "Expected <qux>..., but got --foo"
         , fail
+            Nothing
             [ "a", "--foo", "-f=10" ]
             "Unmatched option: --foo"
         ]
@@ -175,7 +176,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         options:
           -i, --input FILE
         """
-        [ fail [] "Expected option(s): -i|--input=FILE"
+        [ fail Nothing [] "Expected -i|--input=FILE"
         , pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -189,11 +190,11 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -i, --input FILE
           -o, --output FILE
         """
-        [ fail []
-          $ "Expected option(s): -i|--input=FILE, -o|--output=FILE"
+        [ fail Nothing []
+          $ "Expected -i|--input=FILE, -o|--output=FILE"
 
-        , fail [ "-i", "bar" ]
-          $ "Expected option(s): -o|--output=FILE"
+        , fail Nothing [ "-i", "bar" ]
+          $ "Expected -o|--output=FILE"
 
         , pass Nothing
             [ "-i", "bar", "-o", "bar" ]
@@ -219,11 +220,11 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE [env: QUX]
         """
-        [ fail []
-          $ "Expected option(s): -i|--input=FILE -r|--redirect=FILE, -o|--output=FILE"
+        [ fail Nothing []
+          $ "Expected -i|--input=FILE -r|--redirect=FILE, -o|--output=FILE"
 
-        , fail [ "-i", "bar", "-r", "bar" ]
-            "Expected option(s): -o|--output=FILE"
+        , fail Nothing [ "-i", "bar", "-r", "bar" ]
+            "Expected -o|--output=FILE"
 
         , pass Nothing
             [ "-i", "bar", "-r", "bar", "-o", "bar" ]
@@ -263,9 +264,9 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE
         """
-        [ fail [] "Expected option(s): -i|--input=FILE"
+        [ fail Nothing [] "Expected -i|--input=FILE"
           -- XXX: Would be cool to show the reason the group did not parse!
-        , fail [ "-i", "bar" ] "Expected <env>"
+        , fail Nothing [ "-i", "bar" ] "Expected <env>"
         , pass Nothing
             [ "-i", "bar", "x", "-o", "bar" ]
             [ "--input"  :> D.str "bar"
@@ -274,8 +275,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "--output" :> D.str "bar"
             , "-o"       :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
-        , fail [ "-o", "bar", "x", "-i", "bar" ]
-            "Expected option(s): -i|--input=FILE"
+        , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
+            "Expected -i|--input=FILE"
         ]
 
     , test
@@ -331,13 +332,13 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , pass Nothing
             [ "b" ]
             [ "b" :> D.bool true ]
-        , fail
+        , fail Nothing
             [ "a", "b" ]
             "Unmatched command: b"
-        , fail
+        , fail Nothing
             [ "b", "a" ]
             "Unmatched command: a"
-        , fail [] ""
+        , fail Nothing [] ""
         ]
 
     , test
@@ -428,25 +429,25 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-f"      :> D.array [ D.str "ox" ]
             ]
 
-        , fail
+        , fail Nothing
             [ "foo" ]
-            "Expected option(s): -f|--foo=FOZ..."
-        , fail
+            "Expected -f|--foo=FOZ..."
+        , fail Nothing
             [ "foo", "-o", "-i", "-bax" ]
-            "Expected option(s): -f|--foo=FOZ..."
+            "Expected -f|--foo=FOZ..."
         ]
 
     , test
         """
         usage: prog [foo]
         """
-        [ fail [ "goo" ] "Unmatched command: goo" ]
+        [ fail Nothing [ "goo" ] "Unmatched command: goo" ]
 
     , test
         """
         usage: prog (foo)
         """
-        [ fail [ "goo" ] "Expected foo, but got goo" ]
+        [ fail Nothing [ "goo" ] "Expected foo, but got goo" ]
 
     , test
         """
@@ -583,6 +584,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         ]
 
+
     , test
         """
         Usage: prog ((((foo|bar)|qux)|wux)|-n ARC) ARGS...
@@ -595,10 +597,11 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
+            , "ARGS" :> D.array []]
         ]
 
-    , test2
+    , test
         """
         Usage: prog [-n ARG]
         """
@@ -647,7 +650,219 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "-i" :> D.bool true
             , "-q" :> D.int 2 ]
         ]
-  ]
+
+    , test
+        """
+        usage: prog (-a | -b)... (-d | -e)...
+        """
+        [ pass
+            Nothing
+            [ "-a", "-d" ]
+            [ "-a" :> D.int 1
+            , "-d" :> D.int 1 ]
+        , pass
+            Nothing
+            [ "-a", "-a", "-d" ]
+            [ "-a" :> D.int 2
+            , "-d" :> D.int 1 ]
+        , pass
+            Nothing
+            [ "-a", "-a", "-d", "-d" ]
+            [ "-a" :> D.int 2
+            , "-d" :> D.int 2 ]
+        , pass
+            Nothing
+            [ "-a", "-d", "-a", "-a", "-d", "-a" ]
+            [ "-a" :> D.int 4
+            , "-d" :> D.int 2 ]
+        , pass
+            Nothing
+            [ "-a", "-b" ]
+            [ "-a" :> D.int 1
+            , "-b" :> D.int 1 ]
+        ]
+
+    , test
+        """
+        usage: prog foo --foo... --bar...
+           or: prog <env>...
+        """
+        [ pass
+            Nothing
+            [ "100", "200" ]
+            [ "<env>" :> D.array [ D.int 100, D.int 200 ] ]
+        , pass
+            Nothing
+            [ "foo", "--foo", "--foo" ]
+            [ "foo"   :> D.bool true
+            , "--foo" :> D.int 2 ]
+        , pass
+            Nothing
+            [ "foo", "--foo", "--bar", "--foo" ]
+            [ "foo"   :> D.bool true
+            , "--foo" :> D.int 2
+            , "--bar" :> D.int 1 ]
+        ]
+
+    , test
+        """
+        usage: prog [<foo> <bar>]
+           or: prog foo
+        """
+        [ pass
+          Nothing
+          [ "foo", "bar" ]
+          [ "<foo>" :> D.str "foo"
+          , "<bar>" :> D.str "bar" ]
+        , pass
+          Nothing
+          []
+          []
+        , pass
+          Nothing
+          [ "foo" ]
+          [ "foo" :> D.bool true ]
+        ]
+      ]
+
+      -- stop-at tests in various forms
+      <> (A.concat $ [ TestRequired, TestOptional, TestNone ] <#> \scenario ->
+        [ test
+          (case scenario of
+            TestRequired -> "Usage: prog [-iofx=FILE]"
+            TestOptional -> "Usage: prog [-iofx[=FILE]]"
+            TestNone     -> "Usage: prog [-iofx]"
+          )
+         ([ pass
+              (Just (defaultOptions { stopAt = [ "-x" ] }))
+              [ "-ifx" ,"foo", "-i" ]
+              [ "-i" :> D.bool true
+              , "-f" :> D.bool true
+              , "-x" :> D.array [ D.str "foo",  D.str "-i"  ] ]
+
+          , pass
+              (Just (defaultOptions { stopAt = [ "-x" ] }))
+              [ "-i", "-f", "-x" ]
+              [ "-i" :> D.bool true
+              , "-f" :> D.bool true
+              , "-x" :> D.array [] ]
+          ]
+          <>
+          (case scenario of
+            TestNone ->
+              [ fail
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-i", "-f", "-x=foo", "-i" ]
+                  "Option takes no argument: -x"
+
+              , fail
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-ifx=foo", "-i" ]
+                  "Option takes no argument: -x"
+
+              , fail
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-ifxy=foo", "-i" ]
+                  "Unmatched option: -y=foo"
+
+              , fail
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-i", "-f", "-xoz" ]
+                  "Unmatched option: -z"
+
+              , fail
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-i", "-f", "-oxzfoo", "-i" ]
+                 "Unmatched option: -zfoo"
+              ]
+            otherwise ->
+              [ pass
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-i", "-f", "-x=foo", "-i" ]
+                  [ "-i" :> D.bool true
+                  , "-f" :> D.bool true
+                  , "-x" :> D.array [ D.str "foo",  D.str "-i"  ] ]
+
+              , pass
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-ifx=foo", "-i" ]
+                  [ "-i" :> D.bool true
+                  , "-f" :> D.bool true
+                  , "-x" :> D.array [ D.str "foo",  D.str "-i"  ] ]
+
+              , pass
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-ifxy=foo", "-i" ]
+                  [ "-i" :> D.bool true
+                  , "-f" :> D.bool true
+                  , "-x" :> D.array [ D.str "y=foo",  D.str "-i"  ] ]
+
+              , pass
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-i", "-f", "-xoz" ]
+                  [ "-i" :> D.bool true
+                  , "-f" :> D.bool true
+                  , "-x" :> D.array [ D.str "oz" ] ]
+
+              , pass
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-i", "-f", "-oxzfoo", "-i" ]
+                  [ "-i" :> D.bool true
+                  , "-f" :> D.bool true
+                  , "-o" :> D.bool true
+                  , "-x" :> D.array [ D.str "zfoo",  D.str "-i"  ] ]
+
+              , pass
+                  (Just (defaultOptions { stopAt = [ "-x" ] }))
+                  [ "-i", "-f", "-oxfoo", "-i" ]
+                  [ "-i" :> D.bool true
+                  , "-f" :> D.bool true
+                  , "-o" :> D.bool true
+                  , "-x" :> D.array [ D.str "foo",  D.str "-i"  ] ]
+              ]
+          ))
+
+        -- Test 'stopAt' on long-options
+        , test
+            (case scenario of
+              TestRequired -> "Usage: prog --foo=BAR"
+              TestOptional -> "Usage: prog --foo[=BAR]"
+              TestNone     -> "Usage: prog --foo"
+            )
+         ([ pass
+              (Just (defaultOptions { stopAt = [ "--foo" ] }))
+              [ "--foo" ]
+              [ "--foo" :> D.array [] ]
+          , pass
+              (Just (defaultOptions { stopAt = [ "--foo" ] }))
+              [ "--foo", "-f", "-o", "-x" ]
+              [ "--foo" :> D.array [ D.str "-f", D.str "-o", D.str "-x" ] ]
+          ]
+          <>
+          (case scenario of
+            TestNone ->
+              [ fail
+                  (Just (defaultOptions { stopAt = [ "--foo" ] }))
+                  [ "--foo=BAR", "-f"]
+                  "Option takes no argument: --foo"
+              , fail
+                  (Just (defaultOptions { stopAt = [ "--foo" ] }))
+                  [ "--fooBAR", "-f"]
+                  "Unmatched option: --fooBAR"
+              ]
+            otherwise ->
+              [ pass
+                  (Just (defaultOptions { stopAt = [ "--foo" ] }))
+                  [ "--foo=BAR", "-f"]
+                  [ "--foo" :> D.array [ D.str "BAR", D.str "-f" ] ]
+              , pass
+                  (Just (defaultOptions { stopAt = [ "--foo" ] }))
+                  [ "--fooBAR", "-f"]
+                  [ "--foo" :> D.array [ D.str "BAR", D.str "-f" ] ]
+              ]
+          ))
+        ])
+      )
 
   for_ testCases \(({ help, cases, skip })) -> do
     when (not skip) do
@@ -686,11 +901,11 @@ parserGenSpec = \_ -> describe "The parser generator" do
                             -> Either String (StrMap Value)
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate spec argv env options expected = do
-        let result = uncurry (T.reduce spec env)
-                <$> runParser
-                      env
-                      argv
-                      (genParser spec (fromMaybe defaultOptions options))
+        let result = uncurry (T.reduce spec env) <$> do
+                      ArgParser.run spec
+                                   env
+                                   argv
+                                   (fromMaybe defaultOptions options)
 
         case result of
           Left (e@(P.ParseError { message: msg })) ->

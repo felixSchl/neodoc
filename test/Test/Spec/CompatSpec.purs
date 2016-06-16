@@ -37,7 +37,7 @@ import Data.String.Argv as Argv
 import Docopt as Docopt
 import Language.Docopt (runDocopt)
 import Language.Docopt.Value (Value(..), prettyPrintValue) as D
-import Language.Docopt.Parser.Base (space, digit, alpha, upperAlpha, getInput)
+import Language.Docopt.SpecParser.Base (space, digit, alpha, upperAlpha, getInput)
 
 newtype Test = Test {
   doc   :: String
@@ -56,9 +56,13 @@ type Flags = {
 
 parseFlags :: String -> Flags
 parseFlags s = {
-    optionsFirst: String.contains "p" s
-  , smartOptions: String.contains "s" s
-  }
+  optionsFirst: String.contains "p" s
+, smartOptions: String.contains "s" s
+}
+
+renderFlags :: Flags -> String
+renderFlags f = (if f.optionsFirst then "p" else "")
+             <> (if f.smartOptions then "s" else "")
 
 parseUniversalDocoptTests :: forall eff
   . Eff (fs :: FS, err :: EXCEPTION | eff) (List Test)
@@ -191,10 +195,15 @@ genCompatSpec = do
         for_ kases \(Kase { options, out }) -> do
           let argv = fromJust options.argv
               env  = fromJust options.env
-          describe (intercalate " " $
+              flagsDesc = renderFlags { optionsFirst: options.optionsFirst
+                                      , smartOptions: options.smartOptions
+                                      }
+          describe (intercalate " " (
             (fromList $ StrMap.toList env <#> \t ->
-              fst t ++ "=\"" ++ snd t ++ "\"")
-            ++ argv
+                fst t ++ "=\"" ++ snd t ++ "\"")
+              <> argv
+            )
+            <> (if String.length flagsDesc > 0 then " # flags: " <> flagsDesc else "")
             ) do
             it ("\n" ++ prettyPrintOut out) do
 

@@ -1,4 +1,4 @@
-module Language.Docopt.Parser.Usage.Argument (
+module Language.Docopt.SpecParser.Usage.Argument (
     Argument (..)
   , IsRepeatable ()
   , IsOptional ()
@@ -18,7 +18,7 @@ module Language.Docopt.Parser.Usage.Argument (
 import Prelude
 import Data.List (List())
 import Data.Foldable (intercalate, all)
-import Language.Docopt.Parser.Usage.Option as O
+import Language.Docopt.SpecParser.Usage.Option as O
 
 -- A command argument is literal that must be matched exactly.
 -- It's value, if present must always be a boolean 'true' or any positive

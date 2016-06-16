@@ -5,8 +5,9 @@
 -- |
 -- | ===
 
-module Language.Docopt.Compiler.Lexer (
-  lex
+module Language.Docopt.ArgParser.Lexer (
+    lex
+  , Options()
   ) where
 
 import Prelude
@@ -15,17 +16,23 @@ import Data.Either (Either())
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
-import Data.String (fromCharArray)
+import Data.String (fromCharArray, fromChar)
 import Data.List (List(..), singleton, many)
+import Data.Foldable (elem)
 import Text.Parsing.Parser (ParseError, Parser, runParser) as P
 import Text.Parsing.Parser.Combinators (try, choice, optional, optionMaybe) as P
 import Text.Parsing.Parser.Pos (Position(Position)) as P
 import Text.Parsing.Parser.String (eof, anyChar, char, oneOf, noneOf, string) as P
 import Data.Array as A
 import Control.Plus (empty)
-import Language.Docopt.Compiler.Token (PositionedToken(..), Token(..))
-import Language.Docopt.Parser.Base (space, alphaNum)
+import Language.Docopt.ArgParser.Token (PositionedToken(..), Token(..))
+import Language.Docopt.SpecParser.Base (space, alphaNum)
 import Language.Docopt.Value (Value(..)) as D
+
+type Options r = {
+  stopAt :: Array String
+  | r
+}
 
 -- | Parse a single token from the ARGV stream.
 -- | Because each item on the ARGV stream is a a string itself, apply a parser
@@ -68,7 +75,7 @@ parseToken = do
     lopt = do
       P.string "--"
       xs <- fromCharArray <$> do
-        A.some $ P.noneOf [ '=' ]
+        A.some $ P.noneOf [ '=', ' ' ]
       arg <- P.optionMaybe arg
       P.eof
       pure $ LOpt xs arg
@@ -84,20 +91,25 @@ parseToken = do
 
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
 -- | item individually.
-lex :: (List String) -> Either P.ParseError (List PositionedToken)
-lex xs = go xs 1
+lex
+  :: forall r
+   . List String
+  -> Options r
+  -> Either P.ParseError (List PositionedToken)
+lex xs options = go xs 1
   where
     go Nil _ = pure Nil
     go (Cons x xs) n = do
-      tok <- P.runParser x parseToken
-      case tok of
-        (EOA _) -> do
-          pure $ singleton $ PositionedToken {
+      let toEOA l = pure $ singleton $ PositionedToken {
             token:     EOA (D.StringValue <$> xs)
           , sourcePos: P.Position { line: 1, column: n }
           , source:    x
           }
-        _ -> do
+
+      tok <- P.runParser x parseToken
+      case tok of
+        (EOA  _) -> toEOA "--"
+        otherwise -> do
           toks <- go xs (n + 1)
           pure
             $ singleton (PositionedToken {

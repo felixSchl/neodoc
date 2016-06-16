@@ -6,12 +6,12 @@ import Data.Maybe (Maybe(..))
 import Data.List (List(..), length, (!!), take, toList)
 
 import Language.Docopt
-import qualified Language.Docopt.Parser.Usage          as U
-import qualified Language.Docopt.Parser.Usage.Argument as U
-import qualified Language.Docopt.Parser.Usage.Option   as O
-import qualified Language.Docopt.Parser.Lexer          as Lexer
+import qualified Language.Docopt.SpecParser.Usage          as U
+import qualified Language.Docopt.SpecParser.Usage.Argument as U
+import qualified Language.Docopt.SpecParser.Usage.Option   as O
+import qualified Language.Docopt.SpecParser.Lexer          as Lexer
 import qualified Language.Docopt.Scanner               as Scanner
-import Language.Docopt.Parser.Base (debug)
+import Language.Docopt.SpecParser.Base (debug)
 import Text.Wrap (dedent)
 
 -- short hand to create a usage

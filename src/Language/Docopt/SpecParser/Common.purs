@@ -2,7 +2,7 @@
 -- | This module defines commonly used TokenParser-combinators
 -- |
 
-module Language.Docopt.Parser.Common where
+module Language.Docopt.SpecParser.Common where
 
 import Prelude
 import Control.Monad.Trans (lift)
@@ -10,8 +10,8 @@ import Control.MonadPlus (guard)
 import Control.Monad.State (get, modify)
 import Data.List (List(..))
 import Data.Either (Either(..))
-import Language.Docopt.Parser.Lexer (TokenParser, PositionedToken(..))
-import Language.Docopt.Parser.State (ParserState)
+import Language.Docopt.SpecParser.Lexer (TokenParser, PositionedToken(..))
+import Language.Docopt.SpecParser.State (ParserState)
 import Text.Parsing.Parser (PState(..), ParserT(..)) as P
 import Text.Parsing.Parser.Combinators ((<?>), try) as P
 import Text.Parsing.Parser.Pos (Position(..)) as P

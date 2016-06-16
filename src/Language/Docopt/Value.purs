@@ -19,7 +19,7 @@ import Control.Alt ((<|>))
 import Text.Parsing.Parser (ParseError, runParser) as P
 import Text.Parsing.Parser.Combinators (between, choice, try, sepBy1, option) as P
 import Text.Parsing.Parser.String (noneOf, char, string, eof) as P
-import Language.Docopt.Parser.Base (digit)
+import Language.Docopt.SpecParser.Base (digit)
 import Data.Array as A
 import Data.Int (toNumber, fromString) as Int
 import Data.String (fromCharArray)

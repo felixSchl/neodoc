@@ -1,4 +1,4 @@
-module Language.Docopt.Parser.Usage.Usage (
+module Language.Docopt.SpecParser.Usage.Usage (
     Usage (..)
   , prettyPrintUsage
   ) where
@@ -7,7 +7,7 @@ import Prelude
 import Data.List (List())
 import Data.Foldable (intercalate)
 
-import Language.Docopt.Parser.Usage.Argument as U
+import Language.Docopt.SpecParser.Usage.Argument as U
 data Usage = Usage String (List U.Branch)
 
 instance showUsage :: Show Usage where

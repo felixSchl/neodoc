@@ -21,7 +21,7 @@ describe('neodoc', () => {
       expect(git('branch -u origin master'))
         .to.deep.equal({
           branch: true
-        , '<branchname>': 'master'
+        , '<branchname>': [ 'master' ]
         , '-u': 'origin'
         , '--set-upstream-to': 'origin'
         });

@@ -1,4 +1,4 @@
-module Language.Docopt.Compiler.Token (
+module Language.Docopt.ArgParser.Token (
     Token (..)
   , PositionedToken (..)
   , getSource

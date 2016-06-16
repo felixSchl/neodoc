@@ -1,4 +1,4 @@
-module Language.Docopt.Parser.Lexer where
+module Language.Docopt.SpecParser.Lexer where
 
 import Prelude
 import Data.Array as A
@@ -17,10 +17,10 @@ import Data.List (List(..), many, fromList, catMaybes)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (fromCharArray, trim)
 import Data.String.Ext ((^=))
-import Language.Docopt.Parser.Base (lowerAlphaNum, alphaNum, alpha, space,
+import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
                                    lowerAlpha, regex, upperAlpha, string',
                                    getPosition, getInput, spaces, eol)
-import Language.Docopt.Parser.State (ParserState)
+import Language.Docopt.SpecParser.State (ParserState)
 import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..),
                             runParserT, parseFailed, fail, runParser) as P
 import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,

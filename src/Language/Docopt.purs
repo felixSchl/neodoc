@@ -6,6 +6,7 @@
 
 module Language.Docopt (
     runDocopt
+  , preparseDocopt
   , parseDocopt
   , evalDocopt
   , Specification ()
@@ -26,13 +27,13 @@ import Language.Docopt.Errors (Argv, DocoptError(..), SolveError(..),
                               prettyPrintDocoptError
                               ) as D
 import Language.Docopt.Value (Value()) as D
-import Language.Docopt.Compiler  as G
+import Language.Docopt.ArgParser  as G
 import Language.Docopt.Trans.Flat as T
 
 import Language.Docopt.Scanner      as Scanner
 import Language.Docopt.Solver       as Solver
-import Language.Docopt.Parser.Usage as Usage
-import Language.Docopt.Parser.Desc  as Desc
+import Language.Docopt.SpecParser.Usage as Usage
+import Language.Docopt.SpecParser.Desc  as Desc
 
 type Specification = List D.Usage
 
@@ -68,14 +69,31 @@ data Origin
 -- | Parse the docopt text and produce a parser
 -- | that can be applied to user input.
 -- |
+preparseDocopt
+  :: forall r
+   .  String           -- ^ The docopt text
+  -> ParseOptionsObj r -- ^ Parse options
+  -> Either String { usages       :: List Usage.Usage
+                   , descriptions :: List Desc.Desc
+                   }
+preparseDocopt docopt options = do
+  doc <- toScanErr       $ Scanner.scan $ dedent docopt
+  us  <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
+  ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
+  pure { descriptions: ds, usages: us }
+
+-- |
+-- | Parse the docopt text and produce a parser
+-- | that can be applied to user input.
+-- |
 parseDocopt
   :: forall r
    .  String           -- ^ The docopt text
   -> ParseOptionsObj r -- ^ Parse options
   -> Either String Docopt
-parseDocopt docopt opts = do
+parseDocopt docopt options = do
   doc <- toScanErr       $ Scanner.scan $ dedent docopt
-  us  <- toUsageParseErr $ Usage.run doc.usage opts.smartOptions
+  us  <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve us ds
   pure $ { specification: prg
@@ -92,11 +110,9 @@ evalDocopt
   -> Array String     -- ^ The user input
   -> EvalOptionsObj r -- ^ The eval opts
   -> Either String (StrMap D.Value)
-evalDocopt prg env argv opts = do
-  vs <- toUserParseErr argv
-          $ G.runParser env argv
-            $ G.genParser prg opts
-  pure $ uncurry (T.reduce prg env) vs
+evalDocopt spec env argv options = do
+  vs <- toUserParseErr argv $ G.run spec env argv options
+  pure $ uncurry (T.reduce spec env) vs
 
 -- |
 -- | Parse the docopt source, derive a parser and then
@@ -107,11 +123,11 @@ runDocopt
    . String         -- ^ The docopt text
   -> StrMap String  -- ^ The environment
   -> Array String   -- ^ The user input
-  -> Options r      -- ^ Parse and eval opts
+  -> Options r      -- ^ Parse and eval options
   -> Either String (StrMap D.Value)
-runDocopt docopt env argv opts = do
-  { specification } <- parseDocopt docopt opts
-  evalDocopt specification env argv opts
+runDocopt docopt env argv options = do
+  { specification } <- parseDocopt docopt options
+  evalDocopt specification env argv options
 
 toScanErr :: forall a. Either P.ParseError a -> Either String a
 toScanErr  = lmap (D.prettyPrintDocoptError <<< D.DocoptScanError)

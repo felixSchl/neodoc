@@ -1,4 +1,4 @@
-module Language.Docopt.Parser.Usage.Option (
+module Language.Docopt.SpecParser.Usage.Option (
     OptionArgumentObj ()
   , LOptObj ()
   , SOptObj ()
