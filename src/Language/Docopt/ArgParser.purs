@@ -1,4 +1,4 @@
-module Language.Docopt.Compiler (
+module Language.Docopt.ArgParser (
     run
   , Result ()
   , Options ()
@@ -18,10 +18,10 @@ import Text.Parsing.Parser.Pos (initialPos) as P
 import Language.Docopt.Argument (Branch) as D
 import Language.Docopt.Usage (Program) as D
 import Language.Docopt.Env (Env) as D
-import Language.Docopt.Compiler.Parser (spec, initialState, ValueMapping(),
+import Language.Docopt.ArgParser.Parser (spec, initialState, ValueMapping(),
                                         Options()) as P
-import Language.Docopt.Compiler.Lexer (lex, Options()) as L
-import Language.Docopt.Compiler.Parser (ValueMapping()) as Reexport
+import Language.Docopt.ArgParser.Lexer (lex, Options()) as L
+import Language.Docopt.ArgParser.Parser (ValueMapping()) as Reexport
 
 
 type Result = Tuple D.Branch (List P.ValueMapping)

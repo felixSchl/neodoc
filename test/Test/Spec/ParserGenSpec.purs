@@ -1,4 +1,4 @@
-module Test.Spec.CompilerSpec (parserGenSpec) where
+module Test.Spec.ArgParserSpec (parserGenSpec) where
 
 import Prelude
 import Debug.Trace
@@ -32,7 +32,7 @@ import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage
 import Language.Docopt.Env (Env())
-import Language.Docopt.Compiler (run) as Compiler
+import Language.Docopt.ArgParser (run) as ArgParser
 import Language.Docopt.Argument   as D
 import Language.Docopt.Env        as Env
 import Language.Docopt.Trans.Flat as T
@@ -902,7 +902,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                             -> Eff (err :: EXCEPTION | eff) Unit
       validate spec argv env options expected = do
         let result = uncurry (T.reduce spec env) <$> do
-                      Compiler.run spec
+                      ArgParser.run spec
                                    env
                                    argv
                                    (fromMaybe defaultOptions options)
