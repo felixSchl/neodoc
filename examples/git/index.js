@@ -25,7 +25,7 @@ to read about a specific subcommand or concept.
 
 if (args['<command>']) {
   require(`./${args['<command>']}`)(
-    args['<command>'].concat(args['<args>']));
+    [args['<command>']].concat(args['<args>']));
 } else {
   echo(JSON.stringify(args));
 }

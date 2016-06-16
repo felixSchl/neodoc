@@ -18,11 +18,6 @@ options:
     -f, --force           force overwrite of local branch
     -m, --multiple        fetch from multiple remotes
     -t, --tags            fetch all tags and associated objects
-`
-    // Refer to #34.
-    //-n                    do not fetch all tags (--no-tags)
-+
-`
     -p, --prune           prune remote-tracking branches no longer on remote
     --recurse-submodules[=<on-demand>]
                           control recursive fetching of submodules

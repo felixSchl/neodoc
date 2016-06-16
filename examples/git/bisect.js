@@ -34,7 +34,7 @@ git bisect run <cmd>...
 Please use "git help bisect" to get the full man page.
 `
 
-const args = require('../..').run(help);
+const args = require('../..').run(help, { argv: argv, smartOptions: true });
 
 // The `git bisect -h` output is a bit unconventional, so this is not really
 // examplary of how to use neodoc idiomatically. Key is: if it's really

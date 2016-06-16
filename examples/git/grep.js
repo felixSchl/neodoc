@@ -45,11 +45,6 @@ options:
                           show <n> context lines before matches
     -A, --after-context <n>
                           show <n> context lines after matches
-`
-    // Refer to #34.
-    // -N=n                  shortcut for -C NUM
-+
-`
     -p, --show-function   show a line with the function name before matches
     -W, --function-context
                           show the surrounding function
@@ -57,10 +52,10 @@ options:
     -f <file>             read patterns from file
     -e <pattern>          match <pattern>
     --and                 combine patterns specified with -e
-    --or                  
-    --not                 
-    (                     
-    )                     
+    --or
+    --not
+    (
+    )
     -q, --quiet           indicate hit with exit status without output
     --all-match           show only matches from files that match all patterns
 
