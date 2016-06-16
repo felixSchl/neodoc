@@ -75,7 +75,7 @@ parseToken = do
     lopt = do
       P.string "--"
       xs <- fromCharArray <$> do
-        A.some $ P.noneOf [ '=' ]
+        A.some $ P.noneOf [ '=', ' ' ]
       arg <- P.optionMaybe arg
       P.eof
       pure $ LOpt xs arg

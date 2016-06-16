@@ -86,7 +86,7 @@ reduce us env b vs =
                         if D.isFlag a || D.isCommand a
                           then case rv.value of
                             ArrayValue xs -> pure
-                              if all isBoolValue xs
+                              if all isBoolValue xs && A.length xs > 0
                                 then
                                   IntValue (A.length $ flip A.filter xs \x ->
                                       case x of
@@ -105,7 +105,6 @@ reduce us env b vs =
                           else Nothing
                     in flip Tuple (RichValue $ rv { value = v }) <$> do
                         toList $ toKeys a
-
 
 -- | Reduce a usage application specification down to a list of unique
 -- | arguments, merging declarations where requried. This will later indicate

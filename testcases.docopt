@@ -1356,7 +1356,7 @@ Usage: foo [[<args>...]]
 """
 
 $ prog/p
-{}
+{"<args>": []}
 
 $ prog/p bar -a -b -c
 {"<args>": ["bar", "-a", "-b", "-c"]}

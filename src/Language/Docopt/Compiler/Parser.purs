@@ -149,92 +149,171 @@ stdin = token go P.<?> "-"
     go Stdin = Just (BoolValue true)
     go _     = Nothing
 
-type HasConsumedArg = Boolean
-data OptParse = OptParse Value (Maybe Token) HasConsumedArg
+type OptParse = {
+  rawValue       :: Maybe String -- the value (in source form) of this option
+, remainder      :: Maybe Token  -- the remaining token if unconsumed
+, hasConsumedArg :: Boolean      -- has the option consumed the adjacent arg?
+}
 
-longOption :: String -> (Maybe D.OptionArgumentObj) -> Parser Value
-longOption n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+longOption :: Boolean -> String -> (Maybe D.OptionArgumentObj) -> Parser Value
+longOption term n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   pure $ case toks of
     Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks npos e
-        Right (OptParse v newtok hasConsumedArg) ->
-          { consumed: maybe true (const false) newtok
-          , input:    let pushed = maybe empty
-                                         (\v' -> singleton $ PositionedToken {
-                                                  token:     v'
-                                                , sourcePos: pos
-                                                , source:    s
-                                                }
-                                          )
-                                          newtok
-                          rest   = if hasConsumedArg then LU.tail xs else xs
-                       in pushed <> rest
-          , result:   Right v
-          , position: maybe pos
-                            (_.sourcePos <<< unPositionedToken)
-                            (head xs)
-          }
+        Right result -> do
+          let value = fromMaybe (BoolValue true) do
+                                rawValue <- result.rawValue
+                                pure (Value.read rawValue false)
+          if term
+            then
+              -- consume the rest of the source of this short option into a
+              -- single value.
+              { consumed: true
+              , input:    if result.hasConsumedArg then LU.tail xs else xs
+              , result:
+                  let
+                    -- recover the argument in it's string form.
+                    va = maybe []
+                               (A.singleton <<< StringValue)
+                               result.rawValue
+                  in Right (ArrayValue va)
+              , position: pos
+              }
+            else
+              { consumed: maybe true (const false) result.remainder
+              , input:
+                  let pushed = maybe empty
+                                      (\v' -> singleton $ PositionedToken {
+                                                token:     v'
+                                              , sourcePos: pos
+                                              , source:    s
+                                              }
+                                       )
+                                       result.remainder
+                      rest = if result.hasConsumedArg
+                                then LU.tail xs
+                                else xs
+                    in pushed <> rest
+              , result:   Right value
+              , position: maybe pos
+                                (_.sourcePos <<< unPositionedToken)
+                                (head xs)
+              }
     _ -> P.parseFailed toks pos "Expected token, met EOF"
 
   where
     isFlag = isNothing a
+
+    -- case 0:
+    -- The name is an exact match and found in 'options.stopAt'.
+    -- Note that the option may *NOT* have an explicitly assigned
+    -- option-argument. Finally, let the caller do the actual termination
+    -- (updating parser state / consuming all input)
+    go (LOpt n' Nothing) _ | (n' == n) && term
+      = pure { rawValue:       Nothing
+             , remainder:      Nothing
+             , hasConsumedArg: false
+             }
 
     -- case 1:
     -- The name is an exact match
     go (LOpt n' v) atok | (not isFlag) && (n' == n)
       = case v of
           Just s ->
-            pure $ OptParse (Value.read s false) Nothing false
+            pure { rawValue:       Just s
+                 , remainder:      Nothing
+                 , hasConsumedArg: false
+                 }
           _  -> case atok of
-            Just (Lit s) -> pure $ OptParse (Value.read s false)  Nothing true
+            Just (Lit s) ->
+              pure { rawValue:       Just s
+                   , remainder:      Nothing
+                   , hasConsumedArg: true
+                   }
             otherwise    ->
-              if (fromMaybe true (_.optional <$> a))
-                 then Right $ OptParse (BoolValue true) Nothing false
-                 else Left  $ "Option requires argument: --" <> n'
+              if term || (fromMaybe true (_.optional <$> a))
+                 then pure { rawValue:       Nothing
+                           , remainder:      Nothing
+                           , hasConsumedArg: false
+                           }
+                 else Left $ "Option requires argument: --" <> n'
 
     -- case 2:
     -- The name is an exact match and takes no argument
     go (LOpt n' v) _ | isFlag && (n' == n)
       = case v of
              Just _  -> Left $ "Option takes no argument: --" <> n'
-             Nothing -> pure $ OptParse (BoolValue true) Nothing false
+             Nothing -> pure { rawValue:       Nothing
+                             , remainder:      Nothing
+                             , hasConsumedArg: false
+                             }
 
     -- case 3:
     -- The name is a substring of the input and no explicit argument has been
     -- provdided.
     go (LOpt n' Nothing) _ | not isFlag
       = case stripPrefix n n' of
-          Just s -> pure $ OptParse (Value.read s false) Nothing false
-          _      -> Left "Invalid substring"
+          Just s ->
+            pure { rawValue:       Just s
+                 , remainder:      Nothing
+                 , hasConsumedArg: false
+                 }
+          otherwise -> Left "Invalid substring"
 
     go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
 
-shortOption :: Char -> (Maybe D.OptionArgumentObj) -> Parser Value
-shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
+shortOption
+  :: Boolean
+  -> Char
+  -> (Maybe D.OptionArgumentObj)
+  -> Parser (Tuple Value Boolean)
+shortOption term f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
   pure $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks pos e
-        Right (OptParse v newtok hasConsumedArg) ->
-          { consumed: maybe true (const false) newtok
-          , input:
-              let
-                pushed = maybe empty
-                                (\v' ->
-                                  singleton
-                                    $ PositionedToken
-                                        { token:     v'
-                                        , sourcePos: pos
-                                        , source:    "-" <> String.drop 2 s
-                                        })
-                                newtok
-                rest = if hasConsumedArg then LU.tail xs else xs
-              in pushed <> rest
-          , result:   Right v
-          , position: maybe pos
-                            (_.sourcePos <<< unPositionedToken)
-                            (head xs)
+        Right result -> do
+          let value = fromMaybe (BoolValue true) do
+                                rawValue <- result.rawValue
+                                pure (Value.read rawValue false)
+          if term && isNothing result.remainder
+            then
+              -- consume the rest of the source of this short option into a
+              -- single value.
+              { consumed: true
+              , input:    if result.hasConsumedArg then LU.tail xs else xs
+              , result:
+                  let
+                    -- recover the argument in it's string form.
+                    v = maybe []
+                              (\_ -> [ StringValue $ String.drop 2 s ])
+                              result.remainder
+                    va = maybe []
+                               (A.singleton <<< StringValue)
+                               result.rawValue
+                  in Right (Tuple (ArrayValue $ v <> va) true)
+              , position: pos
+              }
+            else
+              { consumed: maybe true (const false) result.remainder
+              , input:
+                  let
+                    pushed = maybe empty
+                                    (\v' ->
+                                      singleton
+                                        $ PositionedToken
+                                            { token:     v'
+                                            , sourcePos: pos
+                                            , source:    "-" <> String.drop 2 s
+                                            })
+                                    result.remainder
+                    rest = if result.hasConsumedArg then LU.tail xs else xs
+                  in pushed <> rest
+              , result:   Right (Tuple value false)
+              , position: maybe pos
+                                (_.sourcePos <<< unPositionedToken)
+                                (head xs)
           }
     _ -> P.parseFailed toks pos "Expected token, met EOF"
 
@@ -246,12 +325,23 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     -- argument may have been passed.
     go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.null xs)
       = case v of
-          Just s    -> pure $ OptParse (Value.read s false) Nothing false
+          Just s ->
+            pure { rawValue:       Just s
+                 , remainder:      Nothing
+                 , hasConsumedArg: false
+                 }
           otherwise -> case atok of
-            Just (Lit s) -> pure $ OptParse (Value.read s false) Nothing true
-            otherwise    ->
-              if (fromMaybe true (_.optional <$> a))
-                 then Right $ OptParse (BoolValue true) Nothing false
+            Just (Lit s) ->
+              pure { rawValue:       Just s
+                   , remainder:      Nothing
+                   , hasConsumedArg: true
+                   }
+            otherwise ->
+              if term || (fromMaybe true (_.optional <$> a))
+                 then pure { rawValue:       Nothing
+                           , remainder:      Nothing
+                           , hasConsumedArg: false
+                           }
                  else  Left $ "Option requires argument: -" <> fromChar f'
 
     -- case 2:
@@ -260,17 +350,19 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
       = do
         let arg = fromCharArray xs <> maybe "" ("=" <> _) v
-        pure $ OptParse (Value.read arg false)
-                          Nothing
-                          false
+        pure { rawValue:       Just arg
+             , remainder:      Nothing
+             , hasConsumedArg: false
+             }
 
     -- case 3:
     -- The leading flag matches, there are stacked options, the option takes
     -- no argument and an explicit argument has not been provided.
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
-      = pure $ OptParse (BoolValue true)
-                          (Just $ SOpt (AU.head xs) (AU.tail xs) v)
-                          false
+      = pure { rawValue:       Nothing
+             , remainder:      pure (SOpt (AU.head xs) (AU.tail xs) v)
+             , hasConsumedArg: false
+             }
 
     -- case 4:
     -- The leading flag matches, there are no stacked options and the option
@@ -278,9 +370,10 @@ shortOption f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
       = case v of
               Just _  -> Left $ "Option takes no argument: -" <> fromChar f'
-              Nothing -> pure $ OptParse (BoolValue true)
-                                            Nothing
-                                            false
+              Nothing -> pure { rawValue:       Nothing
+                              , remainder:      Nothing
+                              , hasConsumedArg: false
+                              }
 
     go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
 
@@ -291,6 +384,8 @@ eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
     (Cons (PositionedToken {token: tok, source}) _) ->
       P.parseFailed s pos
         $ case tok of
+              -- XXX: Check if the command or option is known anywhere
+              --      in the spec and change the error message accordingly
               LOpt _ _   -> "Unmatched option: " <> source
               SOpt _ _ _ -> "Unmatched option: " <> source
               EOA _      -> "Unmatched option: --"
@@ -411,10 +506,12 @@ clumpP options skippable isSkipping l c = do
     <> ", skippable: "   <> show skippable
     <> ", isSkipping: "  <> show isSkipping
     <> ", input: "       <> show (intercalate " " $ Token.getSource <$> i)
-
   go skippable isSkipping l c
+
   where
-  go _         _          l (Fixed xs) = concat <$> for xs (argP' options false false l)
+  go _ _ l (Fixed xs)
+    = concat <$> for xs (argP' options skippable isSkipping l)
+
   go skippable isSkipping l (Free  xs) = draw (Required <$> xs) (length xs)
     where
 
@@ -580,20 +677,10 @@ argP
   -> Parser (List ValueMapping)
 
 -- Terminate at singleton groups that house only positionals.
-argP options _ _ _ x@(D.Group (grp@{ branches: Cons branch Nil }))
-  | options.optionsFirst &&
-      case branch of
-        Cons (D.Positional pos) Nil -> pos.repeatable || grp.repeatable
-        _                           -> false
-  = terminate (LU.head branch) true
-
--- Terminate at option if part of 'stopAt'
-argP options _ _ _ x@(D.Option o) |
-  let names = A.catMaybes [ ("--" ++ _) <$> o.name
-                          , ("-"  ++ _) <<< fromChar <$> o.flag
-                          ]
-    in any (_ `elem` options.stopAt) names
-  = terminate x false
+argP options _ _ _ (D.Group (grp@{ branches: Cons (Cons (x@(D.Positional pos)) Nil) Nil }))
+  | options.optionsFirst && (pos.repeatable || grp.repeatable)
+  = singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> do
+      terminate x
 
 -- The recursive branch of the argv argument parser.
 -- For groups, each branch is run and analyzed.
@@ -623,11 +710,13 @@ argP options skippable isSkipping l g@(D.Group grp) = do
         else pure acc
 
 argP options _ _ _ x@(D.Positional pos)
-  | pos.repeatable && options.optionsFirst = terminate x true
+  | pos.repeatable && options.optionsFirst
+  = singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> do
+      terminate x
 
 -- The non-recursive branch of the argv argument parser.
 -- All of these parsers consume one or more adjacent arguments from argv.
-argP _ _ _ _ x = getInput >>= \i -> (
+argP options _ _ _ x = getInput >>= \i -> (
   (if D.isRepeatable x then some else liftM1 singleton) do
     Tuple x <<< (RValue.from Origin.Argv) <$> do
       P.ParserT \s -> do
@@ -656,7 +745,7 @@ argP _ _ _ _ x = getInput >>= \i -> (
   go (D.Command    cmd) = command    cmd.name
   go (D.Stdin         ) = stdin
   go (D.EOA           ) = eoa <|> (pure $ ArrayValue [])
-  go (D.Option       o) = do
+  go (x@(D.Option   o)) = do
     -- Perform a pre-cursory test in order to capture relevant error
     -- messags which would otherwise be overriden (e.g. a meaningful
     -- error message when trying to match a LOpt against a LOpt would
@@ -665,11 +754,28 @@ argP _ _ _ _ x = getInput >>= \i -> (
     isLoptAhead <- P.option false (P.lookAhead $ P.try $ token isAnyLopt)
     isSoptAhead <- P.option false (P.lookAhead $ P.try $ token isAnySopt)
 
+    let
+      term = any (_ `elem` options.stopAt)
+                 (A.catMaybes [ ("--" <> _)               <$> o.name
+                              , (("-" <> _) <<< fromChar) <$> o.flag
+                              ])
     case o.name of
-      Just n  | isLoptAhead -> longOption n o.arg
+      Just n  | isLoptAhead -> do
+        v <- longOption term n o.arg
+        if term
+            then do
+              vs <- terminate x
+              pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
+            else pure v
       otherwise ->
         case o.flag of
-          Just c | isSoptAhead -> shortOption c o.arg
+          Just c | isSoptAhead -> do
+            (Tuple v canTerm)  <- shortOption term c o.arg
+            if term && canTerm
+                then do
+                  vs <- terminate x
+                  pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
+                else pure v
           otherwise -> do
             P.fail "Expected long or short option"
     where
@@ -761,16 +867,12 @@ evalParsers parsers p = do
       )
       fatal
 
- -- Terminate the parser at the given argument and collect all subsequent
--- values int an array ("options-first")
-terminate :: D.Argument -> Boolean -> Parser (List ValueMapping)
-terminate arg includeSelf = do
+-- Terminate the parser at the given argument and collect all subsequent
+-- values int an array ("options-first" and "stop-at")
+terminate :: D.Argument -> Parser Value
+terminate arg = do
   input <- getInput
-  let rest = Tuple arg <<< (RValue.from Origin.Argv) <$> do
-                StringValue <<< Token.getSource <$>
-                  if includeSelf
-                       then input
-                       else fromMaybe Nil (tail input)
+  let rest = ArrayValue $ fromList $ StringValue <<< Token.getSource <$> input
   markDone
   modifyDepth (const 99999)
   P.ParserT \(P.PState { position: pos }) ->
