@@ -276,7 +276,6 @@ if (args['<command>'] === 'remote') {
 * [x] Allow for `--foo[=<bar>]` syntax (git style).
 * [x] Auto-infer types when not specified (e.g. numbers, strings, booleans)
 * [x] Implement `[-f BAR]` flag syntax ("smart-options")
-* [ ] Allow flag negation syntax `--[no-]foo`: `--foo`, `--no-foo`, `-f`, `+f`
 * [x] Fix all purescript (pscid) warnings
 
 ### Wishlist ###
@@ -291,14 +290,7 @@ if (args['<command>'] === 'remote') {
 * Syntax plugins (vim, ...)
 * Put the "source" of a parsed option's value into the output, e.g. "env",
   "default", "user"
-* Consider  `+o` syntax: `-o, --option` and its negation: `--no-option` or
-  `+o`.
-* Provide warnings. This would mean a largish refactor to use either a custom
-  monad, or the Writer monad, stacked on top of the Either monad.
-* Refactor `Language.Docopt.Compiler.Parser.genBranchParser` to use manual
-  recursive iteration, rather than a fold, like in `Language.Docopt.Solver`.
-* Rewrite recursive functions to be in tail position, using
-  `purescript-tailrec` and consider trampolining using `purescript-free`.
+* Provide warnings
 
 ## Contributing ##
 
