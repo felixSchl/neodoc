@@ -84,7 +84,7 @@ npm install --save neodoc
 
 ## Usage ##
 
-### neodoc.run(docopt, opts)
+### neodoc.run(helpText, opts)
 
 Parse and apply the given docopt help text. If no options are provided, apply
 it to `process.argv` and `process.env`. The result is a mapping of key -> value,
@@ -103,10 +103,10 @@ Options:
 * `opts.stopAt` - Stop parsing at the given options, i.e. `[ -n ]`. It's value
   will be the rest of argv.
 
-### neodoc.parse(docopt, opts)
+### neodoc.parse(helpText, opts)
 
 Parse the docopt specification. This is the canonical representation of the
-CLI as described by it's help text.
+CLI as described by it's help text and can be used for building parsers etc.
 
 Options:
 
@@ -227,7 +227,7 @@ if (args['<command>'] === 'remote') {
 
 > **Neodoc** is fully usable and well-tested. If you find there is something
 > broken or unintuitive about neodoc, please do [open an issue][issue-tracker].
-> The following gives on overview of where docopt is headed.
+> The following gives on overview of where neodoc is headed.
 
 ### Beta Target (complete) ####
 
@@ -249,7 +249,7 @@ if (args['<command>'] === 'remote') {
 
 ### Post-Beta Roadmap ####
 
-> Overview of where docopt is headed, ordered (somewhat) by estimated priority.
+> Overview of where neodoc is headed, ordered (somewhat) by estimated priority.
 
 * [x] Implement "options-first"
 * [x] Improve scanner speed
