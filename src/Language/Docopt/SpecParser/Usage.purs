@@ -108,14 +108,14 @@ usageParser smartOpts = do
 
     elem :: L.TokenParser Argument
     elem = defer \_ -> do
-      P.choice $ P.try <$>
+      (P.choice $ P.try <$>
         [ option
         , positional
         , command
         , (if smartOpts then trySmartOpt else id) <$> group
         , reference
         , stdin
-        ] <?> "Option, Positional, Command, Group or Reference"
+        ]) <?> "Option, Positional, Command, Group or Reference"
 
     trySmartOpt :: Argument -> Argument
     trySmartOpt grp'@(Group grp) = fromMaybe grp' $ do

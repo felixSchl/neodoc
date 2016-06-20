@@ -12,8 +12,8 @@ module Language.Docopt.Value (
 import Prelude
 import Data.Generic (class Generic)
 import Data.Either (Either(), either)
-import Data.Maybe.Unsafe (fromJust)
-import Data.List (List(..), fromList, many, some)
+import Data.Maybe (fromJust)
+import Data.List (List(..), toUnfoldable, many, some)
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
 import Text.Parsing.Parser (ParseError, runParser) as P
@@ -23,6 +23,7 @@ import Language.Docopt.SpecParser.Base (digit)
 import Data.Array as A
 import Data.Int (toNumber, fromString) as Int
 import Data.String (fromCharArray)
+import Partial.Unsafe (unsafePartial)
 import Global (readFloat)
 
 data Value
@@ -110,13 +111,13 @@ parse s split = P.runParser s $ if split then values else value <* P.eof
 
       pure $ case vs of
             Cons x Nil -> x
-            _          -> ArrayValue (fromList vs)
+            _          -> ArrayValue (toUnfoldable vs)
 
     white = P.char ' ' <|> P.char '\n'
 
     inner = do
       P.try value <|> do StringValue <$> do
-                                  fromCharArray <<< fromList <$> do
+                                  fromCharArray <<< toUnfoldable <$> do
                                     many $ P.try (P.noneOf [',', ' ', '\n'])
 
     value = P.choice $ P.try <$> [ bool, number, quoted ]
@@ -130,7 +131,7 @@ parse s split = P.runParser s $ if split then values else value <* P.eof
             P.char '.'
             fromCharArray <$> A.some digit
           pure $ xs <> "." <> xss
-      , pure $ IntValue $ si * (fromJust $ Int.fromString xs)
+      , pure $ IntValue $ si * (unsafePartial $ fromJust $ Int.fromString xs)
       ]
 
 
@@ -144,7 +145,7 @@ parse s split = P.runParser s $ if split then values else value <* P.eof
           pure $ BoolValue false
 
     quoted = StringValue <$> do
-      fromCharArray <<< fromList <$> do
+      fromCharArray <<< toUnfoldable <$> do
         P.choice [
           P.between (P.char '"')  (P.char '"')  (many $ P.noneOf ['"'])
         , P.between (P.char '\'') (P.char '\'') (many $ P.noneOf ['\''])

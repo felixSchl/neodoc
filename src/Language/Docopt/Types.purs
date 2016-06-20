@@ -4,6 +4,8 @@ import Prelude
 import Data.List (List(Nil, Cons), reverse)
 import Data.Generic (class Generic, gShow)
 import Text.Wrap (dedent)
+import Text.Parsing.Parser (ParseError(..)) as P
+import Text.Parsing.Parser.Pos (Position) as P
 
 mapWithIndex :: forall a b. (a -> Int -> b) -> List a -> List b
 mapWithIndex f lst = reverse $ go 0 lst Nil
@@ -14,9 +16,6 @@ mapWithIndex f lst = reverse $ go 0 lst Nil
 --------------------------------------------------------------------------------
 -- Errors (XXX: needs migration and improvement) -------------------------------
 --------------------------------------------------------------------------------
-
-import Text.Parsing.Parser (ParseError(ParseError)) as P
-import Text.Parsing.Parser.Pos (Position) as P
 
 type Argv = Array String
 newtype SolveError = SolveError String

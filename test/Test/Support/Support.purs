@@ -2,7 +2,7 @@ module Test.Support where
 
 import Prelude
 import Data.Map (Map())
-import qualified Data.Map as Map
+import Data.Map as Map
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.List (length)
 import Data.Foldable (intercalate)
@@ -10,7 +10,9 @@ import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff(), liftEff')
 import Control.Monad.Eff
-import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
+import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
+import Control.Monad.Eff.Exception (error, throwException, EXCEPTION(),
+                                    catchException, Error())
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
 
@@ -36,6 +38,27 @@ prettyPrintMap m pK pV =
     in if length xs == 0
           then "{}"
           else "{ "
-            ++ (intercalate "\n, " $ xs <#> \(Tuple k v) ->
-                                                pK k ++ " => " ++ pV v)
-            ++ "\n}"
+            <> (intercalate "\n, " $ xs <#> \(Tuple k v) -> pK k <> " => " <> pV v)
+            <> "\n}"
+
+type Assertion e = Eff (err :: EXCEPTION | e) Unit
+
+assertEqual :: forall e a. (Eq a, Show a) => a -> a -> Assertion e
+assertEqual expected actual =
+  unless (actual == expected) (throwException (error msg))
+    where msg = "expected: " <> show expected
+             <> ", but got: " <> show actual
+
+shouldEqual :: forall e a. (Eq a, Show a) => a -> a -> Assertion e
+shouldEqual = flip assertEqual
+
+assertThrows :: forall e a. (Error -> Boolean)
+             -> Eff (err :: EXCEPTION | e) Unit -> Assertion e
+assertThrows p m = do
+  r <- unsafeInterleaveEff $ catchException (pure <<< pure) (Nothing <$ m)
+  case r of
+       Nothing -> throwException (error "Missing exception")
+       Just  e ->
+        if p e
+          then pure unit
+          else throwException (error $ "Expected an exception, but got: " <> show e)

@@ -10,9 +10,8 @@ import Data.List (List(), many)
 import Text.Parsing.Parser (PState(..), ParserT(..)) as P
 import Text.Parsing.Parser.Pos (Position(..)) as P
 import Text.Parsing.Parser.String (satisfy, char, string) as P
-import Data.String.Regex as Regex
 import Data.Array as A
-import Data.Char (toString, toLower, toUpper, toCharCode)
+import Data.Char (toLower, toUpper, toCharCode)
 import Data.String (toCharArray, fromCharArray)
 import Data.Maybe (Maybe(Nothing, Just))
 import Data.Either (Either(Right))
@@ -60,10 +59,6 @@ getInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 
 traceInput :: forall a m. (Show a, Monad m) => P.ParserT a m Unit
 traceInput = getInput >>= debug
-
-regex :: forall m. (Monad m) => String -> P.ParserT String m Char
-regex s = P.satisfy \c ->
-  Regex.test (Regex.regex s Regex.noFlags) (toString c)
 
 satisfyCode :: forall m. (Monad m) => (Int -> Boolean) -> P.ParserT String m Char
 satisfyCode f = P.satisfy \c -> f (toCharCode c)

@@ -8,28 +8,26 @@ import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION(), error, throwException)
 import Control.Monad.Error.Class (throwError)
-import Data.List (List(..), length, (!!), take, toList, singleton)
+import Data.List (List(..), length, (!!), take, fromFoldable, singleton)
 import Data.Either (Either(..), isRight, isLeft, either)
-import Data.Either.Unsafe (fromLeft, fromRight)
-import Data.Maybe.Unsafe (fromJust)
 import Data.Maybe (Maybe(..))
 import Data.Foldable (intercalate, foldMap, traverse_, for_)
 import Data.Array ((..))
 
 import Language.Docopt
-import qualified Test.Support.Usage                    as U
-import qualified Language.Docopt.SpecParser.Usage          as U
-import qualified Language.Docopt.SpecParser.Usage.Argument as U
-import qualified Language.Docopt.SpecParser.Lexer          as Lexer
-import qualified Language.Docopt.Scanner               as Scanner
+import Test.Support.Usage                        as U
+import Language.Docopt.SpecParser.Usage          as U
+import Language.Docopt.SpecParser.Usage.Argument as U
+import Language.Docopt.SpecParser.Lexer          as Lexer
+import Language.Docopt.Scanner                   as Scanner
 import Language.Docopt.SpecParser.Base (debug)
 import Text.Wrap (dedent)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
-import Test.Assert.Simple
-import Test.Support (vliftEff, runMaybeEff, runEitherEff)
+import Test.Support (vliftEff, runMaybeEff, runEitherEff, assertEqual, shouldEqual,
+                    assertThrows)
 
 data Expected a = F | P a
 
@@ -44,22 +42,6 @@ arg   n        = arg' n false
 
 usageParserSpec = \_ ->
   describe "The usage parser" do
-
-    -- Test commands.
-    -- Commands are the least considered type of token.
-    -- Only after the token is not considered a positional or
-    -- option, it defaults to being a command (given that the
-    -- command parer succeeds).
-    it "should parse commands" do
-      vliftEff do
-        usage <- runEitherEff do
-          toks <- Lexer.lexUsage "foo bar"
-          U.parse false toks
-               -- ^ Disable "smart-options"
-        assertEqual 1 (length usage)
-        (U.Usage _ u) <- runMaybeEff $ usage !! 0
-        g <- runMaybeEff $ u !! 0
-        flip assertEqual g (Cons (U.co "bar") Nil)
 
     -- Test positionals in various formats.
     -- Each entry is run for both singular and repeated version.
@@ -228,49 +210,10 @@ usageParserSpec = \_ ->
         , pass "[foo-options...]" $ [[[ U.ref "foo" ]]]
         ]
 
-    -- | Test the scanner and lexer in combination with the parser.
-    -- | This validates that the program source can successfully extracted
-    -- | from the - possibly - unstructured usage description text.
-    it "should parse scanned and lexed usage sections" do
-      vliftEff do
-
-        -- Scan, lex and parse the usage section
-        usage <- runEitherEff do
-          docopt <- Scanner.scan $
-            dedent
-              """
-              Usage: foo foo | bar aux
-                    foo (bar qux)
-              NOT PART OF SECTION
-              """
-          toks <- Lexer.lexUsage docopt.usage
-          U.parse false toks
-                -- ^ Disable "smart-options"
-        assertEqual 2 (length usage)
-
-        -- Validate the first usage
-        (U.Usage _ u0) <- runMaybeEff $ usage !! 0
-        assertEqual 2 (length u0)
-
-        -- Validate the left half of the mutex group
-        u0g0 <- runMaybeEff $ u0 !! 0
-        assertEqual 1 (length u0g0)
-
-        -- Validate the right half of the mutex group
-        u0g1 <- runMaybeEff $ u0 !! 1
-        assertEqual 2 (length u0g1)
-
-        -- Validate the second usage
-        (U.Usage _ u1) <- runMaybeEff $ usage !! 1
-        assertEqual 1 (length u1)
-
-        u1g0 <- runMaybeEff $ u1 !! 0
-        assertEqual 1 (length u1g0)
-
   where
 
     kase :: forall a. String -> Expected a -> { i :: String, o :: Expected a }
-    kase i o = { i: i, o: o }
+    kase i o = { i, o }
 
     pass :: forall a. String -> a -> { i :: String, o :: Expected a }
     pass i o = kase i (P o)
@@ -278,57 +221,58 @@ usageParserSpec = \_ ->
     fail :: forall a. String -> { i :: String, o :: Expected a }
     fail i = kase i F
 
+    runTests :: _
     runTests xs =
-      for_ xs \{ i: i, o: o } -> do
-        let input = "foo " ++ i
+      for_ xs \{ i, o } -> do
+        let input = "foo " <> i
         case o of
           P expected -> do
             -- deeply convert array to list
             -- (array is used for readability above)
-            let expected' = (U.Usage "foo" <$> do
-                              (((toList <$>) <$>) toList
-                                              <$> toList
-                                              <$> toList expected))
+            let
+              expected'
+                = (U.Usage "foo" <$> do
+                      (((fromFoldable <$> _)  <$> _) fromFoldable
+                                              <$>    fromFoldable
+                                              <$>    fromFoldable expected))
             it (input
-                ++ " -> "
-                ++ intercalate "\n" (U.prettyPrintUsage <$> expected'))  do
+                <> " -> "
+                <> intercalate "\n" (U.prettyPrintUsage <$> expected'))  do
               vliftEff do
                 usages <- runEitherEff do
                   Lexer.lexUsage input >>= U.parse false
-                                                -- ^ Disable "smart-options"
                 flip assertEqual
                   (U.prettyPrintUsage <$> usages)
                   (U.prettyPrintUsage <$> expected')
-          _ -> do
-            it (input ++ " should fail") do
+          otherwise -> do
+            it (input <> " should fail") do
             vliftEff do
               assertThrows (const true) do
                 runEitherEff do
                   toks  <- Lexer.lexUsage input
                   usage <- U.parse false toks
-                                -- ^ Disable "smart-options"
-
                   debug usage
 
+    runSingleArgumentTests :: _
     runSingleArgumentTests xs =
-      for_ xs \{ i: i, o: o } -> do
+      for_ xs \{ i, o } -> do
         for_ [ false, true ] \isRepeated -> do -- Append "..." ?
           let ys = if isRepeated then (1 .. 2) else (1 .. 1)
           for_ ys \q -> do -- "..." vs " ..." (note the space)
-            let input = "foo " ++ i ++ (if isRepeated
+            let input = "foo " <> i <> (if isRepeated
                                       then (if q == 1 then "..." else " ...")
                                       else "")
             case o of
               P v -> do
                 let expected = v isRepeated
-                it (input ++ " -> " ++ U.prettyPrintArg expected)  do
+                it (input <> " -> " <> U.prettyPrintArg expected)  do
                   vliftEff do
                     usage <- runEitherEff do
                       Lexer.lexUsage input >>= U.parse false
                                                     -- ^ Disable "smart-options"
 
                     -- There should only be one top-level mutex group
-                    assertEqual 1 (length usage)
+                    (length usage) `shouldEqual` 1
                     (U.Usage _ u) <- runMaybeEff $ usage !! 0
                     g <- runMaybeEff $ u !! 0
                     let result = take 1 g
@@ -338,8 +282,8 @@ usageParserSpec = \_ ->
                       throwException $ error $
                         "Unexpected output:\n"
                           <> (U.prettyPrintUsage $ U.Usage "" (singleton result))
-              _ -> do
-                it (input ++ " should fail") do
+              otherwise -> do
+                it (input <> " should fail") do
                 vliftEff do
                   assertThrows (const true) do
                     runEitherEff do

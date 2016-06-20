@@ -6,7 +6,7 @@ module Language.Docopt.ArgParser (
   ) where
 
 import Prelude
-import Data.List (List(), toList)
+import Data.List (List(), fromFoldable)
 import Data.Either (Either())
 import Data.Tuple (Tuple(), fst)
 import Control.Monad.RWS (RWS(), evalRWS)
@@ -40,7 +40,7 @@ run
   -> Options r
   -> Either P.ParseError Result
 run spec env argv options = do
-  toks <- L.lex (toList argv) options
+  toks <- L.lex (fromFoldable argv) options
   fst $ evalRWS
           (P.runParserT
             (P.PState { input: toks, position: P.initialPos })

@@ -8,7 +8,7 @@ import Control.Monad (when)
 import Control.Monad.Eff.Exception (EXCEPTION())
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Either (Either(..), either)
-import Data.List (List(..), toList, length, fromList, singleton)
+import Data.List (List(..), fromFoldable, length, singleton)
 import Data.Map (Map(..))
 import Data.StrMap as StrMap
 import Data.StrMap (StrMap())
@@ -22,7 +22,6 @@ import Text.Parsing.Parser as P
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())
 import Test.Spec.Reporter.Console (consoleReporter)
-import Test.Assert.Simple
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
 import Test.Support.Arguments
 
@@ -79,7 +78,7 @@ pass ::  Maybe Options                -- ^ The options
 pass opts i o = { argv:     i
                 , env:      []
                 , options:  opts
-                , expected: Right $ StrMap.fromList $ toList o
+                , expected: Right $ StrMap.fromList $ fromFoldable o
                 }
 
 pass' :: Maybe Options                 -- ^ The options
@@ -90,7 +89,7 @@ pass' :: Maybe Options                 -- ^ The options
 pass' opts i e o = { argv:     i
                    , env:      e
                    , options:  opts
-                   , expected: Right $ StrMap.fromList $ toList o
+                   , expected: Right $ StrMap.fromList $ fromFoldable o
                    }
 
 fail  :: Maybe Options -- ^ The options
@@ -99,8 +98,7 @@ fail  :: Maybe Options -- ^ The options
       -> Case
 fail o i e = { argv: i, env: [],  expected: Left e, options: o }
 
-(:>) = Tuple
-infixr 0 :>
+infixr 0 Tuple as :>
 
 data TestArgs = TestRequired | TestOptional | TestNone
 
@@ -914,7 +912,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                 if (msg /= e')
                   then throwException $ error $
                     "Unexpected error:\n" <> msg
-                  else return unit)
+                  else pure unit)
               (const $ throwException $ error $ show e)
               expected
           Right r -> do
@@ -934,5 +932,5 @@ parserGenSpec = \_ -> describe "The parser generator" do
                   then throwException $ error $
                     "Unexpected output:\n"
                       <> prettyPrintOut r
-                  else return unit)
+                  else pure unit)
               expected

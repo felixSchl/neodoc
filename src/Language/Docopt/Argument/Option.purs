@@ -16,7 +16,7 @@ import Data.Function (on)
 import Control.Apply ((*>))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Generic (class Generic, gEq, gShow)
-import Data.String (fromChar)
+import Data.String (singleton) as String
 
 import Language.Docopt.Value (Value(..), prettyPrintValue)
 
@@ -90,7 +90,7 @@ prettyPrintOption :: OptionObj -> String
 prettyPrintOption o
   = short <> long <> arg' <> rep <> default <> env
   where
-    short = maybe "" (\f -> "-" <> (fromChar f)) o.flag
+    short = maybe "" (\f -> "-" <> (String.singleton f)) o.flag
     long  = maybe "" (const ", ") (o.flag *> o.name)
               <> maybe "" ("--" <> _) o.name
     rep  = if o.repeatable then "..." else ""
@@ -107,7 +107,7 @@ prettyPrintOptionNaked :: OptionObj -> String
 prettyPrintOptionNaked o
   = short <> long <> arg' <> rep
   where
-    short = maybe "" (\f -> "-" <> (fromChar f)) o.flag
+    short = maybe "" (\f -> "-" <> (String.singleton f)) o.flag
     long  = maybe "" (const "|") (o.flag *> o.name)
               <> maybe "" ("--" <> _) o.name
     rep  = if o.repeatable then "..." else ""

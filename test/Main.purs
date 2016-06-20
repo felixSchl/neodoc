@@ -26,7 +26,7 @@ main :: Eff ( err     :: EXCEPTION
             , fs      :: FS
             , console :: CONSOLE
             , assert  :: ASSERT
-            ) Unit
+            ) _
 main = launchAff do
   compatSpec <- genCompatSpec
   liftEff $ run [consoleReporter] do

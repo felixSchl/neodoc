@@ -9,7 +9,7 @@ import Control.Monad.Eff.Exception (error, throwException)
 import Control.Monad.State.Trans (StateT(StateT))
 import Data.Either (Either(..), either)
 import Data.Foldable (intercalate, for_)
-import Data.List (fromList)
+import Data.List (toUnfoldable)
 import Data.Maybe (Maybe(..))
 import Language.Docopt.Value (Value(..))
 import Test.Spec (describe, it)
@@ -324,29 +324,29 @@ descParserSpec = \_ ->
         runtest
   where
     runtest (TestCase { input, output }) = do
-      it (input ++ " " ++
-        (either (\msg -> "should fail with \"" ++ msg ++ "\"")
-                (\out -> "should succeed with:\n" ++
+      it (input <> " " <>
+        (either (\msg -> "should fail with \"" <> msg <> "\"")
+                (\out -> "should succeed with:\n" <>
                   (intercalate "\n" $ Desc.prettyPrintDesc <$> out))
                 output)) do
         vliftEff $ evaltest (Desc.parse =<< Lexer.lexDescs input) output
 
     evaltest (Left (P.ParseError { message: msg })) (Left msg')
       = if msg == msg'
-           then return unit
-           else throwException $ error $ "Unexpected error:\n" ++ msg
+           then pure unit
+           else throwException $ error $ "Unexpected error:\n" <> msg
 
     evaltest (Left e) _ = throwException $ error $ show e
 
     evaltest (Right out) (Left _)
       = throwException $ error $
           "Missing exception! Got:\n"
-            ++ (intercalate "\n" $ Desc.prettyPrintDesc <$> out)
+            <> (intercalate "\n" $ Desc.prettyPrintDesc <$> out)
 
     evaltest (Right out) (Right expected)
-      = let out' = fromList out
+      = let out' = toUnfoldable out
          in if (out' == expected)
-              then return unit
+              then pure unit
               else throwException $ error $
                     "Unexpected output:\n"
-                      ++ (intercalate "\n" $ Desc.prettyPrintDesc <$> out')
+                      <> (intercalate "\n" $ Desc.prettyPrintDesc <$> out')

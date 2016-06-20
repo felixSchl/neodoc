@@ -6,14 +6,14 @@ module Language.Docopt.Scanner (
 import Prelude
 import Text.Parsing.Parser (ParseError(ParseError)) as P
 import Text.Parsing.Parser.Pos (initialPos) as P
-import Data.List (List(Nil, Cons), toList, catMaybes)
-import Data.Array as A
-import Data.String (fromCharArray)
+import Data.List (List(Nil, Cons), fromFoldable, catMaybes)
 import Data.String.Regex as Regex
 import Data.String.Regex (regex, Regex())
-import Data.String as Str
+import Data.String (length) as String
+import Data.String.Yarn (replicate) as String
 import Data.Maybe (maybe)
-import Data.Either (Either(Left))
+import Data.Either (Either(Left), fromRight)
+import Partial.Unsafe (unsafePartial)
 
 type Docopt = {
   usage         :: String
@@ -22,15 +22,15 @@ type Docopt = {
 }
 
 section :: String -> Regex
-section name
-  = regex ("^([^\n]*" <> name <> "[^\n]*:(?:.*$)\n?(?:(?:[ \t].*)?(?:\n|$))*)")
-          (Regex.parseFlags "gmi")
+section name = unsafePartial $ fromRight $
+  regex ("^([^\n]*" <> name <> "[^\n]*:(?:.*$)\n?(?:(?:[ \t].*)?(?:\n|$))*)")
+        (Regex.parseFlags "gmi")
 
 fixSection :: String -> String
 fixSection s
   = Regex.replace'
-      (regex ("(^[^:]+:)") (Regex.noFlags))
-      (\m _ -> fromCharArray $ A.replicate (Str.length m) ' ')
+      (unsafePartial $ fromRight $ regex ("(^[^:]+:)") (Regex.noFlags))
+      (\m _ -> String.replicate (String.length m) ' ')
       s
 
 
@@ -53,5 +53,5 @@ scan text = do
                                    , position: P.initialPos }
 
     sections n = maybe Nil
-                       (catMaybes <<< toList)
+                       (catMaybes <<< fromFoldable)
                        (Regex.match (section n) text)

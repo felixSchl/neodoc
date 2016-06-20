@@ -3,32 +3,32 @@ module Test.Support.Usage where
 import Prelude
 import Data.Array ((..))
 import Data.Maybe (Maybe(..))
-import Data.List (List(..), length, (!!), take, toList)
+import Data.List (List(..), length, (!!), take, fromFoldable)
 
 import Language.Docopt
-import qualified Language.Docopt.SpecParser.Usage          as U
-import qualified Language.Docopt.SpecParser.Usage.Argument as U
-import qualified Language.Docopt.SpecParser.Usage.Option   as O
-import qualified Language.Docopt.SpecParser.Lexer          as Lexer
-import qualified Language.Docopt.Scanner               as Scanner
+import Language.Docopt.SpecParser.Usage          as U
+import Language.Docopt.SpecParser.Usage.Argument as U
+import Language.Docopt.SpecParser.Usage.Option   as O
+import Language.Docopt.SpecParser.Lexer          as Lexer
+import Language.Docopt.Scanner                   as Scanner
 import Language.Docopt.SpecParser.Base (debug)
 import Text.Wrap (dedent)
 
 -- short hand to create a usage
 usage :: String -> Array (Array U.Argument) -> U.Usage
-usage n xss = U.Usage n $ toList $ toList <$> xss
+usage n xss = U.Usage n $ fromFoldable $ fromFoldable <$> xss
 
 -- short hand to create a required group node
 gr :: Array (Array U.Argument) -> Boolean -> U.Argument
 gr xs r = U.Group { optional:   false
-                  , branches:   toList <$> (toList xs)
+                  , branches:   fromFoldable <$> (fromFoldable xs)
                   , repeatable: r
                   }
 
 -- short hand to create a optional group node
 go :: Array (Array U.Argument) -> Boolean -> U.Argument
 go xs r = U.Group { optional:   true
-                  , branches:   toList <$> (toList xs)
+                  , branches:   fromFoldable <$> (fromFoldable xs)
                   , repeatable: r
                   }
 

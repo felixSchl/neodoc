@@ -5,19 +5,17 @@ import Debug.Trace
 import Data.Either (Either(..), either)
 import Control.Bind ((=<<))
 import Control.Apply ((*>))
-import Data.List (List(..), toList)
+import Data.List (List(..), fromFoldable)
 import Control.Plus (empty)
 import Data.Foldable (intercalate, for_)
 import Data.Traversable (for)
 import Control.Monad.Eff.Exception (error, throwException)
-import qualified Data.Array as A
+import Data.Array as A
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (fromChar)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
-import Test.Assert.Simple
 
 import Test.Support (vliftEff, runEitherEff)
 import Test.Support.Usage as U
@@ -59,7 +57,7 @@ fail text msg = TestCase { expected: Left msg, desctext: text }
 
 solverSpec = \_ ->
   describe "The solver" do
-    for_ (toList [
+    for_ (fromFoldable [
 
       test "Usage: prog foo"
         [ pass "" [ [ co "foo" ] ] ]
@@ -259,7 +257,7 @@ solverSpec = \_ ->
 
     prettyPrintOutput :: List Usage -> String
     prettyPrintOutput as =
-      intercalate "\n" (("  " ++ ) <$>
+      intercalate "\n" (("  " <> _) <$>
         (prettyPrintUsage <$> as))
 
     runtest (TestSuite { help, cases }) = do
@@ -267,7 +265,7 @@ solverSpec = \_ ->
         describe ("\n" <> help <> "\n" <> dedent desctext) do
           it (
             either
-              (\msg  -> "Should fail with:\n" ++ msg)
+              (\msg  -> "Should fail with:\n" <> msg)
               (\args -> "Should resolve to:\n"
                   <> (intercalate "\n" (
                       ("Usage: prog " <> _)
@@ -285,8 +283,8 @@ solverSpec = \_ ->
                 (expected)
 
     evaltest (Right output) (Right expected)
-      = if output == (pure $ Usage $ toList $ toList <$> expected)
-            then return unit
+      = if output == (pure $ Usage $ fromFoldable $ fromFoldable <$> expected)
+            then pure unit
             else throwException $ error $
               "Unexpected output:\n\n" <> prettyPrintOutput output
 
@@ -296,7 +294,7 @@ solverSpec = \_ ->
 
     evaltest (Left (SolveError err)) (Left expected)
       = if err == expected
-            then return unit
+            then pure unit
             else throwException $ error $
               "Unexpected error:\n\n" <> err
 
