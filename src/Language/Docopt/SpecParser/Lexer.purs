@@ -28,7 +28,17 @@ import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
                                         ) as P
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Text.Parsing.Parser.String (skipSpaces, anyChar, string, char, oneOf,
-                                  whiteSpace, eof, noneOf) as P
+                                  whiteSpace, eof, noneOf, satisfy) as P
+
+-- | faster P.skipSpaces
+-- | TODO: move
+skipSpaces = go
+  where
+    go = (do
+      P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
+      go
+    ) <|> pure unit
+
 
 data Mode = Usage | Descriptions
 
@@ -156,50 +166,50 @@ instance showPositionedToken :: Show PositionedToken where
 
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m = do
-  P.skipSpaces
-  xs <- L.many $ parsePositionedToken m
+  skipSpaces
+  xs <- L.many $ parsePositionedToken (parseToken m)
   P.eof <|> void do
     i <- getInput
     P.fail $ "Unexpected input: " <> i
   pure xs
 
-parsePositionedToken :: Mode -> P.Parser String PositionedToken
-parsePositionedToken m = P.try $ do
+parsePositionedToken :: (P.Parser String Token) -> P.Parser String PositionedToken
+parsePositionedToken p = do
   pos <- getPosition
-  tok <- parseToken m
+  tok <- p
   pure $ PositionedToken { sourcePos: pos, token: tok }
 
 parseToken :: Mode -> P.Parser String Token
-parseToken m = P.choice (P.try <$> A.concat [
+parseToken m = P.choice (A.concat [
     [ P.char   '('   *> pure LParen
     , P.char   ')'   *> pure RParen
     ]
-  , if isDescMode m then [ _tag ] else []
-  , [ _reference
+  , if isDescMode m then [ P.try _tag ] else []
+  , [ P.try _reference
     , P.char   '['   *> pure LSquare
     , P.char   ']'   *> pure RSquare
     , P.char   '|'   *> pure VBar
     , P.char   ':'   *> pure Colon
     , P.char   ','   *> pure Comma
     , P.string "..." *> pure TripleDot
-    , _longOption
-    , _shortOption
-    , _eoa
-    , _stdin
-    , AngleName <$> _angleName
-    , ShoutName <$> _shoutName
-    , Name      <$> _name
+    , P.try _longOption
+    , P.try _shortOption
+    , P.try _eoa
+    , P.try _stdin
+    , P.try $ AngleName <$> _angleName
+    , P.try $ ShoutName <$> _shoutName
+    , P.try $ Name      <$> _name
     ]
   , if isDescMode m
         then [
-          eol      $> Newline
-        , Garbage <$> P.anyChar
+          P.try $ eol      $> Newline
+        , P.try $ Garbage <$> P.anyChar
         ]
         else []
   ])
   <* if isDescMode m
         then void $ spaces -- skip only spaces ' ' and '\t'
-        else P.skipSpaces  -- skip spaces *AND* newlines
+        else skipSpaces  -- skip spaces *AND* newlines
 
  where
 
@@ -238,9 +248,9 @@ parseToken m = P.choice (P.try <$> A.concat [
       go = do
         many space
         fromCharArray <<< toUnfoldable <$> do
-          flip P.manyTill (P.lookAhead $ P.try end) do
+          flip P.manyTill (P.lookAhead end) do
             P.noneOf [ ']' ]
-        <* end <* many space
+        <* end <* skipSpaces
 
       end = do
         many space
@@ -341,7 +351,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     ]
 
     -- Ensure the argument is correctly bounded
-    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+    P.eof <|> (P.lookAhead $ P.choice $ [
       void $ white
     , void $ P.char '|'
     , void $ P.string "..."
@@ -388,7 +398,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     ]
 
     -- Ensure the argument is correctly bounded
-    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+    P.eof <|> (P.lookAhead $ P.choice $ [
       void $ white
     , void $ P.char '|'
     , void $ P.string "..."
