@@ -62,8 +62,8 @@ showOptionArgumentObj a = "{ name: "     <> show a.name
 
 eqOptionArgumentObj :: OptionArgumentObj -> OptionArgumentObj -> Boolean
 eqOptionArgumentObj a a' = a.name     == a'.name
-                  && a.default  == a'.default
-                  && a.optional == a'.optional
+                        && a.default  == a'.default
+                        && a.optional == a'.optional
 
 empty :: OptionObj
 empty = { flag:       Nothing

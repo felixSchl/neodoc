@@ -9,9 +9,8 @@ import Prelude
 import Data.List (List(), fromFoldable)
 import Data.Either (Either())
 import Data.Tuple (Tuple(), fst)
-import Control.Monad.RWS (RWS(), evalRWS)
-import Control.Monad.Reader.Trans (runReaderT)
-import Control.Monad.State (evalState)
+-- import Control.Monad.RWS (RWS(), evalRWS)
+import Control.Monad.Transformerless.RWS (RWS(), evalRWS)
 import Text.Parsing.Parser (ParseError, PState(PState), runParserT) as P
 import Text.Parsing.Parser.Pos (initialPos) as P
 

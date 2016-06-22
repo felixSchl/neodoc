@@ -21,7 +21,7 @@ import Data.String (singleton) as String
 import Data.String.Regex (Regex(), regex)
 import Data.String.Regex (parseFlags, replace) as Regex
 import Partial.Unsafe (unsafePartial)
-import Data.String.Ext ((^=))
+import Data.String.Ext ((^=), (~~))
 import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
                                         lowerAlpha, upperAlpha, string',
                                         getPosition, getInput, spaces, eol)
@@ -34,6 +34,7 @@ import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Text.Parsing.Parser.String (skipSpaces, anyChar, string, char, oneOf,
                                   whiteSpace, eof, noneOf, satisfy) as P
+
 
 -- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
 skipSpaces = go
@@ -61,6 +62,10 @@ isDescMode _            = false
 isUsageMode :: Mode -> Boolean
 isUsageMode Usage = true
 isUsageMode _     = false
+
+instance showMode :: Show Mode where
+  show (Usage)        = "Usage"
+  show (Descriptions) = "Descriptions"
 
 lex :: Mode -> String -> Either P.ParseError (List PositionedToken)
 lex m input = do
@@ -114,27 +119,27 @@ prettyPrintToken Colon         = show ':'
 prettyPrintToken Comma         = show ','
 prettyPrintToken TripleDot     = "..."
 prettyPrintToken DoubleDash    = "--"
-prettyPrintToken (Reference r) = "Reference " <> show r
-prettyPrintToken (Garbage   c) = "Garbage "   <> show c
-prettyPrintToken (Tag k v)     = "Tag "       <> k <> " "  <> (show v)
-prettyPrintToken (Name      n) = "Name "      <> show n
-prettyPrintToken (ShoutName n) = "ShoutName " <> show n
-prettyPrintToken (AngleName n) = "AngleName " <> show n
+prettyPrintToken (Reference r) = "Reference " ~~ show r
+prettyPrintToken (Garbage   c) = "Garbage "   ~~ show c
+prettyPrintToken (Tag k v)     = "Tag "       ~~ k ~~ " "  ~~ (show v)
+prettyPrintToken (Name      n) = "Name "      ~~ show n
+prettyPrintToken (ShoutName n) = "ShoutName " ~~ show n
+prettyPrintToken (AngleName n) = "AngleName " ~~ show n
 prettyPrintToken (LOpt n arg)
-  = "--" <> n
-         <> (fromMaybe "" do
+  = "--" ~~ n
+         ~~ (fromMaybe "" do
               a <- arg
               pure $ if a.optional then "[" else ""
-                <> a.name
-                <> if a.optional then "]" else ""
+                ~~ a.name
+                ~~ if a.optional then "]" else ""
             )
 prettyPrintToken (SOpt n s arg)
-  = "-" <> (fromCharArray (A.cons n s))
-        <> (fromMaybe "" do
+  = "-" ~~ (fromCharArray (A.cons n s))
+        ~~ (fromMaybe "" do
               a <- arg
               pure $ if a.optional then "[" else ""
-                <> a.name
-                <> if a.optional then "]" else ""
+                ~~ a.name
+                ~~ if a.optional then "]" else ""
             )
 
 data PositionedToken = PositionedToken
@@ -184,7 +189,7 @@ instance eqToken :: Eq Token where
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos: pos, token: tok }) =
-    (show tok) <> " at " <> (show pos)
+    (show tok) ~~ " at " ~~ (show pos)
 
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m = do
@@ -195,7 +200,7 @@ parseTokens m = do
                                 else parseUsageToken)
   P.eof <|> void do
     i <- getInput
-    P.fail $ "Unexpected input: " <> i
+    P.fail $ "Unexpected input: " ~~ i
   pure xs
 
 parsePositionedToken :: (P.Parser String Token) -> P.Parser String PositionedToken
@@ -325,7 +330,7 @@ _angleName = do
     , P.noneOf [ '<', '>' ]
     ]
   P.char '>'
-  pure $ "<" <> n <> ">"
+  pure $ "<" ~~ n ~~ ">"
 
 _shortOption :: P.Parser String Token
 _shortOption = do
@@ -531,7 +536,7 @@ name = token go P.<?> "name"
     go _        = Nothing
 
 tag :: String -> TokenParser String
-tag s = token go P.<?> ("tag: " <> s)
+tag s = token go P.<?> ("tag: " ~~ s)
   where
     go (Tag k (Just v)) | k ^= s = Just v
     go _                         = Nothing
