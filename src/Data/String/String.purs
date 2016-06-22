@@ -4,9 +4,12 @@ module Data.String.Ext (
   , notUpperCaseEq
   , endsWith
   , startsWith
+  , (~~)
+  , concat
   ) where
 
 import Prelude
+import Data.Function.Uncurried (runFn2, Fn2)
 import Data.Maybe (maybe)
 import Data.String as Str
 import Data.Function (on)
@@ -28,3 +31,10 @@ endsWith :: String -> String -> Boolean
 endsWith needle haystack = maybe false id do
   ix <- Str.lastIndexOf needle haystack
   pure $ ix == (Str.length haystack - Str.length needle)
+
+foreign import concatImpl :: Fn2 String String String
+
+concat :: String -> String -> String
+concat = runFn2 concatImpl
+
+infixl 9 concat as ~~
