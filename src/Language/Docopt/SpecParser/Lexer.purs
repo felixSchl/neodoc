@@ -73,8 +73,7 @@ lex m input = do
                 then Regex.replace referenceRegex "@$1" input
                 else input
 
-  profileA "lex spec" \_->
-    P.runParser input' (parseTokens m)
+  P.runParser input' (parseTokens m)
 
 lexDescs :: String -> Either P.ParseError (List PositionedToken)
 lexDescs = lex Descriptions
