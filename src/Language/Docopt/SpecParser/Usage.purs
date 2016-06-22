@@ -7,6 +7,7 @@ module Language.Docopt.SpecParser.Usage (
 
 import Prelude
 import Debug.Trace
+import Debug.Profile
 import Data.Functor (($>))
 import Language.Docopt.SpecParser.Lexer as L
 import Language.Docopt.SpecParser.Usage.Option as O
@@ -100,22 +101,22 @@ usageParser smartOpts = do
     maybeInParens p = do
       Tuple close v <- moreIndented *> do
         Tuple
-          <$> (P.optionMaybe $ P.choice [ L.lparen  *> pure L.rparen
-                                        , L.lsquare *> pure L.rsquare ])
+          <$> (P.optionMaybe $ P.choice [ L.lparen  $> L.rparen
+                                        , L.lsquare $> L.rsquare ])
           <*> p
       fromMaybe (pure unit) close
       pure v
 
     elem :: L.TokenParser Argument
-    elem = defer \_ -> do
-      (P.choice $ P.try <$>
-        [ option
-        , positional
+    elem = "Option, Positional, Command, Group or Reference" <??>
+      (P.choice
+        [ positional
         , command
-        , (if smartOpts then trySmartOpt else id) <$> group
         , reference
         , stdin
-        ]) <?> "Option, Positional, Command, Group or Reference"
+        , option
+        , defer \_ -> (if smartOpts then trySmartOpt else id) <$> group
+        ])
 
     trySmartOpt :: Argument -> Argument
     trySmartOpt grp'@(Group grp) = fromMaybe grp' $ do

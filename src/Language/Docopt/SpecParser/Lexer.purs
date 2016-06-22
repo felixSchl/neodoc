@@ -3,19 +3,24 @@ module Language.Docopt.SpecParser.Lexer where
 import Prelude
 import Data.Array as A
 import Debug.Trace
+import Debug.Profile
 import Data.List as L
 import Data.Monoid (mempty)
 import Data.Functor (($>))
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.Monad.State (State, evalState)
-import Control.Monad.State.Trans (StateT())
 import Control.MonadPlus (guard)
-import Data.Either (Either(..))
+import Data.Either (Either(..), fromRight)
 import Data.Identity (Identity())
-import Data.List (List(..), many, catMaybes, toUnfoldable)
+import Data.Foldable (foldMap)
+import Data.List (List(..), many, catMaybes, toUnfoldable, (:), some)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (fromCharArray, trim)
+import Data.String (singleton) as String
+import Data.String.Regex (Regex(), regex)
+import Data.String.Regex (parseFlags, replace) as Regex
+import Partial.Unsafe (unsafePartial)
 import Data.String.Ext ((^=))
 import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
                                         lowerAlpha, upperAlpha, string',
@@ -28,7 +33,24 @@ import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
                                         ) as P
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Text.Parsing.Parser.String (skipSpaces, anyChar, string, char, oneOf,
-                                  whiteSpace, eof, noneOf) as P
+                                  whiteSpace, eof, noneOf, satisfy) as P
+
+-- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
+skipSpaces = go
+  where
+    go = (do
+      P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
+      go
+    ) <|> pure unit
+
+-- | Optimal: Translate [[<anything>-]options] to @anything
+-- | this saves us looking ahead repeatedly when parsing '['.
+referenceRegex :: Regex
+referenceRegex
+  = unsafePartial $ fromRight $
+      regex
+        "\\[(([^\\]](?!\\s*-?\\s*options\\s*))*?.?)\\s*-?\\s*options\\s*\\]"
+        (Regex.parseFlags "gmi")
 
 data Mode = Usage | Descriptions
 
@@ -41,7 +63,17 @@ isUsageMode Usage = true
 isUsageMode _     = false
 
 lex :: Mode -> String -> Either P.ParseError (List PositionedToken)
-lex m = flip P.runParser (parseTokens m)
+lex m input = do
+  -- perform a simple transformation to avoid 'manyTill' and safe some millis
+  -- lexing. Hopefully this won't be necessary when purescript-parsing improves
+  -- performance, a faster parsing library shows up or the purescript compiler
+  -- improves in performance.
+  let
+    input' = if isUsageMode m
+                then Regex.replace referenceRegex "@$1" input
+                else input
+
+  P.runParser input' (parseTokens m)
 
 lexDescs :: String -> Either P.ParseError (List PositionedToken)
 lexDescs = lex Descriptions
@@ -156,257 +188,250 @@ instance showPositionedToken :: Show PositionedToken where
 
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m = do
-  P.skipSpaces
-  xs <- L.many $ parsePositionedToken m
+  skipSpaces
+  xs <- many do
+    parsePositionedToken (if isDescMode m
+                                then parseDescriptionToken
+                                else parseUsageToken)
   P.eof <|> void do
     i <- getInput
     P.fail $ "Unexpected input: " <> i
   pure xs
 
-parsePositionedToken :: Mode -> P.Parser String PositionedToken
-parsePositionedToken m = P.try $ do
+parsePositionedToken :: (P.Parser String Token) -> P.Parser String PositionedToken
+parsePositionedToken p = do
   pos <- getPosition
-  tok <- parseToken m
+  tok <- p
   pure $ PositionedToken { sourcePos: pos, token: tok }
 
-parseToken :: Mode -> P.Parser String Token
-parseToken m = P.choice (P.try <$> A.concat [
-    [ P.char   '('   *> pure LParen
-    , P.char   ')'   *> pure RParen
-    ]
-  , if isDescMode m then [ _tag ] else []
-  , [ _reference
-    , P.char   '['   *> pure LSquare
-    , P.char   ']'   *> pure RSquare
-    , P.char   '|'   *> pure VBar
-    , P.char   ':'   *> pure Colon
-    , P.char   ','   *> pure Comma
-    , P.string "..." *> pure TripleDot
-    , _longOption
-    , _shortOption
-    , _eoa
-    , _stdin
-    , AngleName <$> _angleName
-    , ShoutName <$> _shoutName
-    , Name      <$> _name
-    ]
-  , if isDescMode m
-        then [
-          eol      $> Newline
-        , Garbage <$> P.anyChar
-        ]
-        else []
+parseUsageToken :: P.Parser String Token
+parseUsageToken = P.choice [
+    P.char   '('   $> LParen
+  , P.char   ')'   $> RParen
+  , P.char   ']'   $> RSquare
+  , P.char   '|'   $> VBar
+  , P.char   ':'   $> Colon
+  , P.char   ','   $> Comma
+  , P.string "..." $> TripleDot
+  , P.char   '['   $> LSquare
+  , _reference
+  , P.try _longOption
+  , P.try _shortOption
+  , P.try _eoa
+  , P.try _stdin
+  , P.try $ AngleName <$> _angleName
+  , P.try $ ShoutName <$> _shoutName
+  , P.try $ Name      <$> _name
+  ]
+  <* skipSpaces -- skip spaces *AND* newlines
+
+parseDescriptionToken :: P.Parser String Token
+parseDescriptionToken = P.choice [
+    P.char   ','   $> Comma
+  , P.string "..." $> TripleDot
+  , P.try _longOption
+  , P.try _shortOption
+  , P.try $ AngleName <$> _angleName
+  , P.try $ ShoutName <$> _shoutName
+  , P.try $ Name      <$> _name
+  , P.try _tag
+  , P.try _reference
+  , P.try $ eol      $> Newline
+  , P.try $ Garbage <$> P.anyChar
+  ]
+  <* spaces -- skip only spaces ' ' and '\t'
+
+white :: P.Parser String Unit
+white = void $ P.oneOf [ '\n', '\r', ' ', '\t' ]
+
+_stdin :: P.Parser String Token
+_stdin = do
+  P.char '-'
+  -- Ensure the argument is correctly bounded
+  P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+    void $ white
+  , void $ P.char '|'
+  , void $ P.char ']'
+  , void $ P.char ')'
+  , void $ P.string "..."
   ])
-  <* if isDescMode m
-        then void $ spaces -- skip only spaces ' ' and '\t'
-        else P.skipSpaces  -- skip spaces *AND* newlines
+  pure Dash
 
- where
+_eoa :: P.Parser String Token
+_eoa = do
+  P.string "--"
+  -- Ensure the argument is correctly bounded
+  P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+    void $ white
+  , void $ P.char ']'
+  , void $ P.char ')'
+  ])
+  pure DoubleDash
 
-  white :: P.Parser String Unit
-  white = void $ P.oneOf [ '\n', '\r', ' ', '\t' ]
+_reference :: P.Parser String Token
+_reference = Reference <$> do
+  P.char '@'
+  foldMap String.singleton <$> many (P.noneOf [' ', '\n'])
 
-  _stdin :: P.Parser String Token
-  _stdin = do
-    P.char '-'
-    -- Ensure the argument is correctly bounded
-    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
-      void $ white
-    , void $ P.char '|'
-    , void $ P.char ']'
-    , void $ P.char ')'
-    , void $ P.string "..."
-    ])
-    pure Dash
+_tag :: P.Parser String Token
+_tag = P.between (P.char '[') (P.char ']') do
+  P.choice $ P.try <$> [
+    withValue
+  , withoutValue
+  ]
 
-  _eoa :: P.Parser String Token
-  _eoa = do
-    P.string "--"
-    -- Ensure the argument is correctly bounded
-    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
-      void $ white
-    , void $ P.char ']'
-    , void $ P.char ')'
-    ])
-    pure DoubleDash
+  where
+    withValue = do
+      many white
+      k <- foldMap String.singleton <$> many (P.noneOf [':'])
+      P.char ':'
+      many white
+      v <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
+      many white
+      pure (Tag k (Just v))
+    withoutValue = do
+      k <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
+      pure (Tag k Nothing)
 
-  _reference :: P.Parser String Token
-  _reference = Reference <$> do
-    P.between (P.char '[') (P.char ']') go
+_shoutName :: P.Parser String String
+_shoutName = do
+  n <- foldMap String.singleton <$> do
+    (:)
+      <$> upperAlpha
+      <*> (many (upperAlpha <|> P.oneOf ['-', '_']))
+  P.notFollowedBy lowerAlpha
+  pure n
 
-    where
-      go = do
-        many space
-        fromCharArray <<< toUnfoldable <$> do
-          flip P.manyTill (P.lookAhead $ P.try end) do
-            P.noneOf [ ']' ]
-        <* end <* many space
+_name :: P.Parser String String
+_name = do
+  foldMap String.singleton <$> do
+    (:)
+      <$> alphaNum
+      <*> many do
+            P.choice $ P.try <$> [
+              identLetter
+            , P.char '.' <* (P.notFollowedBy $ P.string "..")
+            , P.oneOf [ '-', '_' ]
+          ]
 
-      end = do
-        many space
-        P.optional $ P.string "-"
-        string' "options"
-        P.optional $ P.string "..."
-
-  _tag :: P.Parser String Token
-  _tag = P.between (P.char '[') (P.char ']') do
-    P.choice $ P.try <$> [
-      withValue
-    , withoutValue
+_angleName :: P.Parser String String
+_angleName = do
+  P.char '<'
+  n <- foldMap String.singleton <$> do
+    some $ P.choice [
+      identLetter
+      -- disallow swallowing new `<`s in order to avoid creating hard to trace
+      -- errors for the user
+    , P.noneOf [ '<', '>' ]
     ]
+  P.char '>'
+  pure $ "<" <> n <> ">"
 
-    where
-      withValue = do
-        many white
-        k <- fromCharArray <$> do A.many (P.noneOf [':'])
-        P.char ':'
-        many white
-        v <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
-        many white
-        pure (Tag k (Just v))
-      withoutValue = do
-        k <- trim <<< fromCharArray <$> do A.some $ P.noneOf [']']
-        pure (Tag k Nothing)
+_shortOption :: P.Parser String Token
+_shortOption = do
+  let validChar = alphaNum <|> P.oneOf [ '?' ]
 
-  _shoutName :: P.Parser String String
-  _shoutName = do
-    n <- fromCharArray <$> do
-      A.cons
-        <$> upperAlpha
-        <*> (A.many (upperAlpha <|> P.oneOf ['-', '_']))
-    P.notFollowedBy lowerAlpha
-    pure n
+  P.char '-'
+  x  <- validChar
+  xs <- A.many validChar
 
-  _name :: P.Parser String String
-  _name = do
-    n  <- alphaNum
-    ns <- do
-      A.many $ P.try $ do
-        P.choice $ P.try <$> [
-          identLetter
-        , P.char '.' <* (P.notFollowedBy $ P.string "..")
-        , P.oneOf [ '-', '_' ]
-      ]
-    pure $ fromCharArray (n A.: ns)
+  arg <- P.choice $ P.try <$> [
 
-  _angleName :: P.Parser String String
-  _angleName = do
-    P.char '<'
-    n <- fromCharArray <$> do
-      A.some $ P.choice [
-        identLetter
-        -- disallow swallowing new `<`s in order to avoid creating hard to trace
-        -- errors for the user
-      , P.try $ P.noneOf [ '<', '>' ]
-      ]
-    P.char '>'
-    pure $ "<" <> n <> ">"
+    -- Case 1: -foo=BAR
+    Just <$> do
+      P.char '='
+      n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
+      pure  { name:     n
+            , optional: false
+            }
 
-  _shortOption :: P.Parser String Token
-  _shortOption = do
-    let validChar = alphaNum <|> P.oneOf [ '?' ]
+    -- Case 2: Option[=ARG]
+  , Just <$> do
+      P.char '['
+      P.optional $ P.char '='
+      n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
+      P.char ']'
+      pure  { name:     n
+            , optional: true
+            }
 
-    P.char '-'
-    x  <- validChar
-    xs <- A.many validChar
+    -- Case 3: Option<ARG>
+  , Just <$> do
+      n <- _angleName
+      pure { name:     n
+            , optional: false
+            }
 
-    arg <- P.choice $ P.try <$> [
+  , pure Nothing
+  ]
 
-      -- Case 1: -foo=BAR
-      Just <$> do
-        P.char '='
-        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        pure  { name:     n
+  -- Ensure the argument is correctly bounded
+  P.eof <|> (P.lookAhead $ P.choice $ [
+    void $ white
+  , void $ P.char '|'
+  , void $ P.string "..."
+  , void $ P.char ']'
+  , void $ P.char ')'
+  , void $ P.char ',' -- desc mode only
+  ])
+
+  pure $ SOpt x xs arg
+
+_longOption :: P.Parser String Token
+_longOption = do
+  P.string "--"
+
+  name' <- foldMap String.singleton <$> do
+    (:)
+      <$> alphaNum
+      <*> (many $ P.choice [
+            alphaNum
+          , P.oneOf [ '-' ] <* P.lookAhead alphaNum
+          ])
+
+  arg <- P.choice $ P.try <$> [
+
+    -- Case 1: OPTION=ARG
+    Just <$> do
+      P.char '='
+      n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
+      pure { name:     n
               , optional: false
               }
 
-      -- Case 2: Option[=ARG]
-    , Just <$> do
-        P.char '['
-        P.optional $ P.char '='
-        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        P.char ']'
-        pure  { name:     n
+    -- Case 2: Option[=ARG]
+  , Just <$> do
+      P.char '['
+      P.optional $ P.char '='
+      n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
+      P.char ']'
+      pure { name:     n
               , optional: true
               }
 
-      -- Case 3: Option<ARG>
-    , Just <$> do
-        n <- _angleName
-        pure { name:     n
-              , optional: false
-              }
+  , pure Nothing
+  ]
 
-    , pure Nothing
-    ]
+  -- Ensure the argument is correctly bounded
+  P.eof <|> (P.lookAhead $ P.choice $ [
+    void $ white
+  , void $ P.char '|'
+  , void $ P.string "..."
+  , void $ P.char ']'
+  , void $ P.char ')'
+  , void $ P.char ',' -- desc mode only
+  ])
 
-    -- Ensure the argument is correctly bounded
-    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
-      void $ white
-    , void $ P.char '|'
-    , void $ P.string "..."
-    , void $ P.char ']'
-    , void $ P.char ')'
-    , void $ P.char ',' -- desc mode only
-    ])
+  pure $ LOpt name' arg
 
-    pure $ SOpt x xs arg
+identStart :: P.Parser String Char
+identStart = alpha
 
-  _longOption :: P.Parser String Token
-  _longOption = do
-    P.string "--"
+identLetter :: P.Parser String Char
+identLetter = alphaNum <|> P.oneOf ['_', '-']
 
-    name' <- fromCharArray <$> do
-      A.cons
-        <$> alphaNum
-        <*> (A.many $ P.choice [
-              alphaNum
-            , P.oneOf [ '-' ] <* P.lookAhead alphaNum
-            ])
-
-    arg <- P.choice $ P.try <$> [
-
-      -- Case 1: OPTION=ARG
-      Just <$> do
-        P.char '='
-        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        pure { name:     n
-               , optional: false
-               }
-
-      -- Case 2: Option[=ARG]
-    , Just <$> do
-        P.char '['
-        P.optional $ P.char '='
-        n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
-        P.char ']'
-        pure { name:     n
-               , optional: true
-               }
-
-    , pure Nothing
-    ]
-
-    -- Ensure the argument is correctly bounded
-    P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
-      void $ white
-    , void $ P.char '|'
-    , void $ P.string "..."
-    , void $ P.char ']'
-    , void $ P.char ')'
-    , void $ P.char ',' -- desc mode only
-    ])
-
-    pure $ LOpt name' arg
-
-  identStart :: P.Parser String Char
-  identStart = alpha
-
-  identLetter :: P.Parser String Char
-  identLetter = alphaNum <|> P.oneOf ['_', '-']
-
-  flag :: P.Parser String Char
-  flag = lowerAlphaNum
+flag :: P.Parser String Char
+flag = lowerAlphaNum
 
 -- | Parser that  parses a stream of tokens
 type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
@@ -435,9 +460,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 match :: Token -> TokenParser Unit
 match tok = token (guard <<< (_ == tok)) P.<?> prettyPrintToken tok
 
-anyToken :: P.ParserT (List PositionedToken)
-                      (StateT { indentation :: Int , line :: Int } Identity )
-                      Token
+anyToken :: TokenParser Token
 anyToken = token $ Just
 
 eof :: TokenParser Unit

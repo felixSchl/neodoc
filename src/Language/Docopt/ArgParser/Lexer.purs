@@ -16,8 +16,9 @@ import Data.Either (Either())
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
-import Data.String (fromCharArray)
-import Data.List (List(..), singleton, many)
+import Data.List (List(..), singleton, many, fromFoldable, some, toUnfoldable)
+import Data.String (singleton) as String
+import Data.Traversable (foldMap)
 import Data.Foldable (elem)
 import Text.Parsing.Parser (ParseError, Parser, runParser) as P
 import Text.Parsing.Parser.Combinators (try, choice, optional, optionMaybe) as P
@@ -40,10 +41,10 @@ type Options r = {
 parseToken :: P.Parser String Token
 parseToken = do
   P.choice $ P.try <$> [
-    stdin <* P.eof
+    lopt  <* P.eof
   , sopt  <* P.eof
-  , lopt  <* P.eof
   , eoa   <* P.eof
+  , stdin <* P.eof
   , lit   <* P.eof
   ]
 
@@ -51,13 +52,11 @@ parseToken = do
     stdin :: P.Parser String Token
     stdin = do
       P.char '-'
-      P.eof
-      pure $ Stdin
+      pure Stdin
 
     eoa :: P.Parser String Token
     eoa = do
       P.string "--"
-      P.eof
       pure $ EOA empty
 
     -- | Parse a short option
@@ -67,27 +66,25 @@ parseToken = do
       x   <- alphaNum
       xs  <- A.many $ P.noneOf [ '=' ]
       arg <- P.optionMaybe arg
-      P.eof
       pure $ SOpt x xs arg
 
     -- | Parse a long option
     lopt :: P.Parser String Token
     lopt = do
       P.string "--"
-      xs <- fromCharArray <$> do
-        A.some $ P.noneOf [ '=', ' ' ]
+      xs <- foldMap String.singleton <$> do
+        some $ P.noneOf [ '=', ' ' ]
       arg <- P.optionMaybe arg
-      P.eof
       pure $ LOpt xs arg
 
     -- | Parse a literal
     lit :: P.Parser String Token
-    lit = Lit <<< fromCharArray <$> do
-      A.many P.anyChar
+    lit = Lit <<< foldMap String.singleton <$> do
+      many P.anyChar
 
     arg = do
       P.char '='
-      fromCharArray <$> A.many P.anyChar
+      foldMap String.singleton <$> many P.anyChar
 
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
 -- | item individually.
