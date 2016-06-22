@@ -10,15 +10,17 @@ import Data.Functor (($>))
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.Monad.State (State, evalState)
-import Control.Monad.State.Trans (StateT())
 import Control.MonadPlus (guard)
-import Data.Either (Either(..))
+import Data.Either (Either(..), fromRight)
 import Data.Identity (Identity())
 import Data.Foldable (foldMap)
 import Data.List (List(..), many, catMaybes, toUnfoldable, (:), some)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (fromCharArray, trim)
 import Data.String (singleton) as String
+import Data.String.Regex (Regex(), regex)
+import Data.String.Regex (parseFlags, replace) as Regex
+import Partial.Unsafe (unsafePartial)
 import Data.String.Ext ((^=))
 import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
                                         lowerAlpha, upperAlpha, string',
@@ -33,14 +35,22 @@ import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Text.Parsing.Parser.String (skipSpaces, anyChar, string, char, oneOf,
                                   whiteSpace, eof, noneOf, satisfy) as P
 
--- | faster P.skipSpaces
--- | TODO: move
+-- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
 skipSpaces = go
   where
     go = (do
       P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
       go
     ) <|> pure unit
+
+-- | Optimal: Translate [[<anything>-]options] to @anything
+-- | this saves us looking ahead repeatedly when parsing '['.
+referenceRegex :: Regex
+referenceRegex
+  = unsafePartial $ fromRight $
+      regex
+        "\\[(([^\\]](?!\\s*-?\\s*options\\s*))*?.?)\\s*-?\\s*options\\s*\\]"
+        (Regex.parseFlags "gmi")
 
 data Mode = Usage | Descriptions
 
@@ -54,8 +64,17 @@ isUsageMode _     = false
 
 lex :: Mode -> String -> Either P.ParseError (List PositionedToken)
 lex m input = do
+  -- perform a simple transformation to avoid 'manyTill' and safe some millis
+  -- lexing. Hopefully this won't be necessary when purescript-parsing improves
+  -- performance, a faster parsing library shows up or the purescript compiler
+  -- improves in performance.
+  let
+    input' = if isUsageMode m
+                then Regex.replace referenceRegex "@$1" input
+                else input
+
   profileA "lex spec" \_->
-    P.runParser input (parseTokens m)
+    P.runParser input' (parseTokens m)
 
 lexDescs :: String -> Either P.ParseError (List PositionedToken)
 lexDescs = lex Descriptions
@@ -195,6 +214,8 @@ parseUsageToken = P.choice [
   , P.char   ':'   $> Colon
   , P.char   ','   $> Comma
   , P.string "..." $> TripleDot
+  , P.char   '['   $> LSquare
+  , _reference
   , P.try _longOption
   , P.try _shortOption
   , P.try _eoa
@@ -202,8 +223,6 @@ parseUsageToken = P.choice [
   , P.try $ AngleName <$> _angleName
   , P.try $ ShoutName <$> _shoutName
   , P.try $ Name      <$> _name
-  , P.try _reference
-  , P.char   '['   $> LSquare
   ]
   <* skipSpaces -- skip spaces *AND* newlines
 
@@ -252,20 +271,8 @@ _eoa = do
 
 _reference :: P.Parser String Token
 _reference = Reference <$> do
-  P.between (P.char '[') (P.char ']') go
-
-  where
-    go = do
-      skipSpaces
-      foldMap String.singleton <$> do
-        flip P.manyTill (P.lookAhead end) do
-          P.noneOf [ ']' ]
-      <* end <* skipSpaces
-
-    end = do
-      P.optional $ P.string "-"
-      string' "options"
-      P.optional $ P.string "..."
+  P.char '@'
+  foldMap String.singleton <$> many (P.noneOf [' ', '\n'])
 
 _tag :: P.Parser String Token
 _tag = P.between (P.char '[') (P.char ']') do
@@ -454,9 +461,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
 match :: Token -> TokenParser Unit
 match tok = token (guard <<< (_ == tok)) P.<?> prettyPrintToken tok
 
-anyToken :: P.ParserT (List PositionedToken)
-                      (StateT { indentation :: Int , line :: Int } Identity )
-                      Token
+anyToken :: TokenParser Token
 anyToken = token $ Just
 
 eof :: TokenParser Unit
