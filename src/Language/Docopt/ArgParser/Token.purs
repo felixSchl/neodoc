@@ -54,7 +54,7 @@ getSource :: PositionedToken -> String
 getSource = unPositionedToken >>> _.source
 
 instance showPositionedToken :: Show PositionedToken where
-  show (PositionedToken { sourcePos=pos, token=tok }) =
+  show (PositionedToken { sourcePos: pos, token: tok }) =
     (show tok) <> " at " <> (show pos)
 
 

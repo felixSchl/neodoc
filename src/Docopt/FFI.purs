@@ -9,9 +9,9 @@
 module Docopt.FFI (run, parse) where
 
 import Prelude
-import Data.Function (Fn2, mkFn2)
+import Data.Function.Uncurried (Fn2(), mkFn2)
 import Data.Maybe (Maybe(Nothing), maybe, fromMaybe)
-import Data.List (fromList)
+import Data.List (toUnfoldable)
 import Data.Array (singleton) as Array
 import Control.Monad.Eff (Eff())
 import Data.Either (Either(..), either)
@@ -130,11 +130,11 @@ parse = mkFn2 go
                               F.readProp "smartOptions" opts)
           }
       result <- Docopt.parse helpText opts'
-      pure $ fromList $ result <#> \(Usage branches) -> do
-        fromList $ convBranch <$> branches
+      pure $ toUnfoldable $ result <#> \(Usage branches) -> do
+        toUnfoldable $ convBranch <$> branches
 
     convBranch :: Branch -> Array Foreign
-    convBranch args = fromList $ convArg <$> args
+    convBranch args = toUnfoldable $ convArg <$> args
 
     convArg :: Argument -> Foreign
     convArg (EOA)          = F.toForeign { type: "EOA" }
@@ -146,7 +146,7 @@ parse = mkFn2 go
     , value: {
         optional:   x.optional
       , repeatable: x.repeatable
-      , branches:   (fromList $ convBranch <$> x.branches) :: Array (Array Foreign)
+      , branches:   (toUnfoldable $ convBranch <$> x.branches) :: Array (Array Foreign)
       }
     }
     convArg (Option x)     = F.toForeign {

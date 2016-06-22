@@ -24,9 +24,9 @@ import Data.Bifunctor (bimap, lmap, rmap)
 import Data.Either (Either(Right, Left))
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
 import Data.List (List(..), reverse, singleton, concat, length, (:),
-                  some, filter, head, fromList, sortBy, groupBy, last, null,
+                  some, filter, head, toUnfoldable, sortBy, groupBy, last, null,
                   tail, many)
-import Data.List.Lazy (take, repeat, fromList) as LL
+import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Control.Alt ((<|>))
 import Data.Traversable (traverse, for)
 import Control.Lazy (defer)
@@ -34,10 +34,10 @@ import Control.Monad (when, unless)
 import Control.MonadPlus (guard)
 import Data.Foldable (all, intercalate, maximumBy, sum, any, for_, foldl, elem)
 import Data.String as String
-import Data.String (fromChar, fromCharArray, stripPrefix)
-import Data.List.Unsafe as LU
+import Data.String (fromCharArray, stripPrefix)
+import Data.List.Partial as LU
 import Data.Array as A
-import Data.Array.Unsafe as AU
+import Data.Array.Partial as AU
 import Data.Monoid (class Monoid, mempty)
 import Data.Tuple (Tuple(..), fst, snd)
 import Control.Monad.Reader (ask)
@@ -49,6 +49,7 @@ import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), fail,
                             parseFailedFatal, parseFailed, unParserT, fatal) as P
 import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>), choice) as P
 import Text.Parsing.Parser.Pos (Position) as P
+import Partial.Unsafe (unsafePartial)
 
 import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 prettyPrintArg, prettyPrintArgNaked,
@@ -113,9 +114,9 @@ token test = P.ParserT $ \(P.PState { input: toks, position: ppos }) ->
       case test tok of
         Just a ->
           let nextpos =
-              case xs of
-                Cons (PositionedToken { sourcePos: npos }) _ -> npos
-                Nil -> ppos
+                case xs of
+                  Cons (PositionedToken { sourcePos: npos }) _ -> npos
+                  Nil -> ppos
           in
             { consumed: true
             , input: xs
@@ -128,7 +129,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: ppos }) ->
 eoa :: Parser Value
 eoa = token go P.<?> "--"
   where
-    go (EOA xs) = Just (ArrayValue (fromList xs))
+    go (EOA xs) = Just (ArrayValue (toUnfoldable xs))
     go _        = Nothing
 
 command :: String -> Parser Value
@@ -156,7 +157,8 @@ type OptParse = {
 }
 
 longOption :: Boolean -> String -> (Maybe D.OptionArgumentObj) -> Parser Value
-longOption term n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+longOption term n a = unsafePartial $
+ P.ParserT $ \(P.PState { input: toks, position: pos }) ->
   pure $ case toks of
     Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
@@ -170,7 +172,9 @@ longOption term n a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
               -- consume the rest of the source of this short option into a
               -- single value.
               { consumed: true
-              , input:    if result.hasConsumedArg then LU.tail xs else xs
+              , input:    if result.hasConsumedArg
+                              then unsafePartial $ LU.tail xs
+                              else xs
               , result:
                   let
                     -- recover the argument in it's string form.
@@ -268,7 +272,8 @@ shortOption
   -> Char
   -> (Maybe D.OptionArgumentObj)
   -> Parser (Tuple Value Boolean)
-shortOption term f a = P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
+shortOption term f a = unsafePartial $
+ P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
   pure $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
@@ -342,7 +347,7 @@ shortOption term f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                            , remainder:      Nothing
                            , hasConsumedArg: false
                            }
-                 else  Left $ "Option requires argument: -" <> fromChar f'
+                 else  Left $ "Option requires argument: -" <> String.singleton f'
 
     -- case 2:
     -- The leading flag matches, there are stacked options, a explicit
@@ -360,7 +365,9 @@ shortOption term f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- no argument and an explicit argument has not been provided.
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
       = pure { rawValue:       Nothing
-             , remainder:      pure (SOpt (AU.head xs) (AU.tail xs) v)
+             , remainder:      pure (SOpt (unsafePartial $ AU.head xs)
+                                          (unsafePartial $ AU.tail xs)
+                                          v)
              , hasConsumedArg: false
              }
 
@@ -369,7 +376,7 @@ shortOption term f a = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
     -- takes no argument - total consumption!
     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
       = case v of
-              Just _  -> Left $ "Option takes no argument: -" <> fromChar f'
+              Just _  -> Left $ "Option takes no argument: -" <> String.singleton f'
               Nothing -> pure { rawValue:       Nothing
                               , remainder:      Nothing
                               , hasConsumedArg: false
@@ -440,7 +447,7 @@ exhaustP options skippable isSkipping l xs = do
                 then traceA $ indentation <> (s unit)
                 else pure unit
   indentation :: String
-  indentation = fromCharArray $ LL.fromList $ LL.take (l * 4) $ LL.repeat ' '
+  indentation = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
 data Clump a = Free a | Fixed a
 
@@ -466,10 +473,10 @@ clump
 clump xs = reverse $ foldl go Nil xs
   where
   go (Nil) x = pure $ (if D.isFree x then Free else Fixed) $ singleton x
-  go   (Cons (Free a)  zs) x | D.isFree x = (Free (a ++ (singleton x))) : zs
+  go   (Cons (Free a)  zs) x | D.isFree x = (Free (a <> (singleton x))) : zs
   go u@(Cons (Free _)   _) x = (Fixed $ singleton x) : u
   go u@(Cons (Fixed _)  _) x | D.isFree x = (Free $ singleton x): u
-  go   (Cons (Fixed a) zs) x = (Fixed (a ++ (singleton x))) : zs
+  go   (Cons (Fixed a) zs) x = (Fixed (a <> (singleton x))) : zs
 
 data Required a = Required a | Optional a
 
@@ -649,7 +656,7 @@ clumpP options skippable isSkipping l c = do
                 then traceA $ indentation <> (s unit)
                 else pure unit
   indentation :: String
-  indentation = fromCharArray $ LL.fromList $ LL.take (l * 4) $ LL.repeat ' '
+  indentation = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
 -- Parse a single argument from argv.
 argP'
@@ -720,7 +727,7 @@ argP options _ _ _ x = getInput >>= \i -> (
   (if D.isRepeatable x then some else liftM1 singleton) do
     Tuple x <<< (RValue.from Origin.Argv) <$> do
       P.ParserT \s -> do
-        o <- P.unParserT (go x) s
+        o <- P.unParserT (unsafePartial $ go x) s
 
         -- Check error messages for fatal errors.
         -- XXX: This should also change.
@@ -741,6 +748,7 @@ argP options _ _ _ x = getInput >>= \i -> (
   ) <|> P.fail ("Expected " <> D.prettyPrintArg x <> butGot i)
 
   where
+  go :: Partial => _ _
   go (D.Positional pos) = positional pos.name
   go (D.Command    cmd) = command    cmd.name
   go (D.Stdin         ) = stdin
@@ -756,8 +764,8 @@ argP options _ _ _ x = getInput >>= \i -> (
 
     let
       term = any (_ `elem` options.stopAt)
-                 (A.catMaybes [ ("--" <> _)               <$> o.name
-                              , (("-" <> _) <<< fromChar) <$> o.flag
+                 (A.catMaybes [ ("--" <> _)                       <$> o.name
+                              , (("-" <> _) <<< String.singleton) <$> o.flag
                               ])
     case o.name of
       Just n  | isLoptAhead -> do
@@ -872,7 +880,7 @@ evalParsers parsers p = do
 terminate :: D.Argument -> Parser Value
 terminate arg = do
   input <- getInput
-  let rest = ArrayValue $ fromList $ StringValue <<< Token.getSource <$> input
+  let rest = ArrayValue $ toUnfoldable $ StringValue <<< Token.getSource <$> input
   markDone
   modifyDepth (const 99999)
   P.ParserT \(P.PState { position: pos }) ->

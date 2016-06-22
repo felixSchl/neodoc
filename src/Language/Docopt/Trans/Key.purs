@@ -6,8 +6,7 @@ module Language.Docopt.Trans.Key (
 
 import Prelude
 import Data.Maybe (maybe)
-import Data.String (fromChar)
-import Data.String (toUpper, toLower) as Str
+import Data.String (singleton) as String
 import Data.Function (on)
 import Data.String.Ext ((^=))
 import Language.Docopt.Argument (Argument(..)) as D
@@ -15,7 +14,7 @@ newtype Key = Key { arg :: D.Argument }
 
 instance showKey :: Show Key where
   show (Key { arg: (D.Option o) }) =
-    maybe "" (\c -> "-"  <> fromChar c <> ", ") o.flag <>
+    maybe "" (\c -> "-"  <> String.singleton c <> ", ") o.flag <>
     maybe "" (\n -> "--" <> n)                  o.name
   show (Key { arg: (D.Positional pos) }) = pos.name
   show (Key { arg: (D.Command cmd) })    = cmd.name
@@ -29,8 +28,8 @@ instance eqKey :: Eq Key where
     where
       go (D.Command    cmd) (D.Command    cmd') = cmd.name == cmd'.name
       go (D.Positional pos) (D.Positional pos') = pos.name ^= pos'.name
-      go (D.Option { flag = f,  name = n  })
-         (D.Option { flag = f', name = n' })
+      go (D.Option { flag: f,  name: n  })
+         (D.Option { flag: f', name: n' })
          = (f == f') && (n == n')
       go a b = a == b
 
@@ -48,5 +47,5 @@ toKeys (D.Group _)        = []
 toKeys (D.EOA)            = ["--"]
 toKeys (D.Stdin)          = ["-"]
 toKeys (D.Option o)       = []
-                          <> maybe [] (\c -> [ "-"  <> fromChar c ]) o.flag
+                          <> maybe [] (\c -> [ "-"  <> String.singleton c ]) o.flag
                           <> maybe [] (\s -> [ "--" <> s ]) o.name

@@ -30,7 +30,7 @@ import Text.Wrap (dedent)
 import Data.StrMap (StrMap())
 import Data.Array as A
 import Data.Bifunctor (lmap)
-import Data.List.WordsLines (lines, unlines)
+import Data.String.Yarn (lines, unlines)
 
 import Language.Docopt (Specification(), parseDocopt, evalDocopt)
 import Language.Docopt.Value (Value())

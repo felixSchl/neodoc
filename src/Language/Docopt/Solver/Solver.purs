@@ -17,10 +17,11 @@ import Data.Foldable (any)
 import Data.Function (on)
 import Data.Functor ((<$))
 import Data.List (findIndex, groupBy, List(..), length, filter, singleton,
-                  toList, catMaybes, head, (:), concat, reverse)
-import Data.Maybe (fromMaybe, Maybe(Nothing, Just), isNothing, maybe, isJust)
-import Data.Maybe.Unsafe (fromJust)
-import Data.String (fromChar, fromCharArray, toCharArray, toUpper)
+                  fromFoldable, catMaybes, head, (:), concat, reverse)
+import Data.Maybe (fromMaybe, Maybe(Nothing, Just), isNothing, maybe, isJust,
+                  fromJust)
+import Data.String (fromCharArray, toCharArray, toUpper)
+import Data.String (singleton) as String
 import Data.String.Ext ((^=), endsWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
@@ -36,6 +37,7 @@ import Language.Docopt.SpecParser.Desc (Desc)
 import Language.Docopt.SpecParser.Usage (Usage(..)) as U
 import Language.Docopt.SpecParser.Usage.Argument (Branch, Argument(..)) as U
 import Language.Docopt.Usage (Usage(..))
+import Partial.Unsafe (unsafePartial)
 
 foreign import undefined :: forall a. a
 
@@ -285,8 +287,8 @@ solveBranch as ds = go as
                       , repeatable: o.repeatable
                       }
           where
-            isMatch (DE.OptionDesc { name = DE.Long n'   }) = n == n'
-            isMatch (DE.OptionDesc { name = DE.Full _ n' }) = n == n'
+            isMatch (DE.OptionDesc { name: DE.Long n'   }) = n == n'
+            isMatch (DE.OptionDesc { name: DE.Full _ n' }) = n == n'
             isMatch _ = false
 
 
@@ -346,13 +348,13 @@ solveBranch as ds = go as
               -- the last (length a.name) characters are uppercased
               -- and hence compared case INSENSITIVELY.
               let bareArgname = stripAngles a.name
-                  needle      = toUpper $ fromChar f <> bareArgname
+                  needle      = toUpper $ String.singleton f <> bareArgname
                   haystack    = toUpper fs
 
               (Tuple fs o) <- if endsWith needle haystack
                 then
                   let ix = S.length haystack - S.length needle
-                   in if US.charAt ix fs == f
+                   in if unsafePartial (US.charAt ix fs) == f
                         then pure
                           $ Tuple (toCharArray
                                     (S.take (S.length fs
@@ -377,7 +379,7 @@ solveBranch as ds = go as
               -- set the same repeatability flag for each stacked option as
               -- indicated by trailing option.
               let cs' = flip setRepeatable o.repeatable <$> do
-                          Option <$> toList cs
+                          Option <$> fromFoldable cs
 
               pure  $ Resolved
                     $ Keep
@@ -414,7 +416,9 @@ solveBranch as ds = go as
           -- (flag, ...flags) -> (...flags, flag)
           (Tuple fs f) <- do
             pure case A.last (o.stack) of
-              Just f'  -> Tuple (o.flag A.: (fromJust $ A.init o.stack)) f'
+              Just f' -> Tuple (o.flag A.: (unsafePartial
+                                            $ fromJust
+                                            $ A.init o.stack)) f'
               Nothing -> Tuple [] o.flag
 
           -- Look the trailing option up in the descriptions
@@ -432,7 +436,7 @@ solveBranch as ds = go as
               --       the same as specified in the option descriptions for
               --       convenience to the user.
               pure $ Resolved $ Keep
-                    $ (toList matches)
+                    $ (fromFoldable matches)
                       <> (singleton $ Option match)
 
             Nothing ->
@@ -455,22 +459,22 @@ solveBranch as ds = go as
                   if not (fromMaybe true $ (_.optional <$> match.arg))
                     then fail
                         $ "Option-Argument specified in options-section missing"
-                          <> " -" <> fromChar f
+                          <> " -" <> String.singleton f
                     else do
                       pure $ Resolved $ Keep
-                        $ (toList matches)
+                        $ (fromFoldable matches)
                           <> (singleton $ Option match)
                 Just er -> do
                   r <- er
                   pure $ Resolved $ Slurp
-                    $ (flip setRepeatable r <$> toList matches)
+                    $ (flip setRepeatable r <$> fromFoldable matches)
                       <> (singleton
                             $ Option $ match { repeatable = r })
 
         guardArgs :: String -> String -> Either SolveError Boolean
         guardArgs n n' | n ^=^ n' = pure true
         guardArgs n n' = fail
-          $ "Arguments mismatch for option -" <> fromChar o.flag <> ": "
+          $ "Arguments mismatch for option -" <> String.singleton o.flag <> ": "
               <> show n <> " and " <> show n'
 
 
@@ -483,7 +487,7 @@ solveBranch as ds = go as
           case filter isMatch ds of
             xs | length xs > 1 -> fail
                     $ "Multiple option descriptions for option -"
-                        <> fromChar f
+                        <> String.singleton f
 
             (Cons (DE.OptionDesc desc) Nil) -> do
               arg <- if isTrailing
@@ -491,15 +495,15 @@ solveBranch as ds = go as
                           else if isNothing desc.arg
                             then pure Nothing
                             else fail
-                              $ "Stacked option -" <> fromChar f
+                              $ "Stacked option -" <> String.singleton f
                                   <> " may not specify arguments"
 
-              pure $ { flag:       DE.getFlag desc.name
-                       , name:       DE.getName desc.name
-                       , arg:        arg
-                       , env:        desc.env
-                       , repeatable: o.repeatable
-                       }
+              pure  { flag:       DE.getFlag desc.name
+                    , name:       DE.getName desc.name
+                    , arg:        arg
+                    , env:        desc.env
+                    , repeatable: o.repeatable
+                    }
 
             -- default fallback: construct the option from itself alone
             _ -> pure
@@ -513,8 +517,8 @@ solveBranch as ds = go as
                       }
 
           where
-            isMatch (DE.OptionDesc { name = DE.Flag f'   }) = f == f'
-            isMatch (DE.OptionDesc { name = DE.Full f' _ }) = f == f'
+            isMatch (DE.OptionDesc { name: DE.Flag f'   }) = f == f'
+            isMatch (DE.OptionDesc { name: DE.Full f' _ }) = f == f'
             isMatch _ = false
 
     -- | Resolve an option's argument name against that given in the
@@ -546,9 +550,9 @@ solveBranch as ds = go as
                -> Maybe OptionArgumentObj
     convertArg arg = do
       a <- arg
-      pure $ { name:     a.name
-               , optional: a.optional
-               , default:  Nothing }
+      pure  { name:     a.name
+            , optional: a.optional
+            , default:  Nothing }
 
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
 solveUsage (U.Usage _ bs) ds = Usage <$> do traverse (flip solveBranch ds) bs

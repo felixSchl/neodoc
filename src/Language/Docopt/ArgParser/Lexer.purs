@@ -16,7 +16,7 @@ import Data.Either (Either())
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
-import Data.String (fromCharArray, fromChar)
+import Data.String (fromCharArray)
 import Data.List (List(..), singleton, many)
 import Data.Foldable (elem)
 import Text.Parsing.Parser (ParseError, Parser, runParser) as P

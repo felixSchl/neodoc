@@ -10,9 +10,8 @@ import Data.List (List(), many)
 import Text.Parsing.Parser (PState(..), ParserT(..)) as P
 import Text.Parsing.Parser.Pos (Position(..)) as P
 import Text.Parsing.Parser.String (satisfy, char, string) as P
-import Data.String.Regex as Regex
 import Data.Array as A
-import Data.Char (toString, toLower, toUpper)
+import Data.Char (toLower, toUpper, toCharCode)
 import Data.String (toCharArray, fromCharArray)
 import Data.Maybe (Maybe(Nothing, Just))
 import Data.Either (Either(Right))
@@ -61,9 +60,17 @@ getInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
 traceInput :: forall a m. (Show a, Monad m) => P.ParserT a m Unit
 traceInput = getInput >>= debug
 
-regex :: forall m. (Monad m) => String -> P.ParserT String m Char
-regex s = P.satisfy \c ->
-  Regex.test (Regex.regex s Regex.noFlags) (toString c)
+satisfyCode :: forall m. (Monad m) => (Int -> Boolean) -> P.ParserT String m Char
+satisfyCode f = P.satisfy \c -> f (toCharCode c)
+
+isDigit :: Int -> Boolean
+isDigit c = c > 47 && c < 58
+
+isLowerAlpha :: Int -> Boolean
+isLowerAlpha c = c > 96 && c < 123
+
+isUpperAlpha :: Int -> Boolean
+isUpperAlpha c = c > 64 && c < 91
 
 lower :: forall m. (Monad m) => P.ParserT String m Char
 lower = P.satisfy \c -> c == toLower c
@@ -72,25 +79,25 @@ upper :: forall m. (Monad m) => P.ParserT String m Char
 upper = P.satisfy \c -> c == toUpper c
 
 digit :: forall m. (Monad m) => P.ParserT String m Char
-digit = regex "[0-9]"
+digit = satisfyCode \c -> c > 47 && c < 58
 
 alpha :: forall m. (Monad m) => P.ParserT String m Char
-alpha = regex "[a-zA-Z]"
+alpha = satisfyCode \c -> (c > 64 && c < 91) || (c > 96 && c < 123)
 
 upperAlpha :: forall m. (Monad m) => P.ParserT String m Char
-upperAlpha = regex "[A-Z]"
+upperAlpha = satisfyCode isUpperAlpha
 
 lowerAlpha :: forall m. (Monad m) => P.ParserT String m Char
-lowerAlpha = regex "[a-z]"
+lowerAlpha = satisfyCode isLowerAlpha
 
 lowerAlphaNum :: forall m. (Monad m) => P.ParserT String m Char
-lowerAlphaNum = regex "[0-9a-z]"
+lowerAlphaNum = satisfyCode \c -> isLowerAlpha c || isDigit c
 
 upperAlphaNum :: forall m. (Monad m) => P.ParserT String m Char
-upperAlphaNum = regex "[0-9A-Z]"
+upperAlphaNum = satisfyCode \c -> isUpperAlpha c || isDigit c
 
 alphaNum :: forall m. (Monad m) => P.ParserT String m Char
-alphaNum = alpha <|> digit
+alphaNum = satisfyCode \c -> isUpperAlpha c || isLowerAlpha c || isDigit c
 
 space :: forall m. (Monad m) => P.ParserT String m Char
 space = P.satisfy \c -> c == ' ' || c == '\t'

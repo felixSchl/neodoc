@@ -5,11 +5,10 @@ module Language.Docopt.Trans.Rich (
 import Prelude
 
 import Debug.Trace
-import Data.List (List(..), catMaybes, singleton, concat, toList, filter,
-                  reverse, null, nub)
+import Data.List (List(..), catMaybes, singleton, concat, toUnfoldable, filter,
+                  reverse, null, nub, fromFoldable)
 import Data.Array (length, filter) as A
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Maybe.Unsafe (fromJust)
+import Data.Maybe (Maybe(..), fromMaybe, fromJust)
 import Data.Map as Map
 import Data.Tuple (Tuple(Tuple))
 import Data.Map (Map())
@@ -18,6 +17,7 @@ import Data.StrMap (StrMap())
 import Data.Bifunctor (rmap, lmap)
 import Data.Foldable (foldl, maximum, all)
 import Control.Alt ((<|>))
+import Partial.Unsafe (unsafePartial)
 
 import Language.Docopt.Value (Value(..), isBoolValue)
 import Language.Docopt.Value as Value
@@ -49,7 +49,7 @@ reduce us env b vs =
 
   mergeVals :: RichValue -> RichValue -> RichValue
   mergeVals (RichValue v) (RichValue v') = RichValue $ {
-    origin: fromJust $ maximum [ v.origin, v'.origin ]
+    origin: unsafePartial $ fromJust $ maximum [ v.origin, v'.origin ]
   , value:  ArrayValue $ Value.intoArray v'.value
                       <> Value.intoArray v.value
   }
@@ -104,7 +104,7 @@ reduce us env b vs =
                             _ -> Nothing
                           else Nothing
                     in flip Tuple (RichValue $ rv { value = v }) <$> do
-                        toList $ toKeys a
+                        fromFoldable $ toKeys a
 
 -- | Reduce a usage application specification down to a list of unique
 -- | arguments, merging declarations where requried. This will later indicate

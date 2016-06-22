@@ -22,6 +22,7 @@ import Control.Monad (when)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.MonadPlus (guard)
+import Data.String (singleton) as String
 import Data.List (List(..), (:), many, some, head, length, filter, catMaybes,
                   reverse)
 import Text.Parsing.Parser (ParseError, fail) as P
@@ -31,7 +32,6 @@ import Text.Parsing.Parser.Combinators ((<?>), try, choice, lookAhead, manyTill,
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(Nothing, Just), isJust, isNothing, maybe, fromMaybe)
 import Data.Generic (class Generic, gEq, gShow)
-import Data.String (fromChar)
 import Data.Array as A
 import Data.String.Ext ((^=))
 
@@ -165,9 +165,9 @@ prettyPrintOption :: OptionObj -> String
 prettyPrintOption opt
   = (name opt.name) <> arg <> env
   where
-      name (Flag c)   = "-"  <> fromChar c
+      name (Flag c)   = "-"  <> String.singleton c
       name (Long n)   = "--" <> n
-      name (Full c n) = "-"  <> fromChar c <> ", --" <> n
+      name (Full c n) = "-"  <> String.singleton c <> ", --" <> n
 
       arg = maybe "" id do
         a <- opt.arg
@@ -374,7 +374,7 @@ descParser = markIndent do
             Tuple (Left { name: Flag f  })
                   (Just (Left { name: Flag f' }))  -> P.fail $
               "Expected an optional long alias for -"
-                <> fromChar f <> ", but got: -" <> fromChar f'
+                <> String.singleton f <> ", but got: -" <> String.singleton f'
             Tuple (Right { name: Long n  })
                   (Just (Right { name: Long n' })) -> P.fail $
               "Expected an optional short alias for --"

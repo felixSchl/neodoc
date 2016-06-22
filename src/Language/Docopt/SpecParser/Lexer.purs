@@ -13,13 +13,13 @@ import Control.Monad.State.Trans (StateT())
 import Control.MonadPlus (guard)
 import Data.Either (Either(..))
 import Data.Identity (Identity())
-import Data.List (List(..), many, fromList, catMaybes)
+import Data.List (List(..), many, catMaybes, toUnfoldable)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (fromCharArray, trim)
 import Data.String.Ext ((^=))
 import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
-                                   lowerAlpha, regex, upperAlpha, string',
-                                   getPosition, getInput, spaces, eol)
+                                        lowerAlpha, upperAlpha, string',
+                                        getPosition, getInput, spaces, eol)
 import Language.Docopt.SpecParser.State (ParserState)
 import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..),
                             runParserT, parseFailed, fail, runParser) as P
@@ -151,7 +151,7 @@ instance eqToken :: Eq Token where
   eq _ _                                  = false
 
 instance showPositionedToken :: Show PositionedToken where
-  show (PositionedToken { sourcePos=pos, token=tok }) =
+  show (PositionedToken { sourcePos: pos, token: tok }) =
     (show tok) <> " at " <> (show pos)
 
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
@@ -237,7 +237,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     where
       go = do
         many space
-        fromCharArray <<< fromList <$> do
+        fromCharArray <<< toUnfoldable <$> do
           flip P.manyTill (P.lookAhead $ P.try end) do
             P.noneOf [ ']' ]
         <* end <* many space
@@ -273,7 +273,7 @@ parseToken m = P.choice (P.try <$> A.concat [
     n <- fromCharArray <$> do
       A.cons
         <$> upperAlpha
-        <*> (A.many $ regex "[A-Z_-]")
+        <*> (A.many (upperAlpha <|> P.oneOf ['-', '_']))
     P.notFollowedBy lowerAlpha
     pure n
 
@@ -300,7 +300,7 @@ parseToken m = P.choice (P.try <$> A.concat [
       , P.try $ P.noneOf [ '<', '>' ]
       ]
     P.char '>'
-    pure $ "<" ++ n ++ ">"
+    pure $ "<" <> n <> ">"
 
   _shortOption :: P.Parser String Token
   _shortOption = do
@@ -419,9 +419,9 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
       case test tok of
         Just a ->
           let nextpos =
-              case xs of
-                Cons (PositionedToken { sourcePos: npos }) _ -> npos
-                Nil -> ppos
+                case xs of
+                  Cons (PositionedToken { sourcePos: npos }) _ -> npos
+                  Nil -> ppos
           in
             { consumed: true
             , input: xs

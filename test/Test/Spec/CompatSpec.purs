@@ -13,13 +13,13 @@ import Data.Either (Either(..), either)
 import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
 import Data.Foldable (intercalate, for_)
 import Text.Wrap (dedent)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Maybe.Unsafe (fromJust)
-import Data.List (List, many, fromList)
+import Data.Maybe (Maybe(..), fromMaybe, fromJust)
+import Data.List (List, many, toUnfoldable)
 import Test.Spec (Spec(), describe, it)
 import Data.String (fromCharArray)
 import Data.String as String
 import Test.Support (vliftEff, runEitherEff)
+import Partial.Unsafe (unsafePartial)
 import Text.Parsing.Parser.Pos (initialPos) as P
 import Text.Parsing.Parser (runParser, runParserT, PState(..)) as P
 import Text.Parsing.Parser.Combinators (manyTill, optional, between, sepBy,
@@ -81,7 +81,7 @@ parseUniversalDocoptTests = do
       P.skipSpaces *> skipComments *>  P.skipSpaces
       u  <- usage
       as <- A.many application
-      return $ Test {
+      pure $ Test {
         doc: u
       , kases: as
       }
@@ -100,7 +100,7 @@ parseUniversalDocoptTests = do
                               P.char '/'
                               fromCharArray <$> A.many alpha
       many (P.char ' ')
-      input <- Argv.parse <<< fromCharArray <<< fromList <$>
+      input <- Argv.parse <<< fromCharArray <<< toUnfoldable <$>
         P.manyTill (P.noneOf ['\n']) (P.char '\n')
       P.skipSpaces *> skipComments *>  P.skipSpaces
       output <- P.choice $ P.try <$>
@@ -122,14 +122,14 @@ parseUniversalDocoptTests = do
             P.char '"'
             many $ P.char ' '
             P.optional comment
-            return $ s
+            pure $ s
         ]
       P.skipSpaces *> skipComments *>  P.skipSpaces
-      return $ Kase { out: output
+      pure $ Kase { out: output
                     , options: {
-                        argv:         return input
+                        argv:         pure input
                       , optionsFirst: flags.optionsFirst
-                      , env:          return env
+                      , env:          pure env
                       , dontExit:     true
                       , smartOptions: flags.smartOptions
                       , stopAt:       []
@@ -145,39 +145,39 @@ parseUniversalDocoptTests = do
               D.prettyPrintValue <$> value
             , fromCharArray <$> (A.many $ P.noneOf [ ' ' ])
             ]
-          return $ Tuple key val
+          pure $ Tuple key val
 
         value = P.choice $ P.try <$> [
           D.BoolValue <$> do
             P.choice $ P.try <$> [
-              P.string "false" *> return false
-            , P.string "true"  *> return true
+              P.string "false" *> pure false
+            , P.string "true"  *> pure true
             ]
         , D.StringValue <$> do
             fromCharArray <$> do
               P.between (P.char '"') (P.char '"') (A.many $ P.noneOf ['"'])
-        , D.ArrayValue <<< fromList <$> do
+        , D.ArrayValue <<< toUnfoldable <$> do
             P.between (P.char '[') (P.char ']') do
               P.skipSpaces
               flip P.sepBy (P.skipSpaces *> P.char ',' *> P.skipSpaces) do
                 value
         , do
-            si <- P.option 1 (P.char '-' *> return (-1))
+            si <- P.option 1 (P.char '-' *> pure (-1))
             xs <- fromCharArray <$> A.some digit
             P.choice [
               D.FloatValue <<< ((Int.toNumber si) * _) <<< readFloat <$> do
                 xss <- do
                   P.char '.'
                   fromCharArray <$> A.some digit
-                return $ xs ++ "." ++ xss
-            , return $ D.IntValue $ si * (fromJust $ Int.fromString xs)
+                pure $ xs <> "." <> xss
+            , pure $ D.IntValue $ si * (unsafePartial $ fromJust $ Int.fromString xs)
             ]
         ]
 
 
     usage = do
       P.string "r\"\"\""
-      fromCharArray <<< fromList <$> do
+      fromCharArray <<< toUnfoldable <$> do
         P.manyTill P.anyChar $ P.string "\"\"\"\n"
 
 -- Somehow, purescript needs this:
@@ -189,23 +189,23 @@ type CompatEff e = (fs :: FS, err :: EXCEPTION | e)
 genCompatSpec :: forall e. Aff (CompatEff e) (Unit -> Spec (CompatEff e) Unit)
 genCompatSpec = do
   tests <- _liftEff parseUniversalDocoptTests
-  return $ \_ -> describe "Docopt compatibility" do
+  pure $ \_ -> describe "Docopt compatibility" do
     for_ tests \(Test { doc, kases }) -> do
-      describe (doc ++ "\n") do
+      describe (doc <> "\n") do
         for_ kases \(Kase { options, out }) -> do
-          let argv = fromJust options.argv
-              env  = fromJust options.env
+          let argv = unsafePartial $ fromJust options.argv
+              env  = unsafePartial $ fromJust options.env
               flagsDesc = renderFlags { optionsFirst: options.optionsFirst
                                       , smartOptions: options.smartOptions
                                       }
           describe (intercalate " " (
-            (fromList $ StrMap.toList env <#> \t ->
-                fst t ++ "=\"" ++ snd t ++ "\"")
+            (toUnfoldable $ StrMap.toList env <#> \t ->
+                fst t <> "=\"" <> snd t <> "\"")
               <> argv
             )
             <> (if String.length flagsDesc > 0 then " # flags: " <> flagsDesc else "")
             ) do
-            it ("\n" ++ prettyPrintOut out) do
+            it ("\n" <> prettyPrintOut out) do
 
               -- XXX: Manually break the execution context in order to avoid to
               --      avoid stack overflows by executing a large amount of Aff
@@ -213,7 +213,7 @@ genCompatSpec = do
               --      the `Aff` action using it's `MonadRec` instance.
               -- Refer: https://github.com/owickstrom/purescript-spec/issues/24
 
-              later (return unit)
+              later (pure unit)
 
               let result = runDocopt (dedent doc)
                                      (fromMaybe StrMap.empty options.env)
@@ -224,11 +224,11 @@ genCompatSpec = do
                   either
                     (\es ->
                       if es == "user-error"
-                        then return unit
+                        then pure unit
                         else if e == es
-                          then return unit
+                          then pure unit
                           else throwException $ error $
-                            "Unexpected exception message: \"" ++ e ++ "\""
+                            "Unexpected exception message: \"" <> e <> "\""
                     )
                     (const $ throwException $ error $ e)
                     out
@@ -237,20 +237,20 @@ genCompatSpec = do
                     (\_ -> do
                       throwException $ error $
                         "Unexpected output: \n"
-                          ++ prettyPrintOut (pure $ StrMap.toList output)
+                          <> prettyPrintOut (pure $ StrMap.toList output)
                     )
                     (\expected ->
                       let actual = StrMap.toList output
                        in if (StrMap.fromFoldable expected /= output)
                         then throwException $ error $
                           "Unexpected output:\n"
-                            ++ prettyPrintOut (pure actual)
-                        else return unit)
+                            <> prettyPrintOut (pure actual)
+                        else pure unit)
                     out
 
   where
     prettyPrintOut :: Either String (List (Tuple String D.Value)) -> String
     prettyPrintOut (Left "user-error") = "fail"
-    prettyPrintOut (Left err) = "fail with: \"" ++ err ++ "\""
+    prettyPrintOut (Left err) = "fail with: \"" <> err <> "\""
     prettyPrintOut (Right xs)
-      = intercalate "\n" $ xs <#> \(Tuple k v) -> k ++ " => " ++ show v
+      = intercalate "\n" $ xs <#> \(Tuple k v) -> k <> " => " <> show v

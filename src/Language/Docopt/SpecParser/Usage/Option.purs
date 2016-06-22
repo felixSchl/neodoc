@@ -15,9 +15,9 @@ module Language.Docopt.SpecParser.Usage.Option (
 import Prelude
 import Data.Maybe (Maybe(..), maybe, fromMaybe, isNothing)
 import Data.Function (on)
-import Data.String (fromChar)
 import Data.Foldable (intercalate)
-import Data.List (toList)
+import Data.List (fromFoldable)
+import Data.String (singleton) as String
 
 type OptionArgumentObj = {
   name     :: String
@@ -100,8 +100,8 @@ prettyPrintLOptObj o
 
 prettyPrintSOptObj :: SOptObj -> String
 prettyPrintSOptObj o
-  = "-" <> (fromChar o.flag)
-      <> (intercalate "" $ fromChar <$> toList o.stack)
+  = "-" <> (String.singleton o.flag)
+      <> (intercalate "" $ String.singleton <$> fromFoldable o.stack)
       <> (maybe "" (\a ->
             (if a.optional then "[" else "")
               <> "=" <> a.name

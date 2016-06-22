@@ -2,7 +2,7 @@ module Test.Support.Arguments where
 
 import Prelude
 import Data.Maybe
-import Data.List (List(..), toList, length, fromList, singleton)
+import Data.List (List(..), fromFoldable, length, singleton)
 import Language.Docopt.Value
 import Language.Docopt.Argument
 
@@ -157,7 +157,7 @@ eoa = EOA
 
 -- short hand to create a group
 gr :: Boolean -> IsRepeatable -> (Array (Array Argument)) -> Argument
-gr b r xs = Group { optional: b, branches: (toList $ br <$> xs), repeatable: r }
+gr b r xs = Group { optional: b, branches: (fromFoldable $ br <$> xs), repeatable: r }
 
 -- short hand to create a optional group
 gro :: IsRepeatable -> (Array (Array Argument)) -> Argument
@@ -169,7 +169,7 @@ grr = gr false
 
 -- short hand to create a whole branch
 br :: (Array Argument) -> Branch
-br xs = toList xs
+br xs = fromFoldable xs
 
 oa :: String -> Value -> OptionArgumentObj
 oa n v =  { name: n
