@@ -49,7 +49,7 @@ referenceRegex :: Regex
 referenceRegex
   = unsafePartial $ fromRight $
       regex
-        "\\[(([^\\]](?!\\s*-?\\s*options\\s*))*?.?)\\s*-?\\s*options\\s*\\]"
+        "\\[(([^\\]](?!\\s*-?\\s*options\\s*))*?.?)\\s*-?\\s*options\\s*(\\.\\.\\.)?\\s*\\]"
         (Regex.parseFlags "gmi")
 
 data Mode = Usage | Descriptions
