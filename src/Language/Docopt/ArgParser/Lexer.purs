@@ -16,7 +16,6 @@ import Data.Either (Either())
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
-import Data.String (fromCharArray)
 import Data.List (List(..), singleton, many, fromFoldable, some, toUnfoldable)
 import Data.String (singleton) as String
 import Data.Traversable (foldMap)
@@ -85,7 +84,7 @@ parseToken = do
 
     arg = do
       P.char '='
-      fromCharArray <$> A.many P.anyChar
+      foldMap String.singleton <$> many P.anyChar
 
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
 -- | item individually.
