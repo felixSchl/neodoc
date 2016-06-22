@@ -171,7 +171,10 @@ instance showPositionedToken :: Show PositionedToken where
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m = do
   skipSpaces
-  xs <- L.many $ parsePositionedToken (parseToken m)
+  xs <- many do
+    parsePositionedToken (if isDescMode m
+                                then parseDescriptionToken
+                                else parseUsageToken)
   P.eof <|> void do
     i <- getInput
     P.fail $ "Unexpected input: " <> i
@@ -183,37 +186,42 @@ parsePositionedToken p = do
   tok <- p
   pure $ PositionedToken { sourcePos: pos, token: tok }
 
-parseToken :: Mode -> P.Parser String Token
-parseToken m = P.choice (A.concat [
-    [ P.char   '('   $> LParen
-    , P.char   ')'   $> RParen
-    ]
-  , if isDescMode m then [ P.try _tag ] else []
-  , [ P.try _longOption
-    , P.try _shortOption
-    , P.try _eoa
-    , P.try _stdin
-    , P.try $ AngleName <$> _angleName
-    , P.try $ ShoutName <$> _shoutName
-    , P.try $ Name      <$> _name
-    , P.char   ']'   $> RSquare
-    , P.char   '|'   $> VBar
-    , P.char   ':'   $> Colon
-    , P.char   ','   $> Comma
-    , P.string "..." $> TripleDot
-    , P.try _reference
-    , P.char   '['   $> LSquare
-    ]
-  , if isDescMode m
-        then [
-          P.try $ eol      $> Newline
-        , P.try $ Garbage <$> P.anyChar
-        ]
-        else []
-  ])
-  <* if isDescMode m
-        then void $ spaces -- skip only spaces ' ' and '\t'
-        else skipSpaces  -- skip spaces *AND* newlines
+parseUsageToken :: P.Parser String Token
+parseUsageToken = P.choice [
+    P.char   '('   $> LParen
+  , P.char   ')'   $> RParen
+  , P.char   ']'   $> RSquare
+  , P.char   '|'   $> VBar
+  , P.char   ':'   $> Colon
+  , P.char   ','   $> Comma
+  , P.string "..." $> TripleDot
+  , P.try _longOption
+  , P.try _shortOption
+  , P.try _eoa
+  , P.try _stdin
+  , P.try $ AngleName <$> _angleName
+  , P.try $ ShoutName <$> _shoutName
+  , P.try $ Name      <$> _name
+  , P.try _reference
+  , P.char   '['   $> LSquare
+  ]
+  <* skipSpaces -- skip spaces *AND* newlines
+
+parseDescriptionToken :: P.Parser String Token
+parseDescriptionToken = P.choice [
+    P.char   ','   $> Comma
+  , P.string "..." $> TripleDot
+  , P.try _longOption
+  , P.try _shortOption
+  , P.try $ AngleName <$> _angleName
+  , P.try $ ShoutName <$> _shoutName
+  , P.try $ Name      <$> _name
+  , P.try _tag
+  , P.try _reference
+  , P.try $ eol      $> Newline
+  , P.try $ Garbage <$> P.anyChar
+  ]
+  <* spaces -- skip only spaces ' ' and '\t'
 
 white :: P.Parser String Unit
 white = void $ P.oneOf [ '\n', '\r', ' ', '\t' ]
