@@ -20,6 +20,7 @@ import Control.Plus (empty)
 import Debug.Trace
 import Control.Apply ((<*), (*>))
 import Data.Function (on)
+import Data.Function.Uncurried
 import Data.Bifunctor (bimap, lmap, rmap)
 import Data.Either (Either(Right, Left))
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
@@ -410,7 +411,7 @@ spec xs options = do
     -- Create a parser for each usage line.
     parsers
       = (concat $ D.runUsage <$> xs) <#> \branch -> do
-          vs <- exhaustP options true false 0 branch
+          vs <- runFn5 exhaustP options true false 0 branch
           pure (Tuple branch vs)
           <* eof
 
@@ -421,16 +422,18 @@ spec xs options = do
 
 -- Parse a list of arguments.
 -- Take care of clumping free vs. non-free (fixed) arguments.
+-- Represented as `FnX` to take advantage of inlining at compile time.
 exhaustP
   :: forall r
-   . Options r       -- ^ generator options
-  -> Boolean         -- ^ can we skip using fallback values?
-  -> Boolean         -- ^ are we currently skipping using fallback values?
-  -> Int             -- ^ recursive level
-  -> List D.Argument -- ^ the list of arguments to parse
-  -> Parser (List ValueMapping)
-exhaustP options skippable isSkipping l xs = do
-  _debug \_->
+   . Fn5
+      (Options r)       -- ^ generator options
+      Boolean           -- ^ can we skip using fallback values?
+      Boolean           -- ^ are we currently skipping using fallback values?
+      Int               -- ^ recursive level
+      (List D.Argument) -- ^ the list of arguments to parse
+      (Parser (List ValueMapping))
+exhaustP = mkFn5 \options skippable isSkipping l xs -> do
+  _debug l \_->
        "exhaustP: "     <> (intercalate " " $ D.prettyPrintArg <$> xs)
     <> ", skippable: "  <> show skippable
     <> ", isSkipping: " <> show isSkipping
@@ -444,11 +447,11 @@ exhaustP options skippable isSkipping l xs = do
                 x)
 
   where
-  _debug s = if debug
-                then traceA $ indentation <> (s unit)
+  _debug l s = if debug
+                then traceA $ indentation l <> (s unit)
                 else pure unit
-  indentation :: String
-  indentation = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
+  indentation :: Int -> String
+  indentation l = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
 data Clump a = Free a | Fixed a
 
@@ -518,7 +521,7 @@ clumpP options skippable isSkipping l c = do
 
   where
   go _ _ l (Fixed xs)
-    = concat <$> for xs (argP' options skippable isSkipping l)
+    = concat <$> for xs (runFn5 argP' options skippable isSkipping l)
 
   go skippable isSkipping l (Free  xs) = draw (Required <$> xs) (length xs)
     where
@@ -553,7 +556,7 @@ clumpP options skippable isSkipping l c = do
       -- the back of the queue and the number of retries to be cut down by one.
       vs <- P.try do
               mod do
-                argP' options     -- the parsing options
+                runFn5 argP' options     -- the parsing options
                       isSkipping  -- propagate the 'isSkipping' property
                       false       -- reset 'isSkipping' to false
                       (l + 1)     -- increase the recursive level
@@ -646,7 +649,7 @@ clumpP options skippable isSkipping l c = do
           if skippable || null i
             then do
               if not isSkipping
-                then exhaustP options true true l (unRequired <$> xss)
+                then runFn5 exhaustP options true true l (unRequired <$> xss)
                 else do
                   pure ((unRequired `lmap` _) <$> fallbacks)
             else
@@ -664,15 +667,17 @@ clumpP options skippable isSkipping l c = do
   indentation = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
 -- Parse a single argument from argv.
+-- Represented as `FnX` to take advantage of inlining at compile time.
 argP'
   :: forall r
-   . Options r
-  -> Boolean    -- ^ can we skip using fallback values?
-  -> Boolean    -- ^ are we currently skipping using fallback values?
-  -> Int        -- ^ recursive level
-  -> D.Argument -- ^ the argument to parse
-  -> Parser (List ValueMapping)
-argP' options skippable isSkipping l x = do
+   . Fn5
+      (Options r)
+      Boolean    -- ^ can we skip using fallback values?
+      Boolean    -- ^ are we currently skipping using fallback values?
+      Int        -- ^ recursive level
+      D.Argument -- ^ the argument to parse
+      (Parser (List ValueMapping))
+argP' = mkFn5 \options skippable isSkipping l x -> do
   state :: StateObj <- lift State.get
   if state.done
      then pure Nil
@@ -698,7 +703,7 @@ argP options _ _ _ (D.Group (grp@{ branches: Cons (Cons (x@(D.Positional pos)) N
 -- For groups, each branch is run and analyzed.
 argP options skippable isSkipping l g@(D.Group grp) = do
   -- Create a parser for each branch in the group
-  let parsers = exhaustP options skippable isSkipping l <$> grp.branches
+  let parsers = (runFn5 exhaustP options skippable isSkipping l) <$> grp.branches
 
   -- Evaluate the parsers, selecting the result with the most
   -- non-substituted values.
@@ -717,7 +722,13 @@ argP options skippable isSkipping l g@(D.Group grp) = do
 
   where
     loop acc = do
-      vs <- argP' options skippable isSkipping l (D.Group grp {  optional = true })
+      vs <- do
+        runFn5
+          argP' options
+                skippable
+                isSkipping
+                l
+                (D.Group grp {  optional = true })
       if (length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
         then loop $ acc <> vs
         else pure acc
