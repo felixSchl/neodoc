@@ -15,7 +15,7 @@ module Language.Docopt.ArgParser.Parser (
   ) where
 
 import Prelude
-import Control.Monad.RWS (RWS(), evalRWS)
+import Debug.Profile
 import Control.Plus (empty)
 import Debug.Trace
 import Control.Apply ((<*), (*>))
@@ -40,8 +40,8 @@ import Data.Array as A
 import Data.Array.Partial as AU
 import Data.Monoid (class Monoid, mempty)
 import Data.Tuple (Tuple(..), fst, snd)
-import Control.Monad.Reader (ask)
-import Control.Monad.State as State
+import Control.Monad.Transformerless.RWS (RWS(), evalRWS, ask)
+import Control.Monad.Transformerless.RWS (modify, get) as State
 import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
@@ -69,7 +69,7 @@ import Language.Docopt.SpecParser.Base (getInput)
 import Language.Docopt.ArgParser.Token (getSource) as Token
 import Language.Docopt.ArgParser.Token (PositionedToken(..), Token(..),
                                         unPositionedToken, prettyPrintToken)
-import Data.String.Ext (startsWith)
+import Data.String.Ext (startsWith, (~~))
 
 -- | Toggle debugging on/off during development
 debug :: Boolean
@@ -133,13 +133,13 @@ eoa = token go P.<?> "--"
     go _        = Nothing
 
 command :: String -> Parser Value
-command n = token go P.<?> "command " <> show n
+command n = token go P.<?> "command " ~~ show n
   where
     go (Lit s) | s == n = Just (BoolValue true)
     go _                = Nothing
 
 positional :: String -> Parser Value
-positional n = token go P.<?> "positional argument " <> show n
+positional n = token go P.<?> "positional argument " ~~ show n
   where
     go (Lit v) = Just (Value.read v false)
     go _       = Nothing
@@ -436,11 +436,12 @@ exhaustP options skippable isSkipping l xs = do
     <> ", isSkipping: " <> show isSkipping
 
   concat <$>
-    for (clump xs)
+    for (clump xs) \x -> do
         (clumpP options
                 skippable
                 isSkipping
-                l)
+                l
+                x)
 
   where
   _debug s = if debug
@@ -583,10 +584,13 @@ clumpP options skippable isSkipping l c = do
 
       pure (vs <> vss)
     ) <|> (defer \_ -> do
-      _debug \_->
-           "draw: failure"
-        <> ", requeueing: "  <> prettyPrintRequiredArg x
-      draw (xs <> singleton x) (n - 1)
+      if (length xs == 0)
+        then draw (xs <> singleton x) (-1)
+        else do
+          _debug \_->
+              "draw: failure"
+            <> ", requeueing: "  <> prettyPrintRequiredArg x
+          draw (xs <> singleton x) (n - 1)
     )
 
     -- All options have been matched (or have failed to be matched) at least
@@ -630,7 +634,7 @@ clumpP options skippable isSkipping l c = do
         fallbacks = mrights vs
 
       _debug \_->
-           "draw: missing:" <> (intercalate " " $ prettyPrintRequiredArg <$> missing)
+        "draw: missing:" <> (intercalate " " $ prettyPrintRequiredArg <$> missing)
 
       if isSkipping && length missing > 0
         then
@@ -643,7 +647,8 @@ clumpP options skippable isSkipping l c = do
             then do
               if not isSkipping
                 then exhaustP options true true l (unRequired <$> xss)
-                else pure ((unRequired `lmap` _) <$> fallbacks)
+                else do
+                  pure ((unRequired `lmap` _) <$> fallbacks)
             else
               P.fail $
                 "Expected "
@@ -698,11 +703,12 @@ argP options skippable isSkipping l g@(D.Group grp) = do
   -- Evaluate the parsers, selecting the result with the most
   -- non-substituted values.
   vs <- (if grp.optional then P.option Nil else id) do
-    evalParsers parsers (\vs ->
-      sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+    evalParsers parsers (\p ->
+      sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> p
     )
 
-  vss <- if (grp.repeatable &&
+  hasInput <- not <<< null <$> getInput
+  vss <- if (hasInput && grp.repeatable &&
           length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
             then loop Nil
             else pure Nil
@@ -759,8 +765,8 @@ argP options _ _ _ x = getInput >>= \i -> (
     -- error message when trying to match a LOpt against a LOpt would
     -- be overridden by a meaningless try to match a SOpt against a
     -- a LOpt).
-    isLoptAhead <- P.option false (P.lookAhead $ P.try $ token isAnyLopt)
-    isSoptAhead <- P.option false (P.lookAhead $ P.try $ token isAnySopt)
+    isLoptAhead <- P.option false (P.lookAhead $ token isAnyLopt)
+    isSoptAhead <- P.option false (P.lookAhead $ token isAnySopt)
 
     let
       term = any (_ `elem` options.stopAt)
