@@ -42,7 +42,7 @@ run spec env argv options = do
   toks <- L.lex (fromFoldable argv) options
   fst $ evalRWS
           (P.runParserT
-            (P.PState { input: toks, position: P.initialPos })
+            (P.PState toks P.initialPos)
             (P.spec spec options)
           )
           env

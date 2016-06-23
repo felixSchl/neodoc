@@ -7,7 +7,7 @@ module Language.Docopt.SpecParser.Base where
 import Prelude
 import Control.Alt ((<|>))
 import Data.List (List(), many)
-import Text.Parsing.Parser (PState(..), ParserT(..)) as P
+import Text.Parsing.Parser (PState(..), ParserT(..), Result(..)) as P
 import Text.Parsing.Parser.Pos (Position(..)) as P
 import Text.Parsing.Parser.String (satisfy, char, string) as P
 import Data.Array as A
@@ -23,8 +23,8 @@ debug x = traceShow x $ const $ pure unit
 
 -- | Return the current parser position
 getPosition :: forall a m. (Monad m) => P.ParserT a m P.Position
-getPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
-  pure { input: s, result: Right pos, consumed: false, position: pos }
+getPosition = P.ParserT $ \(P.PState s pos) ->
+  pure (P.Result s (Right pos) false pos)
 
 sof :: forall a m. (Monad m) => P.ParserT a m Unit
 sof = do
@@ -54,8 +54,8 @@ tryMaybe p = (Just <$> p) <|> (pure Nothing)
 
 -- | Return the current parser position
 getInput :: forall a m. (Monad m, Show a) => P.ParserT a m a
-getInput = P.ParserT $ \(P.PState { input: s, position: pos }) ->
-  pure { input: s, result: Right s, consumed: false, position: pos }
+getInput = P.ParserT $ \(P.PState s pos) ->
+  pure (P.Result s (Right s) false pos)
 
 traceInput :: forall a m. (Show a, Monad m) => P.ParserT a m Unit
 traceInput = getInput >>= debug

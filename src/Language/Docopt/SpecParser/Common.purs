@@ -13,7 +13,7 @@ import Data.List (List(..))
 import Data.Either (Either(..))
 import Language.Docopt.SpecParser.Lexer (TokenParser, PositionedToken(..))
 import Language.Docopt.SpecParser.State (ParserState)
-import Text.Parsing.Parser (PState(..), ParserT(..)) as P
+import Text.Parsing.Parser (PState(..), ParserT(..), Result(..)) as P
 import Text.Parsing.Parser.Combinators ((<?>), try) as P
 import Text.Parsing.Parser.Pos (Position(..)) as P
 
@@ -26,12 +26,12 @@ traceState = do
 -- Get the position of the token at the head of the stream.
 --
 getTokenPosition :: TokenParser P.Position
-getTokenPosition = P.ParserT $ \(P.PState { input: s, position: pos }) ->
+getTokenPosition = P.ParserT $ \(P.PState s pos) ->
   pure case s of
     Cons (PositionedToken { sourcePos: spos }) _ ->
-      { input: s, result: Right spos, consumed: false, position: pos }
-    _ ->
-      { input: s, result: Right pos, consumed: false, position: pos }
+      P.Result s (Right spos) false pos
+    otherwise ->
+      P.Result s (Right pos) false pos
 
 -- |
 -- Mark the current indentation level

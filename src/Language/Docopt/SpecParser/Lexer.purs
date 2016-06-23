@@ -26,7 +26,7 @@ import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
                                         lowerAlpha, upperAlpha, string',
                                         getPosition, getInput, spaces, eol)
 import Language.Docopt.SpecParser.State (ParserState)
-import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..),
+import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..), Result(..),
                             runParserT, parseFailed, fail, runParser) as P
 import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
                                         lookAhead, optional, between, manyTill
@@ -443,7 +443,7 @@ type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
 
 -- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> TokenParser a
-token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+token test = P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
     Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
       case test tok of
@@ -452,11 +452,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                 case xs of
                   Cons (PositionedToken { sourcePos: npos }) _ -> npos
                   Nil -> ppos
-          in
-            { consumed: true
-            , input: xs
-            , result: Right a
-            , position: nextpos }
+          in P.Result xs (Right a) true nextpos
         -- XXX: Fix this error message, it makes no sense!
         Nothing -> P.parseFailed toks pos "a better error message!"
     _ -> P.parseFailed toks pos "expected token, met EOF"
@@ -561,14 +557,11 @@ shoutName = token go P.<?> "NAME"
 
 -- | Return the next token's position w/o consuming anything
 nextTokPos :: TokenParser P.Position
-nextTokPos = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+nextTokPos = P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
     Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
-      { consumed: false
-      , input: toks
-      , result: Right ppos
-      , position: pos }
-    _ -> P.parseFailed toks pos "expected token, met EOF"
+      P.Result toks (Right ppos) false pos
+    otherwise -> P.parseFailed toks pos "expected token, met EOF"
 
 runTokenParser :: forall a.
                   (List PositionedToken)
@@ -576,4 +569,4 @@ runTokenParser :: forall a.
                 -> Either P.ParseError a
 runTokenParser s =
   flip evalState ({ indentation: 0, line: 0 })
-        <<< P.runParserT (P.PState { input: s, position: P.initialPos })
+        <<< P.runParserT (P.PState s P.initialPos)

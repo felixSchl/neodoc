@@ -331,7 +331,7 @@ descParserSpec = \_ ->
                 output)) do
         vliftEff $ evaltest (Desc.parse =<< Lexer.lexDescs input) output
 
-    evaltest (Left (P.ParseError { message: msg })) (Left msg')
+    evaltest (Left (P.ParseError msg _ _)) (Left msg')
       = if msg == msg'
            then pure unit
            else throwException $ error $ "Unexpected error:\n" <> msg

@@ -70,7 +70,7 @@ parseUniversalDocoptTests = do
   f <- FS.readTextFile UTF8 "testcases.docopt"
   runEitherEff
     $ runTrampoline
-      $ P.runParserT (P.PState { input: f, position: P.initialPos }) do
+      $ P.runParserT (P.PState f P.initialPos) do
           many kase <* P.eof
 
   where
