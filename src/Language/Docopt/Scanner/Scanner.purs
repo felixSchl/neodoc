@@ -48,10 +48,7 @@ scan text = do
   }
 
   where
-    fail msg = Left $ P.ParseError { message:  msg
-                                   , fatal:    true
-                                   , position: P.initialPos }
-
+    fail msg = Left $ P.ParseError msg P.initialPos true
     sections n = maybe Nil
                        (catMaybes <<< fromFoldable)
                        (Regex.match (section n) text)

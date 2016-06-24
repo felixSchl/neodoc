@@ -42,7 +42,7 @@ instance showDocoptError :: Show DocoptError where
 unParseError :: P.ParseError -> { message  :: String
                                 , fatal    :: Boolean
                                 , position :: P.Position }
-unParseError (P.ParseError e) = e
+unParseError (P.ParseError message position fatal) = { message, position, fatal }
 
 -- | XXX: It would be great to provide a link here to the project's website!
 developerErrorMessage :: String
@@ -78,4 +78,4 @@ prettyPrintDocoptError (DocoptSolveError (SolveError err)) =
     <> developerErrorMessage
 prettyPrintDocoptError
   (DocoptUserParseError
-    argv (P.ParseError { message: message })) = message
+    argv (P.ParseError message _ _)) = message

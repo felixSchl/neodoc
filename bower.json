@@ -39,6 +39,7 @@
     "purescript-monoid": "^1.0.0",
     "purescript-exceptions": "^1.0.0",
     "purescript-monadplus-partial": "felixschl/purescript-monadplus-partial#8f9891b27e34f1a295b7a2a07b6ca2bd7461d6f7",
-    "purescript-free": "^1.0.0"
+    "purescript-free": "^1.0.0",
+    "purescript-transformerless": "^1.0.1"
   }
 }

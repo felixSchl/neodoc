@@ -15,11 +15,12 @@ module Language.Docopt.ArgParser.Parser (
   ) where
 
 import Prelude
-import Control.Monad.RWS (RWS(), evalRWS)
+import Debug.Profile
 import Control.Plus (empty)
 import Debug.Trace
 import Control.Apply ((<*), (*>))
 import Data.Function (on)
+import Data.Function.Uncurried
 import Data.Bifunctor (bimap, lmap, rmap)
 import Data.Either (Either(Right, Left))
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
@@ -40,12 +41,12 @@ import Data.Array as A
 import Data.Array.Partial as AU
 import Data.Monoid (class Monoid, mempty)
 import Data.Tuple (Tuple(..), fst, snd)
-import Control.Monad.Reader (ask)
-import Control.Monad.State as State
+import Control.Monad.Transformerless.RWS (RWS(), evalRWS, ask)
+import Control.Monad.Transformerless.RWS (modify, get) as State
 import Data.StrMap (StrMap())
 import Control.Monad.Trans (lift)
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
-import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), fail,
+import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), Result(..), fail,
                             parseFailedFatal, parseFailed, unParserT, fatal) as P
 import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>), choice) as P
 import Text.Parsing.Parser.Pos (Position) as P
@@ -69,7 +70,7 @@ import Language.Docopt.SpecParser.Base (getInput)
 import Language.Docopt.ArgParser.Token (getSource) as Token
 import Language.Docopt.ArgParser.Token (PositionedToken(..), Token(..),
                                         unPositionedToken, prettyPrintToken)
-import Data.String.Ext (startsWith)
+import Data.String.Ext (startsWith, (~~))
 
 -- | Toggle debugging on/off during development
 debug :: Boolean
@@ -108,7 +109,7 @@ type Options r = {
 
 -- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> Parser a
-token test = P.ParserT $ \(P.PState { input: toks, position: ppos }) ->
+token test = P.ParserT $ \(P.PState toks ppos) ->
   pure $ case toks of
     Cons (PositionedToken { token: tok }) xs ->
       case test tok of
@@ -117,11 +118,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: ppos }) ->
                 case xs of
                   Cons (PositionedToken { sourcePos: npos }) _ -> npos
                   Nil -> ppos
-          in
-            { consumed: true
-            , input: xs
-            , result: Right a
-            , position: nextpos }
+          in P.Result xs (Right a) true nextpos
         -- XXX: Fix this error message, it makes no sense!
         Nothing -> P.parseFailed toks ppos "a better error message!"
     _ -> P.parseFailed toks ppos "Expected token, met EOF"
@@ -133,13 +130,13 @@ eoa = token go P.<?> "--"
     go _        = Nothing
 
 command :: String -> Parser Value
-command n = token go P.<?> "command " <> show n
+command n = token go P.<?> "command " ~~ show n
   where
     go (Lit s) | s == n = Just (BoolValue true)
     go _                = Nothing
 
 positional :: String -> Parser Value
-positional n = token go P.<?> "positional argument " <> show n
+positional n = token go P.<?> "positional argument " ~~ show n
   where
     go (Lit v) = Just (Value.read v false)
     go _       = Nothing
@@ -158,7 +155,7 @@ type OptParse = {
 
 longOption :: Boolean -> String -> (Maybe D.OptionArgumentObj) -> Parser Value
 longOption term n a = unsafePartial $
- P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+ P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
     Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
@@ -171,39 +168,32 @@ longOption term n a = unsafePartial $
             then
               -- consume the rest of the source of this short option into a
               -- single value.
-              { consumed: true
-              , input:    if result.hasConsumedArg
-                              then unsafePartial $ LU.tail xs
-                              else xs
-              , result:
-                  let
+              P.Result
+                (if result.hasConsumedArg
+                      then unsafePartial $ LU.tail xs
+                      else xs)
+                (let
                     -- recover the argument in it's string form.
-                    va = maybe []
-                               (A.singleton <<< StringValue)
-                               result.rawValue
-                  in Right (ArrayValue va)
-              , position: pos
-              }
+                    va = maybe [] (A.singleton <<< StringValue) result.rawValue
+                  in Right (ArrayValue va))
+                true
+                pos
             else
-              { consumed: maybe true (const false) result.remainder
-              , input:
-                  let pushed = maybe empty
-                                      (\v' -> singleton $ PositionedToken {
-                                                token:     v'
-                                              , sourcePos: pos
-                                              , source:    s
-                                              }
-                                       )
-                                       result.remainder
-                      rest = if result.hasConsumedArg
-                                then LU.tail xs
-                                else xs
-                    in pushed <> rest
-              , result:   Right value
-              , position: maybe pos
-                                (_.sourcePos <<< unPositionedToken)
-                                (head xs)
-              }
+              P.Result
+                (let
+                    pushed
+                      = maybe empty
+                          (\v' -> singleton $ PositionedToken {
+                                    token:     v'
+                                  , sourcePos: pos
+                                  , source:    s
+                                  })
+                          result.remainder
+                    rest = if result.hasConsumedArg then LU.tail xs else xs
+                  in pushed <> rest)
+                (Right value)
+                (maybe true (const false) result.remainder)
+                (maybe pos (_.sourcePos <<< unPositionedToken) (head xs))
     _ -> P.parseFailed toks pos "Expected token, met EOF"
 
   where
@@ -273,7 +263,7 @@ shortOption
   -> (Maybe D.OptionArgumentObj)
   -> Parser (Tuple Value Boolean)
 shortOption term f a = unsafePartial $
- P.ParserT $ \(P.PState { input: toks, position: pos }) -> do
+ P.ParserT $ \(P.PState toks pos) -> do
   pure $ case toks of
     Cons (PositionedToken { token: tok, source: s }) xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
@@ -286,40 +276,32 @@ shortOption term f a = unsafePartial $
             then
               -- consume the rest of the source of this short option into a
               -- single value.
-              { consumed: true
-              , input:    if result.hasConsumedArg then LU.tail xs else xs
-              , result:
-                  let
+              P.Result
+                (if result.hasConsumedArg then LU.tail xs else xs)
+                (let
                     -- recover the argument in it's string form.
-                    v = maybe []
-                              (\_ -> [ StringValue $ String.drop 2 s ])
-                              result.remainder
-                    va = maybe []
-                               (A.singleton <<< StringValue)
-                               result.rawValue
-                  in Right (Tuple (ArrayValue $ v <> va) true)
-              , position: pos
-              }
+                    v = maybe [] (\_ -> [ StringValue $ String.drop 2 s ]) result.remainder
+                    va = maybe [] (A.singleton <<< StringValue) result.rawValue
+                  in Right (Tuple (ArrayValue $ v <> va) true))
+                true
+                pos
             else
-              { consumed: maybe true (const false) result.remainder
-              , input:
-                  let
-                    pushed = maybe empty
-                                    (\v' ->
-                                      singleton
-                                        $ PositionedToken
-                                            { token:     v'
-                                            , sourcePos: pos
-                                            , source:    "-" <> String.drop 2 s
-                                            })
-                                    result.remainder
-                    rest = if result.hasConsumedArg then LU.tail xs else xs
-                  in pushed <> rest
-              , result:   Right (Tuple value false)
-              , position: maybe pos
-                                (_.sourcePos <<< unPositionedToken)
-                                (head xs)
-          }
+              P.Result
+                (let
+                  pushed = maybe empty
+                                  (\v' ->
+                                    singleton
+                                      $ PositionedToken
+                                          { token:     v'
+                                          , sourcePos: pos
+                                          , source:    "-" <> String.drop 2 s
+                                          })
+                                  result.remainder
+                  rest = if result.hasConsumedArg then LU.tail xs else xs
+                in pushed <> rest)
+                (Right (Tuple value false))
+                (maybe true (const false) result.remainder)
+                (maybe pos (_.sourcePos <<< unPositionedToken) (head xs))
     _ -> P.parseFailed toks pos "Expected token, met EOF"
 
   where
@@ -385,9 +367,9 @@ shortOption term f a = unsafePartial $
     go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
 
 eof :: Parser Unit
-eof = P.ParserT $ \(P.PState { input: s, position: pos }) ->
+eof = P.ParserT $ \(P.PState s pos) ->
   pure $ case s of
-    Nil -> { consumed: false, input: s, result: Right unit, position: pos }
+    Nil -> P.Result s (Right unit) false pos
     (Cons (PositionedToken {token: tok, source}) _) ->
       P.parseFailed s pos
         $ case tok of
@@ -410,7 +392,7 @@ spec xs options = do
     -- Create a parser for each usage line.
     parsers
       = (concat $ D.runUsage <$> xs) <#> \branch -> do
-          vs <- exhaustP options true false 0 branch
+          vs <- runFn5 exhaustP options true false 0 branch
           pure (Tuple branch vs)
           <* eof
 
@@ -421,33 +403,36 @@ spec xs options = do
 
 -- Parse a list of arguments.
 -- Take care of clumping free vs. non-free (fixed) arguments.
+-- Represented as `FnX` to take advantage of inlining at compile time.
 exhaustP
   :: forall r
-   . Options r       -- ^ generator options
-  -> Boolean         -- ^ can we skip using fallback values?
-  -> Boolean         -- ^ are we currently skipping using fallback values?
-  -> Int             -- ^ recursive level
-  -> List D.Argument -- ^ the list of arguments to parse
-  -> Parser (List ValueMapping)
-exhaustP options skippable isSkipping l xs = do
-  _debug \_->
+   . Fn5
+      (Options r)       -- ^ generator options
+      Boolean           -- ^ can we skip using fallback values?
+      Boolean           -- ^ are we currently skipping using fallback values?
+      Int               -- ^ recursive level
+      (List D.Argument) -- ^ the list of arguments to parse
+      (Parser (List ValueMapping))
+exhaustP = mkFn5 \options skippable isSkipping l xs -> do
+  _debug l \_->
        "exhaustP: "     <> (intercalate " " $ D.prettyPrintArg <$> xs)
     <> ", skippable: "  <> show skippable
     <> ", isSkipping: " <> show isSkipping
 
   concat <$>
-    for (clump xs)
+    for (clump xs) \x -> do
         (clumpP options
                 skippable
                 isSkipping
-                l)
+                l
+                x)
 
   where
-  _debug s = if debug
-                then traceA $ indentation <> (s unit)
+  _debug l s = if debug
+                then traceA $ indentation l <> (s unit)
                 else pure unit
-  indentation :: String
-  indentation = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
+  indentation :: Int -> String
+  indentation l = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
 data Clump a = Free a | Fixed a
 
@@ -517,7 +502,7 @@ clumpP options skippable isSkipping l c = do
 
   where
   go _ _ l (Fixed xs)
-    = concat <$> for xs (argP' options skippable isSkipping l)
+    = concat <$> for xs (runFn5 argP' options skippable isSkipping l)
 
   go skippable isSkipping l (Free  xs) = draw (Required <$> xs) (length xs)
     where
@@ -552,7 +537,7 @@ clumpP options skippable isSkipping l c = do
       -- the back of the queue and the number of retries to be cut down by one.
       vs <- P.try do
               mod do
-                argP' options     -- the parsing options
+                runFn5 argP' options     -- the parsing options
                       isSkipping  -- propagate the 'isSkipping' property
                       false       -- reset 'isSkipping' to false
                       (l + 1)     -- increase the recursive level
@@ -583,10 +568,13 @@ clumpP options skippable isSkipping l c = do
 
       pure (vs <> vss)
     ) <|> (defer \_ -> do
-      _debug \_->
-           "draw: failure"
-        <> ", requeueing: "  <> prettyPrintRequiredArg x
-      draw (xs <> singleton x) (n - 1)
+      if (length xs == 0)
+        then draw (xs <> singleton x) (-1)
+        else do
+          _debug \_->
+              "draw: failure"
+            <> ", requeueing: "  <> prettyPrintRequiredArg x
+          draw (xs <> singleton x) (n - 1)
     )
 
     -- All options have been matched (or have failed to be matched) at least
@@ -630,7 +618,7 @@ clumpP options skippable isSkipping l c = do
         fallbacks = mrights vs
 
       _debug \_->
-           "draw: missing:" <> (intercalate " " $ prettyPrintRequiredArg <$> missing)
+        "draw: missing:" <> (intercalate " " $ prettyPrintRequiredArg <$> missing)
 
       if isSkipping && length missing > 0
         then
@@ -642,8 +630,9 @@ clumpP options skippable isSkipping l c = do
           if skippable || null i
             then do
               if not isSkipping
-                then exhaustP options true true l (unRequired <$> xss)
-                else pure ((unRequired `lmap` _) <$> fallbacks)
+                then runFn5 exhaustP options true true l (unRequired <$> xss)
+                else do
+                  pure ((unRequired `lmap` _) <$> fallbacks)
             else
               P.fail $
                 "Expected "
@@ -659,15 +648,17 @@ clumpP options skippable isSkipping l c = do
   indentation = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
 -- Parse a single argument from argv.
+-- Represented as `FnX` to take advantage of inlining at compile time.
 argP'
   :: forall r
-   . Options r
-  -> Boolean    -- ^ can we skip using fallback values?
-  -> Boolean    -- ^ are we currently skipping using fallback values?
-  -> Int        -- ^ recursive level
-  -> D.Argument -- ^ the argument to parse
-  -> Parser (List ValueMapping)
-argP' options skippable isSkipping l x = do
+   . Fn5
+      (Options r)
+      Boolean    -- ^ can we skip using fallback values?
+      Boolean    -- ^ are we currently skipping using fallback values?
+      Int        -- ^ recursive level
+      D.Argument -- ^ the argument to parse
+      (Parser (List ValueMapping))
+argP' = mkFn5 \options skippable isSkipping l x -> do
   state :: StateObj <- lift State.get
   if state.done
      then pure Nil
@@ -693,16 +684,17 @@ argP options _ _ _ (D.Group (grp@{ branches: Cons (Cons (x@(D.Positional pos)) N
 -- For groups, each branch is run and analyzed.
 argP options skippable isSkipping l g@(D.Group grp) = do
   -- Create a parser for each branch in the group
-  let parsers = exhaustP options skippable isSkipping l <$> grp.branches
+  let parsers = (runFn5 exhaustP options skippable isSkipping l) <$> grp.branches
 
   -- Evaluate the parsers, selecting the result with the most
   -- non-substituted values.
   vs <- (if grp.optional then P.option Nil else id) do
-    evalParsers parsers (\vs ->
-      sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+    evalParsers parsers (\p ->
+      sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> p
     )
 
-  vss <- if (grp.repeatable &&
+  hasInput <- not <<< null <$> getInput
+  vss <- if (hasInput && grp.repeatable &&
           length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
             then loop Nil
             else pure Nil
@@ -711,7 +703,13 @@ argP options skippable isSkipping l g@(D.Group grp) = do
 
   where
     loop acc = do
-      vs <- argP' options skippable isSkipping l (D.Group grp {  optional = true })
+      vs <- do
+        runFn5
+          argP' options
+                skippable
+                isSkipping
+                l
+                (D.Group grp {  optional = true })
       if (length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
         then loop $ acc <> vs
         else pure acc
@@ -727,21 +725,21 @@ argP options _ _ _ x = getInput >>= \i -> (
   (if D.isRepeatable x then some else liftM1 singleton) do
     Tuple x <<< (RValue.from Origin.Argv) <$> do
       P.ParserT \s -> do
-        o <- P.unParserT (unsafePartial $ go x) s
+        (o@(P.Result input result consumed pos)) <- P.unParserT (unsafePartial $ go x) s
 
         -- Check error messages for fatal errors.
         -- XXX: This should also change.
-        case o.result of
+        case result of
           (Left e) -> do
             let err = unParseError e
             if ((startsWith "Option takes no argument" err.message)
              || (startsWith "Option requires argument" err.message))
               then do
-                pure $ o {
-                  result = Left $ P.ParseError $ err {
-                    fatal = true
-                  }
-                }
+                pure (P.Result
+                        input
+                        (Left $ P.ParseError err.message err.position true)
+                        consumed
+                        pos)
               else pure o
           otherwise -> pure o
     <* modifyDepth (_ + 1)
@@ -759,13 +757,14 @@ argP options _ _ _ x = getInput >>= \i -> (
     -- error message when trying to match a LOpt against a LOpt would
     -- be overridden by a meaningless try to match a SOpt against a
     -- a LOpt).
-    isLoptAhead <- P.option false (P.lookAhead $ P.try $ token isAnyLopt)
-    isSoptAhead <- P.option false (P.lookAhead $ P.try $ token isAnySopt)
+
+    isLoptAhead <- P.option false (P.lookAhead $ token isAnyLopt)
+    isSoptAhead <- P.option false (P.lookAhead $ token isAnySopt)
 
     let
       term = any (_ `elem` options.stopAt)
-                 (A.catMaybes [ ("--" <> _)                       <$> o.name
-                              , (("-" <> _) <<< String.singleton) <$> o.flag
+                 (A.catMaybes [ ("--" ~~ _)                       <$> o.name
+                              , (("-" ~~ _) <<< String.singleton) <$> o.flag
                               ])
     case o.name of
       Just n  | isLoptAhead -> do
@@ -804,7 +803,7 @@ evalParsers
   -> (a -> b)
   -> Parser a
 evalParsers parsers p = do
-  P.ParserT \(pState@(P.PState { input: i, position: pos })) -> do
+  P.ParserT \(pState@(P.PState i pos)) -> do
     env   :: Env      <- ask
     state :: StateObj <- State.get
 
@@ -814,12 +813,23 @@ evalParsers parsers p = do
       -- `ParserT`'s bind instance.
       collect = for parsers \parser -> do
         -- reset the depth for every branch
-        o <- P.unParserT (modifyDepth (const 0) *> parser) pState
+        (P.Result s result consumed pos) <- P.unParserT (modifyDepth (const 0) *> parser) pState
         state' :: StateObj <- State.get
-        pure $ bimap
-          (\e -> o { result = { error: e, depth: state'.depth + state.depth } })
-          (\r -> o { result = { value: r, depth: state'.depth + state.depth } })
-          o.result
+        let
+          result' = case result of
+            (Left err) -> Left  {
+              input:    s
+            , result:   { error: err, depth: state'.depth + state.depth }
+            , consumed: consumed
+            , position: pos
+            }
+            (Right a)  -> Right {
+              input:    s
+            , result: { value: a, depth: state'.depth + state.depth }
+            , consumed: consumed
+            , position: pos
+            }
+        pure result'
 
       -- Evaluate the parsers.
       results    = fst $ evalRWS collect env initialState
@@ -862,11 +872,11 @@ evalParsers parsers p = do
                 es <- losers
                 pure case es of
                   Cons e es | null es || not (null i) -> do
-                    pure $ e { result = Left e.result.error }
+                    pure (P.Result e.input (Left e.result.error) e.consumed e.position)
                   otherwise -> pure $ P.parseFailed i pos ""
               )
           )
-          (\r -> pure $ r { result = Right r.result.value })
+          (\r -> pure (P.Result r.input (Right r.result.value) r.consumed r.position))
           winner
       )
       (\x ->
@@ -883,13 +893,8 @@ terminate arg = do
   let rest = ArrayValue $ toUnfoldable $ StringValue <<< Token.getSource <$> input
   markDone
   modifyDepth (const 99999)
-  P.ParserT \(P.PState { position: pos }) ->
-    pure {
-      consumed: true
-    , input:    Nil
-    , result:   pure rest
-    , position: pos
-    }
+  P.ParserT \(P.PState _ pos) ->
+    pure (P.Result Nil (Right rest) true pos)
 
 -- Find a fallback value for the given argument.
 getFallbackValue :: Env -> D.Argument -> Maybe RichValue
@@ -932,4 +937,4 @@ isFrom :: Origin -> RichValue -> Boolean
 isFrom o rv = o == RValue.getOrigin rv
 
 unParseError :: P.ParseError -> { position :: P.Position, message :: String, fatal :: Boolean }
-unParseError (P.ParseError e) = e
+unParseError (P.ParseError message position fatal) = { message, position, fatal }

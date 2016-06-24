@@ -906,7 +906,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                                    (fromMaybe defaultOptions options)
 
         case result of
-          Left (e@(P.ParseError { message: msg })) ->
+          Left (e@(P.ParseError msg _ _)) ->
             either
               (\e' ->
                 if (msg /= e')

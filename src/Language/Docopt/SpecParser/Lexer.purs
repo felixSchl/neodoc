@@ -21,12 +21,12 @@ import Data.String (singleton) as String
 import Data.String.Regex (Regex(), regex)
 import Data.String.Regex (parseFlags, replace) as Regex
 import Partial.Unsafe (unsafePartial)
-import Data.String.Ext ((^=))
+import Data.String.Ext ((^=), (~~))
 import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
                                         lowerAlpha, upperAlpha, string',
                                         getPosition, getInput, spaces, eol)
 import Language.Docopt.SpecParser.State (ParserState)
-import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..),
+import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..), Result(..),
                             runParserT, parseFailed, fail, runParser) as P
 import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
                                         lookAhead, optional, between, manyTill
@@ -34,6 +34,7 @@ import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Text.Parsing.Parser.String (skipSpaces, anyChar, string, char, oneOf,
                                   whiteSpace, eof, noneOf, satisfy) as P
+
 
 -- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
 skipSpaces = go
@@ -61,6 +62,10 @@ isDescMode _            = false
 isUsageMode :: Mode -> Boolean
 isUsageMode Usage = true
 isUsageMode _     = false
+
+instance showMode :: Show Mode where
+  show (Usage)        = "Usage"
+  show (Descriptions) = "Descriptions"
 
 lex :: Mode -> String -> Either P.ParseError (List PositionedToken)
 lex m input = do
@@ -114,27 +119,27 @@ prettyPrintToken Colon         = show ':'
 prettyPrintToken Comma         = show ','
 prettyPrintToken TripleDot     = "..."
 prettyPrintToken DoubleDash    = "--"
-prettyPrintToken (Reference r) = "Reference " <> show r
-prettyPrintToken (Garbage   c) = "Garbage "   <> show c
-prettyPrintToken (Tag k v)     = "Tag "       <> k <> " "  <> (show v)
-prettyPrintToken (Name      n) = "Name "      <> show n
-prettyPrintToken (ShoutName n) = "ShoutName " <> show n
-prettyPrintToken (AngleName n) = "AngleName " <> show n
+prettyPrintToken (Reference r) = "Reference " ~~ show r
+prettyPrintToken (Garbage   c) = "Garbage "   ~~ show c
+prettyPrintToken (Tag k v)     = "Tag "       ~~ k ~~ " "  ~~ (show v)
+prettyPrintToken (Name      n) = "Name "      ~~ show n
+prettyPrintToken (ShoutName n) = "ShoutName " ~~ show n
+prettyPrintToken (AngleName n) = "AngleName " ~~ show n
 prettyPrintToken (LOpt n arg)
-  = "--" <> n
-         <> (fromMaybe "" do
+  = "--" ~~ n
+         ~~ (fromMaybe "" do
               a <- arg
               pure $ if a.optional then "[" else ""
-                <> a.name
-                <> if a.optional then "]" else ""
+                ~~ a.name
+                ~~ if a.optional then "]" else ""
             )
 prettyPrintToken (SOpt n s arg)
-  = "-" <> (fromCharArray (A.cons n s))
-        <> (fromMaybe "" do
+  = "-" ~~ (fromCharArray (A.cons n s))
+        ~~ (fromMaybe "" do
               a <- arg
               pure $ if a.optional then "[" else ""
-                <> a.name
-                <> if a.optional then "]" else ""
+                ~~ a.name
+                ~~ if a.optional then "]" else ""
             )
 
 data PositionedToken = PositionedToken
@@ -184,7 +189,7 @@ instance eqToken :: Eq Token where
 
 instance showPositionedToken :: Show PositionedToken where
   show (PositionedToken { sourcePos: pos, token: tok }) =
-    (show tok) <> " at " <> (show pos)
+    (show tok) ~~ " at " ~~ (show pos)
 
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m = do
@@ -195,7 +200,7 @@ parseTokens m = do
                                 else parseUsageToken)
   P.eof <|> void do
     i <- getInput
-    P.fail $ "Unexpected input: " <> i
+    P.fail $ "Unexpected input: " ~~ i
   pure xs
 
 parsePositionedToken :: (P.Parser String Token) -> P.Parser String PositionedToken
@@ -325,7 +330,7 @@ _angleName = do
     , P.noneOf [ '<', '>' ]
     ]
   P.char '>'
-  pure $ "<" <> n <> ">"
+  pure $ "<" ~~ n ~~ ">"
 
 _shortOption :: P.Parser String Token
 _shortOption = do
@@ -438,7 +443,7 @@ type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
 
 -- | Test the token at the head of the stream
 token :: forall a. (Token -> Maybe a) -> TokenParser a
-token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+token test = P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
     Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
       case test tok of
@@ -447,11 +452,7 @@ token test = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
                 case xs of
                   Cons (PositionedToken { sourcePos: npos }) _ -> npos
                   Nil -> ppos
-          in
-            { consumed: true
-            , input: xs
-            , result: Right a
-            , position: nextpos }
+          in P.Result xs (Right a) true nextpos
         -- XXX: Fix this error message, it makes no sense!
         Nothing -> P.parseFailed toks pos "a better error message!"
     _ -> P.parseFailed toks pos "expected token, met EOF"
@@ -531,7 +532,7 @@ name = token go P.<?> "name"
     go _        = Nothing
 
 tag :: String -> TokenParser String
-tag s = token go P.<?> ("tag: " <> s)
+tag s = token go P.<?> ("tag: " ~~ s)
   where
     go (Tag k (Just v)) | k ^= s = Just v
     go _                         = Nothing
@@ -556,14 +557,11 @@ shoutName = token go P.<?> "NAME"
 
 -- | Return the next token's position w/o consuming anything
 nextTokPos :: TokenParser P.Position
-nextTokPos = P.ParserT $ \(P.PState { input: toks, position: pos }) ->
+nextTokPos = P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
     Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
-      { consumed: false
-      , input: toks
-      , result: Right ppos
-      , position: pos }
-    _ -> P.parseFailed toks pos "expected token, met EOF"
+      P.Result toks (Right ppos) false pos
+    otherwise -> P.parseFailed toks pos "expected token, met EOF"
 
 runTokenParser :: forall a.
                   (List PositionedToken)
@@ -571,4 +569,4 @@ runTokenParser :: forall a.
                 -> Either P.ParseError a
 runTokenParser s =
   flip evalState ({ indentation: 0, line: 0 })
-        <<< P.runParserT (P.PState { input: s, position: P.initialPos })
+        <<< P.runParserT (P.PState s P.initialPos)

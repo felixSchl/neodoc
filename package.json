@@ -11,9 +11,11 @@
     "build:lib": "babel lib --out-dir dist",
     "prebuild": "rm -rf dist",
     "build": "npm run build:src && npm run build:lib",
+    "postbuild": "npm run minify",
     "pretest": "npm run build",
     "test": "pulp test && mocha test-js",
     "watch": "pulp -w test",
+    "minify": "uglifyjs dist/docopt.purs.js > dist/docopt.purs.min.js",
     "deps": "bower install",
     "clean": "git stash && git clean -fdX",
     "prerelease": "npm run clean && npm install && npm run deps && npm test",
@@ -46,6 +48,7 @@
     "pulp": "^9.0.0",
     "purescript": "^0.9.0",
     "shelljs": "^0.7.0",
-    "string-argv": "0.0.2"
+    "string-argv": "0.0.2",
+    "uglifyjs": "^2.4.10"
   }
 }

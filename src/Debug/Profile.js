@@ -4,5 +4,5 @@
 // module Debug.Profile
 
 exports.sampleTime = function() {
-  return Date.now();
+  return process.hrtime()[1] / 1000000;
 };
