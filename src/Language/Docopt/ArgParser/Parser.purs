@@ -366,20 +366,28 @@ shortOption term f a = unsafePartial $
 
     go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
 
-eof :: Parser Unit
-eof = P.ParserT $ \(P.PState s pos) ->
+eof :: List D.Branch -> Parser Unit
+eof branches = P.ParserT $ \(P.PState s pos) ->
   pure $ case s of
     Nil -> P.Result s (Right unit) false pos
     (Cons (PositionedToken {token: tok, source}) _) ->
-      P.parseFailed s pos
-        $ case tok of
-              -- XXX: Check if the command or option is known anywhere
-              --      in the spec and change the error message accordingly
-              LOpt _ _   -> "Unmatched option: " <> source
-              SOpt _ _ _ -> "Unmatched option: " <> source
-              EOA _      -> "Unmatched option: --"
-              Stdin      -> "Unmatched option: -"
-              Lit _      -> "Unmatched command: " <> source
+      let isKnown = any (any (p tok)) branches
+          prefix = if isKnown then "Unexpected " else "Unknown "
+       in P.parseFailed s pos $
+          case tok of
+            LOpt _ _   -> prefix <> "option: " <> source
+            SOpt _ _ _ -> prefix <> "option: " <> source
+            EOA _      -> prefix <> "option: --"
+            Stdin      -> prefix <> "option: -"
+            Lit _      -> prefix <> "command: " <> source
+      where
+        p (LOpt n _)   (D.Option { name: Just n' }) = n == n'
+        p (SOpt f _ _) (D.Option { flag: Just f' }) = f == f'
+        p (Lit n)      (D.Command { name: n' })     = n == n'
+        p (EOA _)      (D.EOA)                      = true
+        p (Stdin)      (D.Stdin)                    = true
+        p x            (D.Group { branches })       = any (any (p x)) branches
+        p _            _                            = false
 
 -- | Parse user input against a program specification.
 spec
@@ -390,11 +398,12 @@ spec
 spec xs options = do
   let
     -- Create a parser for each usage line.
+    branches = (concat $ D.runUsage <$> xs)
     parsers
-      = (concat $ D.runUsage <$> xs) <#> \branch -> do
+      = branches <#> \branch -> do
           vs <- runFn5 exhaustP options true false 0 branch
           pure (Tuple branch vs)
-          <* eof
+          <* eof branches
 
   -- Evaluate the parsers, selecting the result with the most
   -- non-substituted values.

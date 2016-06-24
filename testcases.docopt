@@ -2493,7 +2493,7 @@ Usage: foo
 """
 
 $ prog --fooo
-"Unmatched option: --fooo"
+"Unknown option: --fooo"
 
 #
 # This usage section parse must fail until #23 comes to fruition.
@@ -2546,10 +2546,10 @@ $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"Unmatched command: QUX"
+"Unknown command: QUX"
 
 $ prog --foo=bar QUX
-"Unmatched command: QUX"
+"Unknown command: QUX"
 
 r"""
 Usage: foo [-f[=FOO]] [-b=BAR]
@@ -2563,10 +2563,10 @@ $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"Unmatched command: QUX"
+"Unknown command: QUX"
 
 $ prog --foo=bar QUX
-"Unmatched command: QUX"
+"Unknown command: QUX"
 
 #
 # Proper value parsing

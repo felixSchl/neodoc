@@ -122,7 +122,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , fail
             Nothing
             [ "a", "--foo", "-f=10" ]
-            "Unmatched option: --foo"
+            "Unknown option: --foo"
         ]
 
     , test
@@ -332,10 +332,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "b" :> D.bool true ]
         , fail Nothing
             [ "a", "b" ]
-            "Unmatched command: b"
+            "Unexpected command: b"
         , fail Nothing
             [ "b", "a" ]
-            "Unmatched command: a"
+            "Unexpected command: a"
         , fail Nothing [] ""
         ]
 
@@ -439,7 +439,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         """
         usage: prog [foo]
         """
-        [ fail Nothing [ "goo" ] "Unmatched command: goo" ]
+        [ fail Nothing [ "goo" ] "Unknown command: goo" ]
 
     , test
         """
@@ -761,17 +761,17 @@ parserGenSpec = \_ -> describe "The parser generator" do
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-ifxy=foo", "-i" ]
-                  "Unmatched option: -y=foo"
+                  "Unknown option: -y=foo"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-xoz" ]
-                  "Unmatched option: -z"
+                  "Unknown option: -z"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-oxzfoo", "-i" ]
-                 "Unmatched option: -zfoo"
+                 "Unknown option: -zfoo"
               ]
             otherwise ->
               [ pass
@@ -846,7 +846,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
               , fail
                   (Just (defaultOptions { stopAt = [ "--foo" ] }))
                   [ "--fooBAR", "-f"]
-                  "Unmatched option: --fooBAR"
+                  "Unknown option: --fooBAR"
               ]
             otherwise ->
               [ pass
