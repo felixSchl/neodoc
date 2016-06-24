@@ -57,7 +57,7 @@ import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 isRepeatable, OptionArgumentObj(),
                                 setRequired, isOptional, isGroup
                                 ) as D
-import Language.Docopt.Usage (Usage, runUsage) as D
+import Language.Docopt.Usage (Usage) as D
 import Language.Docopt.Env (Env ())
 import Language.Docopt.Env as Env
 import Language.Docopt.Origin as Origin
@@ -398,7 +398,7 @@ spec
 spec xs options = do
   let
     -- Create a parser for each usage line.
-    branches = (concat $ D.runUsage <$> xs)
+    branches = concat xs
     parsers
       = branches <#> \branch -> do
           vs <- runFn5 exhaustP options true false 0 branch

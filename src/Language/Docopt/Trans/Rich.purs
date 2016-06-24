@@ -19,9 +19,10 @@ import Data.Foldable (foldl, maximum, all)
 import Control.Alt ((<|>))
 import Partial.Unsafe (unsafePartial)
 
+import Language.Docopt.Specification
 import Language.Docopt.Value (Value(..), isBoolValue)
 import Language.Docopt.Value as Value
-import Language.Docopt.Usage (Usage(Usage), runUsage) as D
+import Language.Docopt.Usage (Usage) as D
 import Language.Docopt.Env (Env)
 import Language.Docopt.Env as Env
 import Language.Docopt.Argument (Argument(..), Branch(), isRepeatable,
@@ -33,7 +34,7 @@ import Language.Docopt.Origin as Origin
 import Language.Docopt.Origin (Origin())
 import Language.Docopt.Trans.Key (Key(..), key, toKeys)
 
-reduce :: List D.Usage       -- ^ the program specification
+reduce :: Specification      -- ^ the program specification
        -> Env                -- ^ the environment
        -> D.Branch           -- ^ the matched specification
        -> List ValueMapping  -- ^ the parse result
@@ -42,7 +43,7 @@ reduce us env b vs =
   let vm = Map.fromFoldableWith (<>) (rmap singleton <$>
                                             lmap key <$>
                                             reverse vs)
-      m = applyValues vm $ reduceUsage (D.Usage (singleton b))
+      m = applyValues vm $ reduceUsage (singleton b)
    in finalFold m
 
   where
@@ -113,7 +114,7 @@ reduce us env b vs =
 -- | XXX: Explain more here how merging is done and how repetition is merged
 -- |      and so on.
 reduceUsage :: D.Usage -> List D.Argument
-reduceUsage = Map.values <<< reduceBranches false <<< D.runUsage
+reduceUsage = Map.values <<< reduceBranches false
 
     where
     reduceBranches :: Boolean -- ^ force repeatablity? This is used so that

@@ -9,7 +9,8 @@ module Language.Docopt (
   , preparseDocopt
   , parseDocopt
   , evalDocopt
-  , Specification ()
+  , module Language.Docopt.Specification
+  , module Argument
   ) where
 
 import Prelude
@@ -22,7 +23,8 @@ import Data.Traversable (traverse)
 import Text.Parsing.Parser as P
 import Text.Wrap (dedent)
 
-import Language.Docopt.Usage (Usage()) as D
+import Language.Docopt.Specification
+import Language.Docopt.Usage (Usage) as D
 import Language.Docopt.Errors (Argv, DocoptError(..), SolveError(..),
                               prettyPrintDocoptError
                               ) as D
@@ -30,12 +32,11 @@ import Language.Docopt.Value (Value()) as D
 import Language.Docopt.ArgParser  as G
 import Language.Docopt.Trans.Flat as T
 
+import Language.Docopt.Argument     as Argument
 import Language.Docopt.Scanner      as Scanner
 import Language.Docopt.Solver       as Solver
 import Language.Docopt.SpecParser.Usage as Usage
 import Language.Docopt.SpecParser.Desc  as Desc
-
-type Specification = List D.Usage
 
 type Docopt = {
   usage         :: String

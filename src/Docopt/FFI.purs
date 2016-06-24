@@ -22,7 +22,6 @@ import Data.Foreign (readArray, readString, typeOf, toForeign) as F
 import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign,
                     toForeign)
 import Data.Foreign.Class (readProp) as F
-import Language.Docopt.Usage (Usage(Usage))
 import Language.Docopt.Argument (Branch(), Argument(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -130,7 +129,7 @@ parse = mkFn2 go
                               F.readProp "smartOptions" opts)
           }
       result <- Docopt.parse helpText opts'
-      pure $ toUnfoldable $ result <#> \(Usage branches) -> do
+      pure $ toUnfoldable $ result <#> \branches -> do
         toUnfoldable $ convBranch <$> branches
 
     convBranch :: Branch -> Array Foreign

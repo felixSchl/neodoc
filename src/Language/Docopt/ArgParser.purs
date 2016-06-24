@@ -9,13 +9,12 @@ import Prelude
 import Data.List (List(), fromFoldable)
 import Data.Either (Either())
 import Data.Tuple (Tuple(), fst)
--- import Control.Monad.RWS (RWS(), evalRWS)
 import Control.Monad.Transformerless.RWS (RWS(), evalRWS)
 import Text.Parsing.Parser (ParseError, PState(PState), runParserT) as P
 import Text.Parsing.Parser.Pos (initialPos) as P
 
+import Language.Docopt.Specification
 import Language.Docopt.Argument (Branch) as D
-import Language.Docopt.Usage (Program) as D
 import Language.Docopt.Env (Env) as D
 import Language.Docopt.ArgParser.Parser (spec, initialState, ValueMapping(),
                                         Options()) as P
@@ -33,9 +32,9 @@ type Options r = {
 
 run
   :: forall r
-   . D.Program    -- ^ the specification
-  -> D.Env        -- ^ the environment
-  -> Array String -- ^ the user input
+   . Specification -- ^ the specification
+  -> D.Env         -- ^ the environment
+  -> Array String  -- ^ the user input
   -> Options r
   -> Either P.ParseError Result
 run spec env argv options = do

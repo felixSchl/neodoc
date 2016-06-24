@@ -36,7 +36,7 @@ import Language.Docopt.Errors (SolveError(..))
 import Language.Docopt.SpecParser.Desc (Desc)
 import Language.Docopt.SpecParser.Usage (Usage(..)) as U
 import Language.Docopt.SpecParser.Usage.Argument (Branch, Argument(..)) as U
-import Language.Docopt.Usage (Usage(..))
+import Language.Docopt.Usage (Usage)
 import Partial.Unsafe (unsafePartial)
 
 foreign import undefined :: forall a. a
@@ -555,7 +555,7 @@ solveBranch as ds = go as
             , default:  Nothing }
 
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
-solveUsage (U.Usage _ bs) ds = Usage <$> do traverse (flip solveBranch ds) bs
+solveUsage (U.Usage _ bs) ds = traverse (flip solveBranch ds) bs
 
 solve :: List U.Usage
       -> List Desc

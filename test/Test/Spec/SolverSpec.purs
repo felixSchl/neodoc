@@ -25,6 +25,7 @@ import Test.Support.Arguments
 
 import Language.Docopt (preparseDocopt)
 import Language.Docopt.Errors
+import Language.Docopt.Specification
 import Language.Docopt.Argument
 import Language.Docopt.Value
 import Language.Docopt.Usage
@@ -255,7 +256,7 @@ solverSpec = \_ ->
 
   where
 
-    prettyPrintOutput :: List Usage -> String
+    prettyPrintOutput :: Specification -> String
     prettyPrintOutput as =
       intercalate "\n" (("  " <> _) <$>
         (prettyPrintUsage <$> as))
@@ -283,7 +284,7 @@ solverSpec = \_ ->
                 (expected)
 
     evaltest (Right output) (Right expected)
-      = if output == (pure $ Usage $ fromFoldable $ fromFoldable <$> expected)
+      = if output == (pure $ fromFoldable $ fromFoldable <$> expected)
             then pure unit
             else throwException $ error $
               "Unexpected output:\n\n" <> prettyPrintOutput output
