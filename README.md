@@ -194,19 +194,15 @@ if (args['<command>'] === 'remote') {
   whether or not the group itself is required or not - once you start matching
   into the group, elements in the group become required for the match to
   succeed. Consider:
-
   ```sh
   Usage: prog [<name> <type>]
   ```
-
   will fail `prog foo`, but pass `prog foo bar`. The rationale being that this is
   more general, since if the opposite behaviour (any match) was desired, it
   could be expressed as such:
-
   ```sh
   Usage: prog [[<name>] [<type>]]
   ```
-
   **note:** this rule excludes flags/switches and options that have default
   values (or other fallback values).
 * **No abbreviations:**
@@ -222,6 +218,7 @@ if (args['<command>'] === 'remote') {
     1. User input (per `process.argv`)
     1. Environment variables (per `[env: ...]` tag)
     1. Option defaults (per `[default: ...]` tag)
+
 
 ## License ##
 
