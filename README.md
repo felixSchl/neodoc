@@ -20,11 +20,10 @@
 
 <p align="center">
     <b><a href="#about">About</a></b>
+  | <b><a href="#features">Features</a></b>
   | <b><a href="#installation">Installation</a></b>
   | <b><a href="#usage">Usage</a></b>
-  | <b><a href="#project-goals">Goals</a></b>
-  | <b><a href="#project-status">Status</a></b>
-  | <b><a href="#contributing">Contributing</a></b>
+  | <b><a href="#language-overview-and-terminology">Language overview</a></b>
   | <b><a href="#license">License</a></b>
   | <b><a href="https://felixschl.github.com/neodoc">Playground <sup>new</sup></a></b>
 </p>
@@ -43,7 +42,7 @@ command lines by writing the command line's help text first and then deriving
 a matching parser from it, which can then be applied to user input. The
 advantages are numerous:
 
-* **No boilerplate**
+* **No boilerplate** - just write your help-text
 * Full control over **beautiful, hand-crafted help texts**
 * Documentation comes first - **hence your users come first**
 * Documentation is always right - **your help-text is _necessarily_ correct**
@@ -58,10 +57,9 @@ an (in-)comprehensive comparison to the original, click
 ## Features ##
 
 * Derive command line interface from help text
-* Helpful error messages for developer and user
-* _Options-first_ parsing to compose large programs (see example below)
-* Fallback to alternate values:
-    * User input -> Environment -> Defaults
+* Helpful error messages for both developers and users
+* _Options-first_ parsing to compose large programs (see git example)
+* Fallback to alternate values: `Argv -> Environment -> Defaults -> Empty`
 * Convenient, concise and widely accepted POSIX-style syntax
     * `-f[=ARG], --foo[=ARG]` options
     * `<arg>`, `ARG` positionals
@@ -70,11 +68,16 @@ an (in-)comprehensive comparison to the original, click
     * `(<arg>])` required groupings
     * `[-f ARG]` POSIX-style flags
     * `-f[=ARG]...` repeating elements
+    * `--` end of options separator
+    * `-` stdin marker
     * 99% compatible with a typical `git <command> --help` output
-    * **A full overview of the language is still pending**, but things should
-      be intuitive enough to be figured out. To test your intuition, check out
-      the [playground][playground]. _Please do submit an issue if you find
-      something surprising or counter-intuitive._
+    * <a href="#language-overview-and-terminology"><strong>Full overview of the language &rarr;</strong></a>
+* Stop parsing at any option and collect successive input as the argument to
+  that option. Similar to `--` but for named options (and their aliases).
+* Specification parsing (help-text parsing) is separated from argv parsing
+  and can be used for other projects outside of neodoc. _Work is underway to
+  make the argv parser usable from JS as well_.
+* Count repeated flags
 
 ## Installation ##
 
@@ -103,20 +106,7 @@ Options:
 * `opts.stopAt` - Stop parsing at the given options, i.e. `[ -n ]`. It's value
   will be the rest of argv.
 
-### neodoc.parse(helpText, opts)
-
-Parse the docopt specification. This is the canonical representation of the
-CLI as described by it's help text and can be used for building parsers etc.
-
-Options:
-
-* `opts.smartOptions` - Enable parsing groups that "look like" options as
-  options. For example: `[-f ARG...]` means `[-f=ARG...]`
-
-### Example
-
-> For more examples, check out the 'examples' folder.
-> To see the git example in action, run: `node ./examples/git`
+For example:
 
 ```javascript
 #!/usr/bin/env node
@@ -139,11 +129,6 @@ if (args['<command>'] === 'remote') {
                         [--mirror=<fetch|push>] <name> <url>
         git remote rename <old> <new>
         git remote remove <name>
-        git remote set-head <name> (-a | --auto | -d | --delete | <branch>)
-        git remote set-branches [--add] <name> <branch>...
-        git remote set-url [--push] <name> <newurl> [<oldurl>]
-        git remote set-url --add [--push] <name> <newurl>
-        git remote set-url --delete [--push] <name> <url>
         git remote [-v | --verbose] show [-n] <name>...
         git remote prune [-n | --dry-run] <name>...
         git remote [-v | --verbose] update [-p | --prune] [(<group> | <remote>)...]
@@ -153,26 +138,359 @@ if (args['<command>'] === 'remote') {
 } else { /* ... */ }
 ```
 
+See the examples folder for a more sophisticated version of the above example.
 
-## Project goals ##
+### neodoc.parse(helpText, opts)
 
-> Overview of the short- and long-term goals of this project
+Parse the docopt specification. This is the canonical representation of the
+CLI as described by it's help text and can be used for building parsers etc.
 
-* Provide a declarative way to author command lines. Rather than deriving the
-  help text from some EDSL, derive the CLI from a human readable, prose-like help
-  text, located e.g. in the project's README. **This guarantees documentation and
-  implementation never diverge, because they simply can't.**
-* Provide **very good error reporting** for users of the CLI and at least decent
-  error reporting for developers authoring the docopt text.
-* The manually crafted docopt text must be **readable, standardised, yet
-  flexible and powerful** enough to handle a fair set of use-cases.
-* A solid interface for use in **regular javascript**. Purescript should merely
-  be an implementation detail.
-* **Solid test coverage**
-* Sensible compatibility with original docopt.
-* **POSIX compatibility**
+Options:
 
-### Deviations from the original ###
+* `opts.smartOptions` - Enable parsing groups that "look like" options as
+  options. For example: `[-f ARG...]` means `[-f=ARG...]`
+
+## Language overview and terminology
+
+This section gives an overview over the neodoc cli **specification** language.
+Keywords are highlighted.
+
+The over-arching format could be described as follows:
+
+```sh
+Usage: <program> [<argument>...] [| <argument> [<argument>...]]
+[  or: <program> [<argument>...] [| <argument> [<argument>...]]
+]*
+
+[options:
+    [<argument> [<description and meta tags>]
+    ]*
+]*
+```
+
+Where `<argument>` may be any of the arguments described in the following
+subsections.
+
+A full example:
+
+```sh
+usage: git fetch [options] [<repository> [<refspec>...]]
+   or: git fetch [options] <group>
+   or: git fetch --multiple [options] [(<repository> | <group>)...]
+   or: git fetch --all [options]
+
+options:
+    -v, --verbose         be more verbose
+    -q, --quiet           be more quiet
+    --all                 fetch from all remotes
+    -a, --append          append to .git/FETCH_HEAD instead of overwriting
+    --upload-pack <path>  path to upload pack on remote end
+    -f, --force           force overwrite of local branch
+    -m, --multiple        fetch from multiple remotes
+    -t, --tags            fetch all tags and associated objects
+    [...]
+```
+
+### 1. Arguments
+
+At the heart of the language are command line arguments. There are three
+fundamental types of arguments: options, positional arguments and commands.
+Options are arguments that start with either a single or a double dash ('-'),
+commands are literal matches of a certain string and positionals constitute
+everything else.  Read on below for more detail on each argument type.
+
+The internal data structure for arguments looks as follows:
+
+```haskell
+type Specification = List Usage
+type Usage         = List Branch
+type Branch        = List Argument
+
+data Argument
+  = Command     { name       :: String
+                , repeatable :: Boolean
+                }
+  | Positional  { name       :: String
+                , repeatable :: Boolean
+                }
+  | Option      { flag       :: Maybe Char
+                , name       :: Maybe String
+                , arg        :: Maybe { name     :: String
+                                      , default  :: Maybe Value
+                                      , optional :: Boolean
+                                      }
+                , env        :: Maybe String
+                , repeatable :: Boolean
+                }
+  | Group       { optional   :: Boolean
+                , branches   :: List Branch
+                , repeatable :: Boolean
+                }
+  | EOA
+  | Stdin
+```
+
+As you can see, this is a recursive data structure as a `Group` may contain
+multiple `Branch`es, each of which may contain multiple `Argument`s.
+
+First, we dive into describing each argument type in more detail, then focus on
+arranging arguments using groups and branches.
+
+#### 1.1. Options
+
+Options are those arguments that start with either one or two dashes. They are
+referred to as "short" and "long" options respectively throughout this document
+and the source code of neodoc.
+
+Options may take an potentially optional option-argument. Options that do not
+are referred to as flags. Options that do specify an option-argument but declare
+it as being optional may behave as flags if an argument could not be consumed at
+runtime.
+
+The following is true for all options:
+
+* Options may take an optional "option-argument"
+* Options may be repeated using `...`
+* Adjacent options are not fixed in position: `-a -b` is equivalent to `-b -a`.
+  Likewise, `-ab` is equivalent to `-ba`. This also holds true for options that
+  take option-arguments.
+* Options that are repeated collect values into an array
+* Flags that are repeated count the number of occurrences
+* Flags that are not repeated simply yield `true` if present
+* Flags and options with an optional option-argument can always be omitted from
+  the input. They simply won't yield anything in the output value mapping.
+* Options may alias a short (one-character) form with a long form, e.g.: `-v,
+  --verbose`
+* Options that take an argument can specify a `[default: <value>]` in the option
+  section as fallback.
+* Options that take an argument can specify a `[env: <key>]` in the option
+  section as fallback.
+
+##### 1.1.1. Long options
+
+**Long options** are lead by two dashes and may take an potentially optional
+option-argument.\
+For example:
+
+* `--long <ARG>` the option-argument is loosely bound
+* `--long <ARG>` the option-argument is loosely bound and optional. <sub>([#55][issue-55])</sub>
+* `--long=<ARG>` the option-argument is explicitly bound
+* `--long[=<ARG>]` the option-argument is explicitly bound an optional
+* `[--long <ARG>]` the option-argument is explicitly bound via the `smart-options` setting
+* `[--long [<ARG>]]` the option-argument is loosely bound via the `smart-options` setting and optional
+
+Note that all of the above forms could be followed by a `...`, indicating that
+this option may appear one or more times. The repeated occurrence does not
+necessarily need to be adjacent to the previous match.  Repeated occurrences
+are collected into an array or into a count if the option qualifies as a flag.
+
+Note that successive dashes are allowed: `--very-long-option`.
+
+##### 1.1.2. Short options
+
+**Short options** are lead by one dash and may take an potentially optional
+option-argument. A short option is a one character identifier, but can be
+"stacked".
+
+For example:
+
+* `-a <ARG>` the option-argument is loosely bound to `-a`
+* `-a=<ARG>` the option-argument is explicitly bound to `-a`
+* `-a<ARG>` the option-argument is explicitly bound to `-a`
+* `-aARG` the option-argument is **loosely** bound to `-a`
+* `-a [<ARG>]` the option-argument is loosely bound to `-a`. <sub>([#55][issue-55])</sub>
+* `-a=<ARG>` the option-argument is explicitly bound to `-a`
+* `-a[=<ARG>]` the option-argument is explicitly bound to `-a` an optional
+* `[-a <ARG>]` the option-argument is explicitly bound to `-a` via the `smart-options` setting
+* `[-a [<ARG>]]` the option-argument is loosely bound to `-a` via the `smart-options` setting and optional
+
+Note, however that only the last option in the "option stack" may actually bind
+an argument:
+
+* `-abc` is equivalent to `-a -b -c`
+* `-abc <ARG>` is equivalent to `-a -b -c <ARG>`
+* `-abc=<ARG>` is equivalent to `-a -b -c=<ARG>`
+* `-abc[=<ARG>]` is equivalent to `-a -b -c=<ARG>`
+
+...essentially nothing changes when options are stacked. Key is that only the
+last option in the stack may bind and consume arguments.
+
+Again, note that all of the above forms could be followed by a `...`, indicating
+that this option may appear one or more times. It is important to note that the
+repeatability is assigned to **all** options in the stack! Repeated occurrences
+are collected into an array or into a count if the option qualifies as a flag
+(hence for all but the last options in the stack).
+
+##### 1.1.3. Option-arguments
+
+**Option-arguments** are arguments bound to options. If an option is said to
+take an option argument that is not optional, any attempt to match an option
+without the argument will result in an immediate parse error. Should an
+option-argument be declared optional and not matched during parsing, it may be
+treated as a flag and be substituted.
+
+###### 1.1.3.1. Option-argument bindings
+
+* "loose" binding: the option-argument is in adjacent position, but
+  needs to be confirmed in the 'options' section. Should
+  confirmation not take place, the adjacent argument is treated as a
+  positional.
+* "explicit" binding: the option-argument is explicitly bound due to
+  a lack of whitespace, an equal sign or through 'smart-options'.
+
+##### 1.1.4 The option secion
+
+The option section gives a chance to add more information about options, such
+as their default value, their alias or their backing environment variable.
+Furthermore, options appearing in the option section may also indicate if the
+option is supposed to be repeatable or not. There is more information on this
+topic in section "1.7 - References - [options]".
+
+* An alias is assigned via `-v, --verbose`
+* A default value is assigned via `[default: value]`
+* An environment variable is assigned via `[env: MY_KEY]`
+
+For example:
+
+```
+options:
+    -f, --foo BAR  This is foo bar. [env: FOO_BAR] [default: 123]
+```
+
+The text is pretty flexible and can be arranged as the author pleases. For
+example:
+
+```
+options:
+    -f, --foo BAR...
+        This is foo bar.
+        [env: FOO_BAR] [default: 123]
+```
+
+#### 1.2. Positionals
+
+**Positionals** are arguments that do not lead with any dashes. The position
+of their occurrence matters and options are "bounded" by them in that an option
+declared before an positional argument may not occur after that positional. <sub>([#24][issue-24])</sub>
+Positional arguments are distinguished from _commands_ by being either enclosed
+in angled brackets or being all upper case.
+
+For example:
+* `<ARG>` is a positional element named `<ARG>`
+* `ARG` is a positional element named `ARG`
+* `[<ARG>]` is an optional positional element named `<ARG>`
+* `[ARG]` is an optional positional element named `ARG`
+* `[<ARG>]...` is an optional positional element named `<ARG>` that repeats
+* `<ARG>...` is a positional element named `<ARG>` that repeats
+
+Positional arguments either yield a single value if not repeated or an array of
+values if repeated. Note that contrary to options, repetition must occur
+directly adjacent to the previous match. <sub>([#24][issue-24])</sub>
+
+#### 1.3. Commands
+
+**Commands** are a specialized form of positionals that require to be matched
+literally, including casing. All other rules that apply to positionals apply to
+commands. They yield a boolean indicating their presence or a count indicating
+the number of their occurrences if repeated.
+
+For example:
+* `command` must be matched with input "command" on argv
+* `command...` must be matched on ore more times with input "command" on argv
+
+#### 1.4. EOA - end-of-arguments
+
+The **EOA (end-of-arguments)** is understood as the separator between known and
+unknown arguments. The eoa is typically `--` but any option can become one by
+using the 'stop-at' setting.\o
+
+For example:
+* `--`
+* `-- ARGS`
+* `-- ARGS...`
+* `[-- ARGS...]`
+* `[-- [ARGS...]]`
+* ...and so on &mdash; they all have the same meaning.
+
+#### 1.5. Stdin marker
+
+The **stdin** flag is a special, unnamed short-option: `-`. It's presence
+indicates that the program should be reading from standard input.
+
+#### 1.6. Groups
+
+Groups are the only recursive argument type. Groups describe one or more
+mutually exclusive sets of arguments called "branches". At least one branch
+needs to yield a successful parse for the group to succeed.
+
+For example:
+
+* `(foo | bar qux)` means either match command `foo` or command `bar`
+  directly followed by command `qux`.
+* `[foo | bar qux]` means either match command `foo` or command `bar`
+  directly followed by command `qux`, but backtrack on failure and ignore the
+  group.
+* `(foo | bar qux)...` means either match command `foo` or command `bar`
+  directly followed by command `qux`, repeatedly. During repetition another
+  branch can be matched, so this is valid: `foo bar qux bar qux foo`. The output
+  is: `{ "foo": 2, "bar": 2, "qux": 2 }`.
+
+The following is true for all groups:
+
+* Groups can be repeated: `...`
+* Groups can be optional using brackets: `[ foo ]`
+* Groups can be required using parenthesis: `( foo )`
+* Groups must not be empty
+* Groups may contain 1 or more branches
+* Groups succeed if at least one branch succeeds
+* Multiple successful branch matches are weighted and scored
+
+##### 1.6.1. Matching branches
+
+**Branches** describe multiple mutually exclusive ways to parse a valid program.
+Branches can appear at the top-level or in any group. Since branches are
+mutually exclusive, only one branch can ever succeed. If multiple branches
+succeed, the highest scoring winner is elected. Generally, the depth of the
+parse within the branch (that is how deep into the branch the parse succeeded)
+as well as the weighting of the matched arguments matters. Arguments that were
+substituted by values in environment variables, or by their defaults or empty
+values, will have a lower ranking score than those that were read from argv.
+
+#### 1.7. References - [options]
+
+This is not a real argument and not part of the canonical specification. It is
+used to indicate that the entire "options" section should be expanded in it's
+place. Since this approach lacks information about the relation between options,
+options are all expanded as optional and are exchangeable with adjacent options
+<sub>([#57][issue-57])</sub>. One exception to this rule is where an option that
+is defined in the option section also appears directly adjacent to the
+`[options]` reference tag.
+
+For example:
+
+```
+usage: prog [options] (-f | -b)
+options:
+    -f foo
+    -b bar
+```
+
+This program won't accept the input `-f -b` as `-f` and `-b` are declared
+mutually exclusive from one another.
+
+Likewise:
+
+```
+usage: prog [options] --foo ARG
+options:
+    -f, --foo ARG
+```
+
+Here, `--foo` won't be expanded again and hence remain required.
+
+---
+
+## Deviations from the original ###
 
 > This implementation tries to be compatible where sensible, but does cut ties
 > when it comes down to it. The universal docopt test suite has been adjusted
@@ -230,3 +548,6 @@ See file `LICENSE` for a more detailed description of its terms.
 [POSIX]: http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html
 [issue-tracker]: https://github.com/felixSchl/neodoc/issues
 [playground]: https://felixschl.github.com/neodoc
+[issue-55]: https://github.com/felixSchl/neodoc/issues/55
+[issue-24]: https://github.com/felixSchl/neodoc/issues/24
+[issue-57]: https://github.com/felixSchl/neodoc/issues/57
