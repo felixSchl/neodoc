@@ -219,9 +219,9 @@ solveBranch as ds = go as
           --       the same as specified in the option descriptions for
           --       convenience to the user.
           pure  $ Resolved
-                  $ Keep
-                  $ singleton
-                  $ Option match
+                $ Keep
+                $ singleton
+                $ Option match
 
         Nothing -> do
           -- Look ahead if any of the following arguments should be slurped.
@@ -254,9 +254,9 @@ solveBranch as ds = go as
             Just er -> do
               r <- er
               pure  $ Resolved
-                      $ Slurp
-                      $ singleton
-                      $ Option $ match { repeatable = r }
+                    $ Slurp
+                    $ singleton
+                    $ Option $ match { repeatable = r }
 
       where
         guardArgs :: String -> String -> Either SolveError Boolean
@@ -272,20 +272,20 @@ solveBranch as ds = go as
               $ "Multiple option descriptions for option --" <> n
             (Cons (DE.OptionDesc desc) Nil) -> do
               arg <- resolveOptArg o.arg desc.arg
-              pure $ { flag:       DE.getFlag desc.name
-                       , name:       DE.getName desc.name
-                       , arg:        arg
-                       , env:        desc.env
-                       , repeatable: o.repeatable
-                       }
+              pure  { flag:       DE.getFlag desc.name
+                    , name:       DE.getName desc.name
+                    , arg:        arg
+                    , env:        desc.env
+                    , repeatable: o.repeatable
+                    }
             -- default fallback: construct the option from itself alone
-            _ -> pure
-                    $ { flag:       Nothing
-                      , name:       pure n
-                      , env:        Nothing
-                      , arg:        convertArg o.arg
-                      , repeatable: o.repeatable
-                      }
+            otherwise ->
+              pure  { flag:       Nothing
+                    , name:       pure n
+                    , env:        Nothing
+                    , arg:        convertArg o.arg
+                    , repeatable: o.repeatable
+                    }
           where
             isMatch (DE.OptionDesc { name: DE.Long n'   }) = n == n'
             isMatch (DE.OptionDesc { name: DE.Full _ n' }) = n == n'
@@ -506,15 +506,15 @@ solveBranch as ds = go as
                     }
 
             -- default fallback: construct the option from itself alone
-            _ -> pure
-                    $ { flag: pure f
-                      , name: Nothing
-                      , env:  Nothing
-                      , arg:  if isTrailing
-                                   then convertArg o.arg
-                                   else Nothing
-                      , repeatable: o.repeatable
-                      }
+            otherwise ->
+              pure  { flag:       pure f
+                    , name:       Nothing
+                    , env:        Nothing
+                    , arg:        if isTrailing
+                                    then convertArg o.arg
+                                    else Nothing
+                    , repeatable: o.repeatable
+                    }
 
           where
             isMatch (DE.OptionDesc { name: DE.Flag f'   }) = f == f'
@@ -528,14 +528,14 @@ solveBranch as ds = go as
                   -> Either SolveError (Maybe OptionArgumentObj)
 
     resolveOptArg (Just a) Nothing = do
-      pure <<< pure $ { name: a.name
-                        , optional: a.optional
-                        , default: Nothing }
+      pure <<< pure $ { name:     a.name
+                      , optional: a.optional
+                      , default:  Nothing }
 
     resolveOptArg Nothing (Just de) = do
       pure <<< pure $ { name:     de.name
-                        , optional: de.optional
-                        , default:  de.default }
+                      , optional: de.optional
+                      , default:  de.default }
 
     resolveOptArg (Just a) (Just de) = do
       pure <<< pure

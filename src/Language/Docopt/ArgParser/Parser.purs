@@ -23,7 +23,7 @@ import Data.Function (on)
 import Data.Function.Uncurried
 import Data.Bifunctor (bimap, lmap, rmap)
 import Data.Either (Either(Right, Left))
-import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing)
+import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing, isJust)
 import Data.List (List(..), reverse, singleton, concat, length, (:),
                   some, filter, head, toUnfoldable, sortBy, groupBy, last, null,
                   tail, many)
@@ -137,6 +137,12 @@ command n = token go P.<?> "command " ~~ show n
 
 positional :: String -> Parser Value
 positional n = token go P.<?> "positional argument " ~~ show n
+  where
+    go (Lit v) = Just (Value.read v false)
+    go _       = Nothing
+
+optionArgument :: Parser Value
+optionArgument = token go P.<?> "option-argument"
   where
     go (Lit v) = Just (Value.read v false)
     go _       = Nothing
@@ -782,7 +788,12 @@ argP options _ _ _ x = getInput >>= \i -> (
             then do
               vs <- terminate x
               pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
-            else pure v
+            else do
+              if isJust o.arg && o.repeatable
+                  then do
+                    vs <- A.many optionArgument
+                    pure (ArrayValue (Value.intoArray v <> vs))
+                  else pure v
       otherwise ->
         case o.flag of
           Just c | isSoptAhead -> do
@@ -791,7 +802,12 @@ argP options _ _ _ x = getInput >>= \i -> (
                 then do
                   vs <- terminate x
                   pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
-                else pure v
+                else do
+                  if isJust o.arg && o.repeatable
+                      then do
+                        vs <- A.many optionArgument
+                        pure (ArrayValue (Value.intoArray v <> vs))
+                      else pure v
           otherwise -> do
             P.fail "Expected long or short option"
     where

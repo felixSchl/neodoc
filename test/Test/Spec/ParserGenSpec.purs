@@ -341,7 +341,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
     , test
         """
-        usage: prog foo -io [-q]... -b=BAZ -f=FOZ... baz
+        usage: prog foo -io [-q]... -b=BAZ (-f FOZ)... baz
         options:
           -i, --input
           -o, --out
