@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://travis-ci.org/felixSchl/neodoc">
-    <img src="https://travis-ci.org/felixSchl/neodoc.svg"
+    <img src="https://travis-ci.org/felixSchl/neodoc.svg?branch=development"
          alt="Build Status">
   </a>
   <a href="https://gitter.im/felixSchl/neodoc">
