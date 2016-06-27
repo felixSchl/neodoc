@@ -2925,3 +2925,78 @@ usage: foo [--foo BAR]...
 
 $ prog/s --foo 1 --foo 2 --foo 3
 {"--foo": [1, 2, 3]}
+
+#
+# issue #55
+#
+
+r"""
+usage: prog --foo [BAR]
+options: --foo BAR
+"""
+
+$ prog --foo foo
+{"--foo": "foo"}
+
+$ prog --foo
+{"--foo": true}
+
+r"""
+usage: prog --foo (BAR)
+options: --foo BAR
+"""
+
+$ prog --foo foo
+{"--foo": "foo"}
+
+$ prog --foo
+"Option requires argument: --foo"
+
+r"""
+usage: prog --foo [BAR]...
+options: --foo BAR
+"""
+
+$ prog --foo foo --foo bar
+{"--foo": ["foo", "bar"]}
+
+$ prog --foo foo bar
+{"--foo": ["foo", "bar"]}
+
+r"""
+usage: prog -f [BAR]
+options: -f BAR
+"""
+
+$ prog -f foo
+{"-f": "foo"}
+
+r"""
+usage: prog -f [BAR]...
+options: -f BAR
+"""
+
+$ prog -f foo -f bar
+{"-f": ["foo", "bar"]}
+
+$ prog -f foo bar
+{"-f": ["foo", "bar"]}
+
+r"""
+usage: prog -of [BAR]
+options: -f BAR
+"""
+
+$ prog -f foo
+{"-f": "foo"}
+
+r"""
+usage: prog -of [BAR]...
+options: -f BAR
+"""
+
+$ prog -f foo -f bar
+{"-f": ["foo", "bar"]}
+
+$ prog -f foo bar
+{"-f": ["foo", "bar"]}
