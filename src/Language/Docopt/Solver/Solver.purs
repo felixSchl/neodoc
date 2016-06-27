@@ -25,6 +25,7 @@ import Data.String (singleton) as String
 import Data.String.Ext ((^=), endsWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
+import Data.Tuple.Nested ((/\))
 import Data.String as Str
 
 import Language.Docopt.Argument
@@ -206,10 +207,10 @@ solveBranch as ds = go as
     solveArg (U.Reference r) _ = do
       pure $ Unresolved r
 
-    solveArg (U.Option o) adjArg = do
+    solveArg (U.Option o) mAdjArg = do
 
       -- Find a matching option description, if any.
-      match <- matchDesc o.name
+      descMatch <- matchDesc o.name
 
       -- Check to see if this option has an explicitly bound argument.
       -- In this case, a check to consume an adjacent arg must not take place.
@@ -221,27 +222,36 @@ solveBranch as ds = go as
           pure  $ Resolved
                 $ Keep
                 $ singleton
-                $ Option match
+                $ Option descMatch
 
         Nothing -> do
           -- Look ahead if any of the following arguments should be slurped.
           -- Return either `Nothing` to signify that nothing should be slurped
           -- or a value signifieng that it should be slurped, and the
           -- `isRepeated` flag should be inherited.
-          let mr = do
-                guard (not o.repeatable)
-                matchedArg <- match.arg
+          let
+            adjArgMatch = do
+              guard (not o.repeatable)
+              (arg@{ name }) <- descMatch.arg
+              adjArg <- mAdjArg
+              (r /\ n /\ optional) <- case adjArg of
+                (U.Positional pos) -> pure (pos.repeatable /\ pos.name /\ false)
+                (U.Command    cmd) -> pure (cmd.repeatable /\ cmd.name /\ false)
+                (U.Group { branches: (x : Nil) : Nil, optional, repeatable }) ->
+                  case x of
+                    (U.Positional pos) ->
+                      pure ((pos.repeatable || repeatable) /\ pos.name /\ optional)
+                    (U.Command    cmd) ->
+                      pure ((cmd.repeatable || repeatable) /\ cmd.name /\ optional)
+                    otherwise -> Nothing
+                otherwise -> Nothing
+              pure do
+                guardArgs n name
+                pure (r /\ arg { optional = optional })
 
-                case adjArg of
-                  Just (U.Positional pos) ->
-                    pure $ pos.repeatable <$ guardArgs pos.name matchedArg.name
-                  Just (U.Command cmd) ->
-                    pure $ cmd.repeatable <$ guardArgs cmd.name matchedArg.name
-                  otherwise -> Nothing
-
-          case mr of
+          case adjArgMatch of
             Nothing -> do
-              if not (fromMaybe true $ (_.optional <$> match.arg))
+              if not (fromMaybe true $ (_.optional <$> descMatch.arg))
                  then do
                     fail
                       $ "Option-Argument specified in options-section missing"
@@ -250,13 +260,15 @@ solveBranch as ds = go as
                     pure  $ Resolved
                           $ Keep
                           $ singleton
-                          $ Option match
-            Just er -> do
-              r <- er
+                          $ Option descMatch
+            Just matched -> do
+              (r /\ arg) <- matched
               pure  $ Resolved
                     $ Slurp
                     $ singleton
-                    $ Option $ match { repeatable = r }
+                    $ Option $ descMatch  { arg = (pure arg)
+                                          , repeatable = r
+                                          }
 
       where
         guardArgs :: String -> String -> Either SolveError Boolean
@@ -292,7 +304,7 @@ solveBranch as ds = go as
             isMatch _ = false
 
 
-    solveArg (U.OptionStack o) adj
+    solveArg (U.OptionStack o) mAdjArg
       = fromSubsumption <|> fromAdjacentArgOrDefault
 
       where
@@ -424,8 +436,8 @@ solveBranch as ds = go as
           -- Look the trailing option up in the descriptions
           -- and combine it into the most complete option we
           -- can know about at this point.
-          match   <- matchDesc true f
-          matches <- (Option <$> _) <$> (matchDesc false `traverse` fs)
+          descMatch <- matchDesc true f
+          matches   <- (Option <$> _) <$> (matchDesc false `traverse` fs)
 
           -- Check to see if this option has an explicitly bound argument.
           -- In this case, a check to consume an adjacent arg must not take
@@ -437,39 +449,51 @@ solveBranch as ds = go as
               --       convenience to the user.
               pure $ Resolved $ Keep
                     $ (fromFoldable matches)
-                      <> (singleton $ Option match)
+                      <> (singleton $ Option descMatch)
 
             Nothing ->
               -- Look ahead if any of the following arguments should be slurped.
               -- Return either `Nothing` to signify that nothing should be
               -- slurped or a value signifieng that it should be slurped, and
               -- the `isRepeated` flag should be inherited.
-              let mr = do
-                    guard $ not match.repeatable
-                    arg' <- match.arg
-                    case adj of
-                      Just (U.Positional pos) ->
-                        pure $ pos.repeatable <$ guardArgs pos.name arg'.name
-                      Just (U.Command cmd) ->
-                        pure $ cmd.repeatable <$ guardArgs cmd.name arg'.name
-                      otherwise -> Nothing
+              let
+                adjArgMatch = do
+                  guard (not o.repeatable)
+                  (arg@{ name }) <- descMatch.arg
+                  adjArg <- mAdjArg
+                  (r /\ n /\ optional) <- case adjArg of
+                    (U.Positional pos) -> pure (pos.repeatable /\ pos.name /\ false)
+                    (U.Command    cmd) -> pure (cmd.repeatable /\ cmd.name /\ false)
+                    (U.Group { branches: (x : Nil) : Nil, optional, repeatable }) ->
+                      case x of
+                        (U.Positional pos) ->
+                          pure ((pos.repeatable || repeatable) /\ pos.name /\ optional)
+                        (U.Command    cmd) ->
+                          pure ((cmd.repeatable || repeatable) /\ cmd.name /\ optional)
+                        otherwise -> Nothing
+                    otherwise -> Nothing
+                  pure do
+                    guardArgs n name
+                    pure (r /\ arg { optional = optional })
 
-               in case mr of
+              in case adjArgMatch of
                 Nothing -> do
-                  if not (fromMaybe true $ (_.optional <$> match.arg))
+                  if not (fromMaybe true $ (_.optional <$> descMatch.arg))
                     then fail
                         $ "Option-Argument specified in options-section missing"
                           <> " -" <> String.singleton f
                     else do
                       pure $ Resolved $ Keep
                         $ (fromFoldable matches)
-                          <> (singleton $ Option match)
-                Just er -> do
-                  r <- er
+                          <> (singleton $ Option descMatch)
+                Just matched -> do
+                  (r /\ arg) <- matched
                   pure $ Resolved $ Slurp
                     $ (flip setRepeatable r <$> fromFoldable matches)
                       <> (singleton
-                            $ Option $ match { repeatable = r })
+                            $ Option $ descMatch  { arg = (pure arg)
+                                                  , repeatable = r
+                                                  })
 
         guardArgs :: String -> String -> Either SolveError Boolean
         guardArgs n n' | n ^=^ n' = pure true
