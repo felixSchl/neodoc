@@ -11,6 +11,7 @@ module Language.Docopt.SpecParser.Desc (
   ) where
 
 import Prelude
+import Debug.Trace
 import Data.Tuple (Tuple (Tuple))
 import Data.Tuple (swap) as Tuple
 import Data.Functor (($>))
@@ -314,17 +315,17 @@ descParser = markIndent do
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          pure $  { name: Flag opt.flag
-                  , arg:  do
-                      a <- arg
-                      pure {
-                        name:     a.name
-                      , optional: a.optional
-                      , default:  Nothing
-                      }
-                  , env:        Nothing
-                  , repeatable: repeatable
-                  }
+          pure  { name: Flag opt.flag
+                , arg:  do
+                    a <- arg
+                    pure {
+                      name:     a.name
+                    , optional: a.optional
+                    , default:  Nothing
+                    }
+                , env:        Nothing
+                , repeatable: repeatable
+                }
 
         long :: L.TokenParser OptionObj
         long = do
@@ -343,17 +344,17 @@ descParser = markIndent do
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          pure $  { name: Long opt.name
-                  , arg:  do
-                      a <- arg
-                      pure {
-                        name:     a.name
-                      , optional: a.optional
-                      , default:  Nothing
-                      }
-                  , env:        Nothing
-                  , repeatable: repeatable
-                  }
+          pure  { name: Long opt.name
+                , arg:  do
+                    a <- arg
+                    pure {
+                      name:     a.name
+                    , optional: a.optional
+                    , default:  Nothing
+                    }
+                , env:        Nothing
+                , repeatable: repeatable
+                }
 
         opt :: L.TokenParser OptionObj
         opt = do

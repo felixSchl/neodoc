@@ -151,11 +151,11 @@ usageParser smartOpts = do
         case optarg of
               (Positional pos) ->
                 pure $ tuple3 pos.name
-                              (pos.repeatable || grp.repeatable)
+                              (pos.repeatable)
                               false
               (Command cmd) ->
                 pure $ tuple3 cmd.name
-                              (cmd.repeatable || grp.repeatable)
+                              (cmd.repeatable)
                               false
               (Group (grp''@{ branches: Cons (Cons a Nil) Nil })) ->
                 case a of
