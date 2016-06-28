@@ -163,8 +163,8 @@ Keywords are highlighted.
 The over-arching format could be described as follows:
 
 ```sh
-Usage: <program> [<argument>...] [| <argument> [<argument>...]]
-[  or: <program> [<argument>...] [| <argument> [<argument>...]]
+Usage:  <program> [<argument>...] [| <argument> [<argument>...]]
+[ [or:] <program> [<argument>...] [| <argument> [<argument>...]]
 ]*
 
 [options:
