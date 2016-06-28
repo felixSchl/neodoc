@@ -58,6 +58,16 @@ an (in-)comprehensive comparison to the original, click
 [here](#deviations-from-the-original). To take neodoc for a ride, click
 [here][playground].
 
+**_A note to potential adopters and contributors:_** Neodoc is divided into two
+distinct parts &mdash; parsing the specification and parsing the argv, given the
+specificiation. Theoretically, the origin of the specification does not matter
+and the argv parser could be used standalone as it offers a more "correct" parse
+than most cli parsers out there, since it parses the input guided by the
+specification, rather than parsing the input and then matching it to the
+specification. See the "Features" section below. If neodoc finds adoption, I
+would not be surprised to see projects mimicking a yargs-like interface that use
+the neodoc parser, even though it somewhat defies the original idea of docopt.
+
 ## Features ##
 
 * Derive command line interface from help text
@@ -83,6 +93,12 @@ an (in-)comprehensive comparison to the original, click
   make the argv parser usable from JS as well_.
 * Count repeated flags
 * Parses values into primitive JS types (bool, string, number)
+* Correct and smart argument parsing. For example, neodoc has absolutely no
+  problem parsing this input: `tar -xvzfsome-dir/some-file`, given a
+  specification of: `usage: tar [-xvzf FILE]` while other parses would not know
+  that the option stack ends at `-f` and falsly parse this as `-x -v -z -f -s -o
+  -m -e=-dir/some-file` at best.
+
 
 ## Installation ##
 
