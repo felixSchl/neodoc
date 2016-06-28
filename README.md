@@ -82,6 +82,7 @@ an (in-)comprehensive comparison to the original, click
   and can be used for other projects outside of neodoc. _Work is underway to
   make the argv parser usable from JS as well_.
 * Count repeated flags
+* Parses values into primitive JS types (bool, string, number)
 
 ## Installation ##
 
