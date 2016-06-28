@@ -8,6 +8,10 @@
 <hr>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/neodoc">
+    <img src="https://badge.fury.io/js/neodoc.svg"
+         alt="NPM package">
+  </a>
   <a href="https://travis-ci.org/felixSchl/neodoc">
     <img src="https://travis-ci.org/felixSchl/neodoc.svg?branch=development"
          alt="Build Status">
