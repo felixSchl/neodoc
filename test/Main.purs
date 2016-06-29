@@ -19,7 +19,7 @@ import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Eff.Console (CONSOLE)
 import Node.Process (PROCESS)
 import Test.Assert (ASSERT)
-
+import Examples
 
 main :: Eff ( err     :: EXCEPTION
             , process :: PROCESS
@@ -37,3 +37,4 @@ main = launchAff do
     parserGenSpec   unit
     docoptSpec      unit
     compatSpec      unit
+    examples        unit
