@@ -14,6 +14,7 @@ import Data.Generic (class Generic)
 import Data.Either (Either(), either)
 import Data.Maybe (fromJust)
 import Data.List (List(..), toUnfoldable, many, some)
+import Data.Foldable (foldMap)
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
 import Text.Parsing.Parser (ParseError, runParser) as P
@@ -22,7 +23,7 @@ import Text.Parsing.Parser.String (noneOf, char, string, eof) as P
 import Language.Docopt.SpecParser.Base (digit)
 import Data.Array as A
 import Data.Int (toNumber, fromString) as Int
-import Data.String (fromCharArray)
+import Data.String (singleton) as String
 import Partial.Unsafe (unsafePartial)
 import Global (readFloat)
 
@@ -116,20 +117,21 @@ parse s split = P.runParser s $ if split then values else value <* P.eof
     white = P.char ' ' <|> P.char '\n'
 
     inner = do
-      P.try value <|> do StringValue <$> do
-                                  fromCharArray <<< toUnfoldable <$> do
-                                    many $ P.try (P.noneOf [',', ' ', '\n'])
+      P.try value <|> do
+        StringValue <$> do
+          foldMap String.singleton <$> do
+            many $ P.try (P.noneOf [',', ' ', '\n'])
 
     value = P.choice $ P.try <$> [ bool, number, quoted ]
 
     number = do
       si <- P.option 1 (P.char '-' *> pure (-1))
-      xs <- fromCharArray <$> A.some digit
+      xs <- foldMap String.singleton <$> some digit
       P.choice [
         FloatValue <<< ((Int.toNumber si) * _) <<< readFloat <$> do
           xss <- do
             P.char '.'
-            fromCharArray <$> A.some digit
+            foldMap String.singleton <$> some digit
           pure $ xs <> "." <> xss
       , pure $ IntValue $ si * (unsafePartial $ fromJust $ Int.fromString xs)
       ]
@@ -145,7 +147,7 @@ parse s split = P.runParser s $ if split then values else value <* P.eof
           pure $ BoolValue false
 
     quoted = StringValue <$> do
-      fromCharArray <<< toUnfoldable <$> do
+      foldMap String.singleton <$> do
         P.choice [
           P.between (P.char '"')  (P.char '"')  (many $ P.noneOf ['"'])
         , P.between (P.char '\'') (P.char '\'') (many $ P.noneOf ['\''])
