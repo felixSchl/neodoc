@@ -29,8 +29,8 @@ import Language.Docopt.SpecParser.State (ParserState)
 import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..), Result(..),
                             runParserT, parseFailed, fail, runParser, unParserT) as P
 import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
-                                        lookAhead, optional, between, manyTill
-                                        ) as P
+                                        lookAhead, optional, between, manyTill,
+                                        option) as P
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
 import Text.Parsing.Parser.String (skipSpaces, anyChar, string, char, oneOf,
                                   whiteSpace, eof, noneOf, satisfy) as P
@@ -248,12 +248,12 @@ parseDescriptionToken = P.choice [
   , P.string "..." $> TripleDot
   , P.try _longOption
   , P.try _shortOption
-  , P.try $ AngleName <$> _angleName
-  , P.try maybeShoutName
-  , P.try _tag
-  , P.try _reference
-  , P.try $ eol      $> Newline
-  , P.try $ Garbage <$> P.anyChar
+  , AngleName <$> _angleName
+  , maybeShoutName
+  , _tag
+  , _reference
+  , eol $> Newline
+  , Garbage <$> P.anyChar
   ]
   <* spaces -- skip only spaces ' ' and '\t'
   where bind = bindP
@@ -346,12 +346,12 @@ _shortOption = do
   x  <- validChar
   xs <- A.many validChar
 
-  arg <- P.choice $ P.try <$> [
+  arg <- P.option Nothing $ P.choice [
 
     -- Case 1: -foo=BAR
     Just <$> do
       P.char '='
-      n <- P.choice $ P.try <$> [ _angleName, _anyName ]
+      n <- P.choice [ _angleName, _anyName ]
       pure  { name:     n
             , optional: false
             }
@@ -360,7 +360,7 @@ _shortOption = do
   , Just <$> do
       P.char '['
       P.optional $ P.char '='
-      n <- P.choice $ P.try <$> [ _angleName, _anyName ]
+      n <- P.choice [ _angleName, _anyName ]
       P.char ']'
       pure  { name:     n
             , optional: true
@@ -372,12 +372,10 @@ _shortOption = do
       pure { name:     n
             , optional: false
             }
-
-  , pure Nothing
   ]
 
   -- Ensure the argument is correctly bounded
-  P.eof <|> (P.lookAhead $ P.choice $ [
+  P.eof <|> (P.lookAhead $ P.choice [
     void $ white
   , void $ P.char '|'
   , void $ P.string "..."
@@ -401,31 +399,29 @@ _longOption = do
           , P.oneOf [ '-' ] <* P.lookAhead alphaNum
           ])
 
-  arg <- P.choice $ P.try <$> [
+  arg <- P.option Nothing $ P.choice [
 
     -- Case 1: OPTION=ARG
     Just <$> do
       P.char '='
-      n <- P.choice $ P.try <$> [ _angleName, _anyName ]
-      pure { name:     n
-              , optional: false
-              }
+      n <- P.choice [ _angleName, _anyName ]
+      pure  { name: n
+            , optional: false
+            }
 
     -- Case 2: Option[=ARG]
   , Just <$> do
       P.char '['
       P.optional $ P.char '='
-      n <- P.choice $ P.try <$> [ _angleName, _anyName ]
+      n <- P.choice [ _angleName, _anyName ]
       P.char ']'
-      pure { name:     n
-              , optional: true
-              }
-
-  , pure Nothing
+      pure  { name:     n
+            , optional: true
+            }
   ]
 
   -- Ensure the argument is correctly bounded
-  P.eof <|> (P.lookAhead $ P.choice $ [
+  P.eof <|> (P.lookAhead $ P.choice [
     void $ white
   , void $ P.char '|'
   , void $ P.string "..."
