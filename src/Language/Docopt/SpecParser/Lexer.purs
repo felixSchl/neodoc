@@ -260,10 +260,23 @@ parseDescriptionToken = P.choice [
 
 maybeShoutName :: P.Parser String Token
 maybeShoutName = do
-  n <- _name
+  n <- _anyName
   pure if (String.toUpper n == n)
           then ShoutName n
           else Name n
+  where bind = bindP
+
+_anyName :: P.Parser String String
+_anyName = do
+  foldMap String.singleton <$> do
+    (:)
+      <$> alphaNum
+      <*> many do
+            P.choice $ P.try <$> [
+              identLetter
+            , P.char '.' <* (P.notFollowedBy $ P.string "..")
+            , P.oneOf [ '-', '_' ]
+          ]
   where bind = bindP
 
 white :: P.Parser String Unit
@@ -324,29 +337,6 @@ _tag = P.between (P.char '[') (P.char ']') do
       pure (Tag k Nothing)
       where bind = bindP
 
-_shoutName :: P.Parser String String
-_shoutName = do
-  n <- foldMap String.singleton <$> do
-    (:)
-      <$> upperAlpha
-      <*> (many (upperAlpha <|> P.oneOf ['-', '_']))
-  P.notFollowedBy lowerAlpha
-  pure n
-  where bind = bindP
-
-_name :: P.Parser String String
-_name = do
-  foldMap String.singleton <$> do
-    (:)
-      <$> alphaNum
-      <*> many do
-            P.choice $ P.try <$> [
-              identLetter
-            , P.char '.' <* (P.notFollowedBy $ P.string "..")
-            , P.oneOf [ '-', '_' ]
-          ]
-  where bind = bindP
-
 _angleName :: P.Parser String String
 _angleName = do
   P.char '<'
@@ -374,7 +364,7 @@ _shortOption = do
     -- Case 1: -foo=BAR
     Just <$> do
       P.char '='
-      n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
+      n <- P.choice $ P.try <$> [ _angleName, _anyName ]
       pure  { name:     n
             , optional: false
             }
@@ -383,7 +373,7 @@ _shortOption = do
   , Just <$> do
       P.char '['
       P.optional $ P.char '='
-      n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
+      n <- P.choice $ P.try <$> [ _angleName, _anyName ]
       P.char ']'
       pure  { name:     n
             , optional: true
@@ -429,7 +419,7 @@ _longOption = do
     -- Case 1: OPTION=ARG
     Just <$> do
       P.char '='
-      n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
+      n <- P.choice $ P.try <$> [ _angleName, _anyName ]
       pure { name:     n
               , optional: false
               }
@@ -438,7 +428,7 @@ _longOption = do
   , Just <$> do
       P.char '['
       P.optional $ P.char '='
-      n <- P.choice $ P.try <$> [ _angleName, _shoutName, _name ]
+      n <- P.choice $ P.try <$> [ _angleName, _anyName ]
       P.char ']'
       pure { name:     n
               , optional: true
