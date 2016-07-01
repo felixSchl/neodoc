@@ -286,7 +286,7 @@ _stdin :: P.Parser String Token
 _stdin = do
   P.char '-'
   -- Ensure the argument is correctly bounded
-  P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+  P.eof <|> (P.lookAhead $ P.choice [
     void $ white
   , void $ P.char '|'
   , void $ P.char ']'
@@ -300,7 +300,7 @@ _eoa :: P.Parser String Token
 _eoa = do
   P.string "--"
   -- Ensure the argument is correctly bounded
-  P.eof <|> (P.lookAhead $ P.choice $ P.try <$> [
+  P.eof <|> (P.lookAhead $ P.choice [
     void $ white
   , void $ P.char ']'
   , void $ P.char ')'
