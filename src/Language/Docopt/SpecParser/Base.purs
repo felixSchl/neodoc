@@ -28,20 +28,20 @@ getPosition = P.ParserT $ \(P.PState s pos) ->
 
 sof :: forall a m. (Monad m) => P.ParserT a m Unit
 sof = do
-  P.Position { column, line } <- getPosition
-  guard $ column == 1 && line == 1
+  P.Position line col <- getPosition
+  guard $ col == 1 && line == 1
 
 -- | Return the current parser column
 getCol :: forall a m. (Monad m) => P.ParserT a m Int
 getCol = do
-  P.Position { column: col } <- getPosition
+  P.Position _ col <- getPosition
   pure col
 
 -- | Return the current parser row
 -- | XXX: Use either `line` or `row` - not both!
 getRow :: forall a m. (Monad m) => P.ParserT a m Int
 getRow = do
-  P.Position { line: row } <- getPosition
+  P.Position row _ <- getPosition
   pure row
 
 -- | Return the current parser row

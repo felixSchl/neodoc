@@ -99,7 +99,7 @@ lex xs options = go xs 1
     go (Cons x xs) n = do
       let toEOA l = pure $ singleton $ PositionedToken {
             token:     EOA (D.StringValue <$> xs)
-          , sourcePos: P.Position { line: 1, column: n }
+          , sourcePos: P.Position 1 n
           , source:    x
           }
 
@@ -111,6 +111,6 @@ lex xs options = go xs 1
           pure
             $ singleton (PositionedToken {
                           token:     tok
-                        , sourcePos: P.Position { line: 1, column: n }
+                        , sourcePos: P.Position 1 n
                         , source:    x
                         }) <> toks

@@ -53,7 +53,7 @@ usageParser :: Boolean -- ^ Enable "smart-options" parsing
 usageParser smartOpts = do
 
   -- Calculate and mark the original program indentation.
-  P.Position { column: startCol } <- L.nextTokPos <?> "Program name"
+  P.Position _ startCol <- L.nextTokPos <?> "Program name"
   name <- program
   markLine do
     markIndent' startCol $ do

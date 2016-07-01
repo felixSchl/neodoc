@@ -39,9 +39,9 @@ getTokenPosition = P.ParserT $ \(P.PState s pos) ->
 markIndent :: forall a. TokenParser a -> TokenParser a
 markIndent p = do
   { indentation: current } <- lift State.get
-  P.Position { column: pos } <- getTokenPosition
+  P.Position _ col <- getTokenPosition
   P.try do
-    lift $ State.modify \st -> ((st { indentation = pos }) :: ParserState)
+    lift $ State.modify \st -> ((st { indentation = col }) :: ParserState)
     a <- p
     lift $ State.modify \st -> ((st { indentation = current }) :: ParserState)
     pure a
@@ -52,7 +52,7 @@ markIndent p = do
 markLine :: forall a. TokenParser a -> TokenParser a
 markLine p = do
   { line: current } <- lift State.get
-  P.Position { line: pos } <- getTokenPosition
+  P.Position pos _ <- getTokenPosition
   P.try do
     lift $ State.modify \st -> ((st { line = pos }) :: ParserState)
     a <- p
@@ -75,7 +75,7 @@ markIndent' level p = do
 --
 checkIndentation :: (Int -> Int -> Boolean) -> TokenParser Unit
 checkIndentation rel = do
-  P.Position { column: col } <- getTokenPosition
+  P.Position _ col <- getTokenPosition
   { indentation: current } <- lift State.get
   guard (col `rel` current)
 
@@ -115,7 +115,7 @@ sameIndent = checkIndentation (==) P.<?> "same indentation"
 --
 checkLine :: (Int -> Int -> Boolean) -> TokenParser Unit
 checkLine rel = do
-  P.Position { line: line } <- getTokenPosition
+  P.Position line _ <- getTokenPosition
   { line: current } <- lift State.get
   guard (line `rel` current)
 
