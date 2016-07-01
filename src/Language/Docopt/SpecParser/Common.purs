@@ -7,8 +7,8 @@ module Language.Docopt.SpecParser.Common where
 import Prelude
 import Control.Monad.Trans (lift)
 import Control.MonadPlus (guard)
-import Control.Monad.State (State, evalState)
-import Control.Monad.State (get, modify) as State
+import Control.Monad.Transformerless.State (State, evalState)
+import Control.Monad.Transformerless.State (get, modify) as State
 import Data.List (List(..))
 import Data.Either (Either(..))
 import Language.Docopt.SpecParser.Lexer (TokenParser, PositionedToken(..))
