@@ -27,7 +27,7 @@ import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
                                         getPosition, getInput, spaces, eol)
 import Language.Docopt.SpecParser.State (ParserState)
 import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..), Result(..),
-                            runParserT, parseFailed, fail, runParser) as P
+                            runParserT, parseFailed, fail, runParser, unParserT) as P
 import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
                                         lookAhead, optional, between, manyTill
                                         ) as P
@@ -43,6 +43,7 @@ skipSpaces = go
       P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
       go
     ) <|> pure unit
+    bind = bindP
 
 -- | Optimal: Translate [[<anything>-]options] to @anything
 -- | this saves us looking ahead repeatedly when parsing '['.
@@ -52,6 +53,16 @@ referenceRegex
       regex
         "\\[(([^\\]](?!\\s*-?\\s*options\\s*))*?.?)\\s*-?\\s*options\\s*(\\.\\.\\.)?\\s*\\]"
         (Regex.parseFlags "gmi")
+
+-- | Optimal: Typeclass-less bind instance
+-- | TODO: how to make the inner bind typeclass-less?
+bindP p f = P.ParserT $ \s -> do
+  (P.Result input result consumed pos) <- P.unParserT p s
+  case result of
+    Left err  -> pure (P.Result input (Left err) consumed pos)
+    Right a -> do
+      (P.Result input' result' consumed' pos') <- P.unParserT (f a) (P.PState input pos)
+      pure (P.Result input' result' (consumed || consumed') pos')
 
 data Mode = Usage | Descriptions
 
@@ -202,12 +213,14 @@ parseTokens m = do
     i <- getInput
     P.fail $ "Unexpected input: " ~~ i
   pure xs
+  where bind = bindP
 
 parsePositionedToken :: (P.Parser String Token) -> P.Parser String PositionedToken
 parsePositionedToken p = do
   pos <- getPosition
   tok <- p
   pure $ PositionedToken { sourcePos: pos, token: tok }
+  where bind = bindP
 
 parseUsageToken :: P.Parser String Token
 parseUsageToken = P.choice [
@@ -261,6 +274,7 @@ _stdin = do
   , void $ P.string "..."
   ])
   pure Dash
+  where bind = bindP
 
 _eoa :: P.Parser String Token
 _eoa = do
@@ -272,11 +286,13 @@ _eoa = do
   , void $ P.char ')'
   ])
   pure DoubleDash
+  where bind = bindP
 
 _reference :: P.Parser String Token
 _reference = Reference <$> do
   P.char '@'
   foldMap String.singleton <$> many (P.noneOf [' ', '\n'])
+  where bind = bindP
 
 _tag :: P.Parser String Token
 _tag = P.between (P.char '[') (P.char ']') do
@@ -286,6 +302,7 @@ _tag = P.between (P.char '[') (P.char ']') do
   ]
 
   where
+    bind = bindP
     withValue = do
       many white
       k <- foldMap String.singleton <$> many (P.noneOf [':'])
@@ -294,9 +311,11 @@ _tag = P.between (P.char '[') (P.char ']') do
       v <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
       many white
       pure (Tag k (Just v))
+      where bind = bindP
     withoutValue = do
       k <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
       pure (Tag k Nothing)
+      where bind = bindP
 
 _shoutName :: P.Parser String String
 _shoutName = do
@@ -306,6 +325,7 @@ _shoutName = do
       <*> (many (upperAlpha <|> P.oneOf ['-', '_']))
   P.notFollowedBy lowerAlpha
   pure n
+  where bind = bindP
 
 _name :: P.Parser String String
 _name = do
@@ -318,6 +338,7 @@ _name = do
             , P.char '.' <* (P.notFollowedBy $ P.string "..")
             , P.oneOf [ '-', '_' ]
           ]
+  where bind = bindP
 
 _angleName :: P.Parser String String
 _angleName = do
@@ -331,6 +352,7 @@ _angleName = do
     ]
   P.char '>'
   pure $ "<" ~~ n ~~ ">"
+  where bind = bindP
 
 _shortOption :: P.Parser String Token
 _shortOption = do
@@ -381,6 +403,7 @@ _shortOption = do
   ])
 
   pure $ SOpt x xs arg
+  where bind = bindP
 
 _longOption :: P.Parser String Token
 _longOption = do
@@ -428,6 +451,7 @@ _longOption = do
   ])
 
   pure $ LOpt name' arg
+  where bind = bindP
 
 identStart :: P.Parser String Char
 identStart = alpha
