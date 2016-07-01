@@ -17,7 +17,7 @@ import Data.Foldable (foldMap)
 import Data.List (List(..), many, catMaybes, toUnfoldable, (:), some)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (fromCharArray, trim)
-import Data.String (singleton) as String
+import Data.String (singleton, toUpper) as String
 import Data.String.Regex (Regex(), regex)
 import Data.String.Regex (parseFlags, replace) as Regex
 import Partial.Unsafe (unsafePartial)
@@ -238,8 +238,7 @@ parseUsageToken = P.choice [
   , P.try _eoa
   , P.try _stdin
   , P.try $ AngleName <$> _angleName
-  , P.try $ ShoutName <$> _shoutName
-  , P.try $ Name      <$> _name
+  , maybeShoutName
   ]
   <* skipSpaces -- skip spaces *AND* newlines
 
@@ -250,14 +249,22 @@ parseDescriptionToken = P.choice [
   , P.try _longOption
   , P.try _shortOption
   , P.try $ AngleName <$> _angleName
-  , P.try $ ShoutName <$> _shoutName
-  , P.try $ Name      <$> _name
+  , P.try maybeShoutName
   , P.try _tag
   , P.try _reference
   , P.try $ eol      $> Newline
   , P.try $ Garbage <$> P.anyChar
   ]
   <* spaces -- skip only spaces ' ' and '\t'
+  where bind = bindP
+
+maybeShoutName :: P.Parser String Token
+maybeShoutName = do
+  n <- _name
+  pure if (String.toUpper n == n)
+          then ShoutName n
+          else Name n
+  where bind = bindP
 
 white :: P.Parser String Unit
 white = void $ P.oneOf [ '\n', '\r', ' ', '\t' ]
