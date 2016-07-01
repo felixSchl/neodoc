@@ -236,8 +236,8 @@ parseUsageToken = P.choice [
   , P.try _longOption
   , P.try _shortOption
   , P.try _eoa
-  , P.try _stdin
-  , P.try $ AngleName <$> _angleName
+  , _stdin
+  , AngleName <$> _angleName
   , maybeShoutName
   ]
   <* skipSpaces -- skip spaces *AND* newlines
