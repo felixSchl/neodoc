@@ -307,8 +307,13 @@ descParser = markIndent do
           -- binding via `=`.
           arg <- maybe
                   (P.optionMaybe do
+                    c <- P.optionMaybe (P.choice [
+                          L.lparen  $> (L.rparen  $> false)
+                        , L.lsquare $> (L.rsquare $> true)
+                        ])
                     n <- L.shoutName <|> L.angleName
-                    pure { name: n, optional: false }
+                    optional <- fromMaybe (pure false) c
+                    pure { name: n, optional: optional }
                   )
                   (pure <<< Just)
                   opt.arg
@@ -336,8 +341,13 @@ descParser = markIndent do
           -- binding via `=`.
           arg <- maybe
                   (P.optionMaybe do
+                    c <- P.optionMaybe (P.choice [
+                          L.lparen  $> (L.rparen  $> false)
+                        , L.lsquare $> (L.rsquare $> true)
+                        ])
                     n <- L.shoutName <|> L.angleName
-                    pure { name: n, optional: false }
+                    optional <- fromMaybe (pure false) c
+                    pure { name: n, optional: optional }
                   )
                   (pure <<< Just)
                   opt.arg

@@ -1512,6 +1512,110 @@ $ prog --foo bar
 $ prog --foo --foo
 {"--foo": [true, true], "-f": [true, true]}
 
+r"""
+Usage: manage.py [options]
+options: --foo [BAR]
+"""
+
+$ prog --foo bar
+{"--foo": "bar"}
+
+$ prog
+{}
+
+$ prog --foo
+{"--foo": true}
+
+$ prog --foo --foo
+"user-error"
+
+r"""
+Usage: manage.py [options]
+options: -f [BAR]
+"""
+
+$ prog -f bar
+{"-f": "bar"}
+
+$ prog
+{}
+
+$ prog -f
+{"-f": true}
+
+$ prog -f -f
+"user-error"
+
+r"""
+Usage: manage.py [options]
+options: --foo[BAR]
+"""
+
+$ prog --foo bar
+{"--foo": "bar"}
+
+$ prog
+{}
+
+$ prog --foo
+{"--foo": true}
+
+$ prog --foo --foo
+"user-error"
+
+r"""
+Usage: manage.py [options]
+options: -f[BAR]
+"""
+
+$ prog -f bar
+{"-f": "bar"}
+
+$ prog
+{}
+
+$ prog -f
+{"-f": true}
+
+$ prog -f -f
+"user-error"
+
+
+r"""
+Usage: manage.py [options]
+options: --foo[=BAR]
+"""
+
+$ prog --foo bar
+{"--foo": "bar"}
+
+$ prog
+{}
+
+$ prog --foo
+{"--foo": true}
+
+$ prog --foo --foo
+"user-error"
+
+r"""
+Usage: manage.py [options]
+options: -f[=BAR]
+"""
+
+$ prog -f bar
+{"-f": "bar"}
+
+$ prog
+{}
+
+$ prog -f
+{"-f": true}
+
+$ prog -f -f
+"user-error"
+
+
 #
 # Options should be parsed in any order
 #

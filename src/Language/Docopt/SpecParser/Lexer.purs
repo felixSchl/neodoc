@@ -111,7 +111,7 @@ data Token
   | Reference String
   | LOpt String (Maybe { name :: String, optional :: Boolean })
   | SOpt Char (Array Char) (Maybe { name :: String, optional :: Boolean })
-  | Tag String (Maybe String)
+  | Tag String String
   | Name String
   | ShoutName String
   | AngleName String
@@ -132,7 +132,7 @@ prettyPrintToken TripleDot     = "..."
 prettyPrintToken DoubleDash    = "--"
 prettyPrintToken (Reference r) = "Reference " ~~ show r
 prettyPrintToken (Garbage   c) = "Garbage "   ~~ show c
-prettyPrintToken (Tag k v)     = "Tag "       ~~ k ~~ " "  ~~ (show v)
+prettyPrintToken (Tag k v)     = "Tag "       ~~ (show k) ~~ " "  ~~ (show v)
 prettyPrintToken (Name      n) = "Name "      ~~ show n
 prettyPrintToken (ShoutName n) = "ShoutName " ~~ show n
 prettyPrintToken (AngleName n) = "AngleName " ~~ show n
@@ -245,12 +245,16 @@ parseUsageToken = P.choice [
 parseDescriptionToken :: P.Parser String Token
 parseDescriptionToken = P.choice [
     P.char   ','   $> Comma
+  , P.char   '('   $> LParen
+  , P.char   ')'   $> RParen
+  , P.char   ']'   $> RSquare
   , P.string "..." $> TripleDot
   , P.try _longOption
   , P.try _shortOption
   , AngleName <$> _angleName
   , maybeShoutName
-  , _tag
+  , P.try _tag
+  , P.char '[' $> LSquare
   , _reference
   , eol $> Newline
   , Garbage <$> P.anyChar
@@ -318,11 +322,11 @@ _tag :: P.Parser String Token
 _tag = P.between (P.char '[') (P.char ']') do
   s <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
   case A.uncons (String.split ":" s) of
-    Nothing -> pure (Tag s Nothing)
-    Just { head: _, tail: xs } | A.length xs == 0 -> pure (Tag s Nothing)
+    Nothing -> P.fail "Expected label"
+    Just { head: _, tail: xs } | A.length xs == 0 ->  P.fail "Expected label"
     Just { head: x, tail: xs } ->
       let v = trim (String.joinWith ":" xs)
-       in pure (Tag x (Just v))
+       in pure (Tag x v)
 
 _angleName :: P.Parser String String
 _angleName = do
@@ -538,8 +542,8 @@ name = token go P.<?> "name"
 tag :: String -> TokenParser String
 tag s = token go P.<?> ("tag: " ~~ s)
   where
-    go (Tag k (Just v)) | k ^= s = Just v
-    go _                         = Nothing
+    go (Tag k v) | k ^= s = Just v
+    go _                  = Nothing
 
 reference :: TokenParser String
 reference = token go P.<?> "reference"
