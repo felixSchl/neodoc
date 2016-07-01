@@ -17,7 +17,7 @@ import Data.Foldable (foldMap)
 import Data.List (List(..), many, catMaybes, toUnfoldable, (:), some)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (fromCharArray, trim)
-import Data.String (singleton, toUpper) as String
+import Data.String (singleton, toUpper, split, joinWith) as String
 import Data.String.Regex (Regex(), regex)
 import Data.String.Regex (parseFlags, replace) as Regex
 import Partial.Unsafe (unsafePartial)
@@ -316,26 +316,13 @@ _reference = Reference <$> do
 
 _tag :: P.Parser String Token
 _tag = P.between (P.char '[') (P.char ']') do
-  P.choice $ P.try <$> [
-    withValue
-  , withoutValue
-  ]
-
-  where
-    bind = bindP
-    withValue = do
-      skipSpaces
-      k <- foldMap String.singleton <$> many (P.noneOf [':'])
-      P.char ':'
-      skipSpaces
-      v <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
-      skipSpaces
-      pure (Tag k (Just v))
-      where bind = bindP
-    withoutValue = do
-      k <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
-      pure (Tag k Nothing)
-      where bind = bindP
+  s <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
+  case A.uncons (String.split ":" s) of
+    Nothing -> pure (Tag s Nothing)
+    Just { head: _, tail: xs } | A.length xs == 0 -> pure (Tag s Nothing)
+    Just { head: x, tail: xs } ->
+      let v = trim (String.joinWith ":" xs)
+       in pure (Tag x (Just v))
 
 _angleName :: P.Parser String String
 _angleName = do
