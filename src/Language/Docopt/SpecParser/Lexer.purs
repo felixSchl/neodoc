@@ -311,12 +311,12 @@ _tag = P.between (P.char '[') (P.char ']') do
   where
     bind = bindP
     withValue = do
-      many white
+      skipSpaces
       k <- foldMap String.singleton <$> many (P.noneOf [':'])
       P.char ':'
-      many white
+      skipSpaces
       v <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
-      many white
+      skipSpaces
       pure (Tag k (Just v))
       where bind = bindP
     withoutValue = do
