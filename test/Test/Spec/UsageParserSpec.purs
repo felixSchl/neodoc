@@ -36,6 +36,7 @@ sopt  f fs a r = (if r then U.soptR else U.sopt) f fs a
 lopt_ f      r = (if r then U.loptR_ else U.lopt_) f
 lopt  f    a r = (if r then U.loptR else U.lopt) f a
 po    n      r = (if r then U.poR else U.po) n
+co    n      r = (if r then U.coR else U.co) n
 arg'  n o      = { name: n, optional: o }
 arg_  n        = arg' n true
 arg   n        = arg' n false
@@ -53,6 +54,13 @@ usageParserSpec = \_ ->
         , pass "<QuX>"     $ po "<QuX>"
         , pass "<quux>"    $ po "<quux>"
         ]
+
+    -- Commands are basically the same as positionals with some exception.
+    -- Commands are those positionals that are not enclosed in <...>  and do
+    -- do not only have uppercase letters.
+    describe "commands" do
+      runSingleArgumentTests
+        [ pass "0" $ co "0" ]
 
     -- Test long options in various formats.
     -- Each entry is run for both singular and repeated version.

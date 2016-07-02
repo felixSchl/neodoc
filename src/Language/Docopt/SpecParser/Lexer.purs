@@ -19,7 +19,7 @@ import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (fromCharArray, trim)
 import Data.String (singleton, toUpper, split, joinWith) as String
 import Data.String.Regex (Regex(), regex)
-import Data.String.Regex (parseFlags, replace) as Regex
+import Data.String.Regex (test, parseFlags, replace) as Regex
 import Partial.Unsafe (unsafePartial)
 import Data.String.Ext ((^=), (~~))
 import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
@@ -259,10 +259,15 @@ parseDescriptionToken = P.choice [
   <* spaces -- skip only spaces ' ' and '\t'
   where bind = bindP
 
+maybeShoutNameRegex :: Regex
+maybeShoutNameRegex
+  = unsafePartial $ fromRight $
+      regex "[a-zA-Z]" (Regex.parseFlags "gi")
+
 maybeShoutName :: P.Parser String Token
 maybeShoutName = do
   n <- _anyName
-  pure if (String.toUpper n == n)
+  pure if (String.toUpper n == n && Regex.test maybeShoutNameRegex n)
           then ShoutName n
           else Name n
   where bind = bindP

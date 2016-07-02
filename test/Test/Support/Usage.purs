@@ -36,6 +36,7 @@ ref       = U.Reference
 eoa       = U.EOA
 stdin     = U.Stdin
 co n      = U.Command { name: n, repeatable: false }
+coR n     = U.Command { name: n, repeatable: true }
 po' n r   = U.Positional { name: n, repeatable: r }
 po n      = po' n false
 poR n     = po' n true
