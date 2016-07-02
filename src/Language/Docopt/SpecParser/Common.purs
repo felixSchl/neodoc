@@ -28,7 +28,7 @@ traceState = do
 getTokenPosition :: TokenParser P.Position
 getTokenPosition = P.ParserT $ \(P.PState s pos) ->
   pure case s of
-    Cons (PositionedToken { sourcePos: spos }) _ ->
+    Cons (PositionedToken spos _) _ ->
       P.Result s (Right spos) false pos
     otherwise ->
       P.Result s (Right pos) false pos

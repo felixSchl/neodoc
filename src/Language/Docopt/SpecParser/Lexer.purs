@@ -153,10 +153,7 @@ prettyPrintToken (SOpt n s arg)
                 ~~ if a.optional then "]" else ""
             )
 
-data PositionedToken = PositionedToken
-  { sourcePos :: P.Position
-  , token     :: Token
-  }
+data PositionedToken = PositionedToken P.Position Token
 
 instance showToken :: Show Token where
   show = show <<< prettyPrintToken
@@ -199,8 +196,7 @@ instance eqToken :: Eq Token where
   eq _ _                                  = false
 
 instance showPositionedToken :: Show PositionedToken where
-  show (PositionedToken { sourcePos: pos, token: tok }) =
-    (show tok) ~~ " at " ~~ (show pos)
+  show (PositionedToken pos tok) = "PositionedToken " <> show pos <> " " <> show tok
 
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m = do
@@ -219,7 +215,7 @@ parsePositionedToken :: (P.Parser String Token) -> P.Parser String PositionedTok
 parsePositionedToken p = do
   pos <- getPosition
   tok <- p
-  pure $ PositionedToken { sourcePos: pos, token: tok }
+  pure $ PositionedToken pos tok
   where bind = bindP
 
 parseUsageToken :: P.Parser String Token
@@ -453,12 +449,12 @@ type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
 token :: forall a. (Token -> Maybe a) -> TokenParser a
 token test = P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
-    Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
+    Cons x@(PositionedToken ppos tok) xs ->
       case test tok of
         Just a ->
           let nextpos =
                 case xs of
-                  Cons (PositionedToken { sourcePos: npos }) _ -> npos
+                  Cons (PositionedToken npos _) _ -> npos
                   Nil -> ppos
           in P.Result xs (Right a) true nextpos
         -- XXX: Fix this error message, it makes no sense!
@@ -567,7 +563,7 @@ shoutName = token go P.<?> "NAME"
 nextTokPos :: TokenParser P.Position
 nextTokPos = P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
-    Cons x@(PositionedToken { token: tok, sourcePos: ppos }) xs ->
+    Cons x@(PositionedToken ppos _) xs ->
       P.Result toks (Right ppos) false pos
     otherwise -> P.parseFailed toks pos "expected token, met EOF"
 
