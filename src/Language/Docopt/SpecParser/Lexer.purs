@@ -25,7 +25,8 @@ import Data.String.Ext ((^=), (~~))
 import Language.Docopt.SpecParser.Base (lowerAlphaNum, alphaNum, alpha, space,
                                         lowerAlpha, upperAlpha, string',
                                         getPosition, getInput, spaces, eol)
-import Language.Docopt.SpecParser.State (ParserState)
+import Language.Docopt.SpecParser.State (ParserState(..))
+import Language.Docopt.SpecParser.State as ParserState
 import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..), Result(..),
                             runParserT, parseFailed, fail, runParser, unParserT) as P
 import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
@@ -572,5 +573,5 @@ runTokenParser :: forall a.
                 -> TokenParser a
                 -> Either P.ParseError a
 runTokenParser s =
-  flip evalState ({ indentation: 0, line: 0 })
-        <<< P.runParserT (P.PState s P.initialPos)
+  flip evalState ParserState.initialState
+    <<< P.runParserT (P.PState s P.initialPos)
