@@ -5,7 +5,8 @@
 -- |
 
 module Language.Docopt (
-    runDocopt
+    Docopt ()
+  , runDocopt
   , preparseDocopt
   , parseDocopt
   , evalDocopt
@@ -39,7 +40,7 @@ import Language.Docopt.SpecParser.Usage as Usage
 import Language.Docopt.SpecParser.Desc  as Desc
 
 type Docopt = {
-  usage         :: String
+  shortHelp     :: String
 , specification :: Specification
 }
 
@@ -67,8 +68,8 @@ data Origin
   | Default
 
 -- |
--- | Parse the docopt text and produce a parser
--- | that can be applied to user input.
+-- | Parse the docopt text and produce a parser that can be applied to user
+-- | input.
 -- |
 preparseDocopt
   :: forall r
@@ -84,29 +85,29 @@ preparseDocopt docopt options = do
   pure { descriptions: ds, usages: us }
 
 -- |
--- | Parse the docopt text and produce a parser
--- | that can be applied to user input.
+-- | Parse the docopt text and produce a parser that can be applied to user
+-- | input.
 -- |
 parseDocopt
   :: forall r
-   .  String           -- ^ The docopt text
+   . String           -- ^ The neodoc text
   -> ParseOptionsObj r -- ^ Parse options
   -> Either String Docopt
-parseDocopt docopt options = do
-  doc <- toScanErr       $ Scanner.scan $ dedent docopt
+parseDocopt helpText options = do
+  doc <- toScanErr       $ Scanner.scan $ dedent helpText
   us  <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve us ds
   pure $ { specification: prg
-         , usage:         doc.originalUsage
+         , shortHelp:     doc.originalUsage
          }
 
 -- |
--- | Apply the generated docopt parser to user input.
+-- | Apply the neodoc parser to user input.
 -- |
 evalDocopt
   :: forall r
-   . List D.Usage     -- ^ The program specification
+   . Specification    -- ^ The program specification
   -> StrMap String    -- ^ The environment
   -> Array String     -- ^ The user input
   -> EvalOptionsObj r -- ^ The eval opts
@@ -116,8 +117,7 @@ evalDocopt spec env argv options = do
   pure $ uncurry (T.reduce spec env) vs
 
 -- |
--- | Parse the docopt source, derive a parser and then
--- | apply it to user input.
+-- | Parse the neodoc source, derive a parser and then apply it to user input.
 -- |
 runDocopt
   :: forall r

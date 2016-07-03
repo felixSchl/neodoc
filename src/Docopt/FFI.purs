@@ -6,26 +6,42 @@
 -- | curried/uncurried as needed.
 -- |
 
-module Docopt.FFI (run, parse) where
+module Docopt.FFI (
+  run
+, runFromSpec
+, parse
+, undefined
+, readAsString
+) where
 
 import Prelude
-import Data.Function.Uncurried (Fn2(), mkFn2)
-import Data.Maybe (Maybe(Nothing), maybe, fromMaybe)
-import Data.List (toUnfoldable)
+import Debug.Trace
+import Data.Function.Uncurried
+import Data.Bifunctor (lmap)
+import Data.Maybe (Maybe(..), maybe, fromMaybe, isJust)
+import Data.List (toUnfoldable, List(Nil), fromFoldable)
+import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
+import Data.Tuple (Tuple())
+import Data.Tuple.Nested ((/\))
 import Data.Array (singleton) as Array
+import Data.Traversable (traverse, for)
 import Control.Monad.Eff (Eff())
 import Data.Either (Either(..), either)
 import Data.StrMap (StrMap())
 import Control.Bind ((=<<))
 import Control.Alt (alt, (<|>))
-import Data.Foreign (readArray, readString, typeOf, toForeign) as F
+import Data.String (toChar) as String
+import Data.Foreign (readBoolean, readChar, readArray, readString, typeOf, toForeign,
+                    readInt, readNumber, unsafeReadTagged) as F
 import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign,
                     toForeign)
 import Data.Foreign.Class (readProp) as F
-import Language.Docopt.Argument (Branch(), Argument(..))
+import Data.Foreign.NullOrUndefined as F
+import Language.Docopt.Argument (Branch(), Argument(..), OptionArgumentObj)
 import Unsafe.Coerce (unsafeCoerce)
 
 import Docopt as Docopt
+import Language.Docopt (Specification(), Docopt())
 import Language.Docopt.Value (Value(..))
 
 type RawValue = Unit
@@ -41,96 +57,125 @@ rawValue (ArrayValue xs) = unsafeCoerce $ rawValue <$> xs
 foreign import isTruthy :: Foreign -> Boolean
 
 -- |
--- | Run docopt from JS.
+-- | Run neodoc from JS.
 -- |
 run :: forall e.
-      Fn2 String  -- ^ The docopt text
-          Foreign -- ^ The options (optional)
-          (Eff (Docopt.DocoptEff e) (StrMap RawValue))
+  Fn2 String  -- ^ The neodoc text
+      Foreign -- ^ The options (optional)
+      (Eff (Docopt.DocoptEff e) (StrMap RawValue))
 run = mkFn2 go
   where
-    go helpText fopts = do
-
-      let opts = Docopt.defaultOptions {
-            -- override argv with a custom array
-            -- by default, this uses `process.argv`
-            argv = flip alt Docopt.defaultOptions.argv do
-                    toMaybe do
-                      unsafeCoerce <$> do
-                        F.readArray =<< F.readProp "argv" fopts
-
-            -- override the environment with a custom hashmap.
-            -- by default, this uses `process.env`
-          , env = flip alt Docopt.defaultOptions.env do
-                    toMaybe do
-                      unsafeCoerce <$> do
-                        readObject =<< F.readProp "env" fopts
-
-            -- enable "options-first" parsing. Options are only parsed and
-            -- validated until the first operand (positional or command) is
-            -- met. Trailing options are collected into a designated
-            -- placeholder.
-          , optionsFirst = either (const Docopt.defaultOptions.optionsFirst) id
-                            (isTruthy <$> do
-                              F.readProp "optionsFirst" fopts)
-
-            -- enable "smart-options" parsing. This causes singleton groups that
-            -- "look like" they are describing an option to expand to such an
-            -- option, e.g.: '[-o ARG]' becomes '[-o=ARG]'.
-          , smartOptions = either (const Docopt.defaultOptions.smartOptions) id
-                            (isTruthy <$> do
-                              F.readProp "smartOptions" fopts)
-
-            -- stop parsing at these custom EOA markers. This allows any option
-            -- to terminate a parse and collect all subsequent args.
-          , stopAt = fromMaybe Docopt.defaultOptions.stopAt do
-              toMaybe do
-                p <- F.readProp "stopAt" fopts
-                unsafeCoerce (F.readArray p) <|> do
-                  Array.singleton <$> F.readString p
-
-            -- don't exit the process upon failure. By default, neodoc will
-            -- exit the program if an error occured, right after printing the
-            -- help text alongside an error message.
-          , dontExit = either (const Docopt.defaultOptions.dontExit) id
-                            (isTruthy <$> do
-                              F.readProp "dontExit" fopts)
-          }
-
-      result <- Docopt.run helpText opts
+    go helpText rOpts = do
+      result <- Docopt.run (Right helpText) (readCommonOpts rOpts)
       pure $ rawValue <$> result
 
-      where
-        toMaybe :: forall a b. Either a b -> Maybe b
-        toMaybe e = either (const Nothing) (pure <<< id) e
+-- |
+-- | Run neodoc from JS, provided a spec.
+-- |
+runFromSpec :: forall e.
+  Fn2 Foreign -- ^ The neodoc spec
+      Foreign -- ^ The options (optional)
+      (Eff (Docopt.DocoptEff e) (StrMap RawValue))
+runFromSpec = mkFn2 go
+  where
+    go rSpec rOpts = do
+      case (readSpec rSpec) of
+        Left e -> throwException (error (show e))
+        Right spec -> do
+          result <- Docopt.run (Left spec) (readCommonOpts rOpts)
+          pure $ rawValue <$> result
 
-        readObject :: Foreign -> F (StrMap Foreign)
-        readObject value | isObject value = pure $ unsafeFromForeign value
-        readObject value = Left (TypeMismatch "object" (typeOf value))
+-- | Interpret a foreign value as a JS dictionary
+readObject :: Foreign -> F (StrMap Foreign)
+readObject value | isObject value = pure $ unsafeFromForeign value
+readObject value = Left (TypeMismatch "object" (typeOf value))
 
-        isObject :: Foreign -> Boolean
-        isObject f = F.typeOf f == "object"
+-- | Is this Foreign value an object?
+isObject :: Foreign -> Boolean
+isObject f = F.typeOf f == "object"
 
-type Node = { type :: String }
+-- | Read common neodoc options
+readCommonOpts :: Foreign -> Docopt.Options {}
+readCommonOpts o = Docopt.defaultOptions {
+    -- override argv with a custom array. Defaults to using `process.argv`
+    argv = flip alt Docopt.defaultOptions.argv do
+            toMaybe do
+              F.readProp "argv" o
 
+    -- override the environment with a custom hashmap. Defaults to using
+    -- `process.env`
+  , env = flip alt Docopt.defaultOptions.env do
+            toMaybe do
+              unsafeCoerce <$> do
+                readObject =<< F.readProp "env" o
+
+    -- enable "options-first" parsing. Options are only parsed and
+    -- validated until the first operand (positional or command) is met.
+    -- Trailing options are collected into a designated placeholder.
+  , optionsFirst = either (const Docopt.defaultOptions.optionsFirst) id
+                    (isTruthy <$> do
+                      F.readProp "optionsFirst" o)
+
+    -- enable "smart-options" parsing. This causes singleton groups that
+    -- "look like" they are describing an option to expand to such an
+    -- option, e.g.: '[-o ARG]' becomes '[-o=ARG]'.
+  , smartOptions = either (const Docopt.defaultOptions.smartOptions) id
+                    (isTruthy <$> do
+                      F.readProp "smartOptions" o)
+
+    -- stop parsing at these custom EOA markers. This allows any option
+    -- to terminate a parse and collect all subsequent args.
+  , stopAt = fromMaybe Docopt.defaultOptions.stopAt do
+      toMaybe do
+        p <- F.readProp "stopAt" o
+        unsafeCoerce (F.readArray p) <|> do
+          Array.singleton <$> F.readString p
+
+    -- don't exit the process upon failure. By default, neodoc will
+    -- exit the program if an error occured, right after printing the
+    -- help text alongside an error message.
+  , dontExit = either (const Docopt.defaultOptions.dontExit) id
+                        (isTruthy <$> do
+                          F.readProp "dontExit" o)
+  }
+
+-- |
+-- | Parse the help-text and return the spec as a JS value
+-- |
 parse :: forall e.
-        Fn2 String  -- ^ The docopt text
+        Fn2 String  -- ^ The neodoc help-text
             Foreign -- ^ The options (optional)
-            (Eff (Docopt.DocoptEff e) (Array (Array (Array Foreign))))
+            (Eff (Docopt.DocoptEff e) ({
+              specification :: Array (Array (Array Foreign))
+            , shortHelp     :: String
+            }))
 parse = mkFn2 go
   where
-    go helpText opts = do
-      let opts' = Docopt.defaultOptions {
-            -- enable "smart-options" parsing. This causes singleton groups that
-            -- "look like" they are describing an option to expand to such an
-            -- option, e.g.: '[-o ARG]' becomes '[-o=ARG]'.
-            smartOptions = either (const Docopt.defaultOptions.smartOptions) id
-                            (isTruthy <$> do
-                              F.readProp "smartOptions" opts)
-          }
-      result <- Docopt.parse helpText opts'
-      pure $ toUnfoldable $ result <#> \branches -> do
-        toUnfoldable $ convBranch <$> branches
+    go helpText fOpts = do
+      let
+        opts
+          = Docopt.defaultOptions {
+              -- enable "smart-options" parsing. This causes singleton groups
+              -- that "look like" they are describing an option to expand to
+              -- such an option, e.g.: '[-o ARG]' becomes '[-o=ARG]'.
+              smartOptions
+                = either (const Docopt.defaultOptions.smartOptions) id
+                         (isTruthy <$> do
+                           F.readProp "smartOptions" fOpts)
+            }
+
+      { specification, shortHelp } <- Docopt.parse helpText opts
+
+      let
+        jsSpecification = toUnfoldable do
+          specification <#> \branches -> do
+            toUnfoldable do
+              convBranch <$> branches
+
+      pure {
+        shortHelp:     shortHelp
+      , specification: jsSpecification
+      }
 
     convBranch :: Branch -> Array Foreign
     convBranch args = toUnfoldable $ convArg <$> args
@@ -148,7 +193,7 @@ parse = mkFn2 go
       , branches:   (toUnfoldable $ convBranch <$> x.branches) :: Array (Array Foreign)
       }
     }
-    convArg (Option x)     = F.toForeign {
+    convArg (Option x) = F.toForeign {
       type: "Option"
     , value: {
         flag:       maybe undefined F.toForeign x.flag
@@ -163,5 +208,114 @@ parse = mkFn2 go
       }
     }
 
+-- |
+-- | Parse a foreign value into a specification
+-- |
+readSpec :: Foreign -> F Docopt
+readSpec input = do
+  shortHelp  <- F.readProp "shortHelp" input
+  jsSpec     <- F.readProp "specification" input
+  toplevel   <- F.readArray jsSpec
+  spec       <- fromFoldable <$> do
+    for toplevel \usage -> do
+      branches <- F.readArray usage
+      fromFoldable <$> do
+        for branches \branch -> do
+          args <- F.readArray branch
+          fromFoldable <$> do
+            for args readArg
+  pure {
+    shortHelp:     shortHelp
+  , specification: spec
+  }
+
+  where
+  readNode :: Foreign -> F (Tuple String (Maybe Foreign))
+  readNode o = (/\) <$> (F.readString =<< F.readProp "type" o)
+                    <*> ((Just <$> F.readProp "value" o) <|> pure Nothing)
+
+  readArg :: Foreign -> F (Argument)
+  readArg o = do
+    n <- readNode o
+    case n of
+      "Group" /\ (Just v) -> do
+        grp <$> (isTruthy <$> F.readProp "optional" v)
+            <*> (isTruthy <$> F.readProp "repeatable" v)
+            <*> (fromFoldable <$> do
+                  branches <- F.readArray =<< F.readProp "branches" v
+                  for branches \branch -> do
+                    args <- F.readArray branch
+                    fromFoldable <$> do
+                      for args readArg
+                )
+      "Command" /\ (Just v) -> do
+        co <$> (readAsString =<< F.readProp "name" v)
+           <*> (isTruthy <$> F.readProp "repeatable" v)
+      "Positional" /\ (Just v) -> do
+        po <$> (readAsString =<< F.readProp "name" v)
+           <*> (isTruthy <$> F.readProp "repeatable" v)
+      "Option" /\ (Just v) -> do
+        opt <$> (ifHasProp v "flag" readFlag)
+            <*> (ifHasProp v "name" readAsString)
+            <*> (isTruthy <$> F.readProp "repeatable" v)
+            <*> (ifHasProp v "env" readAsString)
+            <*> (readOptArg v)
+      "Stdin" /\ _ -> pure Stdin
+      "EOA"   /\ _ -> pure EOA
+      x /\ _ -> Left (TypeMismatch "Group, Command, Positional, Option, Stdin or EOA" x)
+
+  readOptArg :: Foreign -> F (Maybe OptionArgumentObj)
+  readOptArg v = "invalid option-argument" <!?> do
+    mx <- nullOrUndefined (F.readProp "arg" v)
+    case mx of
+      Nothing -> pure Nothing
+      Just x  -> Just <$> do
+          arg <$> (readAsString =<< F.readProp "name" x)
+              <*> (ifHasProp x "default" \x ->
+                      (BoolValue   <$> F.readBoolean x) <|>
+                      (IntValue    <$> F.readInt     x) <|>
+                      (FloatValue  <$> F.readNumber  x) <|>
+                      (StringValue <$> F.readString  x)
+                  )
+              <*> (isTruthy <$> F.readProp "optional" x)
+
+  readFlag :: Foreign -> F Char
+  readFlag v = do
+    s <- readAsString v
+    F.readChar (F.toForeign s)
+
+  grp x y z     = Group      { optional: x, repeatable: y, branches: z }
+  co  x y       = Command    { name: x, repeatable: y }
+  po  x y       = Positional { name: x, repeatable: y }
+  opt a b c d e = Option     { flag: a, name: b, repeatable: c, env: d, arg: e }
+  arg x y z     = { name: x, default: y, optional: z }
+
+optional :: forall a. F a -> F (Maybe a)
+optional x = (Just <$> x) <|> pure Nothing
+
+ifHasProp :: forall a. Foreign -> String -> (Foreign -> F a) -> F (Maybe a)
+ifHasProp v s f = do
+  mv <- nullOrUndefined (F.readProp s v)
+  case mv of
+    Nothing -> pure Nothing
+    Just  v -> Just <$> f v
+
+toMaybe :: forall a b. Either a b -> Maybe b
+toMaybe e = either (const Nothing) (pure <<< id) e
+
+readAsString :: Foreign -> F String
+readAsString v = do
+  (             (F.unsafeReadTagged "String"  v :: F String)) <|>
+  (toString <$> (F.unsafeReadTagged "Boolean" v :: F String)) <|>
+  (toString <$> (F.unsafeReadTagged "Number"  v :: F String))
+
+nullOrUndefined :: F Foreign -> F (Maybe Foreign)
+nullOrUndefined x = F.unNullOrUndefined <$> do
+  F.readNullOrUndefined pure =<< x
+
+infixl 9 invalidMsg as <!?>
+invalidMsg :: forall a. String -> F a -> F a
+invalidMsg msg x = lmap (\e -> JSONError $ msg <> ": " <> show e) x
 
 foreign import undefined :: forall a. a
+foreign import toString  :: forall a. a -> String

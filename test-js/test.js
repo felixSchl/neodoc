@@ -63,7 +63,9 @@ describe('neodoc', () => {
         Options:
           -f, --foo=BAR...
         `
-      )).to.deep.equal(
+      )).to.deep.equal({
+        shortHelp: 'Usage: foo <command> [options]\n'
+      , specification:
           [
             [
               [
@@ -105,7 +107,59 @@ describe('neodoc', () => {
               ]
             ]
           ]
-      );
+      });
+    })
+  });
+
+  describe.only('specification loading', () => {
+    it ('should return the spec in regular JS', () => {
+      const spec = {
+        shortHelp: 'Usage: foo <command> [options]\n'
+      , specification:
+          [
+            [
+              [
+                {
+                  "type": "Positional",
+                  "value": {
+                    "name": "<command>",
+                    "repeatable": false
+                  }
+                },
+                // each expanded [options] option gets it's own group i.o.t.
+                // indiciate that it's optional. Repeatability is indiciated on
+                // the group itself, rather than on the 'Option' node.
+                {
+                  "type": "Group",
+                  "value": {
+                    "optional": true,
+                    "repeatable": true,
+                    "branches":
+                      [
+                        [
+                          { "type": "Option",
+                            "value": {
+                              "flag": 10,
+                              "name": 100,
+                              "repeatable": 3,
+                              "env": undefined,
+                            }
+                          }
+                        ]
+                      ]
+                  }
+                }
+              ]
+            ]
+          ]
+      };
+
+      expect(neodoc.run(spec, { argv: [ 'bar', '--100', '"test"' ] }))
+        .to.deep.equal({
+          '<command>': 'bar'
+        , '--foo': 'test'
+        , '-f': 'test'
+        });
     })
   });
 });

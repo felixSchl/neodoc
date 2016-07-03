@@ -8,3 +8,7 @@ exports.isTruthy = function (value) {
 };
 
 exports.undefined = undefined;
+
+exports.toString = function(value) {
+  return value.toString();
+}
