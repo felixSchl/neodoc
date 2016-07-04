@@ -19,6 +19,7 @@ module Language.Docopt.Argument (
   , isOption
   , isGroup
   , isFlag
+  , isPositional
   , isCommand
   , isFree
   , eqTypes
@@ -255,6 +256,6 @@ isOption (Option _) = true
 isOption _          = false
 
 isFree :: Argument -> Boolean
-isFree (Option _) = true
-isFree (Group g)  = all (all isFree) g.branches
-isFree _          = false
+isFree (Option _)           = true
+isFree (Group { branches }) = all (all isFree) branches
+isFree _                    = false

@@ -65,6 +65,7 @@ type Options r = {
 , smartOptions :: Boolean      -- ^ parse singleton groups as opts if possible
 , stopAt       :: Array String -- ^ stop parsing at these custom EOA markers
 , requireFlags :: Boolean      -- ^ do not ignore missing flags
+, laxPlacement :: Boolean      -- ^ allow positionals/commands to be appear anywhere
 }
 
 defaultOptions :: Options {}
@@ -75,6 +76,7 @@ defaultOptions = {
 , dontExit:     false
 , smartOptions: false
 , stopAt:       []
+, laxPlacement: false
 , requireFlags: false
 }
 

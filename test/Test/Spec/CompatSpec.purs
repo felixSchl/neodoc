@@ -38,6 +38,7 @@ compatSpec tests =
               flagsDesc = renderFlags { optionsFirst: options.optionsFirst
                                       , smartOptions: options.smartOptions
                                       , requireFlags: options.requireFlags
+                                      , laxPlacement: options.laxPlacement
                                       }
           describe (intercalate " " (
             (toUnfoldable $ StrMap.toList env <#> \t ->

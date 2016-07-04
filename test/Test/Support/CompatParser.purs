@@ -57,6 +57,7 @@ type Flags = {
   optionsFirst :: Boolean -- ^ 'p'
 , smartOptions :: Boolean -- ^ 's'
 , requireFlags :: Boolean -- ^ 'r'
+, laxPlacement :: Boolean -- ^ 'l'
 }
 
 parseFlags :: String -> Flags
@@ -64,12 +65,14 @@ parseFlags s = {
   optionsFirst: String.contains "p" s
 , smartOptions: String.contains "s" s
 , requireFlags: String.contains "r" s
+, laxPlacement: String.contains "l" s
 }
 
 renderFlags :: Flags -> String
 renderFlags f = (if f.optionsFirst then "p" else "")
              <> (if f.smartOptions then "s" else "")
              <> (if f.requireFlags then "r" else "")
+             <> (if f.laxPlacement then "l" else "")
 
 readTests :: forall eff
    . String
@@ -105,6 +108,7 @@ readTests filepath = do
       flags <- P.option { optionsFirst: false
                         , smartOptions: false
                         , requireFlags: false
+                        , laxPlacement: false
                         } $ parseFlags <$> do
                               P.char '/'
                               fromCharArray <$> A.many alpha
@@ -143,6 +147,7 @@ readTests filepath = do
                       , smartOptions: flags.smartOptions
                       , stopAt:       []
                       , requireFlags: flags.requireFlags
+                      , laxPlacement: flags.laxPlacement
                       }
                     }
 
