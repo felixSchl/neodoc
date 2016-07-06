@@ -14,7 +14,7 @@ module Language.Docopt.Argument.Option (
 import Prelude
 import Data.Function (on)
 import Control.Apply ((*>))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), maybe, isJust)
 import Data.Generic (class Generic, gEq, gShow)
 import Data.String (singleton) as String
 
@@ -104,11 +104,13 @@ prettyPrintOption o
     env = flip (maybe "") o.env \k -> " [env: " <> k <> "]"
 
 prettyPrintOptionNaked :: OptionObj -> String
-prettyPrintOptionNaked o
-  = short <> long <> arg' <> rep
+prettyPrintOptionNaked o =
+     (if hasAlias then "(" else "")
+  <> (short <> (if hasAlias then "|" else "") <> long <> arg' <> rep)
+  <> (if hasAlias then ")" else "")
   where
+    hasAlias = isJust o.flag && isJust o.name
     short = maybe "" (\f -> "-" <> (String.singleton f)) o.flag
-    long  = maybe "" (const "|") (o.flag *> o.name)
-              <> maybe "" ("--" <> _) o.name
+    long  = maybe "" ("--" <> _) o.name
     rep  = if o.repeatable then "..." else ""
     arg' = flip (maybe "") o.arg \({ name }) -> "="  <> name

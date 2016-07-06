@@ -146,8 +146,10 @@ prettyPrintArgNaked (EOA)          = "-- ARGS..."
 prettyPrintArgNaked (Command x)    = x.name <> (if x.repeatable then "..." else "")
 prettyPrintArgNaked (Positional x) = x.name <> (if x.repeatable then "..." else "")
 prettyPrintArgNaked (Option o)     = O.prettyPrintOptionNaked o
-prettyPrintArgNaked (Group g)      = inner <> repetition
+prettyPrintArgNaked (Group g)      = open <> inner <> close <> repetition
   where
+    open       = if g.optional then "[" else "("
+    close      = if g.optional then "]" else ")"
     inner      = intercalate " | " (prettyPrintBranchNaked <$> g.branches)
     repetition = if g.repeatable then "..." else ""
 

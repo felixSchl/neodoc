@@ -655,7 +655,7 @@ clumpP options skippable isSkipping l c = do
           <> (intercalate " " $ prettyPrintRequiredIndexedArg <$> missing)
 
       if isSkipping && length missing > 0
-        then expected missing
+        then expected missing i
         else
           if skippable || null i
             then do
@@ -663,20 +663,24 @@ clumpP options skippable isSkipping l c = do
                 then runFn5 exhaustP options true true l
                     (getIndexedElem <<< unRequired <$> xss')
                 else pure (((getIndexedElem <<< unRequired) `lmap` _) <$> fallbacks)
-            else expected xss'
+            else expected xss' i
 
     draw _ _ = pure Nil
 
-  expected xs = P.fail $
+  expected xs i = P.fail $
     "Expected "
-      <> intercalate ", "
-          (D.prettyPrintArgNaked <<< getIndexedElem <<< unRequired <$> xs)
+      <> (intercalate ", "
+          (D.prettyPrintArgNaked <<< getIndexedElem <<< unRequired <$> xs))
+      <> butGot i
 
   _debug s = if debug
                 then traceA $ indentation <> (s unit)
                 else pure unit
   indentation :: String
   indentation = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
+
+  butGot ((PositionedToken { source }):_) = ", but got " <> source
+  butGot Nil                              = ""
 
 -- Parse a single argument from argv.
 -- Represented as `FnX` to take advantage of inlining at compile time.
@@ -832,8 +836,8 @@ argP options _ _ _ x = getInput >>= \i -> (
     isAnySopt (SOpt _ _ _) = pure true
     isAnySopt _            = pure false
 
-  butGot (Cons (PositionedToken { source }) _) = ", but got " <> source
-  butGot Nil                                   = ""
+  butGot ((PositionedToken { source }):_) = ", but got " <> source
+  butGot Nil                              = ""
 
 -- Evaluate multiple parsers, producing a new parser that chooses the best
 -- succeeding match or none.
