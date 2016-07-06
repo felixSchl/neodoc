@@ -669,8 +669,9 @@ clumpP options skippable isSkipping l c = do
 
   expected xs i = P.fail $
     "Expected "
-      <> (intercalate ", "
-          (D.prettyPrintArgNaked <<< getIndexedElem <<< unRequired <$> xs))
+      <> (D.prettyPrintArgNaked
+          (getIndexedElem
+            (unRequired (unsafePartial (LU.head xs)))))
       <> butGot i
 
   _debug s = if debug

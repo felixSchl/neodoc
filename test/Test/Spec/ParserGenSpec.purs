@@ -180,7 +180,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         options:
           -i, --input FILE
         """
-        [ fail Nothing [] "Expected ((-i|--input=FILE))"
+        [ fail Nothing [] "Expected (-i|--input=FILE)"
         , pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -195,7 +195,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
         """
         [ fail Nothing []
-          $ "Expected ((-i|--input=FILE)), (-o|--output=FILE)"
+          $ "Expected (-i|--input=FILE)"
 
         , fail Nothing [ "-i", "bar" ]
           $ "Expected (-o|--output=FILE)"
@@ -225,7 +225,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -r, --redirect FILE [env: QUX]
         """
         [ fail Nothing []
-          $ "Expected (((-i|--input=FILE)) (-r|--redirect=FILE)), (-o|--output=FILE)"
+          $ "Expected ((-i|--input=FILE) (-r|--redirect=FILE))"
 
         , fail Nothing [ "-i", "bar", "-r", "bar" ]
             "Expected (-o|--output=FILE)"
@@ -268,7 +268,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE
         """
-        [ fail Nothing [] "Expected ((-i|--input=FILE))"
+        [ fail Nothing [] "Expected (-i|--input=FILE)"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail Nothing [ "-i", "bar" ] "Expected <env>"
         , pass Nothing
@@ -280,7 +280,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-o"       :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-            "Expected ((-i|--input=FILE)), but got -o"
+            "Expected (-i|--input=FILE), but got -o"
         ]
 
     , test
@@ -435,10 +435,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
         , fail Nothing
             [ "foo" ]
-            "Expected ((-f|--foo=FOZ))..."
+            "Expected (-f|--foo=FOZ)..."
         , fail Nothing
             [ "foo", "-o", "-i", "-bax" ]
-            "Expected ((-f|--foo=FOZ))..."
+            "Expected (-f|--foo=FOZ)..."
         ]
 
     , test
