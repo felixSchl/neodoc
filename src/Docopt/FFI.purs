@@ -265,7 +265,7 @@ readSpec input = do
       x /\ _ -> Left (TypeMismatch "Group, Command, Positional, Option, Stdin or EOA" x)
 
   readOptArg :: Foreign -> F (Maybe OptionArgumentObj)
-  readOptArg v = "invalid option-argument" <!?> do
+  readOptArg v = "option-argument" <?> do
     mx <- nullOrUndefined (F.readProp "arg" v)
     case mx of
       Nothing -> pure Nothing
@@ -280,9 +280,9 @@ readSpec input = do
               <*> (isTruthy <$> F.readProp "optional" x)
 
   readFlag :: Foreign -> F Char
-  readFlag v = do
-    s <- readAsString v
-    F.readChar (F.toForeign s)
+  readFlag v = "flag. Must be a single character." <?> do
+      s <- readAsString v
+      F.readChar (F.toForeign s)
 
   grp x y z     = Group      { optional: x, repeatable: y, branches: z }
   co  x y       = Command    { name: x, repeatable: y }
@@ -313,9 +313,9 @@ nullOrUndefined :: F Foreign -> F (Maybe Foreign)
 nullOrUndefined x = F.unNullOrUndefined <$> do
   F.readNullOrUndefined pure =<< x
 
-infixl 9 invalidMsg as <!?>
-invalidMsg :: forall a. String -> F a -> F a
-invalidMsg msg x = lmap (\e -> JSONError $ msg <> ": " <> show e) x
+infixl 9 expected as <?>
+expected :: forall a. String -> F a -> F a
+expected msg x = lmap (\_ -> JSONError $ "Invalid " <> msg) x
 
 foreign import undefined :: forall a. a
 foreign import toString  :: forall a. a -> String
