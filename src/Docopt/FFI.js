@@ -4,7 +4,7 @@
 // module Docopt.FFI
 
 exports.isTruthy = function (value) {
-  return (value == true);
+  return !!value;
 };
 
 exports.undefined = undefined;
