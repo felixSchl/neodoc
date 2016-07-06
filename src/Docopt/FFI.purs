@@ -133,6 +133,12 @@ readCommonOpts o = Docopt.defaultOptions {
         unsafeCoerce (F.readArray p) <|> do
           Array.singleton <$> F.readString p
 
+    -- require flags to be explicitly passed? By default neodoc
+    -- ignores missing flags during parsing argv.
+  , requireFlags = either (const Docopt.defaultOptions.requireFlags) id
+                    (isTruthy <$> do
+                      F.readProp "requireFlags" o)
+
     -- don't exit the process upon failure. By default, neodoc will
     -- exit the program if an error occured, right after printing the
     -- help text alongside an error message.

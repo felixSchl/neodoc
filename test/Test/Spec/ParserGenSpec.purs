@@ -44,10 +44,16 @@ isolate = false
 type Options =  { stopAt       :: Array String
                 , optionsFirst :: Boolean
                 , smartOptions :: Boolean
+                , requireFlags :: Boolean
                 }
 
 defaultOptions :: Options
-defaultOptions = { stopAt: [], optionsFirst: false, smartOptions: true }
+defaultOptions = {
+  stopAt: []
+, optionsFirst: false
+, smartOptions: true
+, requireFlags: false
+}
 
 type Test = { help  :: String
             , cases :: Array Case

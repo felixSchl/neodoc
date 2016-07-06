@@ -56,17 +56,20 @@ newtype Kase = Kase {
 type Flags = {
   optionsFirst :: Boolean -- ^ 'p'
 , smartOptions :: Boolean -- ^ 's'
+, requireFlags :: Boolean -- ^ 'r'
 }
 
 parseFlags :: String -> Flags
 parseFlags s = {
   optionsFirst: String.contains "p" s
 , smartOptions: String.contains "s" s
+, requireFlags: String.contains "r" s
 }
 
 renderFlags :: Flags -> String
 renderFlags f = (if f.optionsFirst then "p" else "")
              <> (if f.smartOptions then "s" else "")
+             <> (if f.requireFlags then "r" else "")
 
 readTests :: forall eff
    . String
@@ -101,6 +104,7 @@ readTests filepath = do
       P.string "prog"
       flags <- P.option { optionsFirst: false
                         , smartOptions: false
+                        , requireFlags: false
                         } $ parseFlags <$> do
                               P.char '/'
                               fromCharArray <$> A.many alpha
@@ -138,6 +142,7 @@ readTests filepath = do
                       , dontExit:     true
                       , smartOptions: flags.smartOptions
                       , stopAt:       []
+                      , requireFlags: flags.requireFlags
                       }
                     }
 

@@ -26,7 +26,7 @@ import Data.Either (Either(Right, Left))
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing, isJust)
 import Data.List (List(..), reverse, singleton, concat, length, (:),
                   some, filter, head, toUnfoldable, sortBy, groupBy, last, null,
-                  tail, many)
+                  tail, many, mapWithIndex)
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Control.Alt ((<|>))
 import Data.Traversable (traverse, for)
@@ -100,6 +100,7 @@ markDone = lift (State.modify \s -> s { done = true })
 type Options r = {
   optionsFirst :: Boolean
 , stopAt       :: Array String
+, requireFlags :: Boolean
   | r
 }
 
@@ -492,9 +493,17 @@ toOptional :: forall a. Required a -> Required a
 toOptional (Required a) = Optional a
 toOptional (Optional a) = Optional a
 
-prettyPrintRequiredArg :: Required D.Argument -> String
-prettyPrintRequiredArg (Required x) = "Required " <> D.prettyPrintArg x
-prettyPrintRequiredArg (Optional x) = "Optional " <> D.prettyPrintArg x
+prettyPrintRequiredIndexedArg :: Required (Indexed D.Argument) -> String
+prettyPrintRequiredIndexedArg (Required (Indexed _ x)) = "Required " <> D.prettyPrintArg x
+prettyPrintRequiredIndexedArg (Optional (Indexed _ x)) = "Optional " <> D.prettyPrintArg x
+
+data Indexed a = Indexed Int a
+
+getIndexedElem :: forall a. Indexed a -> a
+getIndexedElem (Indexed _ x) = x
+
+getIndex :: forall a. Indexed a -> Int
+getIndex (Indexed ix _) = ix
 
 -- Parse a clump of arguments.
 clumpP
@@ -519,19 +528,26 @@ clumpP options skippable isSkipping l c = do
   go _ _ l (Fixed xs)
     = concat <$> for xs (runFn5 argP' options skippable isSkipping l)
 
-  go skippable isSkipping l (Free  xs) = draw (Required <$> xs) (length xs)
+  go skippable isSkipping l (Free  xs) =
+    draw
+      (xs `flip mapWithIndex` \x ix ->
+        Required (Indexed ix x))
+      (length xs)
     where
 
-    draw :: List (Required D.Argument) -> Int -> Parser (List ValueMapping)
+    draw
+      :: List (Required (Indexed D.Argument))
+      -> Int
+      -> Parser (List ValueMapping)
 
     -- Recursively apply each argument parser.
     -- Should an argument be repeatable, try parsing any adjacent matches
     -- repeatedly (NOTE: this could interfere with `argP`'s repetition handling?)
-    draw xss@(Cons x xs) n | n >= 0 = (do
+    draw xss@(x:xs) n | n >= 0 = (do
 
       i <- getInput
       _debug \_->
-           "draw: "         <> (intercalate " " $ prettyPrintRequiredArg <$> xss)
+           "draw: "         <> (intercalate " " $ prettyPrintRequiredIndexedArg <$> xss)
         <> ", n: "          <> show n
         <> ", skippable: "  <> show skippable
         <> ", isSkipping: " <> show isSkipping
@@ -545,14 +561,15 @@ clumpP options skippable isSkipping l c = do
       -- parsing mechanism.
 
       let
-        arg = unRequired x
+        arg = getIndexedElem (unRequired x)
         mod = if isRequired x then id else P.option Nil
 
       -- parse the next argument. failure will cause the argument to be put at
       -- the back of the queue and the number of retries to be cut down by one.
       vs <- P.try do
               mod do
-                runFn5 argP' options     -- the parsing options
+                runFn5 argP'
+                      options     -- the parsing options
                       isSkipping  -- propagate the 'isSkipping' property
                       false       -- reset 'isSkipping' to false
                       (l + 1)     -- increase the recursive level
@@ -588,7 +605,7 @@ clumpP options skippable isSkipping l c = do
         else do
           _debug \_->
               "draw: failure"
-            <> ", requeueing: "  <> prettyPrintRequiredArg x
+            <> ", requeueing: "  <> prettyPrintRequiredIndexedArg x
           draw (xs <> singleton x) (n - 1)
     )
 
@@ -600,7 +617,7 @@ clumpP options skippable isSkipping l c = do
       i <- getInput
       _debug \_->
            "draw: edge-case"
-        <> ", left-over: "  <> (intercalate " " $ prettyPrintRequiredArg <$> xss)
+        <> ", left-over: "  <> (intercalate " " $ prettyPrintRequiredIndexedArg <$> xss)
         <> ", n: "          <> show n
         <> ", skippable: "  <> show skippable
         <> ", isSkipping: " <> show isSkipping
@@ -609,20 +626,21 @@ clumpP options skippable isSkipping l c = do
       env <- lift ask
 
       let
-        vs = xss <#> \x -> do
-          let arg = unRequired x
+        xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss
+        vs = xss' <#> \x -> do
+          let arg = getIndexedElem (unRequired x)
           maybe
             (Left x)
             (Right <<< Tuple x)
             do
-              v <- unRichValue <$> getFallbackValue env arg
+              v <- unRichValue <$> getFallbackValue options env arg
               pure $ RichValue v {
                 value = if D.isRepeatable arg
                     then ArrayValue $ Value.intoArray v.value
                     else v.value
               }
         missing = filter (\x ->
-          let arg = unRequired x
+          let arg = getIndexedElem (unRequired x)
            in isRequired x &&
               -- This may look very counter-intuitive, yet getting fallback
               -- values for entire groups is not possible and not logical.
@@ -633,28 +651,26 @@ clumpP options skippable isSkipping l c = do
         fallbacks = mrights vs
 
       _debug \_->
-        "draw: missing:" <> (intercalate " " $ prettyPrintRequiredArg <$> missing)
+        "draw: missing:"
+          <> (intercalate " " $ prettyPrintRequiredIndexedArg <$> missing)
 
       if isSkipping && length missing > 0
-        then
-          P.fail $
-            "Expected "
-              <> intercalate ", "
-                  (D.prettyPrintArgNaked <<< unRequired <$> missing)
+        then expected missing
         else
           if skippable || null i
             then do
               if not isSkipping
-                then runFn5 exhaustP options true true l (unRequired <$> xss)
-                else do
-                  pure ((unRequired `lmap` _) <$> fallbacks)
-            else
-              P.fail $
-                "Expected "
-                  <> intercalate ", "
-                      (D.prettyPrintArgNaked <<< unRequired <$> xss)
+                then runFn5 exhaustP options true true l
+                    (getIndexedElem <<< unRequired <$> xss')
+                else pure (((getIndexedElem <<< unRequired) `lmap` _) <$> fallbacks)
+            else expected xss'
 
     draw _ _ = pure Nil
+
+  expected xs = P.fail $
+    "Expected "
+      <> intercalate ", "
+          (D.prettyPrintArgNaked <<< getIndexedElem <<< unRequired <$> xs)
 
   _debug s = if debug
                 then traceA $ indentation <> (s unit)
@@ -922,8 +938,8 @@ terminate arg = do
     pure (P.Result Nil (Right rest) true pos)
 
 -- Find a fallback value for the given argument.
-getFallbackValue :: Env -> D.Argument -> Maybe RichValue
-getFallbackValue env x = do
+getFallbackValue :: forall r. Options r -> Env -> D.Argument -> Maybe RichValue
+getFallbackValue options env x = do
   (fromEnv     x <#> RValue.from Origin.Environment) <|>
   (fromDefault x <#> RValue.from Origin.Default)     <|>
   (empty       x <#> RValue.from Origin.Empty)
@@ -944,13 +960,13 @@ getFallbackValue env x = do
   empty = go
     where
     go (D.Option (o@{ arg: Nothing }))
-      = pure
-          $ if o.repeatable then ArrayValue []
-                            else BoolValue false
+      | not options.requireFlags
+      = pure if o.repeatable  then ArrayValue []
+                              else BoolValue false
     go (D.Option (o@{ arg: Just { optional: true } }))
-      = pure
-          $ if o.repeatable then ArrayValue []
-                            else BoolValue false
+      | not options.requireFlags
+      = pure if o.repeatable  then ArrayValue []
+                              else BoolValue false
     go (D.Stdin)                           = pure $ BoolValue false
     go (D.EOA)                             = pure $ ArrayValue []
     go (D.Positional pos) | pos.repeatable = pure $ ArrayValue []
