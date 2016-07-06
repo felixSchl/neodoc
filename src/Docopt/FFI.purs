@@ -270,8 +270,8 @@ readSpec input = do
     case mx of
       Nothing -> pure Nothing
       Just x  -> Just <$> do
-          arg <$> (readAsString =<< F.readProp "name" x)
-              <*> (ifHasProp x "default" \x ->
+          arg <$> (ifHasProp' x "name" "<ARG>" readAsString)
+              <*> (ifHasProp  x "default" \x ->
                       (BoolValue   <$> F.readBoolean x) <|>
                       (IntValue    <$> F.readInt     x) <|>
                       (FloatValue  <$> F.readNumber  x) <|>
@@ -299,6 +299,11 @@ ifHasProp v s f = do
   case mv of
     Nothing -> pure Nothing
     Just  v -> Just <$> f v
+
+ifHasProp' :: forall a. Foreign -> String -> a -> (Foreign -> F a) -> F a
+ifHasProp' v s o f = do
+  mv <- ifHasProp v s f
+  pure (fromMaybe o mv)
 
 toMaybe :: forall a b. Either a b -> Maybe b
 toMaybe e = either (const Nothing) (pure <<< id) e
