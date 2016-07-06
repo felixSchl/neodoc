@@ -111,7 +111,7 @@ describe('neodoc', () => {
     })
   });
 
-  describe.only('specification loading', () => {
+  describe('specification loading', () => {
     it ('should return the spec in regular JS', () => {
       const spec = {
         shortHelp: 'Usage: foo <command> [options]\n'
@@ -123,7 +123,7 @@ describe('neodoc', () => {
                   "type": "Positional",
                   "value": {
                     "name": "<command>",
-                    "repeatable": false
+                    "repeatable": true
                   }
                 },
                 // each expanded [options] option gets it's own group i.o.t.
@@ -133,16 +133,16 @@ describe('neodoc', () => {
                   "type": "Group",
                   "value": {
                     "optional": true,
-                    "repeatable": true,
+                    "repeatable": false,
                     "branches":
                       [
                         [
                           { "type": "Option",
                             "value": {
-                              "flag": 10,
-                              "name": 100,
-                              "repeatable": 3,
-                              "env": undefined,
+                              "flag": "f",
+                              "name": "foo",
+                              "repeatable": false,
+                              "arg": {}
                             }
                           }
                         ]
@@ -154,9 +154,9 @@ describe('neodoc', () => {
           ]
       };
 
-      expect(neodoc.run(spec, { argv: [ 'bar', '--100', '"test"' ] }))
+      expect(neodoc.run(spec, { argv: [ 'bar', '--foo', 'test' ] }))
         .to.deep.equal({
-          '<command>': 'bar'
+          '<command>': ['bar']
         , '--foo': 'test'
         , '-f': 'test'
         });
