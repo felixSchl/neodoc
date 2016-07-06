@@ -462,7 +462,7 @@ The following is true for all groups:
 * Groups can be optional using brackets: `[ foo ]`
 * Groups can be required using parenthesis: `( foo )`
 * Groups must not be empty
-* Groups may contain 1 or more branches
+* Groups must contain 1 or more branches
 * Groups succeed if at least one branch succeeds
 * Multiple successful branch matches are weighted and scored
 
@@ -522,8 +522,7 @@ Here, `--foo` won't be expanded again and hence remain required.
 * **Optional arguments.** Neodoc understands `--foo[=BAR]` (or `-f[=<bar>]`) as
   an option that can be provided either with or without an argument.
 * **Alias matches.** If `--verbose` yields a value, so will `-v` <sub>(given
-  that's the assigned alias)</sub>. Likewise, `FOO` yields value `<foo>` as
-  well as `FOO`, and `<foo>` yields `FOO` and `<foo>`.
+  that's the assigned alias)</sub>.
 * **Flags are optional,** always. There's no reason to force the user to
   explicitly pass an option that takes no argument. The absence of the flag
   speaks - the flag will be set to `false`. This is also the case for flags
