@@ -613,7 +613,9 @@ clumpP options skippable isSkipping l c = do
       pure (vs <> vss)
     ) `catchParseError` (\e ->
       let arg   = getIndexedElem (unRequired x)
-          errs' = Map.alter (const (Just e)) arg errs
+          errs' = if D.isGroup arg
+                    then Map.alter (const (Just e)) arg errs
+                    else errs
       in if (length xs == 0)
           then draw (xs <> singleton x) errs' (-1)
           else do
@@ -626,7 +628,7 @@ clumpP options skippable isSkipping l c = do
     -- All options have been matched (or have failed to be matched) at least
     -- once by now. See where we're at - is there any required option that was
     -- not matched at all?
-    draw xss errs n | (length xss > 0) && (n < 0) = do
+    draw xss@(x:xs) errs n | (n < 0) = do
 
       i <- getInput
       _debug \_->
@@ -641,11 +643,11 @@ clumpP options skippable isSkipping l c = do
 
       let
         xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss
-        vs = xss' <#> \x -> do
-          let arg = getIndexedElem (unRequired x)
+        args = getIndexedElem <<< unRequired <$> xss'
+        vs   = args <#> \arg -> do
           maybe
-            (Left x)
-            (Right <<< Tuple x)
+            (Left arg)
+            (Right <<< Tuple arg)
             do
               v <- unRichValue <$> getFallbackValue options env arg
               pure $ RichValue v {
@@ -653,39 +655,42 @@ clumpP options skippable isSkipping l c = do
                     then ArrayValue $ Value.intoArray v.value
                     else v.value
               }
-        missing = filter (\x ->
-          let arg = getIndexedElem (unRequired x)
-           in isRequired x &&
-              -- This may look very counter-intuitive, yet getting fallback
-              -- values for entire groups is not possible and not logical.
-              -- If a group that is allowed to be omitted fails, there won't
-              -- be any values to fall back onto.
-              not (D.isGroup arg && D.isOptional arg)
-        ) (mlefts vs)
+        missing = mlefts vs `flip filter` (\arg ->
+          isRequired x &&
+          -- This may look very counter-intuitive, yet getting fallback
+          -- values for entire groups is not possible and not logical.
+          -- If a group that is allowed to be omitted fails, there won't
+          -- be any values to fall back onto.
+          not (D.isGroup arg && D.isOptional arg)
+        )
         fallbacks = mrights vs
 
       _debug \_->
         "draw: missing:"
-          <> (intercalate " " $ prettyPrintRequiredIndexedArg <$> missing)
+          <> (intercalate " " $ D.prettyPrintArg <$> missing)
+
 
       if isSkipping && length missing > 0
         then expected missing i
         else
           if skippable || null i
-            then do
+            then
               if not isSkipping
-                then runFn5 exhaustP options true true l
-                    (getIndexedElem <<< unRequired <$> xss')
-                else pure (((getIndexedElem <<< unRequired) `lmap` _) <$> fallbacks)
-            else expected xss' i
+                then runFn5 exhaustP options true true l args
+                else pure fallbacks
+            else expected args i
 
       where
       expected xs i =
-        let x = getIndexedElem (unRequired (unsafePartial (LU.head xs)))
-            msg = maybe'
-                    (\_ -> "Expected " <> D.prettyPrintArgNaked x <> butGot i)
-                    (\(P.ParseError msg _ _) -> msg)
-                    (x `Map.lookup` errs)
+        let
+          x = unsafePartial (LU.head xs)
+          msg = maybe'
+            (\_ -> case i of
+              _:_ -> "Expected " <> D.prettyPrintArgNaked x <> butGot i
+              Nil -> "Missing "  <> D.prettyPrintArgNaked x
+            )
+            (\(P.ParseError msg _ _) -> msg)
+            (x `Map.lookup` errs)
         in P.fail msg
 
     draw _ _ _ = pure Nil
@@ -697,7 +702,7 @@ clumpP options skippable isSkipping l c = do
   indentation = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
   butGot ((PositionedToken { source }):_) = ", but got " <> source
-  butGot Nil                              = ""
+  butGot _ = ""
 
 -- Parse a single argument from argv.
 -- Represented as `FnX` to take advantage of inlining at compile time.

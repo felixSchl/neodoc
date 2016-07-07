@@ -180,7 +180,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         options:
           -i, --input FILE
         """
-        [ fail Nothing [] "Expected (-i|--input=FILE)"
+        [ fail Nothing [] "Missing (-i|--input=FILE)"
         , pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -195,10 +195,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
         """
         [ fail Nothing []
-          $ "Expected (-i|--input=FILE)"
+          $ "Missing (-i|--input=FILE)"
 
         , fail Nothing [ "-i", "bar" ]
-          $ "Expected (-o|--output=FILE)"
+          $ "Missing (-o|--output=FILE)"
 
         , pass Nothing
             [ "-i", "bar", "-o", "bar" ]
@@ -225,10 +225,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -r, --redirect FILE [env: QUX]
         """
         [ fail Nothing []
-          $ "Expected (-i|--input=FILE)"
+          $ "Missing (-i|--input=FILE)"
 
         , fail Nothing [ "-i", "bar", "-r", "bar" ]
-            "Expected (-o|--output=FILE)"
+            "Missing (-o|--output=FILE)"
 
         , pass Nothing
             [ "-i", "bar", "-r", "bar", "-o", "bar" ]
@@ -268,7 +268,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE
         """
-        [ fail Nothing [] "Expected (-i|--input=FILE)"
+        [ fail Nothing [] "Missing (-i|--input=FILE)"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail Nothing [ "-i", "bar" ] "Expected <env>"
         , pass Nothing
@@ -435,10 +435,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
         , fail Nothing
             [ "foo" ]
-            "Expected (-f|--foo=FOZ)"
+            "Missing (-f|--foo=FOZ)"
         , fail Nothing
             [ "foo", "-o", "-i", "-bax" ]
-            "Expected (-f|--foo=FOZ)"
+            "Missing (-f|--foo=FOZ)"
         ]
 
     , test
