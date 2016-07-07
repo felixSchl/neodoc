@@ -225,7 +225,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -r, --redirect FILE [env: QUX]
         """
         [ fail Nothing []
-          $ "Expected ((-i|--input=FILE) (-r|--redirect=FILE))"
+          $ "Expected (-i|--input=FILE)"
 
         , fail Nothing [ "-i", "bar", "-r", "bar" ]
             "Expected (-o|--output=FILE)"
@@ -435,10 +435,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
         , fail Nothing
             [ "foo" ]
-            "Expected (-f|--foo=FOZ)..."
+            "Expected (-f|--foo=FOZ)"
         , fail Nothing
             [ "foo", "-o", "-i", "-bax" ]
-            "Expected (-f|--foo=FOZ)..."
+            "Expected (-f|--foo=FOZ)"
         ]
 
     , test

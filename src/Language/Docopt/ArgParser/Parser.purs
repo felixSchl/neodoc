@@ -44,6 +44,8 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Control.Monad.Transformerless.RWS (RWS(), evalRWS, ask)
 import Control.Monad.Transformerless.RWS (modify, get) as State
 import Data.StrMap (StrMap())
+import Data.Map (Map())
+import Data.Map (empty, alter, lookup) as Map
 import Control.Monad.Trans (lift)
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), Result(..), fail,
@@ -505,6 +507,15 @@ getIndexedElem (Indexed _ x) = x
 getIndex :: forall a. Indexed a -> Int
 getIndex (Indexed ix _) = ix
 
+-- Note: Unfortunate re-implementation of the 'Alt' instance for 'ParserT'.
+catchParseError :: forall a. Parser a -> (P.ParseError -> Parser a) -> Parser a
+catchParseError p1 f2 = P.ParserT \st ->
+  P.unParserT p1 st >>= \(o@(P.Result input result consumed pos)) ->
+    case result of
+      Left (P.ParseError _ _ true) -> pure o
+      Left e | not consumed        -> P.unParserT (f2 e) st
+      otherwise                    -> pure o
+
 -- Parse a clump of arguments.
 clumpP
   :: forall r
@@ -530,20 +541,21 @@ clumpP options skippable isSkipping l c = do
 
   go skippable isSkipping l (Free  xs) =
     draw
-      (xs `flip mapWithIndex` \x ix ->
-        Required (Indexed ix x))
+      (xs `flip mapWithIndex` \x ix -> Required (Indexed ix x))
+      Map.empty
       (length xs)
     where
 
     draw
       :: List (Required (Indexed D.Argument))
+      -> Map D.Argument P.ParseError
       -> Int
       -> Parser (List ValueMapping)
 
     -- Recursively apply each argument parser.
     -- Should an argument be repeatable, try parsing any adjacent matches
     -- repeatedly (NOTE: this could interfere with `argP`'s repetition handling?)
-    draw xss@(x:xs) n | n >= 0 = (do
+    draw xss@(x:xs) errs n | n >= 0 = (do
 
       i <- getInput
       _debug \_->
@@ -589,8 +601,8 @@ clumpP options skippable isSkipping l c = do
                 "draw: repeating as optional: "
                   <> D.prettyPrintArg arg
               -- Make successive matches of this repeated group optional.
-              draw (xs <> pure (toOptional x)) (length xss)
-            else draw xs (length xs)
+              draw (xs <> pure (toOptional x)) errs (length xss)
+            else draw xs errs (length xs)
 
       _debug \_->
         "draw: matched (2): " <> (intercalate ", " $
@@ -599,20 +611,22 @@ clumpP options skippable isSkipping l c = do
         )
 
       pure (vs <> vss)
-    ) <|> (defer \_ -> do
-      if (length xs == 0)
-        then draw (xs <> singleton x) (-1)
-        else do
-          _debug \_->
-              "draw: failure"
-            <> ", requeueing: "  <> prettyPrintRequiredIndexedArg x
-          draw (xs <> singleton x) (n - 1)
+    ) `catchParseError` (\e ->
+      let arg   = getIndexedElem (unRequired x)
+          errs' = Map.alter (const (Just e)) arg errs
+      in if (length xs == 0)
+          then draw (xs <> singleton x) errs' (-1)
+          else do
+            _debug \_->
+                "draw: failure"
+              <> ", requeueing: "  <> prettyPrintRequiredIndexedArg x
+            draw (xs <> singleton x) errs' (n - 1)
     )
 
     -- All options have been matched (or have failed to be matched) at least
     -- once by now. See where we're at - is there any required option that was
     -- not matched at all?
-    draw xss n | (length xss > 0) && (n < 0) = do
+    draw xss errs n | (length xss > 0) && (n < 0) = do
 
       i <- getInput
       _debug \_->
@@ -665,14 +679,16 @@ clumpP options skippable isSkipping l c = do
                 else pure (((getIndexedElem <<< unRequired) `lmap` _) <$> fallbacks)
             else expected xss' i
 
-    draw _ _ = pure Nil
+      where
+      expected xs i =
+        let x = getIndexedElem (unRequired (unsafePartial (LU.head xs)))
+            msg = maybe'
+                    (\_ -> "Expected " <> D.prettyPrintArgNaked x <> butGot i)
+                    (\(P.ParseError msg _ _) -> msg)
+                    (x `Map.lookup` errs)
+        in P.fail msg
 
-  expected xs i = P.fail $
-    "Expected "
-      <> (D.prettyPrintArgNaked
-          (getIndexedElem
-            (unRequired (unsafePartial (LU.head xs)))))
-      <> butGot i
+    draw _ _ _ = pure Nil
 
   _debug s = if debug
                 then traceA $ indentation <> (s unit)
@@ -745,7 +761,7 @@ argP options skippable isSkipping l g@(D.Group grp) = do
                 skippable
                 isSkipping
                 l
-                (D.Group grp {  optional = true })
+                (D.Group grp { optional = true })
       if (length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
         then loop $ acc <> vs
         else pure acc
@@ -779,7 +795,7 @@ argP options _ _ _ x = getInput >>= \i -> (
               else pure o
           otherwise -> pure o
     <* modifyDepth (_ + 1)
-  ) <|> P.fail ("Expected " <> D.prettyPrintArg x <> butGot i)
+  ) <|> P.fail ("Expected " <> D.prettyPrintArgNaked x <> butGot i)
 
   where
   go :: Partial => _ _
