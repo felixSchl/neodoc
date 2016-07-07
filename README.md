@@ -528,15 +528,19 @@ Here, `--foo` won't be expanded again and hence remain required.
   an option that can be provided either with or without an argument.
 * **Alias matches.** If `--verbose` yields a value, so will `-v` <sub>(given
   that's the assigned alias)</sub>.
-* **Flags are optional,** always. There's no reason to force the user to
-  explicitly pass an option that takes no argument. The absence of the flag
-  speaks - the flag will be set to `false`. This is also the case for flags
-  inside required groups. E.g.: The group `(-a -b)` will match inputs `-a -b`,
-  `-ab`, `-ba`, `-b -a`, `-b`, `-a` and the empty input.
+* **Flags are optional by default**. There's arguably no reason to force the
+  user to explicitly pass an option that takes no argument as the absence of the
+  flag speaks &mdash; the key will be omitted from the output. This is also the
+  case for flags inside required groups. E.g.: The group `(-a -b)` will match
+  inputs `-a -b`, `-ab`, `-ba`, `-b -a`, `-b`, `-a` and the empty input. To
+  disable this behaviour, enable `options.requireFlags` (see `neodoc.run`).\
+  Please note that the default behaviour may change in a future version of
+  neodoc &mdash; refer to #61.
 * **All arguments in a group are always required**. This is regardless of
-  whether or not the group itself is required or not - once you start matching
-  into the group, elements in the group become required for the match to
-  succeed. Consider:
+  whether or not the group itself is required - once you start matching into the
+  group, all elements that are indicated as required have to be matched, either
+  by value or via fallbacks.\
+  For example:
   ```sh
   Usage: prog [<name> <type>]
   ```
@@ -546,14 +550,13 @@ Here, `--foo` won't be expanded again and hence remain required.
   ```sh
   Usage: prog [[<name>] [<type>]]
   ```
-  **note:** this rule excludes flags/switches and options that have default
-  values (or other fallback values).
+  Also refer to issue #44 which will introduce a slight change in behaviour once
+  completed.
 * **No abbreviations:**
   `--ver` does not match `--verbose`.
   <sub>[(mis-feature in the original implementation)](https://github.com/docopt/docopt/issues/104)</sub>
 * **There is no `null`** in the resulting value map. `null` simply means not
-  matched - so the key is omitted from the resulting value map. <sub>(this is
-  still under consideration)</sub>
+  matched - so the key is omitted from the resulting value map.
 * **Smart-options**. Options can be inferred from groups that "look like"
   options: `Usage: foo [-f FILE]` would then expand to `Usage: foo [-f=FILE]`
 * **Environment variables**. Options can fall back to environment variables,
