@@ -63,7 +63,7 @@ compatSpec tests =
                 Left e ->
                   either
                     (\es ->
-                      if es == "user-error"
+                      if es == "user-error" || es == "spec-error"
                         then pure unit
                         else if e == es
                           then pure unit
@@ -90,7 +90,8 @@ compatSpec tests =
 
   where
     prettyPrintOut :: Either String (List (Tuple String D.Value)) -> String
-    prettyPrintOut (Left "user-error") = "fail"
+    prettyPrintOut (Left "user-error") = "fail at parsing argv"
+    prettyPrintOut (Left "spec-error") = "fail at parsing spec"
     prettyPrintOut (Left err) = "fail with: \"" <> err <> "\""
     prettyPrintOut (Right xs)
       = intercalate "\n" $ xs <#> \(Tuple k v) -> k <> " => " <> show v

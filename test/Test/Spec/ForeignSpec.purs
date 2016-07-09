@@ -1,6 +1,7 @@
 module Test.Spec.ForeignSpec (foreignSpec) where
 
 import Prelude
+import Debug.Trace
 import Data.Foreign (toForeign)
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
@@ -10,6 +11,7 @@ import Data.StrMap as StrMap
 import Data.Function.Uncurried
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Either (Either(..), either)
+import Data.Foldable (any)
 import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
 import Data.Foldable (intercalate, for_)
 import Text.Wrap (dedent)
@@ -19,6 +21,7 @@ import Test.Spec (Spec(), describe, it)
 import Data.String as String
 import Test.Support (vliftEff, runEitherEff)
 import Partial.Unsafe (unsafePartial)
+import Unsafe.Coerce (unsafeCoerce)
 import Control.Apply ((*>), (<*))
 import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
 import Data.Array as A
@@ -43,11 +46,14 @@ instance eqDocoptWrapper :: Eq DocoptWrapper where
 foreignSpec :: forall e. List Test -> Spec (CompatEff e) Unit
 foreignSpec tests = describe "Crossing JS/purescript" do
   for_ tests \(Test { doc, kases }) -> do
-    it doc do
-      case kases of
-        xs | A.length xs == 0 -> pure unit
-        xs -> do
-          Kase _ <- pure (unsafePartial (AU.head xs))
+    if any (\(Kase k) -> case k.out of
+      Left e | e == "spec-error" -> true -- skip
+      Left  _ -> false
+      Right _ -> false
+    ) kases
+      then pure unit
+      else
+        it doc do
 
           -- XXX: Manually break the execution context in order to avoid to
           --      avoid stack overflows by executing a large amount of Aff
@@ -74,6 +80,8 @@ foreignSpec tests = describe "Crossing JS/purescript" do
                 DocoptFFI.parse helpText (toForeign {
                   smartOptions: true
                 })
+
+            traceA (unsafeCoerce input)
 
             let result = DocoptFFI.readSpec (toForeign input)
             case result of
