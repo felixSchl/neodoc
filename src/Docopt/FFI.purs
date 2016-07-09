@@ -12,6 +12,8 @@ module Docopt.FFI (
 , parse
 , undefined
 , readAsString
+, readSpec
+, specToForeign
 ) where
 
 import Prelude
@@ -164,19 +166,27 @@ parse = mkFn2 go
                            F.readProp "smartOptions" fOpts)
             }
 
-      { specification, shortHelp } <- Docopt.parse helpText opts
+      docopt <- Docopt.parse helpText opts
+      pure $ specToForeign docopt
 
-      let
-        jsSpecification = toUnfoldable do
-          specification <#> \branches -> do
-            toUnfoldable do
-              convBranch <$> branches
+specToForeign
+  :: Docopt
+  -> { specification :: Array (Array (Array Foreign))
+     , shortHelp     :: String
+     }
+specToForeign { shortHelp, specification } =
+    let
+      jsSpecification = toUnfoldable do
+        specification <#> \branches -> do
+          toUnfoldable do
+            convBranch <$> branches
 
-      pure {
-        shortHelp:     shortHelp
-      , specification: jsSpecification
-      }
+    in {
+      shortHelp:     shortHelp
+    , specification: jsSpecification
+    }
 
+    where
     convBranch :: Branch -> Array Foreign
     convBranch args = toUnfoldable $ convArg <$> args
 

@@ -1,4 +1,4 @@
-module Test.Spec.CompatSpec (genCompatSpec) where
+module Test.Spec.CompatSpec (compatSpec) where
 
 import Prelude
 import Control.Monad.Eff (Eff())
@@ -25,16 +25,11 @@ import Language.Docopt (runDocopt)
 import Language.Docopt.Value (Value(..), prettyPrintValue) as D
 import Test.Support.CompatParser
 
--- Somehow, purescript needs this:
-_liftEff :: forall e a. Eff e a -> Aff e a
-_liftEff = liftEff
-
 type CompatEff e = (fs :: FS, err :: EXCEPTION | e)
 
-genCompatSpec :: forall e. Aff (CompatEff e) (Unit -> Spec (CompatEff e) Unit)
-genCompatSpec = do
-  tests <- _liftEff $ readTests "testcases.docopt"
-  pure $ \_ -> describe "Docopt compatibility" do
+compatSpec :: forall e. List Test -> Spec (CompatEff e) Unit
+compatSpec tests =
+  describe "Docopt compatibility" do
     for_ tests \(Test { doc, kases }) -> do
       describe (doc <> "\n") do
         for_ kases \(Kase { options, out }) -> do
