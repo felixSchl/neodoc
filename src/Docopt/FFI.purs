@@ -212,7 +212,7 @@ specToForeign { shortHelp, specification } =
       , repeatable: x.repeatable
       , arg:        maybe undefined (\a -> {
                       name:     a.name
-                    , default:  maybe undefined F.toForeign a.default
+                    , default:  maybe undefined rawValue a.default
                     , optional: a.optional
                     }) x.arg
       }
