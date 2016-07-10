@@ -17,7 +17,7 @@ module Docopt (
 import Prelude
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
-import Data.Either (either)
+import Data.Either (Either(..), either)
 import Control.Monad.Eff (Eff())
 import Data.Maybe (Maybe(..), maybe)
 import Node.FS (FS())
@@ -32,7 +32,7 @@ import Data.Array as A
 import Data.Bifunctor (lmap)
 import Data.String.Yarn (lines, unlines)
 
-import Language.Docopt (Specification(), parseDocopt, evalDocopt)
+import Language.Docopt (Docopt, Specification(), parseDocopt, evalDocopt)
 import Language.Docopt.Value (Value())
 import Language.Docopt as D
 import Language.Docopt.Env (Env())
@@ -82,11 +82,10 @@ defaultOptions = {
 parse :: forall e r
        . String
       -> ParseOptionsObj r
-      -> Eff (DocoptEff e) Specification
+      -> Eff (DocoptEff e) Docopt
 parse helpText opts = do
   either (throwException <<< error) pure do
-    { specification } <- parseDocopt helpText opts
-    pure specification
+    parseDocopt helpText opts
 
 -- |
 -- | Run docopt on the given help text.
@@ -95,16 +94,18 @@ parse helpText opts = do
 -- | descriptive help message.
 -- |
 run :: forall e r
-     . String
+     . Either Docopt String
     -> Options r
     -> Eff (DocoptEff e) (StrMap Value)
-run helpText opts = do
+run input opts = do
   argv <- maybe (A.drop 2 <$> Process.argv) (pure <<< id) opts.argv
   env  <- maybe Process.getEnv              (pure <<< id) opts.env
   either onError pure do
-          { specification, usage } <- parseDocopt helpText opts
-          lmap ((help usage) <> _) do
-            evalDocopt specification env argv opts
+    { specification, shortHelp } <- case input of
+      (Left spec)  -> pure spec
+      (Right help) -> parseDocopt help opts
+    lmap ((help shortHelp) <> _) do
+      evalDocopt specification env argv opts
 
   where
     onError e = do
@@ -115,5 +116,5 @@ run helpText opts = do
         else
           throwException $ error $ e
 
-    help usage
-      = dedent $ (unlines $ ("  " <> _) <$> lines (dedent usage)) <> "\n"
+    help shortHelp
+      = dedent $ (unlines $ ("  " <> _) <$> lines (dedent shortHelp)) <> "\n"

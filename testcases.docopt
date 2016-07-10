@@ -1177,15 +1177,15 @@ r"""
 Usage: prog [options]
 
 Options: -f=<n>  [default: foo , bar qux, "foo bar", 400, true,
-                           false, 10.0, TRUE, FALSE, True False,
-                           -100, -10.0
+                           false, 10.1, TRUE, FALSE, True False,
+                           -100, -10.1
                            "True" "True False 10"]
 """
 
 $ prog
-{ "-f": ["foo", "bar", "qux", "foo bar", 400, true, false, 10.0,
+{ "-f": ["foo", "bar", "qux", "foo bar", 400, true, false, 10.1,
          true, false, true, false,
-         -100, -10.0,
+         -100, -10.1,
          "True", "True False 10"] }
 
 #
@@ -1777,7 +1777,7 @@ Options: --file <y>
 """
 
 $ prog
-"user-error"
+"spec-error"
 
 r"""
 Usage: prog -f <x> <a>
@@ -1785,7 +1785,7 @@ Options: -f <y>
 """
 
 $ prog
-"user-error"
+"spec-error"
 
 r"""
 Usage: prog -f <x> <a>
@@ -1793,7 +1793,7 @@ Options: -f, --file <y>
 """
 
 $ prog
-"user-error"
+"spec-error"
 
 r"""
 Usage: prog -f <x> <a>
@@ -1801,7 +1801,7 @@ Options: -f <y>, --file <y>
 """
 
 $ prog
-"user-error"
+"spec-error"
 
 r"""
 Usage: prog -f <x> <a>
@@ -1809,7 +1809,7 @@ Options: -f <x>, --file <y>
 """
 
 $ prog
-"user-error"
+"spec-error"
 
 # This should fail because the `--input` in the usage section does not mention
 # the option-argument specified in the options section.
@@ -1820,7 +1820,7 @@ Options: --input <y>
 """
 
 $ prog
-"user-error"
+"spec-error"
 
 # This should fail because the `--input` in the usage section does not mention
 # the option-argument specified in the options section.
@@ -1831,7 +1831,7 @@ Options: -f <y>
 """
 
 $ prog
-"user-error"
+"spec-error"
 
 # This should fail -f cannot take an argument, since it's stacked.
 
@@ -1841,7 +1841,7 @@ Options: -f <y>
 """
 
 $ prog
-"user-error"
+"spec-error"
 
 #
 # Ensure explicit args don't consume adjacent args
@@ -2609,7 +2609,7 @@ usage: git remote [-v | --verbose]
 """
 
 $ prog
-"user-error"
+"spec-error"
 
 #
 # Check proper option subsumption takes place

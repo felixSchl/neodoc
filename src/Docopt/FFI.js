@@ -4,7 +4,11 @@
 // module Docopt.FFI
 
 exports.isTruthy = function (value) {
-  return (value == true);
+  return !!value;
 };
 
 exports.undefined = undefined;
+
+exports.toString = function(value) {
+  return value.toString();
+}

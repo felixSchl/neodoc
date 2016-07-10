@@ -28,7 +28,7 @@ module Language.Docopt.Argument (
 
 import Prelude
 import Data.Maybe (Maybe(..), maybe)
-import Data.List (List())
+import Data.List (List(..), (:))
 import Data.Foldable (intercalate, all)
 import Data.Function (on)
 import Data.String.Ext ((^=))
