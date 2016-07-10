@@ -1177,15 +1177,15 @@ r"""
 Usage: prog [options]
 
 Options: -f=<n>  [default: foo , bar qux, "foo bar", 400, true,
-                           false, 10.0, TRUE, FALSE, True False,
-                           -100, -10.0
+                           false, 10.1, TRUE, FALSE, True False,
+                           -100, -10.1
                            "True" "True False 10"]
 """
 
 $ prog
-{ "-f": ["foo", "bar", "qux", "foo bar", 400, true, false, 10.0,
+{ "-f": ["foo", "bar", "qux", "foo bar", 400, true, false, 10.1,
          true, false, true, false,
-         -100, -10.0,
+         -100, -10.1,
          "True", "True False 10"] }
 
 #

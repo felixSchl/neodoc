@@ -31,6 +31,7 @@ import Node.FS (FS)
 import Docopt as Docopt
 import Docopt.FFI as DocoptFFI
 import Language.Docopt (runDocopt, Docopt)
+import Language.Docopt.Specification (prettyPrintSpec)
 import Language.Docopt.Value (Value(..), prettyPrintValue) as D
 import Test.Support.CompatParser
 
@@ -66,7 +67,7 @@ foreignSpec tests = describe "Crossing JS/purescript" do
           vliftEff do
             let helpText = dedent doc
             -- parse the spec as a purescript value
-            docopt <- unsafeInterleaveEff do
+            expected <- unsafeInterleaveEff do
               Docopt.parse helpText {
                 smartOptions: true
               }
@@ -81,12 +82,18 @@ foreignSpec tests = describe "Crossing JS/purescript" do
                   smartOptions: true
                 })
 
-            traceA (unsafeCoerce input)
-
             let result = DocoptFFI.readSpec (toForeign input)
+
             case result of
               Left e -> throwException $ error $ show e
               Right output -> do
-                if DocoptWrapper output /= DocoptWrapper docopt
-                  then throwException $ error $ "no dice"
+                if DocoptWrapper output /= DocoptWrapper expected
+                  -- XXX: Would be cool to get some sort of diffing in here.
+                  then throwException $ error $
+                    "input and output mismatches:\n"
+                      <> "Expected:\n"
+                      <> prettyPrintSpec expected.specification
+                      <> "\n"
+                      <> "Received:\n"
+                      <> prettyPrintSpec output.specification
                   else pure unit

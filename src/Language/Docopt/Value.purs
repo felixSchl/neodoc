@@ -134,7 +134,6 @@ parse s split = P.runParser s $ if split then values else value <* P.eof
       , pure $ IntValue $ si * (unsafePartial $ fromJust $ Int.fromString xs)
       ]
 
-
     bool = true' <|> false'
       where
         true' = do
