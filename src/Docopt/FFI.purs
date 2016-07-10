@@ -281,12 +281,7 @@ readSpec input = do
       Nothing -> pure Nothing
       Just x  -> Just <$> do
           arg <$> (ifHasProp' x "name" "<ARG>" readAsString)
-              <*> (ifHasProp  x "default" \x ->
-                      (BoolValue   <$> F.readBoolean x) <|>
-                      (IntValue    <$> F.readInt     x) <|>
-                      (FloatValue  <$> F.readNumber  x) <|>
-                      (StringValue <$> F.readString  x)
-                  )
+              <*> (ifHasProp  x "default" readValue)
               <*> (isTruthy <$> F.readProp "optional" x)
 
   readFlag :: Foreign -> F Char
@@ -299,6 +294,14 @@ readSpec input = do
   po  x y       = Positional { name: x, repeatable: y }
   opt a b c d e = Option     { flag: a, name: b, repeatable: c, env: d, arg: e }
   arg x y z     = { name: x, default: y, optional: z }
+
+readValue :: Foreign -> F Value
+readValue x =
+  (BoolValue   <$> F.readBoolean x) <|>
+  (IntValue    <$> F.readInt     x) <|>
+  (FloatValue  <$> F.readNumber  x) <|>
+  (StringValue <$> F.readString  x) <|>
+  (ArrayValue  <$> (F.readArray x >>= \vs -> for vs readValue))
 
 optional :: forall a. F a -> F (Maybe a)
 optional x = (Just <$> x) <|> pure Nothing
