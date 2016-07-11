@@ -9,7 +9,7 @@ import Text.Parsing.Parser.Pos (initialPos) as P
 import Data.List (List(Nil, Cons), fromFoldable, catMaybes)
 import Data.String.Regex as Regex
 import Data.String.Regex (regex, Regex())
-import Data.String (length) as String
+import Data.String (length, trim) as String
 import Data.String.Yarn (replicate) as String
 import Data.Maybe (maybe)
 import Data.Either (Either(Left), fromRight)
@@ -44,7 +44,7 @@ scan text = do
   pure {
     usage:         fixSection u
   , options:       fixSection <$> sections "options"
-  , originalUsage: u
+  , originalUsage: String.trim u
   }
 
   where
