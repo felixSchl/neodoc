@@ -8,14 +8,7 @@ import Data.List (List())
 import Data.Foldable (intercalate)
 
 import Language.Docopt.SpecParser.Usage.Argument as U
-data Usage = Usage String (List U.Branch)
-
-instance showUsage :: Show Usage where
-  show (Usage n xs) = "Usage " <> show n <> " " <> show xs
-
-instance eqUsage :: Eq Usage where
-  eq (Usage n xs) (Usage n' xs') = (n == n') && (xs == xs')
+type Usage = List U.Branch
 
 prettyPrintUsage :: Usage -> String
-prettyPrintUsage (Usage name bs) =
-  name <> " " <> intercalate " | " (U.prettyPrintBranch <$> bs)
+prettyPrintUsage bs = intercalate " | " (U.prettyPrintBranch <$> bs)

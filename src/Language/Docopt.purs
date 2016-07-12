@@ -40,7 +40,8 @@ import Language.Docopt.SpecParser.Usage as Usage
 import Language.Docopt.SpecParser.Desc  as Desc
 
 type Docopt = {
-  shortHelp     :: String
+  program       :: String
+, shortHelp     :: String
 , specification :: Specification
 }
 
@@ -75,14 +76,15 @@ preparseDocopt
   :: forall r
    .  String           -- ^ The docopt text
   -> ParseOptionsObj r -- ^ Parse options
-  -> Either String { usages       :: List Usage.Usage
+  -> Either String { program      :: String
+                   , usages       :: List Usage.Usage
                    , descriptions :: List Desc.Desc
                    }
 preparseDocopt docopt options = do
   doc <- toScanErr       $ Scanner.scan $ dedent docopt
-  us  <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
+  u   <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
-  pure { descriptions: ds, usages: us }
+  pure { descriptions: ds, usages: u.usages, program: u.program }
 
 -- |
 -- | Parse the docopt text and produce a parser that can be applied to user
@@ -95,11 +97,12 @@ parseDocopt
   -> Either String Docopt
 parseDocopt helpText options = do
   doc <- toScanErr       $ Scanner.scan $ dedent helpText
-  us  <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
+  u   <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
   ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
-  prg <- toSolveErr      $ Solver.solve us ds
+  prg <- toSolveErr      $ Solver.solve u.usages ds
   pure $ { specification: prg
          , shortHelp:     doc.originalUsage
+         , program:       u.program
          }
 
 -- |

@@ -48,14 +48,18 @@ import Text.Parsing.Parser.Pos (Position(Position)) as P
 -- |      are IGNORED.
 -- |    * A token at the identation mark starts a new usage pattern parse.
 -- |
-usageParser :: Boolean -- ^ Enable "smart-options" parsing
-            -> L.TokenParser (List Usage)
+usageParser
+  :: Boolean -- ^ Enable "smart-options" parsing
+  -> L.TokenParser {
+      program :: String
+    , usages  :: List Usage
+    }
 usageParser smartOpts = do
 
   -- Calculate and mark the original program indentation.
   P.Position _ startCol <- L.nextTokPos <?> "Program name"
-  name <- program
-  markLine do
+  name   <- program
+  usages <- markLine do
     markIndent' startCol $ do
       Cons
       <$> (usageLine name)
@@ -65,12 +69,16 @@ usageParser smartOpts = do
               L.colon
             program
             usageLine name
-  <* (L.eof <?> "End of usage section")
+  L.eof <?> "End of usage section"
+  pure {
+    program: name
+  , usages:  usages
+  }
 
   where
 
     usageLine :: String -> L.TokenParser Usage
-    usageLine name = Usage name <$> do
+    usageLine name = do
       xs <- "Option, Positional, Command, Group or Reference elements" <??> do
                   (many $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
       eoa <- P.choice [
@@ -242,12 +250,20 @@ usageParser smartOpts = do
     program :: L.TokenParser String
     program = "Program name" <??> L.name
 
-parse :: Boolean                  -- ^ Enable "smart-options"
-      -> (List L.PositionedToken) -- ^ The token stream
-      -> Either P.ParseError (List Usage)
+parse
+  :: Boolean                  -- ^ Enable "smart-options"
+  -> (List L.PositionedToken) -- ^ The token stream
+  -> Either P.ParseError {
+      program :: String
+    , usages  :: List Usage
+    }
 parse smartOpts = flip L.runTokenParser (usageParser smartOpts)
 
-run :: String  -- ^ The usage section text
-    -> Boolean -- ^ Enable "smart-options"
-    -> Either P.ParseError (List Usage)
+run
+  :: String  -- ^ The usage section text
+  -> Boolean -- ^ Enable "smart-options"
+  -> Either P.ParseError {
+      program :: String
+    , usages  :: List Usage
+    }
 run x smartOpts = parse smartOpts =<< L.lexUsage x

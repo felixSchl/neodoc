@@ -579,7 +579,7 @@ solveBranch as ds = go as
             , default:  Nothing }
 
 solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
-solveUsage (U.Usage _ bs) ds = traverse (flip solveBranch ds) bs
+solveUsage bs ds = traverse (flip solveBranch ds) bs
 
 solve :: List U.Usage
       -> List Desc
