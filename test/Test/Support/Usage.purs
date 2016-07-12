@@ -15,8 +15,8 @@ import Language.Docopt.SpecParser.Base (debug)
 import Text.Wrap (dedent)
 
 -- short hand to create a usage
-usage :: String -> Array (Array U.Argument) -> U.Usage
-usage n xss = U.Usage n $ fromFoldable $ fromFoldable <$> xss
+usage :: Array (Array U.Argument) -> U.Usage
+usage xss = fromFoldable $ fromFoldable <$> xss
 
 -- short hand to create a required group node
 gr :: Array (Array U.Argument) -> Boolean -> U.Argument

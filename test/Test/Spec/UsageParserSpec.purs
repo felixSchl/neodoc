@@ -77,13 +77,13 @@ usageParserSpec = \_ ->
         , pass "--barFOO"      $ lopt_ "barFOO"
 
         , fail "--bar[ = foo]"
-        , pass "--bar[=<foo>]"   $ lopt  "bar" (arg "foo")
-        , pass "--bar[=FOO]"     $ lopt  "bar" (arg "FOO")
+        , pass "--bar[=<foo>]"  $ lopt  "bar" (arg "foo")
+        , pass "--bar[=FOO]"    $ lopt  "bar" (arg "FOO")
         , fail "--bar[ = FOO]"
-        , pass "--bar[=fOo]"     $ lopt  "bar" (arg "fOo")
+        , pass "--bar[=fOo]"    $ lopt  "bar" (arg "fOo")
         , fail "--bar[ = fOo]"
         , fail "--bar[ = <foo>]"
-        , pass "--bar[FOO]"      $ lopt  "bar" (arg "FOO")
+        , pass "--bar[FOO]"     $ lopt  "bar" (arg "FOO")
 
         -- disallow space
         , fail "--bar [ = foo]"
@@ -113,38 +113,38 @@ usageParserSpec = \_ ->
     -- Each entry is run for both singular and repeated version.
     describe "stacked options" do
       runSingleArgumentTests
-        [ pass "-b"          $ sopt_ 'b' []
-        , pass "-?"          $ sopt_ '?' [] -- special chars
-        , pass "-bFOO"       $ sopt_ 'b' ['F', 'O', 'O']
-        , pass "-bFoo"       $ sopt_ 'b' ['F', 'o', 'o']
-        , pass "-b<foo>"     $ sopt  'b' [] (arg "foo")
-        , pass "-b<foo>"     $ sopt  'b' [] (arg "foo")
-        , pass "-b=foo"      $ sopt  'b' [] (arg "foo")
-        , pass "-b=FOO"      $ sopt  'b' [] (arg "FOO")
-        , pass "-b=<foo>"    $ sopt  'b' [] (arg "foo")
+        [ pass "-b"         $ sopt_ 'b' []
+        , pass "-?"         $ sopt_ '?' [] -- special chars
+        , pass "-bFOO"      $ sopt_ 'b' ['F', 'O', 'O']
+        , pass "-bFoo"      $ sopt_ 'b' ['F', 'o', 'o']
+        , pass "-b<foo>"    $ sopt  'b' [] (arg "foo")
+        , pass "-b<foo>"    $ sopt  'b' [] (arg "foo")
+        , pass "-b=foo"     $ sopt  'b' [] (arg "foo")
+        , pass "-b=FOO"     $ sopt  'b' [] (arg "FOO")
+        , pass "-b=<foo>"   $ sopt  'b' [] (arg "foo")
 
-        , pass "-b[FOO]"     $ sopt  'b' [] (arg "FOO")
-        , pass "-b[Foo]"     $ sopt  'b' [] (arg "Foo")
-        , pass "-b[<foo>]"   $ sopt  'b' [] (arg "foo")
-        , pass "-b[<foo>]"   $ sopt  'b' [] (arg "foo")
-        , pass "-b[=foo]"    $ sopt  'b' [] (arg "foo")
-        , pass "-b[=FOO]"    $ sopt  'b' [] (arg "FOO")
-        , pass "-b[=<foo>]"  $ sopt  'b' [] (arg "foo")
+        , pass "-b[FOO]"    $ sopt  'b' [] (arg "FOO")
+        , pass "-b[Foo]"    $ sopt  'b' [] (arg "Foo")
+        , pass "-b[<foo>]"  $ sopt  'b' [] (arg "foo")
+        , pass "-b[<foo>]"  $ sopt  'b' [] (arg "foo")
+        , pass "-b[=foo]"   $ sopt  'b' [] (arg "foo")
+        , pass "-b[=FOO]"   $ sopt  'b' [] (arg "FOO")
+        , pass "-b[=<foo>]" $ sopt  'b' [] (arg "foo")
 
         -- disallow space
         , fail "-b [=foo]"
         , fail "-b [=FOO]"
         , fail "-b [=<foo>]"
 
-        , pass "-bar"        $ sopt_ 'b' ['a', 'r']
-        , pass "-barFOO"     $ sopt_ 'b' ['a', 'r', 'F', 'O', 'O']
-        , pass "-bar<foo>"   $ sopt  'b' ['a', 'r'] (arg "foo")
-        , pass "-barFoo"     $ sopt_ 'b' ['a', 'r', 'F', 'o', 'o']
-        , pass "-bar=foo"    $ sopt  'b' ['a', 'r'] (arg "foo")
-        , pass "-bar=FOO"    $ sopt  'b' ['a', 'r'] (arg "FOO")
-        , pass "-bar=<foo>"  $ sopt  'b' ['a', 'r'] (arg "foo")
-        , pass "-bAR"        $ sopt_ 'b' ['A', 'R']
-        , pass "-bARfoo"     $ sopt_ 'b' ['A', 'R', 'f', 'o', 'o']
+        , pass "-bar"       $ sopt_ 'b' ['a', 'r']
+        , pass "-barFOO"    $ sopt_ 'b' ['a', 'r', 'F', 'O', 'O']
+        , pass "-bar<foo>"  $ sopt  'b' ['a', 'r'] (arg "foo")
+        , pass "-barFoo"    $ sopt_ 'b' ['a', 'r', 'F', 'o', 'o']
+        , pass "-bar=foo"   $ sopt  'b' ['a', 'r'] (arg "foo")
+        , pass "-bar=FOO"   $ sopt  'b' ['a', 'r'] (arg "FOO")
+        , pass "-bar=<foo>" $ sopt  'b' ['a', 'r'] (arg "foo")
+        , pass "-bAR"       $ sopt_ 'b' ['A', 'R']
+        , pass "-bARfoo"    $ sopt_ 'b' ['A', 'R', 'f', 'o', 'o']
 
         , pass "-bar[FOO]"    $ sopt 'b' ['a', 'r'] (arg_ "FOO")
         , pass "-bar[<foo>]"  $ sopt 'b' ['a', 'r'] (arg_ "foo")
@@ -192,18 +192,18 @@ usageParserSpec = \_ ->
     -- Test the EOA marker "--"
     describe "end-of-args" do
       runTests
-        [ pass "--" $ [[[ U.eoa ]]]
-        , pass "-- FOO..." $ [[[ U.eoa ]]]
-        , pass "-- FOO... BAR" $ [[[ U.eoa ]]]
-        , pass "foo -- FOO... BAR" $ [[[ U.co "foo", U.eoa ]]]
+        [ pass "--"                $p$ [[[ U.eoa ]]]
+        , pass "-- FOO..."         $p$ [[[ U.eoa ]]]
+        , pass "-- FOO... BAR"     $p$ [[[ U.eoa ]]]
+        , pass "foo -- FOO... BAR" $p$ [[[ U.co "foo", U.eoa ]]]
         ]
 
     -- Test the stdin marker "-"
     describe "stdin" do
       runTests
-        [ pass "-" $ [[[ U.stdin ]]]
-        , pass "-|-" $ [[[ U.stdin ], [ U.stdin ]]]
-        , pass "--foo - --bar" $ [[[ U.lopt_ "foo"
+        [ pass "-"             $p$ [[[ U.stdin ]]]
+        , pass "-|-"           $p$ [[[ U.stdin ], [ U.stdin ]]]
+        , pass "--foo - --bar" $p$ [[[ U.lopt_ "foo"
                                    , U.stdin
                                    , U.lopt_ "bar"
                                    ]]]
@@ -212,10 +212,10 @@ usageParserSpec = \_ ->
     -- Test the "[options...]", "[options]", etc. syntax
     describe "stdin" do
       runTests
-        [ pass "[options...]"     $ [[[ U.ref ""    ]]]
-        , pass "[options]"        $ [[[ U.ref ""    ]]]
-        , pass "[foo-options]"    $ [[[ U.ref "foo" ]]]
-        , pass "[foo-options...]" $ [[[ U.ref "foo" ]]]
+        [ pass "[options...]"     $p$ [[[ U.ref ""    ]]]
+        , pass "[options]"        $p$ [[[ U.ref ""    ]]]
+        , pass "[foo-options]"    $p$ [[[ U.ref "foo" ]]]
+        , pass "[foo-options...]" $p$ [[[ U.ref "foo" ]]]
         ]
 
   where
@@ -226,6 +226,8 @@ usageParserSpec = \_ ->
     pass :: forall a. String -> a -> { i :: String, o :: Expected a }
     pass i o = kase i (P o)
 
+    p o = { expectedProgram: "prog", expectedUsages: o }
+
     fail :: forall a. String -> { i :: String, o :: Expected a }
     fail i = kase i F
 
@@ -234,20 +236,19 @@ usageParserSpec = \_ ->
       for_ xs \{ i, o } -> do
         let input = "foo " <> i
         case o of
-          P expected -> do
+          P { expectedProgram, expectedUsages } -> do
             -- deeply convert array to list
             -- (array is used for readability above)
             let
               expected'
-                = (U.Usage "foo" <$> do
-                      (((fromFoldable <$> _)  <$> _) fromFoldable
-                                              <$>    fromFoldable
-                                              <$>    fromFoldable expected))
+                = ((fromFoldable <$> _)  <$> _) fromFoldable
+                                         <$>    fromFoldable
+                                         <$>    fromFoldable expectedUsages
             it (input
                 <> " -> "
                 <> intercalate "\n" (U.prettyPrintUsage <$> expected'))  do
               vliftEff do
-                usages <- runEitherEff do
+                { usages } <- runEitherEff do
                   Lexer.lexUsage input >>= U.parse false
                 flip assertEqual
                   (U.prettyPrintUsage <$> usages)
@@ -257,9 +258,9 @@ usageParserSpec = \_ ->
             vliftEff do
               assertThrows (const true) do
                 runEitherEff do
-                  toks  <- Lexer.lexUsage input
-                  usage <- U.parse false toks
-                  debug usage
+                  toks       <- Lexer.lexUsage input
+                  { usages } <- U.parse false toks
+                  debug usages
 
     runSingleArgumentTests :: _
     runSingleArgumentTests xs =
@@ -275,13 +276,13 @@ usageParserSpec = \_ ->
                 let expected = v isRepeated
                 it (input <> " -> " <> U.prettyPrintArg expected)  do
                   vliftEff do
-                    usage <- runEitherEff do
+                    { usages } <- runEitherEff do
                       Lexer.lexUsage input >>= U.parse false
                                                     -- ^ Disable "smart-options"
 
                     -- There should only be one top-level mutex group
-                    (length usage) `shouldEqual` 1
-                    (U.Usage _ u) <- runMaybeEff $ usage !! 0
+                    (length usages) `shouldEqual` 1
+                    u <- runMaybeEff $ usages !! 0
                     g <- runMaybeEff $ u !! 0
                     let result = take 1 g
 
@@ -289,13 +290,12 @@ usageParserSpec = \_ ->
                     when (result /= (singleton expected)) do
                       throwException $ error $
                         "Unexpected output:\n"
-                          <> (U.prettyPrintUsage $ U.Usage "" (singleton result))
+                          <> (U.prettyPrintUsage $ singleton result)
               otherwise -> do
                 it (input <> " should fail") do
                 vliftEff do
                   assertThrows (const true) do
                     runEitherEff do
                       toks  <- Lexer.lexUsage input
-                      usage <- U.parse false toks
-                                    -- ^ Disable "smart-options"
-                      debug usage
+                      { usages } <- U.parse false toks
+                      debug usages

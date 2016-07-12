@@ -32,7 +32,7 @@ import Data.Array as A
 import Data.Bifunctor (lmap)
 import Data.String.Yarn (lines, unlines)
 
-import Language.Docopt (Docopt, Specification(), parseDocopt, evalDocopt)
+import Language.Docopt (Docopt, parseDocopt, evalDocopt)
 import Language.Docopt.Value (Value())
 import Language.Docopt as D
 import Language.Docopt.Env (Env())
@@ -101,11 +101,11 @@ run input opts = do
   argv <- maybe (A.drop 2 <$> Process.argv) (pure <<< id) opts.argv
   env  <- maybe Process.getEnv              (pure <<< id) opts.env
   either onError pure do
-    { specification, shortHelp } <- case input of
+    { program, specification, shortHelp } <- case input of
       (Left spec)  -> pure spec
       (Right help) -> parseDocopt help opts
-    lmap ((help shortHelp) <> _) do
-      evalDocopt specification env argv opts
+    lmap (_ <> (help shortHelp)) do
+      evalDocopt program specification env argv opts
 
   where
     onError e = do
@@ -117,4 +117,4 @@ run input opts = do
           throwException $ error $ e
 
     help shortHelp
-      = dedent $ (unlines $ ("  " <> _) <$> lines (dedent shortHelp)) <> "\n"
+      = "\n" <> (dedent $ (unlines $ ("  " <> _) <$> lines (dedent shortHelp)))

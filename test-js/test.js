@@ -64,7 +64,8 @@ describe('neodoc', () => {
           -f, --foo=BAR...
         `
       )).to.deep.equal({
-        shortHelp: 'Usage: foo <command> [options]\n'
+        program: 'foo'
+      , shortHelp: 'Usage: foo <command> [options]'
       , specification:
           [
             [
@@ -114,7 +115,8 @@ describe('neodoc', () => {
   describe('specification loading', () => {
     it ('should return the spec in regular JS', () => {
       const spec = {
-        shortHelp: 'Usage: foo <command> [options]\n'
+        program: 'foo'
+      , shortHelp: 'Usage: foo <command> [options]'
       , specification:
           [
             [

@@ -150,6 +150,7 @@ parse :: forall e.
             (Eff (Docopt.DocoptEff e) ({
               specification :: Array (Array (Array Foreign))
             , shortHelp     :: String
+            , program       :: String
             }))
 parse = mkFn2 go
   where
@@ -173,8 +174,9 @@ specToForeign
   :: Docopt
   -> { specification :: Array (Array (Array Foreign))
      , shortHelp     :: String
+     , program       :: String
      }
-specToForeign { shortHelp, specification } =
+specToForeign { shortHelp, specification, program } =
     let
       jsSpecification = toUnfoldable do
         specification <#> \branches -> do
@@ -183,6 +185,7 @@ specToForeign { shortHelp, specification } =
 
     in {
       shortHelp:     shortHelp
+    , program:       program
     , specification: jsSpecification
     }
 
@@ -224,6 +227,7 @@ specToForeign { shortHelp, specification } =
 readSpec :: Foreign -> F Docopt
 readSpec input = do
   shortHelp  <- F.readProp "shortHelp" input
+  program    <- F.readProp "program" input
   jsSpec     <- F.readProp "specification" input
   toplevel   <- F.readArray jsSpec
   spec       <- fromFoldable <$> do
@@ -235,7 +239,8 @@ readSpec input = do
           fromFoldable <$> do
             for args readArg
   pure {
-    shortHelp:     shortHelp
+    program:       program
+  , shortHelp:     shortHelp
   , specification: spec
   }
 
