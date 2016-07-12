@@ -192,30 +192,30 @@ usageParserSpec = \_ ->
     -- Test the EOA marker "--"
     describe "end-of-args" do
       runTests
-        [ pass "--"                $p$ [[[ U.eoa ]]]
-        , pass "-- FOO..."         $p$ [[[ U.eoa ]]]
-        , pass "-- FOO... BAR"     $p$ [[[ U.eoa ]]]
-        , pass "foo -- FOO... BAR" $p$ [[[ U.co "foo", U.eoa ]]]
+        [ pass "--"                [[[ U.eoa ]]]
+        , pass "-- FOO..."         [[[ U.eoa ]]]
+        , pass "-- FOO... BAR"     [[[ U.eoa ]]]
+        , pass "foo -- FOO... BAR" [[[ U.co "foo", U.eoa ]]]
         ]
 
     -- Test the stdin marker "-"
     describe "stdin" do
       runTests
-        [ pass "-"             $p$ [[[ U.stdin ]]]
-        , pass "-|-"           $p$ [[[ U.stdin ], [ U.stdin ]]]
-        , pass "--foo - --bar" $p$ [[[ U.lopt_ "foo"
-                                   , U.stdin
-                                   , U.lopt_ "bar"
-                                   ]]]
+        [ pass "-"             [[[ U.stdin ]]]
+        , pass "-|-"           [[[ U.stdin ], [ U.stdin ]]]
+        , pass "--foo - --bar" [[[ U.lopt_ "foo"
+                                 , U.stdin
+                                 , U.lopt_ "bar"
+                                 ]]]
         ]
 
     -- Test the "[options...]", "[options]", etc. syntax
     describe "stdin" do
       runTests
-        [ pass "[options...]"     $p$ [[[ U.ref ""    ]]]
-        , pass "[options]"        $p$ [[[ U.ref ""    ]]]
-        , pass "[foo-options]"    $p$ [[[ U.ref "foo" ]]]
-        , pass "[foo-options...]" $p$ [[[ U.ref "foo" ]]]
+        [ pass "[options...]"     [[[ U.ref ""    ]]]
+        , pass "[options]"        [[[ U.ref ""    ]]]
+        , pass "[foo-options]"    [[[ U.ref "foo" ]]]
+        , pass "[foo-options...]" [[[ U.ref "foo" ]]]
         ]
 
   where
@@ -226,17 +226,15 @@ usageParserSpec = \_ ->
     pass :: forall a. String -> a -> { i :: String, o :: Expected a }
     pass i o = kase i (P o)
 
-    p o = { expectedProgram: "prog", expectedUsages: o }
-
     fail :: forall a. String -> { i :: String, o :: Expected a }
     fail i = kase i F
 
     runTests :: _
     runTests xs =
       for_ xs \{ i, o } -> do
-        let input = "foo " <> i
+        let input = "prog " <> i
         case o of
-          P { expectedProgram, expectedUsages } -> do
+          P expectedUsages -> do
             -- deeply convert array to list
             -- (array is used for readability above)
             let
@@ -248,11 +246,11 @@ usageParserSpec = \_ ->
                 <> " -> "
                 <> intercalate "\n" (U.prettyPrintUsage <$> expected'))  do
               vliftEff do
-                { usages } <- runEitherEff do
+                { program, usages } <- runEitherEff do
                   Lexer.lexUsage input >>= U.parse false
-                flip assertEqual
-                  (U.prettyPrintUsage <$> usages)
-                  (U.prettyPrintUsage <$> expected')
+                assertEqual "prog" program
+                assertEqual (U.prettyPrintUsage <$> expected')
+                            (U.prettyPrintUsage <$> usages)
           otherwise -> do
             it (input <> " should fail") do
             vliftEff do
@@ -268,7 +266,7 @@ usageParserSpec = \_ ->
         for_ [ false, true ] \isRepeated -> do -- Append "..." ?
           let ys = if isRepeated then (1 .. 2) else (1 .. 1)
           for_ ys \q -> do -- "..." vs " ..." (note the space)
-            let input = "foo " <> i <> (if isRepeated
+            let input = "prog " <> i <> (if isRepeated
                                       then (if q == 1 then "..." else " ...")
                                       else "")
             case o of
@@ -276,10 +274,11 @@ usageParserSpec = \_ ->
                 let expected = v isRepeated
                 it (input <> " -> " <> U.prettyPrintArg expected)  do
                   vliftEff do
-                    { usages } <- runEitherEff do
+                    { program, usages } <- runEitherEff do
                       Lexer.lexUsage input >>= U.parse false
                                                     -- ^ Disable "smart-options"
 
+                    assertEqual "prog" program
                     -- There should only be one top-level mutex group
                     (length usages) `shouldEqual` 1
                     u <- runMaybeEff $ usages !! 0
