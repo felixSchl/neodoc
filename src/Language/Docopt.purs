@@ -108,13 +108,14 @@ parseDocopt helpText options = do
 -- |
 evalDocopt
   :: forall r
-   . Specification    -- ^ The program specification
+   . String           -- ^ The program name
+  -> Specification    -- ^ The program specification
   -> StrMap String    -- ^ The environment
   -> Array String     -- ^ The user input
   -> EvalOptionsObj r -- ^ The eval opts
   -> Either String (StrMap D.Value)
-evalDocopt spec env argv options = do
-  vs <- toUserParseErr argv $ G.run spec env argv options
+evalDocopt prog spec env argv options = do
+  vs <- toUserParseErr prog argv $ G.run spec env argv options
   pure $ uncurry (T.reduce spec env) vs
 
 -- |
@@ -128,8 +129,8 @@ runDocopt
   -> Options r      -- ^ Parse and eval options
   -> Either String (StrMap D.Value)
 runDocopt docopt env argv options = do
-  { specification } <- parseDocopt docopt options
-  evalDocopt specification env argv options
+  { program, specification } <- parseDocopt docopt options
+  evalDocopt program specification env argv options
 
 toScanErr :: forall a. Either P.ParseError a -> Either String a
 toScanErr  = lmap (D.prettyPrintDocoptError <<< D.DocoptScanError)
@@ -140,8 +141,8 @@ toUsageParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptUsageParseError)
 toDescParseErr :: forall a. Either P.ParseError a -> Either String a
 toDescParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptDescParseError)
 
-toUserParseErr :: forall a. Array String -> Either P.ParseError a -> Either String a
-toUserParseErr argv = lmap (D.prettyPrintDocoptError <<< D.DocoptUserParseError argv)
+toUserParseErr :: forall a. String -> Array String -> Either P.ParseError a -> Either String a
+toUserParseErr prog argv = lmap (D.prettyPrintDocoptError <<< D.DocoptUserParseError prog argv)
 
 toSolveErr :: forall a. Either D.SolveError a -> Either String a
 toSolveErr = lmap (D.prettyPrintDocoptError <<< D.DocoptSolveError)

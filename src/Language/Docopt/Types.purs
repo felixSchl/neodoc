@@ -1,9 +1,12 @@
 module Language.Docopt.Errors where
 
 import Prelude
+import Data.Maybe (Maybe(..))
 import Data.List (List(Nil, Cons), reverse)
 import Data.Generic (class Generic, gShow)
 import Text.Wrap (dedent)
+import Data.String (uncons, singleton) as String
+import Data.Char (toLower) as Char
 import Text.Parsing.Parser (ParseError(..)) as P
 import Text.Parsing.Parser.Pos (Position) as P
 
@@ -24,7 +27,7 @@ data DocoptError
   = DocoptScanError       P.ParseError
   | DocoptUsageParseError P.ParseError
   | DocoptDescParseError  P.ParseError
-  | DocoptUserParseError  Argv P.ParseError
+  | DocoptUserParseError  String Argv P.ParseError
   | DocoptSolveError      SolveError
 
 derive instance genericSolveError :: Generic SolveError
@@ -33,11 +36,11 @@ instance showSolveError :: Show SolveError where
   show = gShow
 
 instance showDocoptError :: Show DocoptError where
-  show (DocoptScanError        e) = "DocoptScanError "  <> show e
-  show (DocoptUsageParseError  e) = "DocoptParseError " <> show e
-  show (DocoptDescParseError   e) = "DocoptParseError " <> show e
-  show (DocoptUserParseError _ e) = "DocoptParseError " <> show e
-  show (DocoptSolveError       e) = "DocoptSolveError"  <> show e
+  show (DocoptScanError          e) = "DocoptScanError "       <> show e
+  show (DocoptUsageParseError    e) = "DocoptUsageParseError " <> show e
+  show (DocoptDescParseError     e) = "DocoptDescParseError "  <> show e
+  show (DocoptUserParseError p a e) = "DocoptUserParseError "  <> show p <> " " <> show a <> " " <> show e
+  show (DocoptSolveError         e) = "DocoptSolveError "      <> show e
 
 unParseError :: P.ParseError -> { message  :: String
                                 , fatal    :: Boolean
@@ -78,4 +81,10 @@ prettyPrintDocoptError (DocoptSolveError (SolveError err)) =
     <> developerErrorMessage
 prettyPrintDocoptError
   (DocoptUserParseError
-    argv (P.ParseError message _ _)) = message
+    program argv (P.ParseError message _ _))
+      -- de-capitalize the error message after the colon
+      = case String.uncons message of
+          Nothing -> message
+          Just { head, tail } ->
+            let msg = String.singleton (Char.toLower head) <> tail
+             in program <> ": " <> msg

@@ -2219,7 +2219,7 @@ $ prog/s -i 123
 {"-i": 123}
 
 $ prog/s -i
-"Option requires argument: -i"
+"foo: option requires argument: -i"
 
 r"""
 Usage: foo [-oi ARG]...
@@ -2381,7 +2381,7 @@ Usage: foo -
 """
 
 $ prog
-"Expected -"
+"foo: expected -"
 
 $ prog -
 {"-": true}
@@ -2438,7 +2438,7 @@ Options: -f, --foo ARG
 # Missing option-arguments are fatal errors, no pardon:
 
 $ prog -f
-"Option requires argument: -f"
+"foo: option requires argument: -f"
 
 r"""
 Usage: foo [-f ARG]
@@ -2446,7 +2446,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Option requires argument: -f"
+"foo: option requires argument: -f"
 
 r"""
 Usage: foo [[-f ARG]]
@@ -2454,7 +2454,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Option requires argument: -f"
+"foo: option requires argument: -f"
 
 r"""
 Usage: foo [[-bf=ARG]]
@@ -2462,7 +2462,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Option requires argument: -f"
+"foo: option requires argument: -f"
 
 r"""
 Usage: foo (-bf=ARG)
@@ -2470,7 +2470,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Option requires argument: -f"
+"foo: option requires argument: -f"
 
 r"""
 usage: git (([-f ARG]))
@@ -2478,7 +2478,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Option requires argument: -f"
+"git: option requires argument: -f"
 
 r"""
 usage: git (([-f ARG]))
@@ -2487,7 +2487,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Option requires argument: -f"
+"git: option requires argument: -f"
 
 r"""
 usage: git (([-f ARG | -b]))
@@ -2495,7 +2495,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Option requires argument: -f"
+"git: option requires argument: -f"
 
 r"""
 usage: git (([-b | -f ARG]))
@@ -2503,7 +2503,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Option requires argument: -f"
+"git: option requires argument: -f"
 
 r"""
 usage: git (([-bf ARG]))
@@ -2511,7 +2511,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"Option requires argument: -f"
+"git: option requires argument: -f"
 
 r"""
 usage: git (([-b ARG | -f ARG]))
@@ -2519,7 +2519,7 @@ Options: -f, --foo ARG
 """
 
 $ prog --foo
-"Option requires argument: --foo"
+"git: option requires argument: --foo"
 
 r"""
 usage: git (([-b | -f ARG]))
@@ -2547,17 +2547,17 @@ options: -b, --boo
 """
 
 $ prog -b=FOO
-"Option takes no argument: -b"
+"git: option takes no argument: -b"
 
 $ prog --boo=FOO
-"Option takes no argument: --boo"
+"git: option takes no argument: --boo"
 
 r"""
 usage: git -f <foo>
 """
 
 $ prog/s -fb
-"Expected <foo>, but got -b"
+"git: expected <foo>, but got -b"
 
 #
 # Command and positional errors:
@@ -2565,15 +2565,15 @@ $ prog/s -fb
 
 r"""Usage: git <command> -f"""
 $ prog
-"Expected <command>"
+"git: expected <command>"
 
 r"""Usage: git COMMAND -f"""
 $ prog
-"Expected COMMAND"
+"git: expected COMMAND"
 
 r"""Usage: git pull -f"""
 $ prog
-"Expected pull"
+"git: expected pull"
 
 r"""
 Usage: git <command> -f
@@ -2589,7 +2589,7 @@ Usage: foo remote
 """
 
 $ prog --fooo
-"Expected remote, but got --fooo"
+"foo: expected remote, but got --fooo"
 
 r"""
 Usage: foo
@@ -2597,7 +2597,7 @@ Usage: foo
 """
 
 $ prog --fooo
-"Unknown option: --fooo"
+"foo: unknown option: --fooo"
 
 #
 # This usage section parse must fail until #23 comes to fruition.
@@ -2650,10 +2650,10 @@ $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"Unknown command: QUX"
+"foo: unknown command: QUX"
 
 $ prog --foo=bar QUX
-"Unknown command: QUX"
+"foo: unknown command: QUX"
 
 r"""
 Usage: foo [-f[=FOO]] [-b=BAR]
@@ -2667,10 +2667,10 @@ $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"Unknown command: QUX"
+"foo: unknown command: QUX"
 
 $ prog --foo=bar QUX
-"Unknown command: QUX"
+"foo: unknown command: QUX"
 
 #
 # Proper value parsing
@@ -3021,7 +3021,7 @@ usage: foo [--foo BAR]...
 """
 
 $ prog/s --foo 1 2 3
-"Unknown command: 2"
+"foo: unknown command: 2"
 
 r"""
 usage: foo [--foo BAR]...
@@ -3054,7 +3054,7 @@ $ prog --foo foo
 {"--foo": "foo"}
 
 $ prog --foo
-"Option requires argument: --foo"
+"prog: option requires argument: --foo"
 
 r"""
 usage: prog --foo [BAR]...
