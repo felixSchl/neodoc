@@ -108,11 +108,12 @@ npm install --save neodoc
 
 ## Usage ##
 
-### neodoc.run(helpText, opts)
+### neodoc.run(help | spec, opts)
 
-Parse and apply the given docopt help text. If no options are provided, apply
-it to `process.argv` and `process.env`. The result is a mapping of key -> value,
-where the key is the canonical form of the option and its alias, if available.
+Parse and apply the given docopt help text. Alternatively, pass the output of
+`neodoc.parse`. If no options are provided, apply it to `process.argv` and
+`process.env`. The result is a mapping of key -> value, where the key is the
+canonical form of the option and its alias, if available.
 
 Options:
 
@@ -161,10 +162,14 @@ if (args['<command>'] === 'remote') {
 
 See the examples folder for a more sophisticated version of the above example.
 
-### neodoc.parse(helpText, opts)
+### neodoc.parse(help, opts)
 
-Parse the docopt specification. This is the canonical representation of the
-CLI as described by it's help text and can be used for building parsers etc.
+Parse the docopt text and derive the specification along with some meta information.
+The specification is the canonical representation of the CLI as described by it's
+help text and can be used for building parsers etc. The output is a plain JS object
+and can be serialized. The output can further be passed to `neodoc.run`. This avoids
+neodoc having to parse and solve the original help text again, since parsing JSON
+is a order of magnitude faster to parse.
 
 Options:
 
