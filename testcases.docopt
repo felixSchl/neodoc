@@ -3104,3 +3104,23 @@ $ prog -f foo -f bar
 
 $ prog -f foo bar
 {"-f": ["foo", "bar"]}
+
+#
+# Disallow varying program names - issue #62
+#
+
+r"""
+usage: foo
+   or: bar
+"""
+
+$ prog
+"spec-error"
+
+r"""
+usage: foo
+       bar
+"""
+
+$ prog
+"spec-error"

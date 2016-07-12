@@ -20,13 +20,13 @@ import Control.MonadPlus (guard)
 import Data.Either (Either)
 import Data.List (List(..), many, some, singleton, length, modifyAt)
 import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
-import Data.Tuple (Tuple(Tuple))
+import Data.Tuple (Tuple(Tuple), snd, fst)
 import Data.Tuple.Nested (tuple3)
 import Language.Docopt.SpecParser.Common (markIndent', markLine, indented,
                                      sameIndent, lessIndented, moreIndented)
 import Language.Docopt.SpecParser.Usage.Argument (Argument(..))
 import Language.Docopt.SpecParser.Usage.Usage (Usage(..))
-import Text.Parsing.Parser (ParseError) as P
+import Text.Parsing.Parser (ParseError, fatal) as P
 import Text.Parsing.Parser.Combinators (try, optional, choice, sepBy1, between,
                                        optionMaybe, lookAhead, option) as P
 import Text.Parsing.Parser.Combinators ((<?>), (<??>))
@@ -67,8 +67,13 @@ usageParser smartOpts = do
             P.optional $ P.try do
               L.name >>= guard <<< (_ == "or")
               L.colon
-            program
-            usageLine name
+            name' <- program
+            if name /= name'
+               then P.fatal
+                      $ "Program name mismatch: Expected \"" <> name <> "\""
+                          <> ", but got \"" <> name' <> "\""
+               else usageLine name
+
   L.eof <?> "End of usage section"
   pure {
     program: name
