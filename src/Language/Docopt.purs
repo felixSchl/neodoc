@@ -25,7 +25,6 @@ import Text.Parsing.Parser as P
 import Text.Wrap (dedent)
 
 import Language.Docopt.Specification
-import Language.Docopt.Usage (Usage) as D
 import Language.Docopt.Errors (Argv, DocoptError(..), SolveError(..),
                               prettyPrintDocoptError
                               ) as D

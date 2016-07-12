@@ -57,8 +57,8 @@ import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 isRepeatable, OptionArgumentObj(),
                                 setRequired, isOptional, isGroup
                                 ) as D
-import Language.Docopt.Usage (Usage) as D
 import Language.Docopt.Env (Env ())
+import Language.Docopt.Specification (Specification())
 import Language.Docopt.Env as Env
 import Language.Docopt.Origin as Origin
 import Language.Docopt.Origin (Origin())
@@ -398,8 +398,8 @@ eof branches = P.ParserT $ \(P.PState s pos) ->
 -- | Parse user input against a program specification.
 spec
   :: forall r
-   . List D.Usage -- ^ the list of usage branches
-  -> Options r    -- ^ generator options
+   . Specification -- ^ the list of usage branches
+  -> Options r     -- ^ generator options
   -> Parser (Tuple D.Branch (List ValueMapping))
 spec xs options = do
   let

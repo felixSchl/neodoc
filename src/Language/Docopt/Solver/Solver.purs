@@ -30,12 +30,10 @@ import Data.String as Str
 
 import Language.Docopt.Argument
 import Language.Docopt.Argument (isFree) as Arg
-import Language.Docopt.SpecParser.Desc as DE
-import Language.Docopt.SpecParser.Usage.Option as UO
+import Language.Docopt.SpecParser.Desc as Desc
 import Language.Docopt.Argument (Argument(..), Branch)
 import Language.Docopt.Errors (SolveError(..))
-import Language.Docopt.SpecParser.Desc (Desc)
-import Language.Docopt.SpecParser.Usage (Usage(..)) as U
+import Language.Docopt.SpecParser (Desc(), Usage()) as SpecParser
 import Language.Docopt.SpecParser.Usage.Argument (Branch, Argument(..)) as U
 import Language.Docopt.Usage (Usage)
 import Partial.Unsafe (unsafePartial)
@@ -70,9 +68,10 @@ instance showResolveTo :: (Show a, Show b) => Show (ResolveTo a b) where
 fail :: forall a. String -> Either SolveError a
 fail = Left <<< SolveError
 
-solveBranch :: U.Branch                 -- ^ the usage branch
-            -> List Desc                -- ^ the option descriptions
-            -> Either SolveError Branch -- ^ the canonical usage branch
+solveBranch
+  :: U.Branch                 -- ^ the usage branch
+  -> List SpecParser.Desc     -- ^ the option descriptions
+  -> Either SolveError Branch -- ^ the canonical usage branch
 solveBranch as ds = go as
   where
     go :: U.Branch -> Either SolveError (List Argument)
@@ -108,12 +107,12 @@ solveBranch as ds = go as
                           )
 
         expand
-          :: List Desc
+          :: List SpecParser.Desc
           -> List Argument
           -> List Argument
         expand ds surroundingArgs = reverse $ go ds surroundingArgs Nil
           where
-          go (Cons (x@(DE.OptionDesc opt)) xs) surroundingArgs acc = do
+          go (Cons (x@(Desc.OptionDesc opt)) xs) surroundingArgs acc = do
             -- Assuming description and usage have already been merged,
             -- find all options that are not present in the surrounding
             -- "free" area and add them.
@@ -123,8 +122,8 @@ solveBranch as ds = go as
                   let z = Group {
                           optional: true
                         , branches: (singleton $ singleton $ Option $
-                              { flag:       DE.getFlag opt.name
-                              , name:       DE.getName opt.name
+                              { flag:       Desc.getFlag opt.name
+                              , name:       Desc.getName opt.name
                               , arg:        opt.arg
                               , env:        opt.env
                               , repeatable: false
@@ -135,15 +134,15 @@ solveBranch as ds = go as
                   in go xs (z:surroundingArgs) (z:acc)
             where
               isMatch (Option o)
-                = if isJust (DE.getFlag opt.name) &&
+                = if isJust (Desc.getFlag opt.name) &&
                       isJust (o.flag)
                       then fromMaybe false do
-                            eq <$> (DE.getFlag opt.name)
+                            eq <$> (Desc.getFlag opt.name)
                                 <*> o.flag
-                      else if isJust (DE.getName opt.name) &&
+                      else if isJust (Desc.getName opt.name) &&
                               isJust (o.name)
                               then fromMaybe false do
-                                    (^=) <$> (DE.getName opt.name)
+                                    (^=) <$> (Desc.getName opt.name)
                                           <*> o.name
                               else false
               isMatch (Group grp) = any isMatch (concat grp.branches)
@@ -282,10 +281,10 @@ solveBranch as ds = go as
           case filter isMatch ds of
             xs | length xs > 1 -> fail
               $ "Multiple option descriptions for option --" <> n
-            (Cons (DE.OptionDesc desc) Nil) -> do
+            (Cons (Desc.OptionDesc desc) Nil) -> do
               arg <- resolveOptArg o.arg desc.arg
-              pure  { flag:       DE.getFlag desc.name
-                    , name:       DE.getName desc.name
+              pure  { flag:       Desc.getFlag desc.name
+                    , name:       Desc.getName desc.name
                     , arg:        arg
                     , env:        desc.env
                     , repeatable: o.repeatable
@@ -299,8 +298,8 @@ solveBranch as ds = go as
                     , repeatable: o.repeatable
                     }
           where
-            isMatch (DE.OptionDesc { name: DE.Long n'   }) = n == n'
-            isMatch (DE.OptionDesc { name: DE.Full _ n' }) = n == n'
+            isMatch (Desc.OptionDesc { name: Desc.Long n'   }) = n == n'
+            isMatch (Desc.OptionDesc { name: Desc.Full _ n' }) = n == n'
             isMatch _ = false
 
 
@@ -350,10 +349,13 @@ solveBranch as ds = go as
                 (head $ catMaybes $ subsume fs <$> ds)
 
           where
-            subsume :: String -> Desc -> Maybe (ResolveTo (Slurp Argument)
-                                                          Reference)
-            subsume fs (DE.OptionDesc d) = do
-              f <- DE.getFlag d.name
+            subsume
+              :: String
+              -> SpecParser.Desc
+              -> Maybe (ResolveTo (Slurp Argument)
+                       Reference)
+            subsume fs (Desc.OptionDesc d) = do
+              f <- Desc.getFlag d.name
               a <- d.arg
 
               -- the haystack needs to be modified, such that the
@@ -376,7 +378,7 @@ solveBranch as ds = go as
                                     )
                                   )
                                   { flag:       pure f
-                                  , name:       DE.getName d.name
+                                  , name:       Desc.getName d.name
                                   , arg:        pure a
                                   , env:        d.env
                                   , repeatable: o.repeatable
@@ -513,7 +515,7 @@ solveBranch as ds = go as
                     $ "Multiple option descriptions for option -"
                         <> String.singleton f
 
-            (Cons (DE.OptionDesc desc) Nil) -> do
+            (Cons (Desc.OptionDesc desc) Nil) -> do
               arg <- if isTrailing
                           then resolveOptArg o.arg desc.arg
                           else if isNothing desc.arg
@@ -522,8 +524,8 @@ solveBranch as ds = go as
                               $ "Stacked option -" <> String.singleton f
                                   <> " may not specify arguments"
 
-              pure  { flag:       DE.getFlag desc.name
-                    , name:       DE.getName desc.name
+              pure  { flag:       Desc.getFlag desc.name
+                    , name:       Desc.getName desc.name
                     , arg:        arg
                     , env:        desc.env
                     , repeatable: o.repeatable
@@ -541,14 +543,14 @@ solveBranch as ds = go as
                     }
 
           where
-            isMatch (DE.OptionDesc { name: DE.Flag f'   }) = f == f'
-            isMatch (DE.OptionDesc { name: DE.Full f' _ }) = f == f'
+            isMatch (Desc.OptionDesc { name: Desc.Flag f'   }) = f == f'
+            isMatch (Desc.OptionDesc { name: Desc.Full f' _ }) = f == f'
             isMatch _ = false
 
     -- | Resolve an option's argument name against that given in the
     -- | description, pureing the most complete argument known.
     resolveOptArg :: Maybe { name :: String, optional :: Boolean }
-                  -> Maybe DE.OptionArgumentObj
+                  -> Maybe Desc.OptionArgumentObj
                   -> Either SolveError (Maybe OptionArgumentObj)
 
     resolveOptArg (Just a) Nothing = do
@@ -578,10 +580,14 @@ solveBranch as ds = go as
             , optional: a.optional
             , default:  Nothing }
 
-solveUsage :: U.Usage -> List Desc -> Either SolveError Usage
+solveUsage
+  :: SpecParser.Usage
+  -> List SpecParser.Desc
+  -> Either SolveError Usage
 solveUsage bs ds = traverse (flip solveBranch ds) bs
 
-solve :: List U.Usage
-      -> List Desc
-      -> Either SolveError (List Usage)
+solve
+  :: List SpecParser.Usage
+  -> List SpecParser.Desc
+  -> Either SolveError (List Usage)
 solve us ds = traverse (flip solveUsage ds) us
