@@ -33,11 +33,10 @@ import Language.Docopt.Value (Value()) as D
 import Language.Docopt.ArgParser  as G
 import Language.Docopt.Trans.Flat as T
 
-import Language.Docopt.Argument     as Argument
-import Language.Docopt.Scanner      as Scanner
-import Language.Docopt.Solver       as Solver
-import Language.Docopt.SpecParser.Usage as Usage
-import Language.Docopt.SpecParser.Desc  as Desc
+import Language.Docopt.Argument   as Argument
+import Language.Docopt.Scanner    as Scanner
+import Language.Docopt.Solver     as Solver
+import Language.Docopt.SpecParser as SpecParser
 
 type Docopt = {
   program       :: String
@@ -77,13 +76,13 @@ preparseDocopt
    .  String           -- ^ The docopt text
   -> ParseOptionsObj r -- ^ Parse options
   -> Either String { program      :: String
-                   , usages       :: List Usage.Usage
-                   , descriptions :: List Desc.Desc
+                   , usages       :: List SpecParser.Usage
+                   , descriptions :: List SpecParser.Desc
                    }
 preparseDocopt docopt options = do
   doc <- toScanErr       $ Scanner.scan $ dedent docopt
-  u   <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
-  ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
+  u   <- toUsageParseErr $ SpecParser.parseUsage doc.usage options.smartOptions
+  ds  <- toDescParseErr  $ concat <$> SpecParser.parseDesc `traverse` doc.options
   pure { descriptions: ds, usages: u.usages, program: u.program }
 
 -- |
@@ -97,8 +96,8 @@ parseDocopt
   -> Either String Docopt
 parseDocopt helpText options = do
   doc <- toScanErr       $ Scanner.scan $ dedent helpText
-  u   <- toUsageParseErr $ Usage.run doc.usage options.smartOptions
-  ds  <- toDescParseErr  $ concat <$> Desc.run `traverse` doc.options
+  u   <- toUsageParseErr $ SpecParser.parseUsage doc.usage options.smartOptions
+  ds  <- toDescParseErr  $ concat <$> SpecParser.parseDesc `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve u.usages ds
   pure $ { specification: prg
          , shortHelp:     doc.originalUsage

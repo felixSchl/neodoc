@@ -32,7 +32,7 @@ import Data.Array as A
 import Data.Bifunctor (lmap)
 import Data.String.Yarn (lines, unlines)
 
-import Language.Docopt (Docopt, Specification(), parseDocopt, evalDocopt)
+import Language.Docopt (Docopt, parseDocopt, evalDocopt)
 import Language.Docopt.Value (Value())
 import Language.Docopt as D
 import Language.Docopt.Env (Env())
