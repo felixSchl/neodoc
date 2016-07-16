@@ -26,7 +26,7 @@ import Data.Either (Either(Right, Left))
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing, isJust)
 import Data.List (List(..), reverse, singleton, concat, length, (:),
                   some, filter, head, toUnfoldable, sortBy, groupBy, last, null,
-                  tail, many)
+                  tail, many, mapWithIndex)
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Control.Alt ((<|>))
 import Data.Traversable (traverse, for)
@@ -44,6 +44,8 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Control.Monad.Transformerless.RWS (RWS(), evalRWS, ask)
 import Control.Monad.Transformerless.RWS (modify, get) as State
 import Data.StrMap (StrMap())
+import Data.Map (Map())
+import Data.Map (empty, alter, lookup) as Map
 import Control.Monad.Trans (lift)
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), Result(..), fail,
@@ -100,6 +102,7 @@ markDone = lift (State.modify \s -> s { done = true })
 type Options r = {
   optionsFirst :: Boolean
 , stopAt       :: Array String
+, requireFlags :: Boolean
   | r
 }
 
@@ -375,25 +378,27 @@ shortOption term f a = unsafePartial $
 eof :: List D.Branch -> Parser Unit
 eof branches = P.ParserT $ \(P.PState s pos) ->
   pure $ case s of
-    Nil -> P.Result s (Right unit) false pos
-    (Cons (PositionedToken {token: tok, source}) _) ->
-      let isKnown = any (any (p tok)) branches
-          prefix = if isKnown then "Unexpected " else "Unknown "
-       in P.parseFailed s pos $
-          case tok of
-            LOpt _ _   -> prefix <> "option: " <> source
-            SOpt _ _ _ -> prefix <> "option: " <> source
-            EOA _      -> prefix <> "option: --"
-            Stdin      -> prefix <> "option: -"
-            Lit _      -> prefix <> "command: " <> source
-      where
-        p (LOpt n _)   (D.Option { name: Just n' }) = n == n'
-        p (SOpt f _ _) (D.Option { flag: Just f' }) = f == f'
-        p (Lit n)      (D.Command { name: n' })     = n == n'
-        p (EOA _)      (D.EOA)                      = true
-        p (Stdin)      (D.Stdin)                    = true
-        p x            (D.Group { branches })       = any (any (p x)) branches
-        p _            _                            = false
+    Nil   -> P.Result s (Right unit) false pos
+    (x:_) -> P.parseFailed s pos (unexpected branches x)
+
+unexpected :: List D.Branch -> PositionedToken -> String
+unexpected branches (PositionedToken {token: tok, source}) =
+  let isKnown = any (any (p tok)) branches
+      prefix = if isKnown then "Unexpected " else "Unknown "
+    in case tok of
+      LOpt _ _   -> prefix <> "option " <> source
+      SOpt _ _ _ -> prefix <> "option " <> source
+      EOA _      -> prefix <> "option --"
+      Stdin      -> prefix <> "option -"
+      Lit _      -> prefix <> "command " <> source
+  where
+    p (LOpt n _)   (D.Option { name: Just n' }) = n == n'
+    p (SOpt f _ _) (D.Option { flag: Just f' }) = f == f'
+    p (Lit n)      (D.Command { name: n' })     = n == n'
+    p (EOA _)      (D.EOA)                      = true
+    p (Stdin)      (D.Stdin)                    = true
+    p x            (D.Group { branches })       = any (any (p x)) branches
+    p _            _                            = false
 
 -- | Parse user input against a program specification.
 spec
@@ -407,7 +412,7 @@ spec xs options = do
     branches = concat xs
     parsers
       = branches <#> \branch -> do
-          vs <- runFn5 exhaustP options true false 0 branch
+          vs <- runFn6 exhaustP branches options true false 0 branch
           pure (Tuple branch vs)
           <* eof branches
 
@@ -421,14 +426,15 @@ spec xs options = do
 -- Represented as `FnX` to take advantage of inlining at compile time.
 exhaustP
   :: forall r
-   . Fn5
-      (Options r)       -- ^ generator options
+   . Fn6
+      (List D.Branch)   -- ^ the top-level branches
+      (Options r)       -- ^ arg parser options
       Boolean           -- ^ can we skip using fallback values?
       Boolean           -- ^ are we currently skipping using fallback values?
       Int               -- ^ recursive level
       (List D.Argument) -- ^ the list of arguments to parse
       (Parser (List ValueMapping))
-exhaustP = mkFn5 \options skippable isSkipping l xs -> do
+exhaustP = mkFn6 \branches options skippable isSkipping l xs -> do
   _debug l \_->
        "exhaustP: "     <> (intercalate " " $ D.prettyPrintArg <$> xs)
     <> ", skippable: "  <> show skippable
@@ -436,7 +442,8 @@ exhaustP = mkFn5 \options skippable isSkipping l xs -> do
 
   concat <$>
     for (clump xs) \x -> do
-        (clumpP options
+        (clumpP branches
+                options
                 skippable
                 isSkipping
                 l
@@ -492,20 +499,38 @@ toOptional :: forall a. Required a -> Required a
 toOptional (Required a) = Optional a
 toOptional (Optional a) = Optional a
 
-prettyPrintRequiredArg :: Required D.Argument -> String
-prettyPrintRequiredArg (Required x) = "Required " <> D.prettyPrintArg x
-prettyPrintRequiredArg (Optional x) = "Optional " <> D.prettyPrintArg x
+prettyPrintRequiredIndexedArg :: Required (Indexed D.Argument) -> String
+prettyPrintRequiredIndexedArg (Required (Indexed _ x)) = "Required " <> D.prettyPrintArg x
+prettyPrintRequiredIndexedArg (Optional (Indexed _ x)) = "Optional " <> D.prettyPrintArg x
+
+data Indexed a = Indexed Int a
+
+getIndexedElem :: forall a. Indexed a -> a
+getIndexedElem (Indexed _ x) = x
+
+getIndex :: forall a. Indexed a -> Int
+getIndex (Indexed ix _) = ix
+
+-- Note: Unfortunate re-implementation of the 'Alt' instance for 'ParserT'.
+catchParseError :: forall a. Parser a -> (P.ParseError -> Parser a) -> Parser a
+catchParseError p1 f2 = P.ParserT \st ->
+  P.unParserT p1 st >>= \(o@(P.Result input result consumed pos)) ->
+    case result of
+      Left (P.ParseError _ _ true) -> pure o
+      Left e | not consumed        -> P.unParserT (f2 e) st
+      otherwise                    -> pure o
 
 -- Parse a clump of arguments.
 clumpP
   :: forall r
-   . Options r               -- ^ the parsing options
+   . (List D.Branch)         -- ^ the top-level branches
+  -> Options r               -- ^ the parsing options
   -> Boolean                 -- ^ can we skip using fallback values?
   -> Boolean                 -- ^ are we currently skipping using fallback values?
   -> Int                     -- ^ recursive level
   -> Clump (List D.Argument) -- ^ the clumps of arguments to parse.
   -> Parser (List ValueMapping)
-clumpP options skippable isSkipping l c = do
+clumpP toplevel options skippable isSkipping l c = do
 
   i <- getInput
   _debug \_->
@@ -517,21 +542,29 @@ clumpP options skippable isSkipping l c = do
 
   where
   go _ _ l (Fixed xs)
-    = concat <$> for xs (runFn5 argP' options skippable isSkipping l)
+    = concat <$> for xs (runFn6 argP' toplevel options skippable isSkipping l)
 
-  go skippable isSkipping l (Free  xs) = draw (Required <$> xs) (length xs)
+  go skippable isSkipping l (Free  xs) =
+    draw
+      (xs `flip mapWithIndex` \x ix -> Required (Indexed ix x))
+      Map.empty
+      (length xs)
     where
 
-    draw :: List (Required D.Argument) -> Int -> Parser (List ValueMapping)
+    draw
+      :: List (Required (Indexed D.Argument))
+      -> Map D.Argument P.ParseError
+      -> Int
+      -> Parser (List ValueMapping)
 
     -- Recursively apply each argument parser.
     -- Should an argument be repeatable, try parsing any adjacent matches
     -- repeatedly (NOTE: this could interfere with `argP`'s repetition handling?)
-    draw xss@(Cons x xs) n | n >= 0 = (do
+    draw xss@(x:xs) errs n | n >= 0 = (do
 
       i <- getInput
       _debug \_->
-           "draw: "         <> (intercalate " " $ prettyPrintRequiredArg <$> xss)
+           "draw: "         <> (intercalate " " $ prettyPrintRequiredIndexedArg <$> xss)
         <> ", n: "          <> show n
         <> ", skippable: "  <> show skippable
         <> ", isSkipping: " <> show isSkipping
@@ -545,18 +578,20 @@ clumpP options skippable isSkipping l c = do
       -- parsing mechanism.
 
       let
-        arg = unRequired x
+        arg = getIndexedElem (unRequired x)
         mod = if isRequired x then id else P.option Nil
 
       -- parse the next argument. failure will cause the argument to be put at
       -- the back of the queue and the number of retries to be cut down by one.
       vs <- P.try do
               mod do
-                runFn5 argP' options     -- the parsing options
-                      isSkipping  -- propagate the 'isSkipping' property
-                      false       -- reset 'isSkipping' to false
-                      (l + 1)     -- increase the recursive level
-                      (D.setRequired arg true)
+                runFn6 argP'
+                        toplevel
+                        options     -- the parsing options
+                        isSkipping  -- propagate the 'isSkipping' property
+                        false       -- reset 'isSkipping' to false
+                        (l + 1)     -- increase the recursive level
+                        (D.setRequired arg true)
 
       _debug \_->
         "draw: matched: " <> (intercalate ", " $
@@ -572,8 +607,8 @@ clumpP options skippable isSkipping l c = do
                 "draw: repeating as optional: "
                   <> D.prettyPrintArg arg
               -- Make successive matches of this repeated group optional.
-              draw (xs <> pure (toOptional x)) (length xss)
-            else draw xs (length xs)
+              draw (xs <> pure (toOptional x)) errs (length xss)
+            else draw xs errs (length xs)
 
       _debug \_->
         "draw: matched (2): " <> (intercalate ", " $
@@ -582,25 +617,29 @@ clumpP options skippable isSkipping l c = do
         )
 
       pure (vs <> vss)
-    ) <|> (defer \_ -> do
-      if (length xs == 0)
-        then draw (xs <> singleton x) (-1)
-        else do
-          _debug \_->
-              "draw: failure"
-            <> ", requeueing: "  <> prettyPrintRequiredArg x
-          draw (xs <> singleton x) (n - 1)
+    ) `catchParseError` (\e ->
+      let arg   = getIndexedElem (unRequired x)
+          errs' = if D.isGroup arg
+                    then Map.alter (const (Just e)) arg errs
+                    else errs
+      in if (length xs == 0)
+          then draw (xs <> singleton x) errs' (-1)
+          else do
+            _debug \_->
+                "draw: failure"
+              <> ", requeueing: "  <> prettyPrintRequiredIndexedArg x
+            draw (xs <> singleton x) errs' (n - 1)
     )
 
     -- All options have been matched (or have failed to be matched) at least
     -- once by now. See where we're at - is there any required option that was
     -- not matched at all?
-    draw xss n | (length xss > 0) && (n < 0) = do
+    draw xss@(x:xs) errs n | (n < 0) = do
 
       i <- getInput
       _debug \_->
            "draw: edge-case"
-        <> ", left-over: "  <> (intercalate " " $ prettyPrintRequiredArg <$> xss)
+        <> ", left-over: "  <> (intercalate " " $ prettyPrintRequiredIndexedArg <$> xss)
         <> ", n: "          <> show n
         <> ", skippable: "  <> show skippable
         <> ", isSkipping: " <> show isSkipping
@@ -609,52 +648,61 @@ clumpP options skippable isSkipping l c = do
       env <- lift ask
 
       let
-        vs = xss <#> \x -> do
-          let arg = unRequired x
+        xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss
+        args = getIndexedElem <<< unRequired <$> xss'
+        vs   = args <#> \arg -> do
           maybe
-            (Left x)
-            (Right <<< Tuple x)
+            (Left arg)
+            (Right <<< Tuple arg)
             do
-              v <- unRichValue <$> getFallbackValue env arg
+              v <- unRichValue <$> getFallbackValue options env arg
               pure $ RichValue v {
                 value = if D.isRepeatable arg
                     then ArrayValue $ Value.intoArray v.value
                     else v.value
               }
-        missing = filter (\x ->
-          let arg = unRequired x
-           in isRequired x &&
-              -- This may look very counter-intuitive, yet getting fallback
-              -- values for entire groups is not possible and not logical.
-              -- If a group that is allowed to be omitted fails, there won't
-              -- be any values to fall back onto.
-              not (D.isGroup arg && D.isOptional arg)
-        ) (mlefts vs)
+        missing = mlefts vs `flip filter` (\arg ->
+          isRequired x &&
+          -- This may look very counter-intuitive, yet getting fallback
+          -- values for entire groups is not possible and not logical.
+          -- If a group that is allowed to be omitted fails, there won't
+          -- be any values to fall back onto.
+          not (D.isGroup arg && D.isOptional arg)
+        )
         fallbacks = mrights vs
 
       _debug \_->
-        "draw: missing:" <> (intercalate " " $ prettyPrintRequiredArg <$> missing)
+        "draw: missing:"
+          <> (intercalate " " $ D.prettyPrintArg <$> missing)
+
 
       if isSkipping && length missing > 0
-        then
-          P.fail $
-            "Expected "
-              <> intercalate ", "
-                  (D.prettyPrintArgNaked <<< unRequired <$> missing)
+        then expected missing i
         else
           if skippable || null i
-            then do
+            then
               if not isSkipping
-                then runFn5 exhaustP options true true l (unRequired <$> xss)
-                else do
-                  pure ((unRequired `lmap` _) <$> fallbacks)
-            else
-              P.fail $
-                "Expected "
-                  <> intercalate ", "
-                      (D.prettyPrintArgNaked <<< unRequired <$> xss)
+                then runFn6 exhaustP toplevel options true true l args
+                else pure fallbacks
+            else expected args i
 
-    draw _ _ = pure Nil
+      where
+      expected xs i =
+        let
+          x = unsafePartial (LU.head xs)
+          msg = maybe'
+            (\_ -> case i of
+              i':_ -> unexpected toplevel i'
+                        <> ". Expected "
+                        <> (intercalate ", " $ D.prettyPrintArgNaked <$> xs)
+              Nil  -> "Missing "
+                        <> (intercalate ", " $ D.prettyPrintArgNaked <$> xs)
+            )
+            (\(P.ParseError msg _ _) -> msg)
+            (x `Map.lookup` errs)
+        in P.fail msg
+
+    draw _ _ _ = pure Nil
 
   _debug s = if debug
                 then traceA $ indentation <> (s unit)
@@ -662,44 +710,55 @@ clumpP options skippable isSkipping l c = do
   indentation :: String
   indentation = fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
+  butGot ((PositionedToken { source }):_) = ", but got " <> source
+  butGot _ = ""
+
 -- Parse a single argument from argv.
 -- Represented as `FnX` to take advantage of inlining at compile time.
 argP'
   :: forall r
-   . Fn5
-      (Options r)
-      Boolean    -- ^ can we skip using fallback values?
-      Boolean    -- ^ are we currently skipping using fallback values?
-      Int        -- ^ recursive level
-      D.Argument -- ^ the argument to parse
+   . Fn6
+      (List D.Branch) -- ^ the top-level branches
+      (Options r)     -- ^ arg parser options
+      Boolean         -- ^ can we skip using fallback values?
+      Boolean         -- ^ are we currently skipping using fallback values?
+      Int             -- ^ recursive level
+      D.Argument      -- ^ the argument to parse
       (Parser (List ValueMapping))
-argP' = mkFn5 \options skippable isSkipping l x -> do
+argP' = mkFn6 \toplevel options skippable isSkipping l x -> do
   state :: StateObj <- lift State.get
   if state.done
      then pure Nil
-     else argP options skippable isSkipping l x
+     else argP toplevel options skippable isSkipping l x
 
 -- Parse a single argument from argv.
 argP
   :: forall r
-   . Options r
-  -> Boolean    -- ^ can we skip using fallback values?
-  -> Boolean    -- ^ are we currently skipping using fallback values?
-  -> Int        -- ^ recursive level
-  -> D.Argument -- ^ the argument to parse
+   . List D.Branch  -- ^ the top-level branches
+  -> Options r      -- ^ arg parser options
+  -> Boolean        -- ^ can we skip using fallback values?
+  -> Boolean        -- ^ are we currently skipping using fallback values?
+  -> Int            -- ^ recursive level
+  -> D.Argument     -- ^ the argument to parse
   -> Parser (List ValueMapping)
 
 -- Terminate at singleton groups that house only positionals.
-argP options _ _ _ (D.Group (grp@{ branches: Cons (Cons (x@(D.Positional pos)) Nil) Nil }))
+argP _ options _ _ _ (D.Group (grp@{ branches: Cons (Cons (x@(D.Positional pos)) Nil) Nil }))
   | options.optionsFirst && (pos.repeatable || grp.repeatable)
   = singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> do
       terminate x
 
 -- The recursive branch of the argv argument parser.
 -- For groups, each branch is run and analyzed.
-argP options skippable isSkipping l g@(D.Group grp) = do
+argP toplevel options skippable isSkipping l g@(D.Group grp) = do
   -- Create a parser for each branch in the group
-  let parsers = (runFn5 exhaustP options skippable isSkipping l) <$> grp.branches
+  let
+    parsers
+      = (runFn6 exhaustP  toplevel
+                          options
+                          skippable
+                          isSkipping
+                          l) <$> grp.branches
 
   -- Evaluate the parsers, selecting the result with the most
   -- non-substituted values.
@@ -719,24 +778,25 @@ argP options skippable isSkipping l g@(D.Group grp) = do
   where
     loop acc = do
       vs <- do
-        runFn5
-          argP' options
+        runFn6
+          argP' toplevel
+                options
                 skippable
                 isSkipping
                 l
-                (D.Group grp {  optional = true })
+                (D.Group grp { optional = true })
       if (length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
         then loop $ acc <> vs
         else pure acc
 
-argP options _ _ _ x@(D.Positional pos)
+argP _ options _ _ _ x@(D.Positional pos)
   | pos.repeatable && options.optionsFirst
   = singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> do
       terminate x
 
 -- The non-recursive branch of the argv argument parser.
 -- All of these parsers consume one or more adjacent arguments from argv.
-argP options _ _ _ x = getInput >>= \i -> (
+argP _ options _ _ _ x = getInput >>= \i -> (
   (if D.isRepeatable x then some else liftM1 singleton) do
     Tuple x <<< (RValue.from Origin.Argv) <$> do
       P.ParserT \s -> do
@@ -758,7 +818,7 @@ argP options _ _ _ x = getInput >>= \i -> (
               else pure o
           otherwise -> pure o
     <* modifyDepth (_ + 1)
-  ) <|> P.fail ("Expected " <> D.prettyPrintArg x <> butGot i)
+  ) <|> P.fail ("Expected " <> D.prettyPrintArgNaked x <> butGot i)
 
   where
   go :: Partial => _ _
@@ -816,8 +876,8 @@ argP options _ _ _ x = getInput >>= \i -> (
     isAnySopt (SOpt _ _ _) = pure true
     isAnySopt _            = pure false
 
-  butGot (Cons (PositionedToken { source }) _) = ", but got " <> source
-  butGot Nil                                   = ""
+  butGot ((PositionedToken { source }):_) = ", but got " <> source
+  butGot Nil                              = ""
 
 -- Evaluate multiple parsers, producing a new parser that chooses the best
 -- succeeding match or none.
@@ -922,8 +982,8 @@ terminate arg = do
     pure (P.Result Nil (Right rest) true pos)
 
 -- Find a fallback value for the given argument.
-getFallbackValue :: Env -> D.Argument -> Maybe RichValue
-getFallbackValue env x = do
+getFallbackValue :: forall r. Options r -> Env -> D.Argument -> Maybe RichValue
+getFallbackValue options env x = do
   (fromEnv     x <#> RValue.from Origin.Environment) <|>
   (fromDefault x <#> RValue.from Origin.Default)     <|>
   (empty       x <#> RValue.from Origin.Empty)
@@ -944,13 +1004,13 @@ getFallbackValue env x = do
   empty = go
     where
     go (D.Option (o@{ arg: Nothing }))
-      = pure
-          $ if o.repeatable then ArrayValue []
-                            else BoolValue false
+      | not options.requireFlags
+      = pure if o.repeatable  then ArrayValue []
+                              else BoolValue false
     go (D.Option (o@{ arg: Just { optional: true } }))
-      = pure
-          $ if o.repeatable then ArrayValue []
-                            else BoolValue false
+      | not options.requireFlags
+      = pure if o.repeatable  then ArrayValue []
+                              else BoolValue false
     go (D.Stdin)                           = pure $ BoolValue false
     go (D.EOA)                             = pure $ ArrayValue []
     go (D.Positional pos) | pos.repeatable = pure $ ArrayValue []

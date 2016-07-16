@@ -2597,7 +2597,7 @@ Usage: foo
 """
 
 $ prog --fooo
-"foo: unknown option: --fooo"
+"foo: unknown option --fooo"
 
 #
 # This usage section parse must fail until #23 comes to fruition.
@@ -2650,10 +2650,10 @@ $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"foo: unknown command: QUX"
+"foo: unknown command QUX"
 
 $ prog --foo=bar QUX
-"foo: unknown command: QUX"
+"foo: unknown command QUX"
 
 r"""
 Usage: foo [-f[=FOO]] [-b=BAR]
@@ -2667,10 +2667,10 @@ $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"foo: unknown command: QUX"
+"foo: unknown command QUX"
 
 $ prog --foo=bar QUX
-"foo: unknown command: QUX"
+"foo: unknown command QUX"
 
 #
 # Proper value parsing
@@ -3021,7 +3021,7 @@ usage: foo [--foo BAR]...
 """
 
 $ prog/s --foo 1 2 3
-"foo: unknown command: 2"
+"foo: unknown command 2"
 
 r"""
 usage: foo [--foo BAR]...
@@ -3124,3 +3124,32 @@ usage: foo
 
 $ prog
 "spec-error"
+
+#
+# Required flags - issue #61
+#
+
+r"""
+usage: prog --foo
+"""
+
+$ prog/r
+"prog: missing --foo"
+
+r"""
+usage: prog --foo --bar
+"""
+
+$ prog/r
+"prog: missing --foo, --bar"
+
+r"""
+usage: prog (--foo --bar) --qux
+"""
+
+# only reports error of first group
+$ prog/r
+"prog: missing --foo, --bar"
+
+$ prog/r --yikes
+"prog: unknown option --yikes. Expected --foo, --bar"

@@ -44,10 +44,16 @@ isolate = false
 type Options =  { stopAt       :: Array String
                 , optionsFirst :: Boolean
                 , smartOptions :: Boolean
+                , requireFlags :: Boolean
                 }
 
 defaultOptions :: Options
-defaultOptions = { stopAt: [], optionsFirst: false, smartOptions: true }
+defaultOptions = {
+  stopAt: []
+, optionsFirst: false
+, smartOptions: true
+, requireFlags: false
+}
 
 type Test = { help  :: String
             , cases :: Array Case
@@ -122,7 +128,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , fail
             Nothing
             [ "a", "--foo", "-f=10" ]
-            "Unknown option: --foo"
+            "Unknown option --foo"
         ]
 
     , test
@@ -174,7 +180,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         options:
           -i, --input FILE
         """
-        [ fail Nothing [] "Expected -i|--input=FILE"
+        [ fail Nothing [] "Missing (-i|--input=FILE)"
         , pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -189,10 +195,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
         """
         [ fail Nothing []
-          $ "Expected -i|--input=FILE, -o|--output=FILE"
+          $ "Missing (-i|--input=FILE)"
 
         , fail Nothing [ "-i", "bar" ]
-          $ "Expected -o|--output=FILE"
+          $ "Missing (-o|--output=FILE)"
 
         , pass Nothing
             [ "-i", "bar", "-o", "bar" ]
@@ -219,10 +225,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -r, --redirect FILE [env: QUX]
         """
         [ fail Nothing []
-          $ "Expected -i|--input=FILE -r|--redirect=FILE, -o|--output=FILE"
+          $ "Missing (-i|--input=FILE)"
 
         , fail Nothing [ "-i", "bar", "-r", "bar" ]
-            "Expected -o|--output=FILE"
+            "Missing (-o|--output=FILE)"
 
         , pass Nothing
             [ "-i", "bar", "-r", "bar", "-o", "bar" ]
@@ -262,7 +268,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE
         """
-        [ fail Nothing [] "Expected -i|--input=FILE"
+        [ fail Nothing [] "Missing (-i|--input=FILE)"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail Nothing [ "-i", "bar" ] "Expected <env>"
         , pass Nothing
@@ -274,7 +280,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-o"       :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-            "Expected -i|--input=FILE"
+            "Unexpected option -o. Expected (-i|--input=FILE)"
         ]
 
     , test
@@ -332,10 +338,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "b" :> D.bool true ]
         , fail Nothing
             [ "a", "b" ]
-            "Unexpected command: b"
+            "Unexpected command b"
         , fail Nothing
             [ "b", "a" ]
-            "Unexpected command: a"
+            "Unexpected command a"
         , fail Nothing [] ""
         ]
 
@@ -429,17 +435,17 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
         , fail Nothing
             [ "foo" ]
-            "Expected -f|--foo=FOZ..."
+            "Missing (-f|--foo=FOZ)"
         , fail Nothing
             [ "foo", "-o", "-i", "-bax" ]
-            "Expected -f|--foo=FOZ..."
+            "Missing (-f|--foo=FOZ)"
         ]
 
     , test
         """
         usage: prog [foo]
         """
-        [ fail Nothing [ "goo" ] "Unknown command: goo" ]
+        [ fail Nothing [ "goo" ] "Unknown command goo" ]
 
     , test
         """
@@ -761,17 +767,17 @@ parserGenSpec = \_ -> describe "The parser generator" do
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-ifxy=foo", "-i" ]
-                  "Unknown option: -y=foo"
+                  "Unknown option -y=foo"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-xoz" ]
-                  "Unknown option: -z"
+                  "Unknown option -z"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-oxzfoo", "-i" ]
-                 "Unknown option: -zfoo"
+                 "Unknown option -zfoo"
               ]
             otherwise ->
               [ pass
@@ -846,7 +852,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
               , fail
                   (Just (defaultOptions { stopAt = [ "--foo" ] }))
                   [ "--fooBAR", "-f"]
-                  "Unknown option: --fooBAR"
+                  "Unknown option --fooBAR"
               ]
             otherwise ->
               [ pass

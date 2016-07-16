@@ -64,6 +64,7 @@ type Options r = {
 , dontExit     :: Boolean      -- ^ don't exit the process upon failure
 , smartOptions :: Boolean      -- ^ parse singleton groups as opts if possible
 , stopAt       :: Array String -- ^ stop parsing at these custom EOA markers
+, requireFlags :: Boolean      -- ^ do not ignore missing flags
 }
 
 defaultOptions :: Options {}
@@ -74,6 +75,7 @@ defaultOptions = {
 , dontExit:     false
 , smartOptions: false
 , stopAt:       []
+, requireFlags: false
 }
 
 -- |

@@ -51,6 +51,7 @@ type ParseOptionsObj r = {
 type EvalOptionsObj r = {
   optionsFirst :: Boolean
 , stopAt       :: Array String
+, requireFlags :: Boolean
   | r
 }
 
@@ -58,6 +59,7 @@ type Options r = {
   smartOptions :: Boolean
 , optionsFirst :: Boolean
 , stopAt       :: Array String
+, requireFlags :: Boolean
   | r
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "neodoc",
-  "version": "0.7.0",
+  "version": "0.0.0-required-flags",
   "description": "Docopt implementation for node",
   "main": "index.js",
   "directories": {

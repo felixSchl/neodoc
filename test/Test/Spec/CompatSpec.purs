@@ -37,6 +37,7 @@ compatSpec tests =
               env  = unsafePartial $ fromJust options.env
               flagsDesc = renderFlags { optionsFirst: options.optionsFirst
                                       , smartOptions: options.smartOptions
+                                      , requireFlags: options.requireFlags
                                       }
           describe (intercalate " " (
             (toUnfoldable $ StrMap.toList env <#> \t ->

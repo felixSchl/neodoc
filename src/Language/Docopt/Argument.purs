@@ -28,7 +28,7 @@ module Language.Docopt.Argument (
 
 import Prelude
 import Data.Maybe (Maybe(..), maybe)
-import Data.List (List(..), (:))
+import Data.List (List(..), length, (:))
 import Data.Foldable (intercalate, all)
 import Data.Function (on)
 import Data.String.Ext ((^=))
@@ -146,8 +146,14 @@ prettyPrintArgNaked (EOA)          = "-- ARGS..."
 prettyPrintArgNaked (Command x)    = x.name <> (if x.repeatable then "..." else "")
 prettyPrintArgNaked (Positional x) = x.name <> (if x.repeatable then "..." else "")
 prettyPrintArgNaked (Option o)     = O.prettyPrintOptionNaked o
-prettyPrintArgNaked (Group g)      = inner <> repetition
+prettyPrintArgNaked (Group g)      = open <> inner <> close <> repetition
   where
+    showParens = g.optional ||
+                  case g.branches of
+                    x:Nil -> length x > 1
+                    xs    -> true
+    open       = if showParens then (if g.optional then "[" else "(") else ""
+    close      = if showParens then (if g.optional then "]" else ")") else ""
     inner      = intercalate " | " (prettyPrintBranchNaked <$> g.branches)
     repetition = if g.repeatable then "..." else ""
 
