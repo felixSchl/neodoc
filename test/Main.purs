@@ -42,5 +42,5 @@ main = launchAff do
     solverSpec      unit
     parserGenSpec   unit
     docoptSpec      unit
-    compatSpec      tests
     foreignSpec     tests
+    compatSpec      tests

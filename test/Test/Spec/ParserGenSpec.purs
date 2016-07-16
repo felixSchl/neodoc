@@ -128,7 +128,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , fail
             Nothing
             [ "a", "--foo", "-f=10" ]
-            "Unknown option: --foo"
+            "Unknown option --foo"
         ]
 
     , test
@@ -280,7 +280,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-o"       :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-            "Expected (-i|--input=FILE), but got -o"
+            "Unexpected option -o. Expected (-i|--input=FILE)"
         ]
 
     , test
@@ -338,10 +338,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
             [ "b" :> D.bool true ]
         , fail Nothing
             [ "a", "b" ]
-            "Unexpected command: b"
+            "Unexpected command b"
         , fail Nothing
             [ "b", "a" ]
-            "Unexpected command: a"
+            "Unexpected command a"
         , fail Nothing [] ""
         ]
 
@@ -445,7 +445,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         """
         usage: prog [foo]
         """
-        [ fail Nothing [ "goo" ] "Unknown command: goo" ]
+        [ fail Nothing [ "goo" ] "Unknown command goo" ]
 
     , test
         """
@@ -767,17 +767,17 @@ parserGenSpec = \_ -> describe "The parser generator" do
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-ifxy=foo", "-i" ]
-                  "Unknown option: -y=foo"
+                  "Unknown option -y=foo"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-xoz" ]
-                  "Unknown option: -z"
+                  "Unknown option -z"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-oxzfoo", "-i" ]
-                 "Unknown option: -zfoo"
+                 "Unknown option -zfoo"
               ]
             otherwise ->
               [ pass
@@ -852,7 +852,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
               , fail
                   (Just (defaultOptions { stopAt = [ "--foo" ] }))
                   [ "--fooBAR", "-f"]
-                  "Unknown option: --fooBAR"
+                  "Unknown option --fooBAR"
               ]
             otherwise ->
               [ pass
