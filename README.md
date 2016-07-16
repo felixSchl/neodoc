@@ -127,6 +127,9 @@ Options:
   options. For example: `[-f ARG...]` means `[-f=ARG...]`
 * `opts.stopAt` - Stop parsing at the given options, i.e. `[ -n ]`. It's value
   will be the rest of argv.
+* `opts.requireFlags` - Require flags be present in the input. In neodoc, flags
+  are optional by default and can be omitted. This option forces the user to
+  pass flags explicitly, failing the parse otherwise.
 
 For example:
 
