@@ -13,7 +13,7 @@ import Language.Docopt.Origin as Origin
 import Language.Docopt.Origin (Origin())
 import Language.Docopt.RichValue (RichValue())
 import Language.Docopt.RichValue (from, getOrigin) as RValue
-import Language.Docopt.Argument (Argument(..)) as D
+import Language.Docopt.Argument (Argument(..), OptionArgument(..)) as D
 import Language.Docopt.ArgParser.Parser.Options (Options())
 
 -- Find a fallback value for the given argument.
@@ -29,7 +29,7 @@ getFallbackValue options env x = do
   fromEnv _                              = Nothing
 
   fromDefault :: D.Argument -> Maybe Value
-  fromDefault (D.Option (o@{ arg: Just { default: Just v } }))
+  fromDefault (D.Option (o@{ arg: Just (D.OptionArgument { default: Just v }) }))
     = pure if o.repeatable
               then ArrayValue $ Value.intoArray v
               else v
@@ -42,7 +42,7 @@ getFallbackValue options env x = do
       | not options.requireFlags
       = pure if o.repeatable  then ArrayValue []
                               else BoolValue false
-    go (D.Option (o@{ arg: Just { optional: true } }))
+    go (D.Option (o@{ arg: Just (D.OptionArgument { optional: true }) }))
       | not options.requireFlags
       = pure if o.repeatable  then ArrayValue []
                               else BoolValue false

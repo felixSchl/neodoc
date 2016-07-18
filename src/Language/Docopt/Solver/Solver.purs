@@ -31,7 +31,7 @@ import Data.String as Str
 import Language.Docopt.Argument
 import Language.Docopt.Argument (isFree) as Arg
 import Language.Docopt.SpecParser.Desc as Desc
-import Language.Docopt.Argument (Argument(..), Branch)
+import Language.Docopt.Argument (Argument(..), Branch, OptionArgument(..))
 import Language.Docopt.Errors (SolveError(..))
 import Language.Docopt.SpecParser (Desc(), Usage()) as SpecParser
 import Language.Docopt.SpecParser.Usage.Argument (Branch, Argument(..)) as U
@@ -124,7 +124,7 @@ solveBranch as ds = go as
                         , branches: (singleton $ singleton $ Option $
                               { flag:       Desc.getFlag opt.name
                               , name:       Desc.getName opt.name
-                              , arg:        opt.arg
+                              , arg:        OptionArgument <$> opt.arg
                               , env:        opt.env
                               , repeatable: false
                               }
@@ -231,7 +231,7 @@ solveBranch as ds = go as
           let
             adjArgMatch = do
               guard (not o.repeatable)
-              (arg@{ name }) <- descMatch.arg
+              (arg@{ name }) <- unOptionArgument <$> descMatch.arg
               adjArg <- mAdjArg
               (r /\ n /\ optional) <- case adjArg of
                 (U.Positional pos) -> pure (pos.repeatable /\ pos.name /\ false)
@@ -250,7 +250,8 @@ solveBranch as ds = go as
 
           case adjArgMatch of
             Nothing -> do
-              if not (fromMaybe true $ (_.optional <$> descMatch.arg))
+              if not (fromMaybe true
+                      $ (_.optional <<< unOptionArgument <$> descMatch.arg))
                  then do
                     fail
                       $ "Option-Argument specified in options-section missing"
@@ -265,7 +266,7 @@ solveBranch as ds = go as
               pure  $ Resolved
                     $ Slurp
                     $ singleton
-                    $ Option $ descMatch  { arg = (pure arg)
+                    $ Option $ descMatch  { arg = pure (OptionArgument arg)
                                           , repeatable = r
                                           }
 
@@ -285,7 +286,7 @@ solveBranch as ds = go as
               arg <- resolveOptArg o.arg desc.arg
               pure  { flag:       Desc.getFlag desc.name
                     , name:       Desc.getName desc.name
-                    , arg:        arg
+                    , arg:        OptionArgument <$> arg
                     , env:        desc.env
                     , repeatable: o.repeatable
                     }
@@ -294,7 +295,7 @@ solveBranch as ds = go as
               pure  { flag:       Nothing
                     , name:       pure n
                     , env:        Nothing
-                    , arg:        convertArg o.arg
+                    , arg:        OptionArgument <$> convertArg o.arg
                     , repeatable: o.repeatable
                     }
           where
@@ -397,7 +398,9 @@ solveBranch as ds = go as
 
               pure  $ Resolved
                     $ Keep
-                    $ cs' <> (singleton $ Option o)
+                    $ cs' <> (singleton $ Option $ o {
+                      arg = OptionArgument <$> o.arg
+                    })
 
             subsume _ _ = Nothing
 
@@ -461,7 +464,7 @@ solveBranch as ds = go as
               let
                 adjArgMatch = do
                   guard (not o.repeatable)
-                  (arg@{ name }) <- descMatch.arg
+                  (arg@{ name }) <- unOptionArgument <$> descMatch.arg
                   adjArg <- mAdjArg
                   (r /\ n /\ optional) <- case adjArg of
                     (U.Positional pos) -> pure (pos.repeatable /\ pos.name /\ false)
@@ -480,7 +483,8 @@ solveBranch as ds = go as
 
               in case adjArgMatch of
                 Nothing -> do
-                  if not (fromMaybe true $ (_.optional <$> descMatch.arg))
+                  if not (fromMaybe true
+                           $ _.optional <<< unOptionArgument <$> descMatch.arg)
                     then fail
                         $ "Option-Argument specified in options-section missing"
                           <> " -" <> String.singleton f
@@ -493,7 +497,7 @@ solveBranch as ds = go as
                   pure $ Resolved $ Slurp
                     $ (flip setRepeatable r <$> fromFoldable matches)
                       <> (singleton
-                            $ Option $ descMatch  { arg = (pure arg)
+                            $ Option $ descMatch  { arg = pure (OptionArgument arg)
                                                   , repeatable = r
                                                   })
 
@@ -526,7 +530,7 @@ solveBranch as ds = go as
 
               pure  { flag:       Desc.getFlag desc.name
                     , name:       Desc.getName desc.name
-                    , arg:        arg
+                    , arg:        OptionArgument <$> arg
                     , env:        desc.env
                     , repeatable: o.repeatable
                     }
@@ -536,9 +540,10 @@ solveBranch as ds = go as
               pure  { flag:       pure f
                     , name:       Nothing
                     , env:        Nothing
-                    , arg:        if isTrailing
-                                    then convertArg o.arg
-                                    else Nothing
+                    , arg:        OptionArgument <$>
+                                    if isTrailing
+                                      then convertArg o.arg
+                                      else Nothing
                     , repeatable: o.repeatable
                     }
 

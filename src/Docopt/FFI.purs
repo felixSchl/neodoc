@@ -39,7 +39,8 @@ import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign,
                     toForeign)
 import Data.Foreign.Class (readProp) as F
 import Data.Foreign.NullOrUndefined as F
-import Language.Docopt.Argument (Branch(), Argument(..), OptionArgumentObj)
+import Language.Docopt.Argument (Branch(), Argument(..), OptionArgument(..),
+                                OptionArgumentObj)
 import Unsafe.Coerce (unsafeCoerce)
 
 import Docopt as Docopt
@@ -219,7 +220,7 @@ specToForeign { shortHelp, specification, program } =
       , name:       maybe undefined F.toForeign x.name
       , env:        maybe undefined F.toForeign x.env
       , repeatable: x.repeatable
-      , arg:        maybe undefined (\a -> {
+      , arg:        maybe undefined (\(OptionArgument a) -> {
                       name:     a.name
                     , default:  maybe undefined rawValue a.default
                     , optional: a.optional
@@ -285,12 +286,12 @@ readSpec input = do
       "EOA"   /\ _ -> pure EOA
       x /\ _ -> Left (TypeMismatch "Group, Command, Positional, Option, Stdin or EOA" x)
 
-  readOptArg :: Foreign -> F (Maybe OptionArgumentObj)
+  readOptArg :: Foreign -> F (Maybe OptionArgument)
   readOptArg v = "option-argument" <?> do
     mx <- nullOrUndefined (F.readProp "arg" v)
     case mx of
       Nothing -> pure Nothing
-      Just x  -> Just <$> do
+      Just x  -> Just <<< OptionArgument <$> do
           arg <$> (ifHasProp' x "name" "<ARG>" readAsString)
               <*> (ifHasProp  x "default" readValue)
               <*> (isTruthy <$> F.readProp "optional" x)

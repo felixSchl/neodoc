@@ -56,7 +56,8 @@ import Language.Docopt.ArgParser.Parser.Atom
 import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 isRepeatable, OptionArgumentObj(),
-                                setRequired, isOptional, isGroup
+                                setRequired, isOptional, isGroup,
+                                unOptionArgument
                                 ) as D
 import Language.Docopt.Env (Env ())
 import Language.Docopt.Specification (Specification())
@@ -75,7 +76,7 @@ import Data.String.Ext (startsWith, (~~))
 
 -- | Toggle debugging on/off during development
 debug :: Boolean
-debug = true
+debug = false
 
 initialState :: StateObj
 initialState = { depth: 0, done: false }
@@ -504,7 +505,7 @@ argP _ options _ _ _ x = getInput >>= \i -> (
                               ])
     case o.name of
       Just n  | isLoptAhead -> do
-        v <- longOption term n o.arg
+        v <- longOption term n (D.unOptionArgument <$> o.arg)
         if term
             then do
               vs <- terminate x
@@ -518,7 +519,7 @@ argP _ options _ _ _ x = getInput >>= \i -> (
       otherwise ->
         case o.flag of
           Just c | isSoptAhead -> do
-            (Tuple v canTerm)  <- shortOption term c o.arg
+            (Tuple v canTerm)  <- shortOption term c (D.unOptionArgument <$> o.arg)
             if term && canTerm
                 then do
                   vs <- terminate x

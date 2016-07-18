@@ -1,6 +1,8 @@
 module Language.Docopt.Argument.Option (
     OptionObj ()
+  , OptionArgument (..)
   , OptionArgumentObj ()
+  , unOptionArgument
   , showOptionObj
   , eqOptionObj
   , hasDefault
@@ -22,28 +24,41 @@ import Language.Docopt.Value (Value(..), prettyPrintValue)
 
 type OptionObj =  { flag       :: Maybe Char
                   , name       :: Maybe String
-                  , arg        :: Maybe OptionArgumentObj
+                  , arg        :: Maybe OptionArgument
                   , env        :: Maybe String
                   , repeatable :: Boolean
                   }
 
+newtype OptionArgument = OptionArgument { name     :: String
+                                        , default  :: Maybe Value
+                                        , optional :: Boolean
+                                        }
+
+unOptionArgument :: OptionArgument -> OptionArgumentObj
+unOptionArgument (OptionArgument o) = o
+
+instance showOptionArgument :: Show OptionArgument where
+  show (OptionArgument arg) = "OptionArgument " <> showOptionArgumentObj arg
+
+instance eqOptionArgument :: Eq OptionArgument where
+  eq (OptionArgument a) (OptionArgument a') = eqOptionArgumentObj a a'
+
+derive instance genericOptionArgument :: Generic OptionArgument
+
 showOptionObj :: OptionObj -> String
 showOptionObj o = "{ flag: "       <> show o.flag
                <> ", name: "       <> show o.name
-               <> ", arg: "        <> showArg o.arg
+               <> ", arg: "        <> show o.arg
                <> ", env: "        <> show o.env
                <> ", repeatable: " <> show o.repeatable
                <> "}"
-  where
-    showArg (Just a) = showOptionArgumentObj a
-    showArg Nothing  = "Nothing"
 
 eqOptionObj :: OptionObj -> OptionObj -> Boolean
 eqOptionObj o o' = o.flag       == o'.flag
                 && o.name       == o'.name
                 && o.env        == o'.env
                 && o.repeatable == o'.repeatable
-                && argsEqual o.arg o'.arg
+                && o.arg        == o'.arg
   where
     argsEqual (Just a) (Just a') = eqOptionArgumentObj a a'
     argsEqual Nothing Nothing    = true
@@ -74,17 +89,17 @@ empty = { flag:       Nothing
         }
 
 hasDefault :: OptionObj -> Boolean
-hasDefault { arg: Just { default: Just _ } } = true
-hasDefault _                                 = false
+hasDefault { arg: Just (OptionArgument { default: Just _ }) } = true
+hasDefault _                                                  = false
 
 takesArgument :: OptionObj -> Boolean
 takesArgument { arg: Just _ } = true
 takesArgument _               = false
 
 isFlag :: OptionObj -> Boolean
-isFlag { arg: Just { default: Just (BoolValue _)}} = true
-isFlag { arg: Nothing }                            = true
-isFlag _                                           = false
+isFlag { arg: Just (OptionArgument { default: Just (BoolValue _) }) } = true
+isFlag { arg: Nothing }                                               = true
+isFlag _                                                              = false
 
 prettyPrintOption :: OptionObj -> String
 prettyPrintOption o
@@ -94,11 +109,11 @@ prettyPrintOption o
     long  = maybe "" (const ", ") (o.flag *> o.name)
               <> maybe "" ("--" <> _) o.name
     rep  = if o.repeatable then "..." else ""
-    arg' = flip (maybe "") o.arg \({ name, optional }) ->
+    arg' = flip (maybe "") o.arg \(OptionArgument { name, optional }) ->
                 (if optional then "[" else "")
                   <> "=" <> name
                   <> (if optional then "]" else "")
-    default = flip (maybe "") o.arg \({ default }) ->
+    default = flip (maybe "") o.arg \(OptionArgument { default }) ->
                 flip (maybe "") default \v->
                   " [default: " <> (prettyPrintValue v) <>  "]"
     env = flip (maybe "") o.env \k -> " [env: " <> k <> "]"
@@ -113,4 +128,4 @@ prettyPrintOptionNaked o =
     short = maybe "" (\f -> "-" <> (String.singleton f)) o.flag
     long  = maybe "" ("--" <> _) o.name
     rep  = if o.repeatable then "..." else ""
-    arg' = flip (maybe "") o.arg \({ name }) -> "="  <> name
+    arg' = flip (maybe "") o.arg \(OptionArgument { name }) -> "="  <> name

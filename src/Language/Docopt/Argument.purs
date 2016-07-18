@@ -33,9 +33,13 @@ import Data.Foldable (intercalate, all)
 import Data.Function (on)
 import Data.String.Ext ((^=))
 import Data.String as String
+import Data.Function.Memoize
+import Data.Lazy (defer)
+import Data.Generic
 
+import Language.Docopt.Value (Value(..))
 import Language.Docopt.Argument.Option as O
-import Language.Docopt.Argument.Option (OptionObj)
+import Language.Docopt.Argument.Option (OptionObj, OptionArgument)
 import Language.Docopt.Argument.Option hiding (hasDefault, isFlag, takesArgument
                                               ) as OptionReexport
 import Language.Docopt.Env as Env
@@ -75,13 +79,29 @@ showGroupObj x
   <> ", repeatable: " <> show x.repeatable
   <> "}"
 
+-- Note: We cannot use type aliases to build this ADT, unfortunately, as
+-- deriving the generic instance won't work.
 data Argument
-  = Command     CommandObj
-  | Positional  PositionalObj
-  | Option      OptionObj
-  | Group       GroupObj
+  = Command     { name       :: String
+                , repeatable :: Boolean
+                }
+  | Positional  { name       :: String
+                , repeatable :: Boolean
+                }
+  | Option      { flag       :: Maybe Char
+                , name       :: Maybe String
+                , arg        :: Maybe OptionArgument
+                , env        :: Maybe String
+                , repeatable :: Boolean
+                }
+  | Group       { optional   :: Boolean
+                , branches   :: List Branch
+                , repeatable :: Boolean
+                }
   | EOA
   | Stdin
+
+derive instance genericArgument :: Generic Argument
 
 instance showArgument :: Show Argument where
   show (EOA)          = "EOA"
@@ -189,7 +209,7 @@ takesArgument (Option o) = O.takesArgument o
 takesArgument _          = false
 
 getArgument :: Argument -> Maybe O.OptionArgumentObj
-getArgument (Option o) = o.arg
+getArgument (Option o) = O.unOptionArgument <$> o.arg
 getArgument _          = Nothing
 
 getEnvKey :: Argument -> Maybe String
