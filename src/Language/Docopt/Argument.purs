@@ -36,6 +36,7 @@ import Data.String as String
 import Data.Function.Memoize
 import Data.Lazy (defer)
 import Data.Generic
+import Partial.Unsafe
 
 import Language.Docopt.Value (Value(..))
 import Language.Docopt.Argument.Option as O
@@ -102,6 +103,9 @@ data Argument
   | Stdin
 
 derive instance genericArgument :: Generic Argument
+
+instance tabulateArgument :: Tabulate Argument where
+  tabulate = unsafePartial gTabulate
 
 instance showArgument :: Show Argument where
   show (EOA)          = "EOA"

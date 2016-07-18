@@ -6,6 +6,7 @@ module Language.Docopt.ArgParser (
   ) where
 
 import Prelude
+import Data.Either (Either(..))
 import Data.List (List(), fromFoldable)
 import Data.Either (Either())
 import Data.Tuple (Tuple(), fst)
