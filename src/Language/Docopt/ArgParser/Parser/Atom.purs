@@ -14,7 +14,7 @@ import Data.Maybe (Maybe(..), maybe, fromMaybe, isNothing)
 import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), Result(..), fail,
                             parseFailedFatal, parseFailed, unParserT, fatal) as P
 import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>), choice) as P
-import Text.Parsing.Parser.Pos (Position) as P
+import Text.Parsing.Parser.Pos (Position(..)) as P
 import Data.String.Ext ((~~))
 import Data.String as String
 import Data.String (fromCharArray, stripPrefix)
@@ -202,7 +202,12 @@ shortOption term f a = unsafePartial $
                                           })
                                   result.remainder
                   rest = if result.hasConsumedArg then LU.tail xs else xs
-                in pushed <> rest)
+                  rest' = rest <#> \(PositionedToken p) ->
+                            PositionedToken $ p {
+                              sourcePos = case p.sourcePos of
+                                P.Position n x -> P.Position (n + 1) x
+                            }
+                in pushed <> rest')
                 (Right (Tuple value false))
                 (maybe true (const false) result.remainder)
                 (maybe pos (_.sourcePos <<< unPositionedToken) (head xs))

@@ -9,12 +9,16 @@ import Prelude
 import Debug.Profile
 import Control.Plus (empty)
 import Debug.Trace
+import Data.Foreign
+import Data.Map as Map
+import Data.Map (Map())
 import Control.Apply ((<*), (*>))
 import Data.Function (on)
 import Data.Function.Uncurried
 import Data.Bifunctor (bimap, lmap, rmap)
 import Data.Either (Either(Right, Left))
-import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing, isJust)
+import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing, isJust, fromJust)
+import Unsafe.Coerce
 import Data.List (List(..), reverse, singleton, concat, length, (:),
                   some, filter, head, toUnfoldable, sortBy, groupBy, last, null,
                   tail, many, mapWithIndex)
@@ -32,6 +36,7 @@ import Data.Array as A
 import Data.Array.Partial as AU
 import Data.Monoid (class Monoid, mempty)
 import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple.Nested ((/\))
 import Control.Monad.Transformerless.RWS (RWS(), evalRWS, ask)
 import Control.Monad.Transformerless.RWS (modify, get) as State
 import Data.StrMap (StrMap())
@@ -79,7 +84,35 @@ debug :: Boolean
 debug = false
 
 initialState :: StateObj
-initialState = { depth: 0, done: false }
+initialState = {
+  depth: 0
+, done:  false
+, cache: Map.empty
+}
+
+withLocalCache :: forall a. Parser a -> Parser a
+withLocalCache p = P.ParserT \st -> do
+  storedState :: StateObj <- State.get
+  State.modify \s -> s { cache = Map.empty :: Cache }
+  v <- P.unParserT p st
+  State.modify \s -> s { cache = storedState.cache }
+  pure v
+
+cached
+  :: Required (Indexed D.Argument)
+  -> Parser (List (Tuple D.Argument RichValue))
+  -> Parser (List (Tuple D.Argument RichValue))
+cached a p = P.ParserT \(s@(P.PState i _)) -> do
+  state :: StateObj <- State.get
+  let key = i /\ a
+  maybe'
+    (\_ -> do
+      v <- P.unParserT p s
+      State.modify \s -> s { cache = Map.alter (const (pure v)) key s.cache }
+      pure v
+    )
+    pure
+    (Map.lookup key state.cache)
 
 modifyDepth :: (Int -> Int) -> Parser Unit
 modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
@@ -124,7 +157,8 @@ spec xs options = do
     toplevel = concat xs
     parsers
       = toplevel <#> \branch -> do
-          vs <- exhaustP toplevel true false 0 branch
+          vs <- withLocalCache do
+            exhaustP toplevel true false 0 branch
           pure (Tuple branch vs)
           <* eof toplevel
 
@@ -137,7 +171,6 @@ spec xs options = do
 
   -- Parse a list of arguments.
   -- Take care of clumping free vs. non-free (fixed) arguments.
-  -- Represented as `FnX` to take advantage of inlining at compile time.
   exhaustP
     :: forall r
      . List D.Branch   -- ^ the top-level branches
@@ -166,16 +199,15 @@ spec xs options = do
       i <- getInput
       _debug \_->
           "parsing clump: " <> prettyPrintArgClump c
-        <> ", skippable: "   <> show skippable
-        <> ", isSkipping: "  <> show isSkipping
-        <> ", input: "       <> show (intercalate " " $ Token.getSource <$> i)
+        <> ", skippable: "  <> show skippable
+        <> ", isSkipping: " <> show isSkipping
+        <> ", input: "      <> show (intercalate " " $ Token.getSource <$> i)
       go l c
 
       where
       go l (Fixed xs) = concat <$> for xs (argP' skippable isSkipping l)
 
       go l (Free xs) =
-        -- profileA "draw" \_ -> draw
         draw
           (xs `mapWithIndex'` \x ix -> Required (Indexed ix x))
           Map.empty
@@ -218,7 +250,7 @@ spec xs options = do
 
           -- parse the next argument. failure will cause the argument to be put at
           -- the back of the queue and the number of retries to be cut down by one.
-          vs <- P.try $ mod p
+          vs <- cached x $ P.try $ mod p
 
           _debug \_->
             "draw: matched: " <> (intercalate ", " $
@@ -310,7 +342,8 @@ spec xs options = do
               if skippable || null i
                 then
                   if not isSkipping
-                    then exhaustP toplevel true true l args
+                    then withLocalCache do
+                      exhaustP toplevel true true l args
                     else pure fallbacks
                 else expected args i
 
@@ -333,7 +366,6 @@ spec xs options = do
         draw _ _ _ = pure Nil
 
     -- Parse a single argument from argv.
-    -- Represented as `FnX` to take advantage of inlining at compile time.
     argP'
       :: forall r
        . Boolean       -- ^ can we skip using fallback values?
@@ -359,7 +391,10 @@ spec xs options = do
       -- For groups, each branch is run and analyzed.
       argP g@(D.Group grp) = do
         -- Create a parser for each branch in the group
-        let parsers = exhaustP toplevel skippable isSkipping l <$> grp.branches
+        let
+          parsers = grp.branches <#> \branch ->
+            withLocalCache do
+              exhaustP toplevel skippable isSkipping l branch
 
         -- Evaluate the parsers, selecting the result with the most
         -- non-substituted values.

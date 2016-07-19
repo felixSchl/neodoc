@@ -28,6 +28,7 @@ module Language.Docopt.Argument (
 
 import Prelude
 import Data.Maybe (Maybe(..), maybe)
+import Data.Tuple.Nested ((/\))
 import Data.List (List(..), length, (:))
 import Data.Foldable (intercalate, all)
 import Data.Function (on)
@@ -115,9 +116,19 @@ instance showArgument :: Show Argument where
   show (Group g)      = "Group "      <> showGroupObj g
   show (Option o)     = "Option " <> O.showOptionObj o
 
+-- | The ord instance for arguments uses the Tuple semantics for Ord
 instance ordArgument :: Ord Argument where
-  -- XXX: Implement a more efficient `compare` function
-  compare = compare `on` show
+  compare (EOA)   (EOA)   = GT
+  compare (Stdin) (Stdin) = GT
+  compare (Command x) (Command x') = x `(compare `on` f)` x'
+    where f x = x.repeatable /\ x.name
+  compare (Positional x) (Positional x') = x `(compare `on` f)` x'
+    where f x = x.repeatable /\ x.name
+  compare (Option x) (Option x') = x `(compare `on` f)` x'
+    where f x = x.repeatable /\ x.flag /\ x.name /\ x.arg /\ x.env
+  compare (Group x) (Group x') = x `(compare `on` f)` x'
+    where f x = x.repeatable /\ x.optional /\ x.branches
+  compare _ _ = LT
 
 instance eqArgument :: Eq Argument where
   eq (EOA)            (EOA)             = true

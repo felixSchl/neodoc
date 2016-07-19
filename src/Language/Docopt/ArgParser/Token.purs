@@ -7,12 +7,14 @@ module Language.Docopt.ArgParser.Token (
   ) where
 
 import Prelude
+import Data.Function (on)
+import Data.Tuple.Nested ((/\))
 import Data.Maybe (Maybe(), maybe)
 import Data.Foldable (intercalate)
 import Data.List (List())
 import Data.String (fromCharArray)
 import Data.Array as A
-import Text.Parsing.Parser.Pos (Position) as P
+import Text.Parsing.Parser.Pos (Position(..)) as P
 
 import Language.Docopt.Value (Value, prettyPrintValue) as D
 data Token
@@ -29,6 +31,12 @@ instance showToken :: Show Token where
   show (EOA  xs)     = "EOA "  <> show xs
   show (Stdin)       = "Stdin"
 
+instance ordToken :: Ord Token where
+  compare = compare `on` show -- XXX
+
+instance eqToken :: Eq Token where
+  eq = eq `on` show -- XXX
+
 prettyPrintToken :: Token -> String
 prettyPrintToken (Stdin) = "-"
 prettyPrintToken (EOA xs) = "-- " <> intercalate " " (D.prettyPrintValue <$> xs)
@@ -43,6 +51,20 @@ data PositionedToken = PositionedToken
   , token     :: Token
   , source    :: String
   }
+
+instance ordPositionedToken :: Ord PositionedToken where
+  compare = compare `on` \(PositionedToken {
+    sourcePos: P.Position l r
+  , token
+  , source
+  }) -> l /\ r /\ source /\ token
+
+instance eqPositionedToken :: Eq PositionedToken where
+  eq = eq `on` \(PositionedToken {
+    sourcePos
+  , token
+  , source
+  }) -> source /\ token /\ sourcePos
 
 unPositionedToken :: PositionedToken -> { sourcePos :: P.Position
                                         , token     :: Token

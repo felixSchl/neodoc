@@ -15,6 +15,7 @@ module Language.Docopt.Argument.Option (
 
 import Prelude
 import Data.Function (on)
+import Data.Tuple.Nested ((/\))
 import Control.Apply ((*>))
 import Data.Maybe (Maybe(..), maybe, isJust)
 import Data.Generic (class Generic, gEq, gShow)
@@ -42,6 +43,11 @@ instance showOptionArgument :: Show OptionArgument where
 
 instance eqOptionArgument :: Eq OptionArgument where
   eq (OptionArgument a) (OptionArgument a') = eqOptionArgumentObj a a'
+
+-- | The ord instance for option arguments uses the Tuple semantics for Ord
+instance ordArgument :: Ord OptionArgument where
+  compare (OptionArgument x) (OptionArgument x') = x `(compare `on` f)` x'
+    where f x = x.optional /\ x.name /\ x.default
 
 derive instance genericOptionArgument :: Generic OptionArgument
 
