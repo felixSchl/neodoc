@@ -51,6 +51,14 @@ instance eqValue :: Eq Value where
   eq (IntValue    x) (IntValue    x') = x  == x'
   eq _               _                = false
 
+instance ordValue :: Ord Value where
+  compare (StringValue s) (StringValue s') = s  `compare` s'
+  compare (BoolValue   b) (BoolValue   b') = b  `compare` b'
+  compare (ArrayValue xs) (ArrayValue xs') = xs `compare` xs'
+  compare (FloatValue  x) (FloatValue  x') = x  `compare` x'
+  compare (IntValue    x) (IntValue    x') = x  `compare` x'
+  compare _               _                = LT
+
 isSameValueType :: Value -> Value -> Boolean
 isSameValueType (StringValue _) (StringValue _) = true
 isSameValueType (BoolValue   _) (BoolValue   _) = true

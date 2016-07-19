@@ -19,7 +19,7 @@ opt'
 opt' f n a e r = Option {
   flag:       f
 , name:       n
-, arg:        a
+, arg:        OptionArgument <$> a
 , env:        e
 , repeatable: r
 }
@@ -41,7 +41,7 @@ sopt' :: Char -> (Maybe OptionArgumentObj) -> IsRepeatable -> Argument
 sopt' f a r = Option {
   flag:       pure f
 , name:       Nothing
-, arg:        a
+, arg:        OptionArgument <$> a
 , env:        Nothing
 , repeatable: r
 }
@@ -63,7 +63,7 @@ lopt' :: String -> (Maybe OptionArgumentObj) -> IsRepeatable -> Argument
 lopt' n a r = Option {
   flag:       Nothing
 , name:       pure n
-, arg:        a
+, arg:        OptionArgument <$> a
 , env:        Nothing
 , repeatable: r
 }
@@ -101,7 +101,7 @@ soptE' :: Char -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> Argumen
 soptE' f a r e = Option {
   flag:       pure f
 , name:       Nothing
-, arg:        a
+, arg:        OptionArgument <$> a
 , env:        pure e
 , repeatable: r
 }
@@ -123,7 +123,7 @@ loptE' :: String -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> Argum
 loptE' n a r e = Option {
   flag:       Nothing
 , name:       pure n
-, arg:        a
+, arg:        OptionArgument <$> a
 , env:        pure e
 , repeatable: r
 }

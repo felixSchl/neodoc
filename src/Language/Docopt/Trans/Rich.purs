@@ -27,6 +27,7 @@ import Language.Docopt.Env (Env)
 import Language.Docopt.Env as Env
 import Language.Docopt.Argument (Argument(..), Branch(), isRepeatable,
                                 setRepeatable, setRepeatableOr,
+                                unOptionArgument, OptionArgument(..),
                                 isCommand, isFlag) as D
 import Language.Docopt.ArgParser (ValueMapping)
 import Language.Docopt.RichValue (RichValue(..), unRichValue)
@@ -144,9 +145,9 @@ reduceUsage = Map.values <<< reduceBranches false
     resolveAcrossBranches :: D.Argument -> D.Argument -> D.Argument
     resolveAcrossBranches (D.Option o) (D.Option o')
         = D.Option (o {
-                    arg = do
-                      a  <- o.arg  <|> o'.arg
-                      a' <- o'.arg <|> o.arg
+                    arg = D.OptionArgument <$> do
+                      a  <- D.unOptionArgument <$> (o.arg  <|> o'.arg)
+                      a' <- D.unOptionArgument <$> (o'.arg <|> o.arg)
                       pure {
                         name:     a.name
                       , default:  a.default  <|> a'.default
@@ -160,9 +161,9 @@ reduceUsage = Map.values <<< reduceBranches false
     resolveInSameBranch :: D.Argument -> D.Argument -> D.Argument
     resolveInSameBranch (D.Option o) (D.Option o')
         = D.Option (o {
-                    arg = do
-                      a  <- o.arg  <|> o'.arg
-                      a' <- o'.arg <|> o.arg
+                    arg = D.OptionArgument <$> do
+                      a  <- D.unOptionArgument <$> (o.arg  <|> o'.arg)
+                      a' <- D.unOptionArgument <$> (o'.arg <|> o.arg)
                       pure {
                         name:     a.name
                       , default:  a.default  <|> a'.default

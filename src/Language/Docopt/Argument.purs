@@ -28,14 +28,20 @@ module Language.Docopt.Argument (
 
 import Prelude
 import Data.Maybe (Maybe(..), maybe)
+import Data.Tuple.Nested ((/\))
 import Data.List (List(..), length, (:))
 import Data.Foldable (intercalate, all)
 import Data.Function (on)
 import Data.String.Ext ((^=))
 import Data.String as String
+import Data.Function.Memoize
+import Data.Lazy (defer)
+import Data.Generic
+import Partial.Unsafe
 
+import Language.Docopt.Value (Value(..))
 import Language.Docopt.Argument.Option as O
-import Language.Docopt.Argument.Option (OptionObj)
+import Language.Docopt.Argument.Option (OptionObj, OptionArgument)
 import Language.Docopt.Argument.Option hiding (hasDefault, isFlag, takesArgument
                                               ) as OptionReexport
 import Language.Docopt.Env as Env
@@ -75,13 +81,32 @@ showGroupObj x
   <> ", repeatable: " <> show x.repeatable
   <> "}"
 
+-- Note: We cannot use type aliases to build this ADT, unfortunately, as
+-- deriving the generic instance won't work.
 data Argument
-  = Command     CommandObj
-  | Positional  PositionalObj
-  | Option      OptionObj
-  | Group       GroupObj
+  = Command     { name       :: String
+                , repeatable :: Boolean
+                }
+  | Positional  { name       :: String
+                , repeatable :: Boolean
+                }
+  | Option      { flag       :: Maybe Char
+                , name       :: Maybe String
+                , arg        :: Maybe OptionArgument
+                , env        :: Maybe String
+                , repeatable :: Boolean
+                }
+  | Group       { optional   :: Boolean
+                , branches   :: List Branch
+                , repeatable :: Boolean
+                }
   | EOA
   | Stdin
+
+derive instance genericArgument :: Generic Argument
+
+instance tabulateArgument :: Tabulate Argument where
+  tabulate = unsafePartial gTabulate
 
 instance showArgument :: Show Argument where
   show (EOA)          = "EOA"
@@ -91,9 +116,19 @@ instance showArgument :: Show Argument where
   show (Group g)      = "Group "      <> showGroupObj g
   show (Option o)     = "Option " <> O.showOptionObj o
 
+-- | The ord instance for arguments uses the Tuple semantics for Ord
 instance ordArgument :: Ord Argument where
-  -- XXX: Implement a more efficient `compare` function
-  compare = compare `on` show
+  compare (EOA)   (EOA)   = GT
+  compare (Stdin) (Stdin) = GT
+  compare (Command x) (Command x') = x `(compare `on` f)` x'
+    where f x = x.repeatable /\ x.name
+  compare (Positional x) (Positional x') = x `(compare `on` f)` x'
+    where f x = x.repeatable /\ x.name
+  compare (Option x) (Option x') = x `(compare `on` f)` x'
+    where f x = x.repeatable /\ x.flag /\ x.name /\ x.arg /\ x.env
+  compare (Group x) (Group x') = x `(compare `on` f)` x'
+    where f x = x.repeatable /\ x.optional /\ x.branches
+  compare _ _ = LT
 
 instance eqArgument :: Eq Argument where
   eq (EOA)            (EOA)             = true
@@ -189,7 +224,7 @@ takesArgument (Option o) = O.takesArgument o
 takesArgument _          = false
 
 getArgument :: Argument -> Maybe O.OptionArgumentObj
-getArgument (Option o) = o.arg
+getArgument (Option o) = O.unOptionArgument <$> o.arg
 getArgument _          = Nothing
 
 getEnvKey :: Argument -> Maybe String
