@@ -12,8 +12,8 @@ import Control.Alt ((<|>))
 import Control.MonadPlus (guard)
 import Control.MonadPlus.Partial (mpartition)
 import Data.Bifunctor (bimap)
-import Data.Either (Either(..), either)
-import Data.Foldable (any)
+import Data.Either (Either(..), either, fromRight)
+import Data.Foldable (any, elem)
 import Data.Function (on)
 import Data.Functor ((<$))
 import Data.List (findIndex, groupBy, List(..), length, filter, singleton,
@@ -27,6 +27,8 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested ((/\))
 import Data.String as Str
+import Data.NonEmpty (NonEmpty(..), (:|))
+import Data.NonEmpty as NonEmpty
 
 import Language.Docopt.Argument
 import Language.Docopt.Argument (isFree) as Arg
@@ -112,41 +114,38 @@ solveBranch as ds = go as
           -> List Argument
         expand ds surroundingArgs = reverse $ go ds surroundingArgs Nil
           where
-          go (Cons (x@(Desc.OptionDesc opt)) xs) surroundingArgs acc = do
+          go :: List SpecParser.Desc -> List Argument -> List Argument -> List Argument
+          go (Cons (x@(Desc.OptionDesc desc)) xs) surroundingArgs acc = do
             -- Assuming description and usage have already been merged,
             -- find all options that are not present in the surrounding
             -- "free" area and add them.
-            if isJust (findIndex isMatch surroundingArgs)
+            let
+                -- XXX: `unsafePartial` is required here since this is
+                -- supposed to be a pure function. The change in the
+                -- representation of aliases to a stronger type highlights
+                -- this potential scenario. This needs to be revisited,
+                -- probably by using the same approach for descriptions
+                -- themselves.
+                aliases = unsafePartial $ fromRight $ convertToAlias desc.name
+            if isJust (findIndex (isMatch aliases) surroundingArgs)
                 then go xs surroundingArgs acc
                 else
                   let z = Group {
                           optional: true
                         , branches: (singleton $ singleton $ Option $
-                              { flag:       Desc.getFlag opt.name
-                              , name:       Desc.getName opt.name
-                              , arg:        OptionArgument <$> opt.arg
-                              , env:        opt.env
+                              { aliases:    aliases
+                              , arg:        OptionArgument <$> desc.arg
+                              , env:        desc.env
                               , repeatable: false
                               }
                           )
-                        , repeatable: opt.repeatable
+                        , repeatable: desc.repeatable
                         }
                   in go xs (z:surroundingArgs) (z:acc)
             where
-              isMatch (Option o)
-                = if isJust (Desc.getFlag opt.name) &&
-                      isJust (o.flag)
-                      then fromMaybe false do
-                            eq <$> (Desc.getFlag opt.name)
-                                <*> o.flag
-                      else if isJust (Desc.getName opt.name) &&
-                              isJust (o.name)
-                              then fromMaybe false do
-                                    (^=) <$> (Desc.getName opt.name)
-                                          <*> o.name
-                              else false
-              isMatch (Group grp) = any isMatch (concat grp.branches)
-              isMatch _           = false
+              isMatch aliases (Option o)  = any (_ `elem` aliases) o.aliases
+              isMatch aliases (Group grp) = any (isMatch aliases) (concat grp.branches)
+              isMatch _ _                 = false
 
           go (Cons _ xs) surroundingArgs acc = go xs surroundingArgs acc
           go _ _ acc = acc
@@ -284,16 +283,21 @@ solveBranch as ds = go as
               $ "Multiple option descriptions for option --" <> n
             (Cons (Desc.OptionDesc desc) Nil) -> do
               arg <- resolveOptArg o.arg desc.arg
-              pure  { flag:       Desc.getFlag desc.name
-                    , name:       Desc.getName desc.name
+
+              -- coerce the descriptions representation of an option name
+              -- into that understood by `D.Argument`.
+              -- TODO: update the descriptions representation to something
+              --       similar.
+              aliases <- convertToAlias desc.name
+
+              pure  { aliases:    aliases
                     , arg:        OptionArgument <$> arg
                     , env:        desc.env
                     , repeatable: o.repeatable
                     }
             -- default fallback: construct the option from itself alone
             otherwise ->
-              pure  { flag:       Nothing
-                    , name:       pure n
+              pure  { aliases:    NonEmpty (Long n) Nil
                     , env:        Nothing
                     , arg:        OptionArgument <$> convertArg o.arg
                     , repeatable: o.repeatable
@@ -378,8 +382,10 @@ solveBranch as ds = go as
                                             ) fs
                                     )
                                   )
-                                  { flag:       pure f
-                                  , name:       Desc.getName d.name
+                                  { aliases: Short f
+                                                :| maybe  Nil
+                                                          (singleton <<< Long)
+                                                          (Desc.getName d.name)
                                   , arg:        pure a
                                   , env:        d.env
                                   , repeatable: o.repeatable
@@ -527,9 +533,9 @@ solveBranch as ds = go as
                             else fail
                               $ "Stacked option -" <> String.singleton f
                                   <> " may not specify arguments"
+              aliases <- convertToAlias desc.name
 
-              pure  { flag:       Desc.getFlag desc.name
-                    , name:       Desc.getName desc.name
+              pure  { aliases:    aliases
                     , arg:        OptionArgument <$> arg
                     , env:        desc.env
                     , repeatable: o.repeatable
@@ -537,8 +543,7 @@ solveBranch as ds = go as
 
             -- default fallback: construct the option from itself alone
             otherwise ->
-              pure  { flag:       pure f
-                    , name:       Nothing
+              pure  { aliases:    (Short f) :| Nil
                     , env:        Nothing
                     , arg:        OptionArgument <$>
                                     if isTrailing
@@ -584,6 +589,20 @@ solveBranch as ds = go as
       pure  { name:     a.name
             , optional: a.optional
             , default:  Nothing }
+
+    convertToAlias
+      :: Desc.Name
+      -> Either SolveError (NonEmpty List OptionName)
+    convertToAlias n =
+      maybe (fail "Unnamed option") pure do
+                  ((:|) <$> (Short <$> Desc.getFlag n)
+                        <*> ((singleton <<< Long <$> Desc.getName n)
+                                    <|> pure Nil)
+                  ) <|>
+                  ((:|) <$> (Long <$> Desc.getName n)
+                        <*> ((singleton <<< Short <$> Desc.getFlag n)
+                                    <|> pure Nil)
+                  )
 
 solveUsage
   :: SpecParser.Usage

@@ -21,18 +21,21 @@ import Debug.Trace
 import Data.Function.Uncurried
 import Data.Bifunctor (lmap)
 import Data.Maybe (Maybe(..), maybe, fromMaybe, isJust)
-import Data.List (toUnfoldable, List(Nil), fromFoldable)
+import Data.List (toUnfoldable, List(Nil), (:), fromFoldable)
+import Data.String.Ext ((~~))
 import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
 import Data.Tuple (Tuple())
+import Data.Foldable (intercalate)
 import Data.Tuple.Nested ((/\))
-import Data.Array (singleton) as Array
+import Data.Array (singleton, uncons, fromFoldable) as Array
 import Data.Traversable (traverse, for)
+import Data.NonEmpty ((:|))
 import Control.Monad.Eff (Eff())
 import Data.Either (Either(..), either)
 import Data.StrMap (StrMap())
 import Control.Bind ((=<<))
 import Control.Alt (alt, (<|>))
-import Data.String (toChar) as String
+import Data.String (toChar, toCharArray, singleton) as String
 import Data.Foreign (readBoolean, readChar, readArray, readString, typeOf, toForeign,
                     readInt, readNumber, unsafeReadTagged) as F
 import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign,
@@ -40,7 +43,8 @@ import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign,
 import Data.Foreign.Class (readProp) as F
 import Data.Foreign.NullOrUndefined as F
 import Language.Docopt.Argument (Branch(), Argument(..), OptionArgument(..),
-                                OptionArgumentObj)
+                                OptionArgumentObj, OptionName())
+import Language.Docopt.Argument (OptionName(..)) as OName
 import Unsafe.Coerce (unsafeCoerce)
 
 import Docopt as Docopt
@@ -177,6 +181,14 @@ parse = mkFn2 go
       docopt <- Docopt.parse helpText opts
       pure $ specToForeign docopt
 
+readOptionName :: String -> Either String OptionName
+readOptionName s = case fromFoldable (String.toCharArray s) of
+  '-' : '-' : '-' : _  -> Left "Must not start with more than 2 dashes"
+  '-' : '-' : x   : xs -> Right $ OName.Long (intercalate "" (String.singleton <$> (x:xs)))
+  '-' : x   : Nil      -> Right $ OName.Short x
+  '-' : x   : _        -> Left "Single dash mandates single character name"
+  _                    -> Left "Must start with a dash"
+
 specToForeign
   :: Docopt
   -> { specification :: Array (Array (Array Foreign))
@@ -216,8 +228,9 @@ specToForeign { shortHelp, specification, program } =
     convArg (Option x) = F.toForeign {
       type: "Option"
     , value: {
-        flag:       maybe undefined F.toForeign x.flag
-      , name:       maybe undefined F.toForeign x.name
+        aliases:    Array.fromFoldable $ x.aliases <#> case _ of
+                      OName.Short f ->  "-" ~~ String.singleton f
+                      OName.Long  n -> "--" ~~ n
       , env:        maybe undefined F.toForeign x.env
       , repeatable: x.repeatable
       , arg:        maybe undefined (\(OptionArgument a) -> {
@@ -233,11 +246,10 @@ specToForeign { shortHelp, specification, program } =
 -- |
 readSpec :: Foreign -> F Docopt
 readSpec input = do
-  shortHelp  <- F.readProp "shortHelp" input
-  program    <- F.readProp "program" input
-  jsSpec     <- F.readProp "specification" input
-  toplevel   <- F.readArray jsSpec
-  spec       <- fromFoldable <$> do
+  shortHelp                 <- F.readProp "shortHelp" input
+  program                   <- F.readProp "program" input
+  toplevel :: Array Foreign <- F.readProp "specification" input
+  spec <- fromFoldable <$> do
     for toplevel \usage -> do
       branches <- F.readArray usage
       fromFoldable <$> do
@@ -277,11 +289,20 @@ readSpec input = do
         po <$> (readAsString =<< F.readProp "name" v)
            <*> (isTruthy <$> F.readProp "repeatable" v)
       "Option" /\ (Just v) -> do
-        opt <$> (ifHasProp v "flag" readFlag)
-            <*> (ifHasProp v "name" readAsString)
-            <*> (isTruthy <$> F.readProp "repeatable" v)
-            <*> (ifHasProp v "env" readAsString)
-            <*> (readOptArg v)
+        opt
+          <$> (do
+            aliases :: Array Foreign <- F.readProp "aliases" v
+            ns <- for (fromFoldable aliases) \alias -> do
+              s <- readAsString alias
+              lmap  (\e -> JSONError $ "Invalid option alias " ~~ show s  ~~ ": " ~~ e)
+                    (readOptionName s)
+            case ns of
+              x : xs -> pure (x :| xs)
+              _      -> Left $ JSONError "Option must at least have one alias"
+          )
+          <*> (isTruthy <$> F.readProp "repeatable" v)
+          <*> (ifHasProp v "env" readAsString)
+          <*> (readOptArg v)
       "Stdin" /\ _ -> pure Stdin
       "EOA"   /\ _ -> pure EOA
       x /\ _ -> Left (TypeMismatch "Group, Command, Positional, Option, Stdin or EOA" x)
@@ -301,11 +322,11 @@ readSpec input = do
       s <- readAsString v
       F.readChar (F.toForeign s)
 
-  grp x y z     = Group      { optional: x, repeatable: y, branches: z }
-  co  x y       = Command    { name: x, repeatable: y }
-  po  x y       = Positional { name: x, repeatable: y }
-  opt a b c d e = Option     { flag: a, name: b, repeatable: c, env: d, arg: e }
-  arg x y z     = { name: x, default: y, optional: z }
+  grp x y z    = Group      { optional: x, repeatable: y, branches: z }
+  co  x y      = Command    { name: x, repeatable: y }
+  po  x y      = Positional { name: x, repeatable: y }
+  opt as r e a = Option     { aliases: as, repeatable: r, env: e, arg: a }
+  arg x y z    = { name: x, default: y, optional: z }
 
 readValue :: Foreign -> F Value
 readValue x =
