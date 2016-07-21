@@ -1,10 +1,7 @@
 module Language.Docopt.SpecParser.Desc (
     Desc (..)
-  , Name (..)
   , OptionObj ()
   , OptionArgumentObj ()
-  , getFlag
-  , getName
   , prettyPrintDesc
   , run
   , parse
@@ -13,9 +10,11 @@ module Language.Docopt.SpecParser.Desc (
 import Prelude
 import Debug.Trace
 import Data.Tuple (Tuple (Tuple))
+import Data.Tuple.Nested ((/\))
 import Data.Tuple (swap) as Tuple
 import Data.Functor (($>))
 import Data.Function (on)
+import Data.Foldable (intercalate, foldl, elem)
 import Data.String as Str
 import Control.Lazy (defer)
 import Control.Bind ((>=>))
@@ -25,11 +24,11 @@ import Control.Apply ((*>), (<*))
 import Control.MonadPlus (guard)
 import Data.String (singleton) as String
 import Data.List (List(..), (:), many, some, head, length, filter, catMaybes,
-                  reverse)
+                  reverse, singleton)
 import Text.Parsing.Parser (ParseError, fail) as P
 import Text.Parsing.Parser.Combinators ((<?>), try, choice, lookAhead, manyTill,
-                                        option, optionMaybe, notFollowedBy,
-                                        (<??>)) as P
+                                        option, optionMaybe, optional, notFollowedBy,
+                                        sepBy, sepBy1, (<??>)) as P
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(Nothing, Just), isJust, isNothing, maybe, fromMaybe)
 import Data.Generic (class Generic, gEq, gShow)
@@ -41,13 +40,20 @@ import Language.Docopt.SpecParser.Common (sameIndent, markIndent, indented,
                                      moreIndented, lessIndented)
 import Language.Docopt.SpecParser.Lexer (lexDescs)
 import Language.Docopt.SpecParser.Lexer as L
+import Language.Docopt.OptionAlias (Aliases(), OptionAlias(), (:|), prettyPrintOptionAlias)
+import Language.Docopt.OptionAlias (OptionAlias(..)) as OptionAlias
 import Language.Docopt.Value as Value
+import Partial.Unsafe
 
 -- XXX: This is duplicated from Solver.purs.
 --      Where should this live???
 posArgsEq :: String -> String -> Boolean
 posArgsEq = eq `on` (Str.toUpper <<< stripAngles)
 infixl 9 posArgsEq as ^=^
+
+notPosArgsEq :: String -> String -> Boolean
+notPosArgsEq = not <<< posArgsEq
+infixl 9 notPosArgsEq as ^/=^
 
 stripAngles :: String -> String
 stripAngles = stripPrefix <<< stripSuffix
@@ -59,27 +65,22 @@ data Desc
   = OptionDesc OptionObj
   | CommandDesc
 
-data Name
-  = Flag Char
-  | Long String
-  | Full Char String
-
 type OptionObj = {
-  name       :: Name
+  aliases    :: Aliases
 , arg        :: Maybe OptionArgumentObj
 , env        :: Maybe String
 , repeatable :: Boolean
 }
 
 showOptionObj :: OptionObj -> String
-showOptionObj o = "{ name: "       <> show o.name
+showOptionObj o = "{ aliases: "    <> show o.aliases
                <> ", arg: "        <> show (OptionArgument <$> o.arg)
                <> ", env: "        <> show o.env
                <> ", repeatable: " <> show o.repeatable
                <> "}"
 
 eqOptionObj :: OptionObj -> OptionObj -> Boolean
-eqOptionObj o o' = o.name                     == o'.name
+eqOptionObj o o' = o.aliases                  == o'.aliases
                 && (OptionArgument <$> o.arg) == (OptionArgument <$> o'.arg)
                 && o.env                      == o'.env
                 && o.repeatable               == o'.repeatable
@@ -112,16 +113,6 @@ instance showOptionArgument :: Show OptionArgument where
 instance eqOptionArgument :: Eq OptionArgument where
   eq = eqOptionArgumentObj `on` unOptionArgument
 
-getFlag :: Name -> Maybe Char
-getFlag (Flag f)   = pure f
-getFlag (Full f _) = pure f
-getFlag _          = Nothing
-
-getName :: Name -> Maybe String
-getName (Long   n) = pure n
-getName (Full _ n) = pure n
-getName _          = Nothing
-
 data Content
   = Default String
   | Env     String
@@ -142,12 +133,7 @@ getEnvKey :: Content -> Maybe String
 getEnvKey (Env k) = Just k
 getEnvKey _       = Nothing
 
-derive instance genericName    :: Generic Name
 derive instance genericContent :: Generic Content
-
-instance showName     :: Show Name     where show = gShow
-instance showContent  :: Show Content  where show = gShow
-instance eqName       :: Eq Name       where eq = gEq
 
 prettyPrintDesc :: Desc -> String
 prettyPrintDesc (OptionDesc opt) = "Option " <> prettyPrintOption opt
@@ -164,11 +150,9 @@ instance eqDesc :: Eq Desc where
 
 prettyPrintOption :: OptionObj -> String
 prettyPrintOption opt
-  = (name opt.name) <> arg <> env
+  = aliases <> arg <> env
   where
-      name (Flag c)   = "-"  <> String.singleton c
-      name (Long n)   = "--" <> n
-      name (Full c n) = "-"  <> String.singleton c <> ", --" <> n
+      aliases = intercalate ", " (prettyPrintOptionAlias <$> opt.aliases)
 
       arg = maybe "" id do
         a <- opt.arg
@@ -178,17 +162,16 @@ prettyPrintOption opt
             <> (if a.optional then "]" else "")
             <> (if opt.repeatable then "..." else "")
             <> (maybe ""
-                      (\v -> "[default: " <> prettyPrintValue v <> "]")
+                      (\v -> " [default: " <> prettyPrintValue v <> "]")
                       a.default)
 
       env = maybe "" id do
         k <- opt.env
         pure $ " [env: " <> k <> "]"
 
-prettyPrintOptionArgument :: OptionArgumentObj -> String
-prettyPrintOptionArgument { optional: o, name: n, default: d }
+prettyPrintOptionArgument :: _ -> String
+prettyPrintOptionArgument { optional: o, name: n }
   = (if o then "[" else "") <> n <> (if o then "]" else "")
-    <> maybe "" (\v -> " [default: " <> (prettyPrintValue v) <>  "]") d
 
 run :: String -> Either P.ParseError (List Desc)
 run = lexDescs >=> parse
@@ -264,13 +247,13 @@ descParser = markIndent do
 
       if (length defaults > 1)
          then P.fail $
-          "Option " <> (show $ prettyPrintOption xopt)
+          "Option " <> (intercalate ", " $ prettyPrintOptionAlias <$> xopt.aliases)
                     <> " has multiple defaults!"
          else pure unit
 
       if (length envs > 1)
          then P.fail $
-          "Option " <> (show $ prettyPrintOption xopt)
+          "Option " <> (intercalate ", " $ prettyPrintOptionAlias <$> xopt.aliases)
                     <> " has multiple environment mappings!"
          else pure unit
 
@@ -279,23 +262,25 @@ descParser = markIndent do
 
       if (isJust default) && (isNothing xopt.arg)
          then P.fail $
-          "Option " <> (show $ prettyPrintOption xopt)
+          "Option " <> (intercalate ", " $ prettyPrintOptionAlias <$> xopt.aliases)
                     <> " does not take arguments. "
                     <> "Cannot specify defaults."
          else pure unit
 
       pure $ OptionDesc $
-        xopt { env = env
-            , arg = do
-                arg <- xopt.arg
-                pure $ arg {
-                  default = default
-                }
-            }
+        xopt  { env = env
+              , arg = do
+                  arg <- xopt.arg
+                  pure $ {
+                    name:     arg.name
+                  , optional: arg.optional
+                  , default:  default
+                  }
+              }
 
       where
 
-        short :: L.TokenParser OptionObj
+        short :: L.TokenParser _
         short = do
           opt <- do
             opt <- L.sopt
@@ -320,19 +305,12 @@ descParser = markIndent do
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          pure  { name: Flag opt.flag
-                , arg:  do
-                    a <- arg
-                    pure {
-                      name:     a.name
-                    , optional: a.optional
-                    , default:  Nothing
-                    }
-                , env:        Nothing
+          pure  { alias:      OptionAlias.Short opt.flag
+                , arg:        arg
                 , repeatable: repeatable
                 }
 
-        long :: L.TokenParser OptionObj
+        long :: L.TokenParser _
         long = do
           opt <- L.lopt
 
@@ -354,71 +332,54 @@ descParser = markIndent do
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          pure  { name: Long opt.name
-                , arg:  do
-                    a <- arg
-                    pure {
-                      name:     a.name
-                    , optional: a.optional
-                    , default:  Nothing
-                    }
-                , env:        Nothing
+          pure  { alias:      OptionAlias.Long opt.name
+                , arg:        arg
                 , repeatable: repeatable
                 }
 
-        opt :: L.TokenParser OptionObj
+        opt :: L.TokenParser _
         opt = do
-          let p = P.choice  [ Left  <$> short
-                            , Right <$> long
-                            ]
-          x <- p
-          y <- P.optionMaybe
-                $ P.choice  [ L.comma *> many L.newline *> indented *> p
-                            , p
-                            ]
+          let optsP = "option" P.<??> P.choice [ P.try short, long ]
+          xs <- optsP `P.sepBy1` (P.optional $ L.comma *> many L.newline *> indented)
 
-          case Tuple x y of
-            Tuple (Left s)  (Just (Right l)) -> combine s l
-            Tuple (Right l) (Just (Left s))  -> combine s l
-            Tuple (Left s)  Nothing          -> pure s
-            Tuple (Right l) Nothing          -> pure l
-            Tuple (Left { name: Flag f  })
-                  (Just (Left { name: Flag f' }))  -> P.fail $
-              "Expected an optional long alias for -"
-                <> String.singleton f <> ", but got: -" <> String.singleton f'
-            Tuple (Right { name: Long n  })
-                  (Just (Right { name: Long n' })) -> P.fail $
-              "Expected an optional short alias for --"
-                <> n <> ", but got: --" <> n'
-            otherwise -> P.fail "Expected options"
+          -- check integrity of the option-aliases
+          aliases <- foldl (\acc next -> do
+            cur <- acc
+            if next `elem` cur
+              then P.fail $
+                "Option appears multiple times: "
+                  <> prettyPrintOptionAlias next
+              else pure $ cur <> singleton next
+          ) (pure Nil) (_.alias <$> xs)
 
-          where
-            -- Combine two options into one. This function *does not* cover all
-            -- cases right now. It deals only with a known subset and can there-
-            -- fore make assumptions
-            combine :: OptionObj -> OptionObj -> L.TokenParser OptionObj
-            combine (x@{ name: Flag f }) (y@{ name: Long n }) = do
-              either P.fail pure do
-                arg <- combineArg x.arg y.arg
-                pure $ {
-                  name:       Full f n
-                , arg:        arg
-                , env:        Nothing -- No need to keep at this stage
-                , repeatable: x.repeatable || y.repeatable
-                }
-              where
-                combineArg (Just a) (Just a')
-                  | (a.name ^=^ a'.name) = pure $ Just
-                      $ { name:     a.name
-                        , optional: a.optional || a'.optional
-                        , default:  a.default <|> a'.default
-                        }
-                combineArg Nothing  (Just b) = pure (pure b)
-                combineArg (Just a) Nothing  = pure (pure a)
-                combineArg Nothing Nothing   = pure Nothing
-                combineArg (Just a) (Just b) = Left $
-                        "Option-arguments mismatch: "
-                          <> (show $ prettyPrintOptionArgument a)
-                          <> " and "
-                          <> (show $ prettyPrintOptionArgument b)
-            combine _ _ = P.fail "Invalid case - expected flag and long option"
+          -- check integrity of the option-arguments
+          arg <- foldl (\acc next -> do
+            cur <- acc
+            case cur of
+              Nothing  -> pure (Just next)
+              Just arg ->
+                if arg.name ^/=^ next.name
+                  then P.fail $
+                    "Option-arguments mismatch: "
+                      <> (show $ prettyPrintOptionArgument arg)
+                      <> " and "
+                      <> (show $ prettyPrintOptionArgument next)
+                  else pure (Just $ arg {
+                              -- if any argument is shown as optional, they all
+                              -- are considered optional in the eyes of the law.
+                              optional = arg.optional || next.optional
+                            })
+          ) (pure Nothing) (catMaybes $ _.arg <$> xs)
+
+          let repeatable = foldl (||) false (_.repeatable <$> xs)
+
+          -- Note: this can safely be `unsafePartial` because we're using the
+          -- `sepBy1` combinator above, which guarantees at least one match. It
+          -- would be interesting to use the `NonEmpty` type for `sepBy1`.
+          pure $ unsafePartial $ case aliases of
+            (x : xs) -> {
+              aliases:    x :| xs
+            , arg:        arg
+            , env:        Nothing
+            , repeatable: repeatable
+            }

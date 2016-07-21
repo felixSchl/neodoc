@@ -5,6 +5,7 @@ module Language.Docopt.OptionAlias (
   , isLong
   , isShort
   , toAliasList
+  , module NonEmpty
   ) where
 
 import Prelude
