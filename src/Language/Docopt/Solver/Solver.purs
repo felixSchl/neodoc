@@ -32,6 +32,8 @@ import Data.NonEmpty as NonEmpty
 
 import Language.Docopt.Argument
 import Language.Docopt.Argument (isFree) as Arg
+import Language.Docopt.OptionAlias (Aliases(), OptionAlias(..))
+import Language.Docopt.OptionAlias (OptionAlias(..)) as OptionAlias
 import Language.Docopt.SpecParser.Desc as Desc
 import Language.Docopt.Argument (Argument(..), Branch, OptionArgument(..))
 import Language.Docopt.Errors (SolveError(..))
@@ -297,7 +299,7 @@ solveBranch as ds = go as
                     }
             -- default fallback: construct the option from itself alone
             otherwise ->
-              pure  { aliases:    NonEmpty (Long n) Nil
+              pure  { aliases:    NonEmpty (OptionAlias.Long n) Nil
                     , env:        Nothing
                     , arg:        OptionArgument <$> convertArg o.arg
                     , repeatable: o.repeatable
@@ -382,10 +384,11 @@ solveBranch as ds = go as
                                             ) fs
                                     )
                                   )
-                                  { aliases: Short f
-                                                :| maybe  Nil
-                                                          (singleton <<< Long)
-                                                          (Desc.getName d.name)
+                                  { aliases:
+                                      OptionAlias.Short f
+                                        :| maybe  Nil
+                                            (singleton <<< OptionAlias.Long)
+                                            (Desc.getName d.name)
                                   , arg:        pure a
                                   , env:        d.env
                                   , repeatable: o.repeatable
@@ -592,7 +595,7 @@ solveBranch as ds = go as
 
     convertToAlias
       :: Desc.Name
-      -> Either SolveError (NonEmpty List OptionName)
+      -> Either SolveError Aliases
     convertToAlias n =
       maybe (fail "Unnamed option") pure do
                   ((:|) <$> (Short <$> Desc.getFlag n)

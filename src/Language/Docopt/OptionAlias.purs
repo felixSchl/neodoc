@@ -1,6 +1,10 @@
 module Language.Docopt.OptionAlias (
     OptionAlias (..)
   , Aliases ()
+  , prettyPrintOptionAlias
+  , isLong
+  , isShort
+  , toAliasList
   ) where
 
 import Prelude

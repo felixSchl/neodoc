@@ -43,8 +43,9 @@ import Data.Foreign (Foreign, F, ForeignError(..), typeOf, unsafeFromForeign,
 import Data.Foreign.Class (readProp) as F
 import Data.Foreign.NullOrUndefined as F
 import Language.Docopt.Argument (Branch(), Argument(..), OptionArgument(..),
-                                OptionArgumentObj, OptionName())
-import Language.Docopt.Argument (OptionName(..)) as OName
+                                OptionArgumentObj)
+import Language.Docopt.OptionAlias (OptionAlias())
+import Language.Docopt.OptionAlias (OptionAlias(..)) as OptionAlias
 import Unsafe.Coerce (unsafeCoerce)
 
 import Docopt as Docopt
@@ -181,13 +182,14 @@ parse = mkFn2 go
       docopt <- Docopt.parse helpText opts
       pure $ specToForeign docopt
 
-readOptionName :: String -> Either String OptionName
-readOptionName s = case fromFoldable (String.toCharArray s) of
+readOptionAlias :: String -> Either String OptionAlias
+readOptionAlias s = case fromFoldable (String.toCharArray s) of
   '-' : '-' : '-' : _  -> Left "Must not start with more than 2 dashes"
-  '-' : '-' : x   : xs -> Right $ OName.Long (intercalate "" (String.singleton <$> (x:xs)))
-  '-' : x   : Nil      -> Right $ OName.Short x
+  '-' : '-' : x   : xs -> Right $ OptionAlias.Long (reassemble x xs)
+  '-' : x   : Nil      -> Right $ OptionAlias.Short x
   '-' : x   : _        -> Left "Single dash mandates single character name"
   _                    -> Left "Must start with a dash"
+  where reassemble x xs = intercalate "" (String.singleton <$> (x:xs))
 
 specToForeign
   :: Docopt
@@ -229,8 +231,8 @@ specToForeign { shortHelp, specification, program } =
       type: "Option"
     , value: {
         aliases:    Array.fromFoldable $ x.aliases <#> case _ of
-                      OName.Short f ->  "-" ~~ String.singleton f
-                      OName.Long  n -> "--" ~~ n
+                      OptionAlias.Short f ->  "-" ~~ String.singleton f
+                      OptionAlias.Long  n -> "--" ~~ n
       , env:        maybe undefined F.toForeign x.env
       , repeatable: x.repeatable
       , arg:        maybe undefined (\(OptionArgument a) -> {
@@ -295,7 +297,7 @@ readSpec input = do
             ns <- for (fromFoldable aliases) \alias -> do
               s <- readAsString alias
               lmap  (\e -> JSONError $ "Invalid option alias " ~~ show s  ~~ ": " ~~ e)
-                    (readOptionName s)
+                    (readOptionAlias s)
             case ns of
               x : xs -> pure (x :| xs)
               _      -> Left $ JSONError "Option must at least have one alias"

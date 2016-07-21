@@ -62,10 +62,8 @@ import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 isRepeatable, OptionArgumentObj(),
                                 setRequired, isOptional, isGroup,
-                                unOptionArgument, isPositional,
-                                prettyPrintOptionName
-                                ) as D
-import Language.Docopt.Argument (OptionName(..), isLong, isShort) as OName
+                                unOptionArgument) as D
+import Language.Docopt.OptionAlias (OptionAlias(..), isLong, isShort) as OptionAlias
 import Language.Docopt.Env (Env ())
 import Language.Docopt.Specification (Specification())
 import Language.Docopt.Env as Env
@@ -139,8 +137,8 @@ unexpected branches (PositionedToken {token: tok, source}) =
       Stdin      -> prefix <> "option -"
       Lit _      -> prefix <> "command " <> source
   where
-    p (LOpt n _)   (D.Option { aliases })   = elem (OName.Long n) aliases
-    p (SOpt s _ _) (D.Option { aliases })   = elem (OName.Short s) aliases
+    p (LOpt n _)   (D.Option { aliases })   = elem (OptionAlias.Long n) aliases
+    p (SOpt s _ _) (D.Option { aliases })   = elem (OptionAlias.Short s) aliases
     p (Lit n)      (D.Command { name: n' }) = n == n'
     p (EOA _)      (D.EOA)                  = true
     p (Stdin)      (D.Stdin)                = true
@@ -472,11 +470,11 @@ spec xs options = do
           let
             ns = fromFoldable
                   $ o.aliases <#> case _ of
-                    OName.Short f -> Left  f
-                    OName.Long  n -> Right n
+                    OptionAlias.Short f -> Left  f
+                    OptionAlias.Long  n -> Right n
             term = any (_ `elem` options.stopAt) $ o.aliases <#> case _ of
-                      OName.Short s -> "-"  ~~ (String.singleton s)
-                      OName.Long  n -> "--" ~~ n
+                      OptionAlias.Short s -> "-"  ~~ (String.singleton s)
+                      OptionAlias.Long  n -> "--" ~~ n
 
           -- try each alias
           v /\ canTerm <- case 0 of

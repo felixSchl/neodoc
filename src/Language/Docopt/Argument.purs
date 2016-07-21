@@ -42,8 +42,9 @@ import Data.Generic
 import Partial.Unsafe
 
 import Language.Docopt.Value (Value(..))
+import Language.Docopt.OptionAlias (Aliases())
 import Language.Docopt.Argument.Option as O
-import Language.Docopt.Argument.Option (OptionObj, OptionArgument, OptionName)
+import Language.Docopt.Argument.Option (OptionObj, OptionArgument)
 import Language.Docopt.Argument.Option hiding (hasDefault, isFlag, takesArgument
                                               ) as OptionReexport
 import Language.Docopt.Env as Env
@@ -92,7 +93,7 @@ data Argument
   | Positional  { name       :: String
                 , repeatable :: Boolean
                 }
-  | Option      { aliases    :: NonEmpty List OptionName
+  | Option      { aliases    :: Aliases
                 , arg        :: Maybe OptionArgument
                 , env        :: Maybe String
                 , repeatable :: Boolean

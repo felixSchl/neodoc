@@ -12,15 +12,15 @@ import Data.Array (fromFoldable) as Array
 import Data.Function (on)
 import Data.String.Ext ((^=), (~~))
 import Language.Docopt.Argument (Argument(..)) as D
-import Language.Docopt.Argument (OptionName(..)) as OName
+import Language.Docopt.OptionAlias (OptionAlias(..)) as OptionAlias
 
 newtype Key = Key { arg :: D.Argument }
 
 instance showKey :: Show Key where
   show (Key { arg: (D.Option o) }) =
     intercalate ", " $ o.aliases <#> case _ of
-      OName.Long  n -> "--" ~~ n
-      OName.Short c ->  "-" ~~ String.singleton c
+      OptionAlias.Long  n -> "--" ~~ n
+      OptionAlias.Short c ->  "-" ~~ String.singleton c
   show (Key { arg: (D.Positional pos) }) = pos.name
   show (Key { arg: (D.Command cmd) })    = cmd.name
   show _                                 = "invalid" -- XXX
@@ -50,5 +50,5 @@ toKeys (D.Group _)        = []
 toKeys (D.EOA)            = ["--"]
 toKeys (D.Stdin)          = ["-"]
 toKeys (D.Option o)       = Array.fromFoldable $ o.aliases <#> case _ of
-                              OName.Long  n -> "--" ~~ n
-                              OName.Short c ->  "-" ~~ String.singleton c
+                              OptionAlias.Long  n -> "--" ~~ n
+                              OptionAlias.Short c ->  "-" ~~ String.singleton c

@@ -2,7 +2,6 @@ module Language.Docopt.Argument.Option (
     OptionObj ()
   , OptionArgument (..)
   , OptionArgumentObj ()
-  , OptionName (..)
   , unOptionArgument
   , showOptionObj
   , eqOptionObj
@@ -11,9 +10,6 @@ module Language.Docopt.Argument.Option (
   , takesArgument
   , prettyPrintOption
   , prettyPrintOptionNaked
-  , prettyPrintOptionName
-  , isLong
-  , isShort
   ) where
 
 import Prelude
@@ -28,42 +24,9 @@ import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
 import Data.NonEmpty as NonEmpty
 import Language.Docopt.Value (Value(..), prettyPrintValue)
+import Language.Docopt.OptionAlias 
 
-toAliasList :: NonEmpty List OptionName -> List OptionName
-toAliasList = fromNonEmpty (:)
-
-data OptionName = Short Char | Long String
-
-instance showName :: Show OptionName where
-  show (Short c) = "Short " <> show c
-  show (Long  s) = "Long "  <> show s
-
-instance eqName :: Eq OptionName where
-  eq (Short c) (Short c') = c == c'
-  eq (Long  s) (Long  s') = s == s'
-  eq _         _          = false
-
-instance ordName :: Ord OptionName where
-  compare (Short c) (Short c') = c `compare` c'
-  compare (Long  s) (Long  s') = s `compare` s'
-  compare (Long  _) _          = GT -- move long names to the back
-  compare (Short _) _          = LT -- move short names to the front
-
-derive instance genericOptionName :: Generic OptionName
-
-prettyPrintOptionName :: OptionName -> String
-prettyPrintOptionName (Short c) = "-"  <> (String.singleton c)
-prettyPrintOptionName (Long  n) = "--" <> n
-
-isLong :: OptionName -> Boolean
-isLong (Long _) = true
-isLong _        = false
-
-isShort :: OptionName -> Boolean
-isShort (Short _) = true
-isShort _         = false
-
-type OptionObj =  { aliases    :: NonEmpty List OptionName
+type OptionObj =  { aliases    :: Aliases
                   , arg        :: Maybe OptionArgument
                   , env        :: Maybe String
                   , repeatable :: Boolean
@@ -139,7 +102,7 @@ isFlag _                                                              = false
 prettyPrintOption :: OptionObj -> String
 prettyPrintOption o = aliases <> arg' <> rep <> default <> env
   where
-    prettyAliases = prettyPrintOptionName <$> (sort $ toAliasList o.aliases)
+    prettyAliases = prettyPrintOptionAlias <$> (sort $ toAliasList o.aliases)
     aliases = intercalate "/" prettyAliases
     rep  = if o.repeatable then "..." else ""
     arg' = flip (maybe "") o.arg \(OptionArgument { name, optional }) ->
@@ -158,7 +121,7 @@ prettyPrintOptionNaked o =
   <> (if hasAlias then ")" else "")
   where
     hasAlias = length (NonEmpty.tail o.aliases) > 0
-    prettyAliases = prettyPrintOptionName <$> (sort $ toAliasList o.aliases)
+    prettyAliases = prettyPrintOptionAlias <$> (sort $ toAliasList o.aliases)
     aliases = intercalate "/" prettyAliases
     rep  = if o.repeatable then "..." else ""
     arg' = flip (maybe "") o.arg \(OptionArgument { name }) -> "="  <> name
