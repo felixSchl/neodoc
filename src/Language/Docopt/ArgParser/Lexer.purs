@@ -49,6 +49,12 @@ parseToken = do
   ]
 
   where
+    illegalOptChar :: Array Char
+    illegalOptChar = [ '=', ' ', '\t', '\n', '\r' ]
+
+    illegalSOptChar :: Array Char
+    illegalSOptChar = '-' A.: illegalOptChar
+
     stdin :: P.Parser String Token
     stdin = do
       P.char '-'
@@ -63,8 +69,8 @@ parseToken = do
     sopt :: P.Parser String Token
     sopt = do
       P.char '-'
-      x   <- alphaNum
-      xs  <- A.many $ P.noneOf [ '=' ]
+      x   <- P.noneOf illegalSOptChar
+      xs  <- A.many $ P.noneOf illegalOptChar -- re-allow '-'s
       arg <- P.optionMaybe arg
       pure $ SOpt x xs arg
 
@@ -73,7 +79,7 @@ parseToken = do
     lopt = do
       P.string "--"
       xs <- foldMap String.singleton <$> do
-        some $ P.noneOf [ '=', ' ' ]
+        some $ P.noneOf illegalOptChar
       arg <- P.optionMaybe arg
       pure $ LOpt xs arg
 
