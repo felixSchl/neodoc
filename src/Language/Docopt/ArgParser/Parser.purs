@@ -21,7 +21,7 @@ import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing, isJust, fromJ
 import Unsafe.Coerce
 import Data.List (List(..), reverse, singleton, concat, length, (:),
                   some, filter, head, toUnfoldable, sortBy, groupBy, last, null,
-                  tail, many, mapWithIndex)
+                  tail, many, mapWithIndex, fromFoldable)
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Control.Alt ((<|>))
 import Data.Traversable (traverse, for)
@@ -62,8 +62,8 @@ import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 isRepeatable, OptionArgumentObj(),
                                 setRequired, isOptional, isGroup,
-                                unOptionArgument
-                                ) as D
+                                unOptionArgument) as D
+import Language.Docopt.OptionAlias (OptionAlias(..), isLong, isShort) as OptionAlias
 import Language.Docopt.Env (Env ())
 import Language.Docopt.Specification (Specification())
 import Language.Docopt.Env as Env
@@ -137,13 +137,13 @@ unexpected branches (PositionedToken {token: tok, source}) =
       Stdin      -> prefix <> "option -"
       Lit _      -> prefix <> "command " <> source
   where
-    p (LOpt n _)   (D.Option { name: Just n' }) = n == n'
-    p (SOpt f _ _) (D.Option { flag: Just f' }) = f == f'
-    p (Lit n)      (D.Command { name: n' })     = n == n'
-    p (EOA _)      (D.EOA)                      = true
-    p (Stdin)      (D.Stdin)                    = true
-    p x            (D.Group { branches })       = any (any (p x)) branches
-    p _            _                            = false
+    p (LOpt n _)   (D.Option { aliases })   = elem (OptionAlias.Long n) aliases
+    p (SOpt s _ _) (D.Option { aliases })   = elem (OptionAlias.Short s) aliases
+    p (Lit n)      (D.Command { name: n' }) = n == n'
+    p (EOA _)      (D.EOA)                  = true
+    p (Stdin)      (D.Stdin)                = true
+    p x            (D.Group { branches })   = any (any (p x)) branches
+    p _            _                        = false
 
 -- | Parse user input against a program specification.
 spec
@@ -468,39 +468,45 @@ spec xs options = do
           isSoptAhead <- P.option false (P.lookAhead $ token isAnySopt)
 
           let
-            term = any (_ `elem` options.stopAt)
-                      (A.catMaybes [ ("--" ~~ _)                       <$> o.name
-                                    , (("-" ~~ _) <<< String.singleton) <$> o.flag
-                                    ])
-          case o.name of
-            Just n  | isLoptAhead -> do
-              v <- longOption term n (D.unOptionArgument <$> o.arg)
-              if term
-                  then do
-                    vs <- terminate x
-                    pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
-                  else do
-                    if isJust o.arg && o.repeatable
-                        then do
-                          vs <- A.many optionArgument
-                          pure (ArrayValue (Value.intoArray v <> vs))
-                        else pure v
-            otherwise ->
-              case o.flag of
-                Just c | isSoptAhead -> do
-                  (Tuple v canTerm)  <- shortOption term c (D.unOptionArgument <$> o.arg)
-                  if term && canTerm
-                      then do
-                        vs <- terminate x
-                        pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
-                      else do
-                        if isJust o.arg && o.repeatable
-                            then do
-                              vs <- A.many optionArgument
-                              pure (ArrayValue (Value.intoArray v <> vs))
-                            else pure v
-                otherwise -> do
-                  P.fail "Expected long or short option"
+            ns = fromFoldable
+                  $ o.aliases <#> case _ of
+                    OptionAlias.Short f -> Left  f
+                    OptionAlias.Long  n -> Right n
+            term = any (_ `elem` options.stopAt) $ o.aliases <#> case _ of
+                      OptionAlias.Short s -> "-"  ~~ (String.singleton s)
+                      OptionAlias.Long  n -> "--" ~~ n
+
+          -- try each alias
+          v /\ canTerm <- case 0 of
+            _ | isLoptAhead ->
+              let ls = mrights ns
+               in if null ls
+                    then P.fail "Option has no long alias"
+                    else P.choice $ ls <#> \n -> P.try do
+                      let mOptArg = D.unOptionArgument <$> o.arg
+                      v <- longOption term n mOptArg
+                      pure (v /\ true)
+            _ | isSoptAhead ->
+              let cs = mlefts ns
+               in if null cs
+                    then P.fail "Option has no short alias"
+                    else P.choice $ cs <#> \c -> P.try do
+                      let mOptArg = D.unOptionArgument <$> o.arg
+                      shortOption term c mOptArg
+            _ -> P.fail "Expected long or short option"
+
+          -- try terminating at this option
+          if term && canTerm
+              then do
+                vs <- terminate x
+                pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
+              else do
+                if isJust o.arg && o.repeatable
+                    then do
+                      vs <- A.many optionArgument
+                      pure (ArrayValue (Value.intoArray v <> vs))
+                    else pure v
+
           where
           isAnyLopt (LOpt _ _)   = pure true
           isAnyLopt _            = pure false

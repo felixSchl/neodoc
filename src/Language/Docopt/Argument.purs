@@ -35,11 +35,14 @@ import Data.Function (on)
 import Data.String.Ext ((^=))
 import Data.String as String
 import Data.Function.Memoize
+import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
+import Data.NonEmpty as NonEmpty
 import Data.Lazy (defer)
 import Data.Generic
 import Partial.Unsafe
 
 import Language.Docopt.Value (Value(..))
+import Language.Docopt.OptionAlias (Aliases())
 import Language.Docopt.Argument.Option as O
 import Language.Docopt.Argument.Option (OptionObj, OptionArgument)
 import Language.Docopt.Argument.Option hiding (hasDefault, isFlag, takesArgument
@@ -90,8 +93,7 @@ data Argument
   | Positional  { name       :: String
                 , repeatable :: Boolean
                 }
-  | Option      { flag       :: Maybe Char
-                , name       :: Maybe String
+  | Option      { aliases    :: Aliases
                 , arg        :: Maybe OptionArgument
                 , env        :: Maybe String
                 , repeatable :: Boolean
@@ -125,7 +127,7 @@ instance ordArgument :: Ord Argument where
   compare (Positional x) (Positional x') = x `(compare `on` f)` x'
     where f x = x.repeatable /\ x.name
   compare (Option x) (Option x') = x `(compare `on` f)` x'
-    where f x = x.repeatable /\ x.flag /\ x.name /\ x.arg /\ x.env
+    where f x = x.repeatable /\ x.aliases /\ x.arg /\ x.env
   compare (Group x) (Group x') = x `(compare `on` f)` x'
     where f x = x.repeatable /\ x.optional /\ x.branches
   compare _ _ = LT

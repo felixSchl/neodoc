@@ -757,6 +757,30 @@ $ prog -a
 $ prog -aa
 "user-error"
 
+r"""usage: prog [options] [-a]
+
+options: -a, --all
+         -b
+"""
+
+$ prog -a
+{"-a": true, "--all": true}
+
+$ prog --all
+{"-a": true, "--all": true}
+
+$ prog -aa
+"user-error"
+
+$ prog --all -a
+"user-error"
+
+$ prog -a --all
+"user-error"
+
+$ prog --all --all
+"user-error"
+
 #
 # Test [options] shourtcut
 #

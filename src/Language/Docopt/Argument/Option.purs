@@ -10,21 +10,23 @@ module Language.Docopt.Argument.Option (
   , takesArgument
   , prettyPrintOption
   , prettyPrintOptionNaked
-  , empty
   ) where
 
 import Prelude
 import Data.Function (on)
+import Data.Foldable (intercalate)
 import Data.Tuple.Nested ((/\))
+import Data.List (List(), (:), length, sort)
 import Control.Apply ((*>))
 import Data.Maybe (Maybe(..), maybe, isJust)
 import Data.Generic (class Generic, gEq, gShow)
 import Data.String (singleton) as String
-
+import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
+import Data.NonEmpty as NonEmpty
 import Language.Docopt.Value (Value(..), prettyPrintValue)
+import Language.Docopt.OptionAlias 
 
-type OptionObj =  { flag       :: Maybe Char
-                  , name       :: Maybe String
+type OptionObj =  { aliases    :: Aliases
                   , arg        :: Maybe OptionArgument
                   , env        :: Maybe String
                   , repeatable :: Boolean
@@ -52,16 +54,14 @@ instance ordArgument :: Ord OptionArgument where
 derive instance genericOptionArgument :: Generic OptionArgument
 
 showOptionObj :: OptionObj -> String
-showOptionObj o = "{ flag: "       <> show o.flag
-               <> ", name: "       <> show o.name
+showOptionObj o = "{ aliases: "    <> show o.aliases
                <> ", arg: "        <> show o.arg
                <> ", env: "        <> show o.env
                <> ", repeatable: " <> show o.repeatable
                <> "}"
 
 eqOptionObj :: OptionObj -> OptionObj -> Boolean
-eqOptionObj o o' = o.flag       == o'.flag
-                && o.name       == o'.name
+eqOptionObj o o' = o.aliases    == o'.aliases
                 && o.env        == o'.env
                 && o.repeatable == o'.repeatable
                 && o.arg        == o'.arg
@@ -86,14 +86,6 @@ eqOptionArgumentObj a a' = a.name     == a'.name
                         && a.default  == a'.default
                         && a.optional == a'.optional
 
-empty :: OptionObj
-empty = { flag:       Nothing
-        , name:       Nothing
-        , arg:        Nothing
-        , env:        Nothing
-        , repeatable: false
-        }
-
 hasDefault :: OptionObj -> Boolean
 hasDefault { arg: Just (OptionArgument { default: Just _ }) } = true
 hasDefault _                                                  = false
@@ -108,12 +100,10 @@ isFlag { arg: Nothing }                                               = true
 isFlag _                                                              = false
 
 prettyPrintOption :: OptionObj -> String
-prettyPrintOption o
-  = short <> long <> arg' <> rep <> default <> env
+prettyPrintOption o = aliases <> arg' <> rep <> default <> env
   where
-    short = maybe "" (\f -> "-" <> (String.singleton f)) o.flag
-    long  = maybe "" (const ", ") (o.flag *> o.name)
-              <> maybe "" ("--" <> _) o.name
+    prettyAliases = prettyPrintOptionAlias <$> (sort $ toAliasList o.aliases)
+    aliases = intercalate "/" prettyAliases
     rep  = if o.repeatable then "..." else ""
     arg' = flip (maybe "") o.arg \(OptionArgument { name, optional }) ->
                 (if optional then "[" else "")
@@ -127,11 +117,11 @@ prettyPrintOption o
 prettyPrintOptionNaked :: OptionObj -> String
 prettyPrintOptionNaked o =
      (if hasAlias then "(" else "")
-  <> (short <> (if hasAlias then "|" else "") <> long <> arg' <> rep)
+  <> (aliases <> arg' <> rep)
   <> (if hasAlias then ")" else "")
   where
-    hasAlias = isJust o.flag && isJust o.name
-    short = maybe "" (\f -> "-" <> (String.singleton f)) o.flag
-    long  = maybe "" ("--" <> _) o.name
+    hasAlias = length (NonEmpty.tail o.aliases) > 0
+    prettyAliases = prettyPrintOptionAlias <$> (sort $ toAliasList o.aliases)
+    aliases = intercalate "/" prettyAliases
     rep  = if o.repeatable then "..." else ""
     arg' = flip (maybe "") o.arg \(OptionArgument { name }) -> "="  <> name

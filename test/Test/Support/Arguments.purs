@@ -2,9 +2,13 @@ module Test.Support.Arguments where
 
 import Prelude
 import Data.Maybe
-import Data.List (List(..), fromFoldable, length, singleton)
+import Data.List (List(..), (:), fromFoldable, length, singleton)
+import Data.Tuple.Nested ((/\))
 import Language.Docopt.Value
 import Language.Docopt.Argument
+import Language.Docopt.OptionAlias (OptionAlias(..)) as OptionAlias
+import Data.NonEmpty ((:|))
+import Partial.Unsafe (unsafePartial)
 
 type IsRepeatable = Boolean
 
@@ -17,8 +21,10 @@ opt'
   -> IsRepeatable
   -> Argument
 opt' f n a e r = Option {
-  flag:       f
-, name:       n
+  aliases:    unsafePartial $ case f /\ n of
+                Just f' /\ Just n' -> OptionAlias.Short f' :| OptionAlias.Long n' : Nil
+                Just f' /\ _       -> OptionAlias.Short f' :| Nil
+                _       /\ Just n' -> OptionAlias.Long  n' :| Nil
 , arg:        OptionArgument <$> a
 , env:        e
 , repeatable: r
@@ -39,8 +45,7 @@ optR_ f n = opt' (Just f) (Just n) Nothing Nothing true
 -- short hand to create an Short-Argument argument
 sopt' :: Char -> (Maybe OptionArgumentObj) -> IsRepeatable -> Argument
 sopt' f a r = Option {
-  flag:       pure f
-, name:       Nothing
+  aliases:    OptionAlias.Short f :| Nil
 , arg:        OptionArgument <$> a
 , env:        Nothing
 , repeatable: r
@@ -61,8 +66,7 @@ soptR_ f = sopt' f Nothing true
 -- short hand to create an Long-Argument argument
 lopt' :: String -> (Maybe OptionArgumentObj) -> IsRepeatable -> Argument
 lopt' n a r = Option {
-  flag:       Nothing
-, name:       pure n
+  aliases:    OptionAlias.Long n :| Nil
 , arg:        OptionArgument <$> a
 , env:        Nothing
 , repeatable: r
@@ -99,8 +103,7 @@ optER_ f n e = opt' (Just f) (Just n) Nothing (Just e) true
 -- short hand to create an Short-Argument argument
 soptE' :: Char -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> Argument
 soptE' f a r e = Option {
-  flag:       pure f
-, name:       Nothing
+  aliases:    OptionAlias.Short f :| Nil
 , arg:        OptionArgument <$> a
 , env:        pure e
 , repeatable: r
@@ -121,8 +124,7 @@ soptER_ f e = soptE' f Nothing true e
 -- short hand to create an Long-Argument argument
 loptE' :: String -> (Maybe OptionArgumentObj) -> IsRepeatable -> String -> Argument
 loptE' n a r e = Option {
-  flag:       Nothing
-, name:       pure n
+  aliases:    OptionAlias.Long n :| Nil
 , arg:        OptionArgument <$> a
 , env:        pure e
 , repeatable: r

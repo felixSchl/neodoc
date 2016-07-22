@@ -12,8 +12,8 @@ import Control.Alt ((<|>))
 import Control.MonadPlus (guard)
 import Control.MonadPlus.Partial (mpartition)
 import Data.Bifunctor (bimap)
-import Data.Either (Either(..), either)
-import Data.Foldable (any)
+import Data.Either (Either(..), either, fromRight)
+import Data.Foldable (any, elem)
 import Data.Function (on)
 import Data.Functor ((<$))
 import Data.List (findIndex, groupBy, List(..), length, filter, singleton,
@@ -27,9 +27,13 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested ((/\))
 import Data.String as Str
+import Data.NonEmpty (NonEmpty(..), (:|))
+import Data.NonEmpty as NonEmpty
 
 import Language.Docopt.Argument
 import Language.Docopt.Argument (isFree) as Arg
+import Language.Docopt.OptionAlias (Aliases(), OptionAlias(..))
+import Language.Docopt.OptionAlias (OptionAlias(..)) as OptionAlias
 import Language.Docopt.SpecParser.Desc as Desc
 import Language.Docopt.Argument (Argument(..), Branch, OptionArgument(..))
 import Language.Docopt.Errors (SolveError(..))
@@ -112,41 +116,30 @@ solveBranch as ds = go as
           -> List Argument
         expand ds surroundingArgs = reverse $ go ds surroundingArgs Nil
           where
-          go (Cons (x@(Desc.OptionDesc opt)) xs) surroundingArgs acc = do
+          go :: List SpecParser.Desc -> List Argument -> List Argument -> List Argument
+          go (Cons (x@(Desc.OptionDesc desc)) xs) surroundingArgs acc = do
             -- Assuming description and usage have already been merged,
             -- find all options that are not present in the surrounding
             -- "free" area and add them.
-            if isJust (findIndex isMatch surroundingArgs)
+            if isJust (findIndex (isMatch desc.aliases) surroundingArgs)
                 then go xs surroundingArgs acc
                 else
                   let z = Group {
                           optional: true
                         , branches: (singleton $ singleton $ Option $
-                              { flag:       Desc.getFlag opt.name
-                              , name:       Desc.getName opt.name
-                              , arg:        OptionArgument <$> opt.arg
-                              , env:        opt.env
+                              { aliases:    desc.aliases
+                              , arg:        OptionArgument <$> desc.arg
+                              , env:        desc.env
                               , repeatable: false
                               }
                           )
-                        , repeatable: opt.repeatable
+                        , repeatable: desc.repeatable
                         }
                   in go xs (z:surroundingArgs) (z:acc)
             where
-              isMatch (Option o)
-                = if isJust (Desc.getFlag opt.name) &&
-                      isJust (o.flag)
-                      then fromMaybe false do
-                            eq <$> (Desc.getFlag opt.name)
-                                <*> o.flag
-                      else if isJust (Desc.getName opt.name) &&
-                              isJust (o.name)
-                              then fromMaybe false do
-                                    (^=) <$> (Desc.getName opt.name)
-                                          <*> o.name
-                              else false
-              isMatch (Group grp) = any isMatch (concat grp.branches)
-              isMatch _           = false
+              isMatch aliases (Option o)  = any (_ `elem` aliases) o.aliases
+              isMatch aliases (Group grp) = any (isMatch aliases) (concat grp.branches)
+              isMatch _ _                 = false
 
           go (Cons _ xs) surroundingArgs acc = go xs surroundingArgs acc
           go _ _ acc = acc
@@ -183,33 +176,36 @@ solveBranch as ds = go as
     -- | Should the first argument be an option with an argument that
     -- | matches an adjacent command or positional, consume the adjacent
     -- | argument from the input (consume).
-    solveArg :: U.Argument
-              -> Maybe U.Argument
-              -> Either SolveError (ResolveTo (Slurp Argument) Reference)
+    solveArg
+      :: U.Argument
+      -> Maybe U.Argument
+      -> Either SolveError (ResolveTo (Slurp Argument) Reference)
 
-    solveArg (U.EOA) _            = simpleResolve EOA
-    solveArg (U.Stdin) _          = simpleResolve Stdin
-    solveArg (U.Command cmd) _    = simpleResolve $ Command {
-                                      name:       cmd.name
-                                    , repeatable: cmd.repeatable
-                                    }
-    solveArg (U.Positional pos) _ = simpleResolve $ Positional {
-                                      name:       pos.name
-                                    , repeatable: pos.repeatable
-                                    }
+    solveArg (U.Reference r) _ = pure $ Unresolved r
+    solveArg (U.EOA) _         = simpleResolve EOA
+    solveArg (U.Stdin) _       = simpleResolve Stdin
 
-    solveArg (U.Group grp) _
-      = Resolved <<< Keep <<< singleton <$> do
-          branches <- flip solveBranch ds `traverse` grp.branches
-          pure $ Group grp { branches = branches }
+    solveArg (U.Command cmd) _ = simpleResolve
+      $ Command {
+          name:       cmd.name
+        , repeatable: cmd.repeatable
+        }
 
-    solveArg (U.Reference r) _ = do
-      pure $ Unresolved r
+    solveArg (U.Positional pos) _ = simpleResolve
+      $ Positional {
+        name:       pos.name
+      , repeatable: pos.repeatable
+      }
+
+    solveArg (U.Group grp) _ =
+      Resolved <<< Keep <<< singleton <$> do
+        branches <- flip solveBranch ds `traverse` grp.branches
+        pure $ Group grp { branches = branches }
 
     solveArg (U.Option o) mAdjArg = do
 
       -- Find a matching option description, if any.
-      descMatch <- matchDesc o.name
+      descMatch <- matchDesc
 
       -- Check to see if this option has an explicitly bound argument.
       -- In this case, a check to consume an adjacent arg must not take place.
@@ -277,30 +273,33 @@ solveBranch as ds = go as
           $ "Arguments mismatch for option --" <> o.name <> ": "
               <> show n <> " and " <> show n'
 
-        matchDesc :: String -> Either SolveError OptionObj
-        matchDesc n =
+        matchDesc :: Either SolveError OptionObj
+        matchDesc =
           case filter isMatch ds of
+
             xs | length xs > 1 -> fail
-              $ "Multiple option descriptions for option --" <> n
-            (Cons (Desc.OptionDesc desc) Nil) -> do
+              $ "Multiple option descriptions for option --" <> o.name
+
+            -- construct the option from itself and the matching description
+            (Desc.OptionDesc desc) : Nil -> do
               arg <- resolveOptArg o.arg desc.arg
-              pure  { flag:       Desc.getFlag desc.name
-                    , name:       Desc.getName desc.name
+              pure  { aliases:    desc.aliases
                     , arg:        OptionArgument <$> arg
                     , env:        desc.env
                     , repeatable: o.repeatable
                     }
+
             -- default fallback: construct the option from itself alone
             otherwise ->
-              pure  { flag:       Nothing
-                    , name:       pure n
+              pure  { aliases:    NonEmpty (OptionAlias.Long o.name) Nil
                     , env:        Nothing
                     , arg:        OptionArgument <$> convertArg o.arg
                     , repeatable: o.repeatable
                     }
           where
-            isMatch (Desc.OptionDesc { name: Desc.Long n'   }) = n == n'
-            isMatch (Desc.OptionDesc { name: Desc.Full _ n' }) = n == n'
+            isMatch (Desc.OptionDesc { aliases }) = flip any aliases case _ of
+              OptionAlias.Long n -> n == o.name
+              _                  -> false
             isMatch _ = false
 
 
@@ -321,7 +320,7 @@ solveBranch as ds = go as
         -- |    `-- the flag matches - case SENSITIVE
         -- |
         -- | Should this check yield a match, slice the matched
-        -- | string off the stack and pure the remainder option
+        -- | string off the stack and return the remainder option
         -- | stack (if any).
         -- |
         -- | The remaining options, must - in turn - be solved, too.
@@ -343,20 +342,24 @@ solveBranch as ds = go as
 
           let fs  = fromCharArray $ o.flag A.: o.stack
 
-          maybe (fail "No description subsumed option")
-                pure
-                -- XXX: Purescript is not lazy, so this is too expensive.
-                --      We can just stop at the first `Just` value.
-                (head $ catMaybes $ subsume fs <$> ds)
+          maybe (fail "No description subsumed option") pure do
+            -- XXX: Purescript is not lazy, so this is too expensive.
+            --      We can just stop at the first `Just` value.
+            head $ catMaybes $ ds <#> case _ of
+              (Desc.OptionDesc d) -> do
+                head $ catMaybes $ fromFoldable $ d.aliases <#> case _ of
+                  (OptionAlias.Short f) -> subsume f fs d
+                  _                     -> Nothing
+              _ -> Nothing
 
           where
             subsume
-              :: String
-              -> SpecParser.Desc
+              :: Char
+              -> String
+              -> _
               -> Maybe (ResolveTo (Slurp Argument)
                        Reference)
-            subsume fs (Desc.OptionDesc d) = do
-              f <- Desc.getFlag d.name
+            subsume f fs d = do
               a <- d.arg
 
               -- the haystack needs to be modified, such that the
@@ -378,8 +381,7 @@ solveBranch as ds = go as
                                             ) fs
                                     )
                                   )
-                                  { flag:       pure f
-                                  , name:       Desc.getName d.name
+                                  { aliases:    d.aliases
                                   , arg:        pure a
                                   , env:        d.env
                                   , repeatable: o.repeatable
@@ -401,8 +403,6 @@ solveBranch as ds = go as
                     $ cs' <> (singleton $ Option $ o {
                       arg = OptionArgument <$> o.arg
                     })
-
-            subsume _ _ = Nothing
 
         -- | Last flag method (w/ fallback):
         -- |
@@ -527,9 +527,7 @@ solveBranch as ds = go as
                             else fail
                               $ "Stacked option -" <> String.singleton f
                                   <> " may not specify arguments"
-
-              pure  { flag:       Desc.getFlag desc.name
-                    , name:       Desc.getName desc.name
+              pure  { aliases:    desc.aliases
                     , arg:        OptionArgument <$> arg
                     , env:        desc.env
                     , repeatable: o.repeatable
@@ -537,8 +535,7 @@ solveBranch as ds = go as
 
             -- default fallback: construct the option from itself alone
             otherwise ->
-              pure  { flag:       pure f
-                    , name:       Nothing
+              pure  { aliases:    (Short f) :| Nil
                     , env:        Nothing
                     , arg:        OptionArgument <$>
                                     if isTrailing
@@ -548,8 +545,9 @@ solveBranch as ds = go as
                     }
 
           where
-            isMatch (Desc.OptionDesc { name: Desc.Flag f'   }) = f == f'
-            isMatch (Desc.OptionDesc { name: Desc.Full f' _ }) = f == f'
+            isMatch (Desc.OptionDesc { aliases }) = flip any aliases case _ of
+              OptionAlias.Short f' -> f' == f
+              _                    -> false
             isMatch _ = false
 
     -- | Resolve an option's argument name against that given in the

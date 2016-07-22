@@ -192,9 +192,9 @@ solverSpec = \_ ->
         [ pass
             "options: -f --file=FILE  [default: foo]"
             [ [ soptR_ 'x'
-            , soptR_ 'v'
-            , soptR_ 'z'
-            , optR 'f' "file" (oa "FILE" (StringValue "foo"))
+              , soptR_ 'v'
+              , soptR_ 'z'
+              , optR 'f' "file" (oa "FILE" (StringValue "foo"))
             ] ]
         ]
 
@@ -250,6 +250,15 @@ solverSpec = \_ ->
             [ [ gro false [ [ lopt_ "foo" ] ]
               , gro false [ [ sopt_ 'q'   ] ]
             ] ]
+        ]
+
+    , test
+        "Usage: prog [options] [-a]"
+        [ pass
+            "options: -a, --all"
+            [ [ gro false [ [
+                  opt_ 'a' "all"
+            ] ] ] ]
         ]
 
     ]) runtest
