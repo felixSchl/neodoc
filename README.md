@@ -130,6 +130,9 @@ Options:
 * `opts.requireFlags` - Require flags be present in the input. In neodoc, flags
   are optional by default and can be omitted. This option forces the user to
   pass flags explicitly, failing the parse otherwise.
+* `opts.laxPlacement` - Relax placement rules. Positionals and commands are no
+  longer solid anchors. The order amongs them, however, remains fixed. This
+  implies that options can appear anywhere.
 
 For example:
 

@@ -18,7 +18,6 @@ import Data.Function.Uncurried
 import Data.Bifunctor (bimap, lmap, rmap)
 import Data.Either (Either(Right, Left))
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing, isJust, fromJust)
-import Unsafe.Coerce
 import Data.List (List(..), reverse, singleton, concat, length, (:),
                   some, filter, head, toUnfoldable, sortBy, groupBy, last, null,
                   tail, many, mapWithIndex, fromFoldable)
@@ -62,7 +61,7 @@ import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 isRepeatable, OptionArgumentObj(),
                                 setRequired, isOptional, isGroup,
-                                unOptionArgument) as D
+                                unOptionArgument, isPositional) as D
 import Language.Docopt.OptionAlias (OptionAlias(..), isLong, isShort) as OptionAlias
 import Language.Docopt.Env (Env ())
 import Language.Docopt.Specification (Specification())
@@ -149,7 +148,7 @@ unexpected branches (PositionedToken {token: tok, source}) =
 spec
   :: forall r
    . Specification -- ^ the list of usage branches
-  -> Options r     -- ^ generator options
+  -> Options r    -- ^ argv parser options
   -> Parser (Tuple D.Branch (List ValueMapping))
 spec xs options = do
   let
@@ -181,11 +180,13 @@ spec xs options = do
     -> Parser (List ValueMapping)
   exhaustP toplevel skippable isSkipping l xs = do
     _debug \_->
-        "exhaustP: "     <> (intercalate " " $ D.prettyPrintArg <$> xs)
+        "exhaustP: "      <> (intercalate " " $ D.prettyPrintArg <$> xs)
       <> ", skippable: "  <> show skippable
       <> ", isSkipping: " <> show isSkipping
 
-    concat <$> for (clump xs) clumpP
+    concat <$> for (clump xs options.laxPlacement
+                             options.optionsFirst
+                             ) clumpP
 
     where
 
@@ -335,7 +336,6 @@ spec xs options = do
             "draw: missing:"
               <> (intercalate " " $ D.prettyPrintArg <$> missing)
 
-
           if isSkipping && length missing > 0
             then expected missing i
             else
@@ -382,10 +382,9 @@ spec xs options = do
       argP :: D.Argument -> Parser (List ValueMapping)
 
       -- Terminate at singleton groups that house only positionals.
-      argP (D.Group (grp@{ branches: Cons (Cons (x@(D.Positional pos)) Nil) Nil }))
-        | options.optionsFirst && (pos.repeatable || grp.repeatable)
-        = singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> do
-            terminate x
+      argP x | options.optionsFirst && isTerm x
+        = let y = unsafePartial (fromJust (termAs x))
+          in singleton <<< Tuple y <<< (RValue.from Origin.Argv) <$> terminate y
 
       -- The recursive branch of the argv argument parser.
       -- For groups, each branch is run and analyzed.
@@ -418,11 +417,6 @@ spec xs options = do
             if (length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
               then loop $ acc <> vs
               else pure acc
-
-      argP x@(D.Positional pos)
-        | pos.repeatable && options.optionsFirst
-        = singleton <<< Tuple x <<< (RValue.from Origin.Argv) <$> do
-            terminate x
 
       -- The non-recursive branch of the argv argument parser.
       -- All of these parsers consume one or more adjacent arguments from argv.
@@ -639,14 +633,17 @@ mapWithIndex' = flip mapWithIndex
 -- any order.
 clump
   :: List D.Argument -- ^ the list of arguments to clump
+  -> Boolean         -- ^ allow lax placement?
+  -> Boolean         -- ^ are we parsing options first?
   -> List (Clump (List D.Argument))
-clump xs = reverse $ foldl go Nil xs
+clump xs lax optsFirst = reverse $ foldl go Nil xs
   where
-  go (Nil) x = pure $ (if D.isFree x then Free else Fixed) $ singleton x
-  go   (Cons (Free a)  zs) x | D.isFree x = (Free (a <> (singleton x))) : zs
+  go (Nil) x = pure $ (if isFree x then Free else Fixed) $ singleton x
+  go   (Cons (Free a)  zs) x | isFree x = (Free (a <> (singleton x))) : zs
   go u@(Cons (Free _)   _) x = (Fixed $ singleton x) : u
-  go u@(Cons (Fixed _)  _) x | D.isFree x = (Free $ singleton x): u
+  go u@(Cons (Fixed _)  _) x | isFree x = (Free $ singleton x): u
   go   (Cons (Fixed a) zs) x = (Fixed (a <> (singleton x))) : zs
+  isFree x = (lax || D.isFree x) && (not (optsFirst && isTerm x))
 
 -- Note: Unfortunate re-implementation of the 'Alt' instance for 'ParserT'.
 catchParseError :: forall a. Parser a -> (P.ParseError -> Parser a) -> Parser a
@@ -657,3 +654,11 @@ catchParseError p1 f2 = P.ParserT \st ->
       Left e | not consumed        -> P.unParserT (f2 e) st
       otherwise                    -> pure o
 
+termAs :: D.Argument -> Maybe D.Argument
+termAs (D.Group (grp@{ branches: (x@(D.Positional pos):Nil) : Nil }))
+  | pos.repeatable || grp.repeatable = Just x
+termAs x@(D.Positional pos) | pos.repeatable = Just x
+termAs _ = Nothing
+
+isTerm :: D.Argument -> Boolean
+isTerm = isJust <<< termAs

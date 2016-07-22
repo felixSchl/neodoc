@@ -7,5 +7,6 @@ type Options r = {
   optionsFirst :: Boolean
 , stopAt       :: Array String
 , requireFlags :: Boolean
+, laxPlacement :: Boolean
   | r
 }

@@ -6,7 +6,6 @@ module Language.Docopt.SpecParser.Usage.Argument (
   , GroupObj ()
   , CommandObj ()
   , PositionalObj ()
-  , isFree
   , isOption
   , isPositional
   , isCommand
@@ -85,11 +84,6 @@ data Argument
   | EOA
   | Stdin
   | Reference String
-
-isFree :: Argument -> Boolean
-isFree (Option _)  = true
-isFree (Group grp) = all (all isFree) grp.branches
-isFree _           = false
 
 isOption :: Argument -> Boolean
 isOption (Option _)      = true

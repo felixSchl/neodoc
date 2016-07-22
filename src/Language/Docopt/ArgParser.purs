@@ -1,7 +1,6 @@
 module Language.Docopt.ArgParser (
     run
   , Result ()
-  , Options ()
   , module Reexport
   ) where
 
@@ -20,17 +19,10 @@ import Language.Docopt.Env (Env) as D
 import Language.Docopt.ArgParser.Parser (spec, initialState, ValueMapping(),
                                         Options()) as P
 import Language.Docopt.ArgParser.Lexer (lex, Options()) as L
-import Language.Docopt.ArgParser.Parser (ValueMapping()) as Reexport
-
+import Language.Docopt.ArgParser.Parser (ValueMapping(), Options) as Reexport
+import Language.Docopt.ArgParser.Parser (Options)
 
 type Result = Tuple D.Branch (List P.ValueMapping)
-
-type Options r = {
-  optionsFirst :: Boolean
-, stopAt       :: Array String
-, requireFlags :: Boolean
-  | r
-}
 
 run
   :: forall r

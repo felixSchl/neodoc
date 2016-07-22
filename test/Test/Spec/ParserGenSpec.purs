@@ -45,6 +45,7 @@ type Options =  { stopAt       :: Array String
                 , optionsFirst :: Boolean
                 , smartOptions :: Boolean
                 , requireFlags :: Boolean
+                , laxPlacement :: Boolean
                 }
 
 defaultOptions :: Options
@@ -53,6 +54,7 @@ defaultOptions = {
 , optionsFirst: false
 , smartOptions: true
 , requireFlags: false
+, laxPlacement: false
 }
 
 type Test = { help  :: String

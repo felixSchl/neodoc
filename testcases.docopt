@@ -3177,3 +3177,27 @@ $ prog/r
 
 $ prog/r --yikes
 "prog: unknown option --yikes. Expected --foo, --bar"
+
+#
+# Free positionals
+#
+
+r"""
+usage: prog <BAR>... --foo
+"""
+
+$ prog/l --foo a b c
+{"--foo": true, "<BAR>": [ "a", "b", "c"]}
+
+r"""
+usage: prog <BAR> <QUX> --foo
+"""
+
+$ prog/l --foo a b
+{"--foo": true, "<BAR>": "a", "<QUX>": "b"}
+
+$ prog/l a --foo b
+{"--foo": true, "<BAR>": "a", "<QUX>": "b"}
+
+$ prog/l a b --foo
+{"--foo": true, "<BAR>": "a", "<QUX>": "b"}

@@ -145,6 +145,13 @@ readCommonOpts o = Docopt.defaultOptions {
                     (isTruthy <$> do
                       F.readProp "requireFlags" o)
 
+    -- relax placement rules. Positionals and commands are no longer
+    -- solid anchor points but can shift as well. The order amongst
+    -- them, however, remains fixed.
+  , laxPlacement = either (const Docopt.defaultOptions.laxPlacement) id
+                    (isTruthy <$> do
+                      F.readProp "laxPlacement" o)
+
     -- don't exit the process upon failure. By default, neodoc will
     -- exit the program if an error occured, right after printing the
     -- help text alongside an error message.
