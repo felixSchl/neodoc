@@ -321,6 +321,15 @@ descParserSpec = \_ ->
                 , repeatable: false
                 }
             ]
+
+          -- more than two aliases:
+        , pass  "-q, -?, --help"
+            [ o { aliases:    Alias.Short 'q' :| Alias.Short '?' : Alias.Long "help" : Nil
+                , arg:        Nothing
+                , env:        Nothing
+                , repeatable: false
+                }
+            ]
         ]
         runtest
   where
