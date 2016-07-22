@@ -90,8 +90,7 @@ describe('neodoc', () => {
                         [
                           { "type": "Option",
                             "value": {
-                              "flag": "f",
-                              "name": "foo",
+                              "aliases": [ "-f", "--foo" ],
                               "repeatable": false,
                               "env": undefined,
                               "arg": {
@@ -141,8 +140,7 @@ describe('neodoc', () => {
                         [
                           { "type": "Option",
                             "value": {
-                              "flag": "f",
-                              "name": "foo",
+                              "aliases": [ "-f", "--foo" ],
                               "repeatable": false,
                               "arg": {}
                             }
