@@ -61,7 +61,7 @@ import Language.Docopt.Argument (Argument(..), Branch, isFree,
                                 prettyPrintArg, prettyPrintArgNaked,
                                 isRepeatable, OptionArgumentObj(),
                                 setRequired, isOptional, isGroup,
-                                unOptionArgument, isPositional) as D
+                                unOptionArgument, isPositional, isCommand) as D
 import Language.Docopt.OptionAlias (OptionAlias(..), isLong, isShort) as OptionAlias
 import Language.Docopt.Env (Env ())
 import Language.Docopt.Specification (Specification())
@@ -278,22 +278,46 @@ spec xs options = do
             )
 
           pure (vs <> vss)
-        ) `catchParseError` (\e ->
-          let arg   = getIndexedElem (unRequired x)
-              errs' = if D.isGroup arg
+        ) `catchParseError` (\e -> do
+          let
+            arg = getIndexedElem (unRequired x)
+            isPosOrCmd = \x -> D.isPositional x || D.isCommand x
+            errs' = if D.isGroup arg || not (D.isFree arg)
                         then Map.alter (const (Just e)) arg errs
                         else errs
-          in if (length xs == 0)
-              then draw (xs <> singleton x) errs' (-1)
-              else do
-                _debug \_->
-                    "draw: failure"
-                  <> ", requeueing: "  <> prettyPrintRequiredIndexedArg x
-                draw (xs <> singleton x) errs' (n - 1)
+            onlyPosOrCmdLeft = false {- not $ any (not <<< isPosOrCmd
+                                              <<< getIndexedElem
+                                              <<< unRequired) xs
+                                              -}
+
+          _debug \_->
+              "draw: failure"
+            <> ", requeueing: " <> prettyPrintRequiredIndexedArg x
+            <> ", length of xs: " <> show (length xs)
+            <> ", onlyPosOrCmdLeft: " <> show onlyPosOrCmdLeft
+
+
+          if n == 0 || length xs == 0 || onlyPosOrCmdLeft
+            -- shortcut: there's no point trying again if there's nothing left
+            -- to parse.
+            then draw (xs <> singleton x) errs' (-1)
+            else do
+              if not $ isPosOrCmd arg
+                then draw (xs <> singleton x) errs' (n - 1)
+                else
+                  -- never move a positional beyond another positional, instead
+                  -- use a stable sort to move them to the back of the queue.
+                  -- the `onlyPosOrCmdLeft` check above ensures we're as lazy
+                  -- as possible.
+                  draw
+                    (sortBy (compare `on` (isPosOrCmd
+                                            <<< getIndexedElem
+                                            <<< unRequired)) (x:xs)
+                    ) errs' (n - 1)
         )
 
-        -- All options have been matched (or have failed to be matched) at least
-        -- once by now. See where we're at - is there any required option that was
+        -- All arguments have been matched (or have failed to be matched) at least
+        -- once by now. See where we're at - is there any required argument that was
         -- not matched at all?
         draw xss@(x:xs) errs n | (n < 0) = do
 
@@ -333,8 +357,11 @@ spec xs options = do
             fallbacks = mrights vs
 
           _debug \_->
-            "draw: missing:"
+            "draw: missing: "
               <> (intercalate " " $ D.prettyPrintArg <$> missing)
+
+          -- traceShowA $ "draw: xss: " <> show xss
+          -- traceShowA $ errs
 
           if isSkipping && length missing > 0
             then expected missing i

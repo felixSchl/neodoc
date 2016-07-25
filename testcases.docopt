@@ -3201,3 +3201,17 @@ $ prog/l a --foo b
 
 $ prog/l a b --foo
 {"--foo": true, "<BAR>": "a", "<QUX>": "b"}
+
+r"""
+usage: prog go foo
+"""
+
+$ prog/l foo go
+"prog: expected go, but got foo"
+
+r"""
+usage: git [foo] bar [qux]
+"""
+
+$ prog/l bar
+{"bar": true}
