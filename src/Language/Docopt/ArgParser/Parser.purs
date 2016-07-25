@@ -221,9 +221,6 @@ spec xs options = do
           -> Int
           -> Parser (List ValueMapping)
 
-        -- Recursively apply each argument parser.
-        -- Should an argument be repeatable, try parsing any adjacent matches
-        -- repeatedly (NOTE: this could interfere with `argP`'s repetition handling?)
         draw xss@(x:xs) errs n | n >= 0 = (do
 
           i <- getInput
@@ -234,13 +231,6 @@ spec xs options = do
             <> ", isSkipping: " <> show isSkipping
             <> ", input: "      <> show (intercalate " " $ Token.getSource <$> i)
 
-          -- Try parsing the argument 'x'. If 'x' fails, enqueue it for a later try.
-          -- Should 'x' fail and should 'x' be skippable (i.e. it defines a default
-          -- value or is backed by an environment variable), substitute x.
-          -- For groups, temporarily set the required flag to "true", such that it
-          -- will fail and we have a chance to retry as part of the exhaustive
-          -- parsing mechanism.
-
           let
             arg = getIndexedElem (unRequired x)
             mod = if isRequired x then id else P.option Nil
@@ -249,8 +239,13 @@ spec xs options = do
                         (l + 1)     -- increase the recursive level
                         (D.setRequired arg true)
 
-          -- parse the next argument. failure will cause the argument to be put at
-          -- the back of the queue and the number of retries to be cut down by one.
+          -- Try parsing the argument 'x'. If 'x' fails, enqueue it for a later
+          -- try.  Should 'x' fail and should 'x' be skippable (i.e. it defines
+          -- a default value or is backed by an environment variable),
+          -- substitute x.  For groups, temporarily set the required flag to
+          -- "true", such that it will fail and we have a chance to retry as
+          -- part of the exhaustive parsing mechanism.  The 'cached' call
+          -- ensures that we only parse a (arg, input) combo once per group.
           vs <- cached x $ P.try $ mod p
 
           _debug \_->
@@ -292,30 +287,29 @@ spec xs options = do
             <> ", length of xs: " <> show (length xs)
 
 
-          if n == 0 || length xs == 0
+          if false -- n == 0 || length xs == 0
             -- shortcut: there's no point trying again if there's nothing left
             -- to parse.
-            then draw (xs <> singleton x) errs' (-1)
-            else do
-              if not $ isFixed arg
-                then draw (xs <> singleton x) errs' (n - 1)
-                else
-                  -- If a fixed, yet optional argument failed to parse, move on
-                  -- without it. We cannot requeue as it would falsify the
-                  -- relationship between all positionals.
-                  --
-                  -- XXX: Future work could include slicing off those branches
-                  --      in the group that are 'free' and re-queueing those.
-                  if D.isOptional arg
-                    then draw xs errs' (n - 1)
-                    -- never move a positional beyond another positional,
-                    -- instead use a stable sort to move them to the back of the
-                    -- queue.
-                    else draw (sortBy (compare `on` (isFixed
-                                                <<< getIndexedElem
-                                                <<< unRequired)) (x:xs)
-                              ) errs' (n - 1)
-        )
+            then
+              let xs' = if isFixed arg then xss else (xs <> singleton x)
+               in draw xs' errs' (-1)
+            else
+              let isFixed' = isFixed <<< getIndexedElem <<< unRequired
+                  xs' =
+                    if D.isFree arg
+                      then xs <> singleton x
+                      -- If a fixed, yet optional argument failed to parse, move
+                      -- on without it. We cannot requeue as it would falsify
+                      -- the relationship between all positionals.
+
+                      -- XXX: Future work could include slicing off those
+                      -- branches in the group that are 'free' and re-queueing
+                      -- those.
+                      else if D.isOptional arg
+                            then xs
+                            else sortBy (compare `on` isFixed') xss
+               in draw xs' errs' (n - 1)
+          )
 
         -- All arguments have been matched (or have failed to be matched) at least
         -- once by now. See where we're at - is there any required argument that was
@@ -360,9 +354,6 @@ spec xs options = do
           _debug \_->
             "draw: missing: "
               <> (intercalate " " $ D.prettyPrintArg <$> missing)
-
-          -- traceShowA $ "draw: xss: " <> show xss
-          -- traceShowA $ errs
 
           if isSkipping && length missing > 0
             then expected missing i

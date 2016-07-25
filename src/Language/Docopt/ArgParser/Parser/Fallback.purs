@@ -46,10 +46,6 @@ getFallbackValue options env x = do
       | not options.requireFlags
       = pure if o.repeatable  then ArrayValue []
                               else BoolValue false
-    go (D.Stdin)                           = pure $ BoolValue false
-    go (D.EOA)                             = pure $ ArrayValue []
-    go (D.Positional pos) | pos.repeatable = pure $ ArrayValue []
-    go (D.Command cmd)    | cmd.repeatable = pure $ ArrayValue []
-    go _                                   = Nothing
-
-
+    go (D.Stdin) = pure $ BoolValue false
+    go (D.EOA)   = pure $ ArrayValue []
+    go _         = Nothing

@@ -3231,7 +3231,7 @@ usage: prog go... foo
 """
 
 $ prog/l foo go
-"prog: expected go, but got foo"
+"prog: expected go..., but got foo"
 
 r"""
 usage: prog [foo...]... bar... [qux]
@@ -3245,7 +3245,7 @@ usage: prog (a...)... b...
 """
 
 $ prog/l b a
-"prog: expected a, but got b"
+"prog: expected a..., but got b"
 
 $ prog/l a b
 {"a": 1, "b": 1}
