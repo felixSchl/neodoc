@@ -112,7 +112,7 @@ describe('neodoc', () => {
   });
 
   describe('specification loading', () => {
-    it ('should return the spec in regular JS', () => {
+    it ('should parse argv using a JS spec', () => {
       const spec = {
         program: 'foo'
       , shortHelp: 'Usage: foo <command> [options]'
