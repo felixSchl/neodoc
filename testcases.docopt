@@ -3225,3 +3225,27 @@ $ prog/l b a
 
 $ prog/l a b
 {"a": true, "b": true}
+
+r"""
+usage: prog go... foo
+"""
+
+$ prog/l foo go
+"prog: expected go, but got foo"
+
+r"""
+usage: prog [foo...]... bar... [qux]
+"""
+
+$ prog/l bar
+{"bar": 1}
+
+r"""
+usage: prog (a...)... b...
+"""
+
+$ prog/l b a
+"prog: expected a, but got b"
+
+$ prog/l a b
+{"a": 1, "b": 1}
