@@ -3210,8 +3210,18 @@ $ prog/l foo go
 "prog: expected go, but got foo"
 
 r"""
-usage: git [foo] bar [qux]
+usage: prog [foo] bar [qux]
 """
 
 $ prog/l bar
 {"bar": true}
+
+r"""
+usage: prog (a) b
+"""
+
+$ prog/l b a
+"prog: expected a, but got b"
+
+$ prog/l a b
+{"a": true, "b": true}

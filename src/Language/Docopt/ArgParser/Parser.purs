@@ -281,39 +281,37 @@ spec xs options = do
         ) `catchParseError` (\e -> do
           let
             arg = getIndexedElem (unRequired x)
-            isPosOrCmd = \x -> D.isPositional x || D.isCommand x
+            isFixed = not <<< D.isFree
             errs' = if D.isGroup arg || not (D.isFree arg)
                         then Map.alter (const (Just e)) arg errs
                         else errs
-            onlyPosOrCmdLeft = false {- not $ any (not <<< isPosOrCmd
-                                              <<< getIndexedElem
-                                              <<< unRequired) xs
-                                              -}
 
           _debug \_->
               "draw: failure"
             <> ", requeueing: " <> prettyPrintRequiredIndexedArg x
             <> ", length of xs: " <> show (length xs)
-            <> ", onlyPosOrCmdLeft: " <> show onlyPosOrCmdLeft
 
 
-          if n == 0 || length xs == 0 || onlyPosOrCmdLeft
+          if n == 0 || length xs == 0
             -- shortcut: there's no point trying again if there's nothing left
             -- to parse.
             then draw (xs <> singleton x) errs' (-1)
             else do
-              if not $ isPosOrCmd arg
+              if not $ isFixed arg
                 then draw (xs <> singleton x) errs' (n - 1)
                 else
-                  -- never move a positional beyond another positional, instead
-                  -- use a stable sort to move them to the back of the queue.
-                  -- the `onlyPosOrCmdLeft` check above ensures we're as lazy
-                  -- as possible.
-                  draw
-                    (sortBy (compare `on` (isPosOrCmd
-                                            <<< getIndexedElem
-                                            <<< unRequired)) (x:xs)
-                    ) errs' (n - 1)
+                  -- If a fixed, yet optional argument failed to parse, move on
+                  -- without it. We cannot requeue as it would falsify the
+                  -- relationship between all positionals.
+                  if D.isOptional arg
+                    then draw xs errs' (n - 1)
+                    -- never move a positional beyond another positional,
+                    -- instead use a stable sort to move them to the back of the
+                    -- queue.
+                    else draw (sortBy (compare `on` (isFixed
+                                                <<< getIndexedElem
+                                                <<< unRequired)) (x:xs)
+                              ) errs' (n - 1)
         )
 
         -- All arguments have been matched (or have failed to be matched) at least
