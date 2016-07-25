@@ -303,6 +303,9 @@ spec xs options = do
                   -- If a fixed, yet optional argument failed to parse, move on
                   -- without it. We cannot requeue as it would falsify the
                   -- relationship between all positionals.
+                  --
+                  -- XXX: Future work could include slicing off those branches
+                  --      in the group that are 'free' and re-queueing those.
                   if D.isOptional arg
                     then draw xs errs' (n - 1)
                     -- never move a positional beyond another positional,
