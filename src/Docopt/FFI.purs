@@ -170,10 +170,11 @@ parse :: ∀ e.
               specification :: Array (Array (Array Foreign))
             , shortHelp     :: String
             , program       :: String
+            , help          :: String
             }))
 parse = mkFn2 go
   where
-    go helpText fOpts = do
+    go helpText fOpts =
       let
         opts
           = Docopt.defaultOptions {
@@ -185,9 +186,7 @@ parse = mkFn2 go
                          (isTruthy <$> do
                            F.readProp "smartOptions" fOpts)
             }
-
-      docopt <- Docopt.parse helpText opts
-      pure $ specToForeign docopt
+       in specToForeign <$> Docopt.parse helpText opts
 
 readOptionAlias :: String -> Either String OptionAlias
 readOptionAlias s = case fromFoldable (String.toCharArray s) of
@@ -203,8 +202,9 @@ specToForeign
   -> { specification :: Array (Array (Array Foreign))
      , shortHelp     :: String
      , program       :: String
+     , help          :: String
      }
-specToForeign { shortHelp, specification, program } =
+specToForeign { help, shortHelp, specification, program } =
     let
       jsSpecification = toUnfoldable do
         specification <#> \branches -> do
@@ -212,8 +212,9 @@ specToForeign { shortHelp, specification, program } =
             convBranch <$> branches
 
     in {
-      shortHelp:     shortHelp
+      help:          help
     , program:       program
+    , shortHelp:     shortHelp
     , specification: jsSpecification
     }
 
@@ -255,8 +256,9 @@ specToForeign { shortHelp, specification, program } =
 -- |
 readSpec :: Foreign -> F Docopt
 readSpec input = do
-  shortHelp                 <- F.readProp "shortHelp" input
+  help                      <- F.readProp "help" input
   program                   <- F.readProp "program" input
+  shortHelp                 <- F.readProp "shortHelp" input
   toplevel :: Array Foreign <- F.readProp "specification" input
   spec <- fromFoldable <$> do
     for toplevel \usage -> do
@@ -267,7 +269,8 @@ readSpec input = do
           fromFoldable <$> do
             for args readArg
   pure {
-    program:       program
+    help:          help
+  , program:       program
   , shortHelp:     shortHelp
   , specification: spec
   }

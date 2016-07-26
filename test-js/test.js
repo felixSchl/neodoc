@@ -58,13 +58,15 @@ describe('neodoc', () => {
 
   describe('specification parsing', () => {
     it ('should return the spec in regular JS', () => {
-      expect(neodoc.parse(`
+      const help = `
         Usage: foo <command> [options]
         Options:
           -f, --foo=BAR...
-        `
-      )).to.deep.equal({
+        `;
+
+      expect(neodoc.parse(help)).to.deep.equal({
         program: 'foo'
+      , help: help
       , shortHelp: 'Usage: foo <command> [options]'
       , specification:
           [
@@ -115,6 +117,7 @@ describe('neodoc', () => {
     it ('should parse argv using a JS spec', () => {
       const spec = {
         program: 'foo'
+      , help: '...' /* does not matter */
       , shortHelp: 'Usage: foo <command> [options]'
       , specification:
           [

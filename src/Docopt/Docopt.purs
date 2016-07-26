@@ -1,5 +1,5 @@
 -- |
--- | Docopt utiltiy surface.
+-- | Docopt utility surface.
 -- |
 -- | The impure part of docopt, providing conventient entry
 -- | points and functions to use docopt.
@@ -15,8 +15,13 @@ module Docopt (
   ) where
 
 import Prelude
+import Debug.Trace
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
+import Control.Applicative (liftA1)
+import Data.Tuple (Tuple(..))
+import Data.Tuple.Nested ((/\))
+import Data.Foldable (any)
 import Data.Either (Either(..), either)
 import Control.Monad.Eff (Eff())
 import Data.Maybe (Maybe(..), maybe)
@@ -29,7 +34,8 @@ import Control.Monad.Eff.Console as Console
 import Text.Wrap (dedent)
 import Data.StrMap (StrMap())
 import Data.Array as A
-import Data.Bifunctor (lmap)
+import Data.StrMap (member)
+import Data.Bifunctor (bimap)
 import Data.String.Yarn (lines, unlines)
 
 import Language.Docopt (Docopt, parseDocopt, evalDocopt)
@@ -102,23 +108,38 @@ run :: ∀ e r
     -> Options r
     -> Eff (DocoptEff e) (StrMap Value)
 run input opts = do
-  argv <- maybe (A.drop 2 <$> Process.argv) (pure <<< id) opts.argv
-  env  <- maybe Process.getEnv              (pure <<< id) opts.env
-  either onError pure do
-    { program, specification, shortHelp } <- case input of
-      (Left spec)  -> pure spec
-      (Right help) -> parseDocopt help opts
-    lmap (_ <> (help shortHelp)) do
-      evalDocopt program specification env argv opts
+  argv <- maybe (A.drop 2 <$> Process.argv) pure opts.argv
+  env  <- maybe Process.getEnv              pure opts.env
+
+  output <- runEither do
+    { program, specification, shortHelp, help } <- case input of
+      (Left spec)   -> pure spec
+      (Right help') -> parseDocopt help' opts
+
+    bimap
+      (fmtHelp shortHelp)
+      (\output ->
+        if any (flip member output) ["-?", "-h", "--help"]
+          then Left  help
+          else Right output
+      )
+      (evalDocopt program specification env argv opts)
+
+  case output of
+    Left help -> do
+      Console.log help
+      Process.exit 0
+    Right vs -> pure vs
 
   where
-    onError e = do
+    runEither = flip either pure \e ->
       if not opts.dontExit
         then do
-          Console.log e
-          Process.exit 1
-        else
-          throwException $ error $ e
+          Console.error e
+          Process.exit  1
+        else throwException $ error $ e
 
-    help shortHelp
-      = "\n" <> (dedent $ (unlines $ ("  " <> _) <$> lines (dedent shortHelp)))
+    fmtHelp shortHelp errmsg
+      = errmsg
+      <> "\n"
+      <> (dedent $ unlines $ ("  " <> _) <$> lines (dedent shortHelp))

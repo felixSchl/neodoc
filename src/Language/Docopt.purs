@@ -41,6 +41,7 @@ type Docopt = {
   program       :: String
 , shortHelp     :: String
 , specification :: Specification
+, help          :: String
 }
 
 type ParseOptionsObj r = {
@@ -105,6 +106,7 @@ parseDocopt helpText options = do
   pure $ { specification: prg
          , shortHelp:     doc.originalUsage
          , program:       u.program
+         , help:          helpText
          }
 
 -- |
