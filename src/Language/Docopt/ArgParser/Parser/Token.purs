@@ -13,7 +13,7 @@ import Language.Docopt.ArgParser.Token (PositionedToken(..), Token(..))
 import Language.Docopt.ArgParser.Parser.Types
 
 -- | Test the token at the head of the stream
-token :: forall a. (Token -> Maybe a) -> Parser a
+token :: ∀ a. (Token -> Maybe a) -> Parser a
 token test = P.ParserT $ \(P.PState toks ppos) ->
   pure $ case toks of
     (PositionedToken { token: tok }):xs ->

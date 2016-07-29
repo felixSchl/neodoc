@@ -23,7 +23,7 @@ import Test.Assert (ASSERT)
 import Test.Support.CompatParser
 
 -- Somehow, purescript needs this:
-_liftEff :: forall e a. Eff e a -> Aff e a
+_liftEff :: ∀ e a. Eff e a -> Aff e a
 _liftEff = liftEff
 
 main :: Eff ( err     :: EXCEPTION

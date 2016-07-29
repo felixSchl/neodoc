@@ -452,7 +452,7 @@ flag = lowerAlphaNum
 type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
 
 -- | Test the token at the head of the stream
-token :: forall a. (Token -> Maybe a) -> TokenParser a
+token :: ∀ a. (Token -> Maybe a) -> TokenParser a
 token test = P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
     x@(PositionedToken ppos tok):xs ->
@@ -573,7 +573,7 @@ nextTokPos = P.ParserT $ \(P.PState toks pos) ->
       P.Result toks (Right ppos) false pos
     otherwise -> P.parseFailed toks pos "expected token, met EOF"
 
-runTokenParser :: forall a.
+runTokenParser :: ∀ a.
                   (List PositionedToken)
                 -> TokenParser a
                 -> Either P.ParseError a

@@ -67,7 +67,7 @@ foreign import isTruthy :: Foreign -> Boolean
 -- |
 -- | Run neodoc from JS.
 -- |
-run :: forall e.
+run :: ∀ e.
   Fn2 String  -- ^ The neodoc text
       Foreign -- ^ The options (optional)
       (Eff (Docopt.DocoptEff e) (StrMap RawValue))
@@ -80,7 +80,7 @@ run = mkFn2 go
 -- |
 -- | Run neodoc from JS, provided a spec.
 -- |
-runFromSpec :: forall e.
+runFromSpec :: ∀ e.
   Fn2 Foreign -- ^ The neodoc spec
       Foreign -- ^ The options (optional)
       (Eff (Docopt.DocoptEff e) (StrMap RawValue))
@@ -163,7 +163,7 @@ readCommonOpts o = Docopt.defaultOptions {
 -- |
 -- | Parse the help-text and return the spec as a JS value
 -- |
-parse :: forall e.
+parse :: ∀ e.
         Fn2 String  -- ^ The neodoc help-text
             Foreign -- ^ The options (optional)
             (Eff (Docopt.DocoptEff e) ({
@@ -345,22 +345,22 @@ readValue x =
   (StringValue <$> F.readString  x) <|>
   (ArrayValue  <$> (F.readArray x >>= \vs -> for vs readValue))
 
-optional :: forall a. F a -> F (Maybe a)
+optional :: ∀ a. F a -> F (Maybe a)
 optional x = (Just <$> x) <|> pure Nothing
 
-ifHasProp :: forall a. Foreign -> String -> (Foreign -> F a) -> F (Maybe a)
+ifHasProp :: ∀ a. Foreign -> String -> (Foreign -> F a) -> F (Maybe a)
 ifHasProp v s f = do
   mv <- nullOrUndefined (F.readProp s v)
   case mv of
     Nothing -> pure Nothing
     Just  v -> Just <$> f v
 
-ifHasProp' :: forall a. Foreign -> String -> a -> (Foreign -> F a) -> F a
+ifHasProp' :: ∀ a. Foreign -> String -> a -> (Foreign -> F a) -> F a
 ifHasProp' v s o f = do
   mv <- ifHasProp v s f
   pure (fromMaybe o mv)
 
-toMaybe :: forall a b. Either a b -> Maybe b
+toMaybe :: ∀ a b. Either a b -> Maybe b
 toMaybe e = either (const Nothing) (pure <<< id) e
 
 readAsString :: Foreign -> F String
@@ -374,8 +374,8 @@ nullOrUndefined x = F.unNullOrUndefined <$> do
   F.readNullOrUndefined pure =<< x
 
 infixl 9 expected as <?>
-expected :: forall a. String -> F a -> F a
+expected :: ∀ a. String -> F a -> F a
 expected msg x = lmap (\_ -> JSONError $ "Invalid " <> msg) x
 
-foreign import undefined :: forall a. a
-foreign import toString  :: forall a. a -> String
+foreign import undefined :: ∀ a. a
+foreign import toString  :: ∀ a. a -> String

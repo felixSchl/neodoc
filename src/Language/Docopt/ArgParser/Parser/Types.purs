@@ -76,15 +76,15 @@ instance showRequired :: (Show a) => Show (Required a) where
   show (Required a) = "Required " <> show a
   show (Optional a) = "Optional " <> show a
 
-unRequired :: forall a. Required a -> a
+unRequired :: ∀ a. Required a -> a
 unRequired (Required a) = a
 unRequired (Optional a) = a
 
-isRequired :: forall a. Required a -> Boolean
+isRequired :: ∀ a. Required a -> Boolean
 isRequired (Required _) = true
 isRequired _            = false
 
-toOptional :: forall a. Required a -> Required a
+toOptional :: ∀ a. Required a -> Required a
 toOptional (Required a) = Optional a
 toOptional (Optional a) = Optional a
 
@@ -107,10 +107,10 @@ instance showIndexed :: (Show a) => Show (Indexed a) where
 instance ordIndexed :: (Ord a) => Ord (Indexed a) where
   compare = compare `on` \(Indexed n a) -> n /\ a
 
-getIndexedElem :: forall a. Indexed a -> a
+getIndexedElem :: ∀ a. Indexed a -> a
 getIndexedElem (Indexed _ x) = x
 
-getIndex :: forall a. Indexed a -> Int
+getIndex :: ∀ a. Indexed a -> Int
 getIndex (Indexed ix _) = ix
 
 -- | Auxiliary data structure to indiciate whether or not the contained elements
@@ -122,7 +122,7 @@ instance showClump :: (Show a) => Show (Clump a) where
   show (Fixed a) = "Fixed " <> show a
   show (Free  a) = "Free "  <> show a
 
-isFree :: forall a. Clump a -> Boolean
+isFree :: ∀ a. Clump a -> Boolean
 isFree (Free _) = true
 isFree _        = false
 

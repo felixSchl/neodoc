@@ -95,7 +95,7 @@ parseToken = do
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
 -- | item individually.
 lex
-  :: forall r
+  :: ∀ r
    . List String
   -> Options r
   -> Either P.ParseError (List PositionedToken)

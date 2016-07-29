@@ -74,7 +74,7 @@ renderFlags f = (if f.optionsFirst then "p" else "")
              <> (if f.requireFlags then "r" else "")
              <> (if f.laxPlacement then "l" else "")
 
-readTests :: forall eff
+readTests :: ∀ eff
    . String
   -> Eff (fs :: FS, err :: EXCEPTION | eff) (List Test)
 readTests filepath = do

@@ -89,7 +89,7 @@ initialState = {
 , cache: Map.empty
 }
 
-withLocalCache :: forall a. Parser a -> Parser a
+withLocalCache :: ∀ a. Parser a -> Parser a
 withLocalCache p = P.ParserT \st -> do
   storedState :: StateObj <- State.get
   State.modify \s -> s { cache = Map.empty :: Cache }
@@ -146,7 +146,7 @@ unexpected branches (PositionedToken {token: tok, source}) =
 
 -- | Parse user input against a program specification.
 spec
-  :: forall r
+  :: ∀ r
    . Specification -- ^ the list of usage branches
   -> Options r    -- ^ argv parser options
   -> Parser (Tuple D.Branch (List ValueMapping))
@@ -171,7 +171,7 @@ spec xs options = do
   -- Parse a list of arguments.
   -- Take care of clumping free vs. non-free (fixed) arguments.
   exhaustP
-    :: forall r
+    :: ∀ r
      . List D.Branch   -- ^ the top-level branches
     -> Boolean         -- ^ can we skip using fallback values?
     -> Boolean         -- ^ are we currently skipping using fallback values?
@@ -192,7 +192,7 @@ spec xs options = do
 
     -- Parse a clump of arguments.
     clumpP
-      :: forall r
+      :: ∀ r
        . Clump (List D.Argument) -- ^ the clumps of arguments to parse.
       -> Parser (List ValueMapping)
     clumpP c = do
@@ -386,7 +386,7 @@ spec xs options = do
 
     -- Parse a single argument from argv.
     argP'
-      :: forall r
+      :: ∀ r
        . Boolean       -- ^ can we skip using fallback values?
       -> Boolean       -- ^ are we currently skipping using fallback values?
       -> Int           -- ^ recursive level
@@ -539,7 +539,7 @@ spec xs options = do
 -- Evaluate multiple parsers, producing a new parser that chooses the best
 -- succeeding match or none.
 evalParsers
-  :: forall a b
+  :: ∀ a b
    . (Show a, Ord b)
   => List (Parser a)
   -> (a -> b)
@@ -665,7 +665,7 @@ clump xs lax optsFirst = reverse $ foldl go Nil xs
   isFree x = (lax || D.isFree x) && (not (optsFirst && isTerm x))
 
 -- Note: Unfortunate re-implementation of the 'Alt' instance for 'ParserT'.
-catchParseError :: forall a. Parser a -> (P.ParseError -> Parser a) -> Parser a
+catchParseError :: ∀ a. Parser a -> (P.ParseError -> Parser a) -> Parser a
 catchParseError p1 f2 = P.ParserT \st ->
   P.unParserT p1 st >>= \(o@(P.Result input result consumed pos)) ->
     case result of

@@ -10,7 +10,7 @@ import Data.Char (toLower) as Char
 import Text.Parsing.Parser (ParseError(..)) as P
 import Text.Parsing.Parser.Pos (Position) as P
 
-mapWithIndex :: forall a b. (a -> Int -> b) -> List a -> List b
+mapWithIndex :: ∀ a b. (a -> Int -> b) -> List a -> List b
 mapWithIndex f lst = reverse $ go 0 lst Nil
   where
   go _ Nil acc = acc

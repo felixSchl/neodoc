@@ -75,7 +75,7 @@ data Origin
 -- | input.
 -- |
 preparseDocopt
-  :: forall r
+  :: ∀ r
    .  String           -- ^ The docopt text
   -> ParseOptionsObj r -- ^ Parse options
   -> Either String { program      :: String
@@ -93,7 +93,7 @@ preparseDocopt docopt options = do
 -- | input.
 -- |
 parseDocopt
-  :: forall r
+  :: ∀ r
    . String           -- ^ The neodoc text
   -> ParseOptionsObj r -- ^ Parse options
   -> Either String Docopt
@@ -111,7 +111,7 @@ parseDocopt helpText options = do
 -- | Apply the neodoc parser to user input.
 -- |
 evalDocopt
-  :: forall r
+  :: ∀ r
    . String           -- ^ The program name
   -> Specification    -- ^ The program specification
   -> StrMap String    -- ^ The environment
@@ -126,7 +126,7 @@ evalDocopt prog spec env argv options = do
 -- | Parse the neodoc source, derive a parser and then apply it to user input.
 -- |
 runDocopt
-  :: forall r
+  :: ∀ r
    . String         -- ^ The docopt text
   -> StrMap String  -- ^ The environment
   -> Array String   -- ^ The user input
@@ -136,17 +136,17 @@ runDocopt docopt env argv options = do
   { program, specification } <- parseDocopt docopt options
   evalDocopt program specification env argv options
 
-toScanErr :: forall a. Either P.ParseError a -> Either String a
+toScanErr :: ∀ a. Either P.ParseError a -> Either String a
 toScanErr  = lmap (D.prettyPrintDocoptError <<< D.DocoptScanError)
 
-toUsageParseErr :: forall a. Either P.ParseError a -> Either String a
+toUsageParseErr :: ∀ a. Either P.ParseError a -> Either String a
 toUsageParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptUsageParseError)
 
-toDescParseErr :: forall a. Either P.ParseError a -> Either String a
+toDescParseErr :: ∀ a. Either P.ParseError a -> Either String a
 toDescParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptDescParseError)
 
-toUserParseErr :: forall a. String -> Array String -> Either P.ParseError a -> Either String a
+toUserParseErr :: ∀ a. String -> Array String -> Either P.ParseError a -> Either String a
 toUserParseErr prog argv = lmap (D.prettyPrintDocoptError <<< D.DocoptUserParseError prog argv)
 
-toSolveErr :: forall a. Either D.SolveError a -> Either String a
+toSolveErr :: ∀ a. Either D.SolveError a -> Either String a
 toSolveErr = lmap (D.prettyPrintDocoptError <<< D.DocoptSolveError)

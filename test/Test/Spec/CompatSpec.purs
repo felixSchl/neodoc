@@ -27,7 +27,7 @@ import Test.Support.CompatParser
 
 type CompatEff e = (fs :: FS, err :: EXCEPTION | e)
 
-compatSpec :: forall e. List Test -> Spec (CompatEff e) Unit
+compatSpec :: ∀ e. List Test -> Spec (CompatEff e) Unit
 compatSpec tests =
   describe "Docopt compatibility" do
     for_ tests \(Test { doc, kases }) -> do

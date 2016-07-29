@@ -18,7 +18,7 @@ type Env = StrMap String
 empty :: StrMap String
 empty = StrMap.empty
 
-fromFoldable :: forall f. (Foldable f) => f (Tuple String String) -> StrMap String
+fromFoldable :: ∀ f. (Foldable f) => f (Tuple String String) -> StrMap String
 fromFoldable = StrMap.fromFoldable
 
 member :: String -> StrMap String -> Boolean

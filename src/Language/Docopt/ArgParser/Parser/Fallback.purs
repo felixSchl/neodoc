@@ -17,7 +17,7 @@ import Language.Docopt.Argument (Argument(..), OptionArgument(..)) as D
 import Language.Docopt.ArgParser.Parser.Options (Options())
 
 -- Find a fallback value for the given argument.
-getFallbackValue :: forall r. Options r -> Env -> D.Argument -> Maybe RichValue
+getFallbackValue :: ∀ r. Options r -> Env -> D.Argument -> Maybe RichValue
 getFallbackValue options env x = do
   (fromEnv     x <#> RValue.from Origin.Environment) <|>
   (fromDefault x <#> RValue.from Origin.Default)     <|>

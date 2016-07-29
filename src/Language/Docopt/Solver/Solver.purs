@@ -42,7 +42,7 @@ import Language.Docopt.SpecParser.Usage.Argument (Branch, Argument(..)) as U
 import Language.Docopt.Usage (Usage)
 import Partial.Unsafe (unsafePartial)
 
-foreign import undefined :: forall a. a
+foreign import undefined :: ∀ a. a
 
 type Reference = String -- [options] reference
 
@@ -69,7 +69,7 @@ instance showResolveTo :: (Show a, Show b) => Show (ResolveTo a b) where
   show (Resolved   a) = "Resolved "   <> show a
   show (Unresolved b) = "Unresolved " <> show b
 
-fail :: forall a. String -> Either SolveError a
+fail :: ∀ a. String -> Either SolveError a
 fail = Left <<< SolveError
 
 solveBranch
@@ -97,7 +97,7 @@ solveBranch as ds = go as
         groupFree = groupBy (eq `on` isFree)
 
         partition
-          :: forall a b
+          :: ∀ a b
            . List (ResolveTo a b)
           -> Tuple (List a) (List b)
         partition = f <<< mpartition isResolved
@@ -144,11 +144,11 @@ solveBranch as ds = go as
           go (_:xs) surroundingArgs acc = go xs surroundingArgs acc
           go _ _ acc = acc
 
-        isFree :: forall b . ResolveTo Argument b -> Boolean
+        isFree :: ∀ b . ResolveTo Argument b -> Boolean
         isFree (Resolved a)   = Arg.isFree a
         isFree (Unresolved _) = true
 
-        isResolved :: forall a b . ResolveTo a b -> Boolean
+        isResolved :: ∀ a b . ResolveTo a b -> Boolean
         isResolved (Resolved _) = true
         isResolved _            = false
 

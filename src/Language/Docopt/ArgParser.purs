@@ -25,7 +25,7 @@ import Language.Docopt.ArgParser.Parser (Options)
 type Result = Tuple D.Branch (List P.ValueMapping)
 
 run
-  :: forall r
+  :: ∀ r
    . Specification -- ^ the specification
   -> D.Env         -- ^ the environment
   -> Array String  -- ^ the user input

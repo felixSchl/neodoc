@@ -900,7 +900,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         StrMap.toList m <#> \(Tuple arg val) ->
           arg <> " => " <> prettyPrintValue val
 
-      validate :: forall eff.  List Usage
+      validate :: ∀ eff.  List Usage
                             -> Array String
                             -> Env
                             -> Maybe Options

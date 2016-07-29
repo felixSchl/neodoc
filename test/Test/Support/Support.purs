@@ -16,20 +16,20 @@ import Control.Monad.Eff.Exception (error, throwException, EXCEPTION(),
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
 
-runMaybeEff :: forall a eff. Maybe a -> Eff (err :: EXCEPTION | eff) a
+runMaybeEff :: ∀ a eff. Maybe a -> Eff (err :: EXCEPTION | eff) a
 runMaybeEff = maybe (throwException $ error "Nothing") pure
 
-runEitherEff :: forall err a eff. (Show err) =>
+runEitherEff :: ∀ err a eff. (Show err) =>
   Either err a ->
   Eff (err :: EXCEPTION | eff) a
 runEitherEff = either (throwException <<< error <<< show) pure
 
 -- Run a effectful computation, but return unit
 -- This is helpful to make a set of assertions in a Spec
-vliftEff :: forall e. Eff e Unit -> Aff e Unit
+vliftEff :: ∀ e. Eff e Unit -> Aff e Unit
 vliftEff = void <<< liftEff
 
-prettyPrintMap :: forall k v. Map k v
+prettyPrintMap :: ∀ k v. Map k v
                             -> (k -> String)
                             -> (v -> String)
                             -> String
@@ -43,16 +43,16 @@ prettyPrintMap m pK pV =
 
 type Assertion e = Eff (err :: EXCEPTION | e) Unit
 
-assertEqual :: forall e a. (Eq a, Show a) => a -> a -> Assertion e
+assertEqual :: ∀ e a. (Eq a, Show a) => a -> a -> Assertion e
 assertEqual expected actual =
   unless (actual == expected) (throwException (error msg))
     where msg = "expected: " <> show expected
              <> ", but got: " <> show actual
 
-shouldEqual :: forall e a. (Eq a, Show a) => a -> a -> Assertion e
+shouldEqual :: ∀ e a. (Eq a, Show a) => a -> a -> Assertion e
 shouldEqual = flip assertEqual
 
-assertThrows :: forall e a. (Error -> Boolean)
+assertThrows :: ∀ e a. (Error -> Boolean)
              -> Eff (err :: EXCEPTION | e) Unit -> Assertion e
 assertThrows p m = do
   r <- unsafeInterleaveEff $ catchException (pure <<< pure) (Nothing <$ m)

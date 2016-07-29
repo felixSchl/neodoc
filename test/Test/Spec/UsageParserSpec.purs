@@ -220,13 +220,13 @@ usageParserSpec = \_ ->
 
   where
 
-    kase :: forall a. String -> Expected a -> { i :: String, o :: Expected a }
+    kase :: ∀ a. String -> Expected a -> { i :: String, o :: Expected a }
     kase i o = { i, o }
 
-    pass :: forall a. String -> a -> { i :: String, o :: Expected a }
+    pass :: ∀ a. String -> a -> { i :: String, o :: Expected a }
     pass i o = kase i (P o)
 
-    fail :: forall a. String -> { i :: String, o :: Expected a }
+    fail :: ∀ a. String -> { i :: String, o :: Expected a }
     fail i = kase i F
 
     runTests :: _

@@ -45,7 +45,7 @@ type DocoptEff e = ( process :: PROCESS
                    | e
                    )
 
-liftEffA :: forall e a. Eff (DocoptEff e) a -> Aff (DocoptEff e) a
+liftEffA :: ∀ e a. Eff (DocoptEff e) a -> Aff (DocoptEff e) a
 liftEffA = liftEff
 
 -- |
@@ -83,7 +83,7 @@ defaultOptions = {
 -- |
 -- | Parse the docopt specification from the given help text.
 -- |
-parse :: forall e r
+parse :: ∀ e r
        . String
       -> ParseOptionsObj r
       -> Eff (DocoptEff e) Docopt
@@ -97,7 +97,7 @@ parse helpText opts = do
 -- | This either succeeds with the key/value mappings or fails with a
 -- | descriptive help message.
 -- |
-run :: forall e r
+run :: ∀ e r
      . Either Docopt String
     -> Options r
     -> Eff (DocoptEff e) (StrMap Value)

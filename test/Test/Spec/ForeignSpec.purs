@@ -44,7 +44,7 @@ instance eqDocoptWrapper :: Eq DocoptWrapper where
     a.shortHelp == b.shortHelp &&
     a.specification == b.specification
 
-foreignSpec :: forall e. List Test -> Spec (CompatEff e) Unit
+foreignSpec :: ∀ e. List Test -> Spec (CompatEff e) Unit
 foreignSpec tests = describe "Crossing JS/purescript" do
   for_ tests \(Test { doc, kases }) -> do
     if any (\(Kase k) -> case k.out of

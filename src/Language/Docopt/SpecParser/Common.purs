@@ -35,7 +35,7 @@ getTokenPosition = P.ParserT $ \(P.PState s pos) ->
 -- |
 -- Mark the current indentation level
 --
-markIndent :: forall a. TokenParser a -> TokenParser a
+markIndent :: ∀ a. TokenParser a -> TokenParser a
 markIndent p = do
   currentIndent <- ParserState.getIndentation <$> lift State.get
   P.Position _ col <- getTokenPosition
@@ -48,7 +48,7 @@ markIndent p = do
 -- |
 -- Mark the current line
 --
-markLine :: forall a. TokenParser a -> TokenParser a
+markLine :: ∀ a. TokenParser a -> TokenParser a
 markLine p = do
   currentLine <- ParserState.getLine <$> lift State.get
   P.Position tokLine _ <- getTokenPosition
@@ -61,7 +61,7 @@ markLine p = do
 -- |
 -- Mark a custom indentation level
 --
-markIndent' :: forall a. Int -> TokenParser a -> TokenParser a
+markIndent' :: ∀ a. Int -> TokenParser a -> TokenParser a
 markIndent' level p = do
   current <- ParserState.getIndentation <$> lift State.get
   lift $ State.modify (flip ParserState.setIndentation level)
