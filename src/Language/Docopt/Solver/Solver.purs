@@ -101,11 +101,11 @@ solveBranch as ds = go as
            . List (ResolveTo a b)
           -> Tuple (List a) (List b)
         partition = f <<< mpartition isResolved
-          where f = bimap (\x -> concat $ x <#> \a -> case a of
+          where f = bimap (\x -> concat $ x <#> case _ of
                             (Resolved x) -> pure x
                             otherwise    -> Nil
                           )
-                          (\x -> concat $ x <#> \a -> case a of
+                          (\x -> concat $ x <#> case _ of
                             (Unresolved x) -> pure x
                             otherwise      -> Nil
                           )
