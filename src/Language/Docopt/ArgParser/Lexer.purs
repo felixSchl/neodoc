@@ -16,7 +16,7 @@ import Data.Either (Either())
 import Data.Maybe (Maybe(..))
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
-import Data.List (List(..), singleton, many, fromFoldable, some, toUnfoldable)
+import Data.List (List(..), (:), singleton, many, fromFoldable, some, toUnfoldable)
 import Data.String (singleton) as String
 import Data.Traversable (foldMap)
 import Data.Foldable (elem)
@@ -102,7 +102,7 @@ lex
 lex xs options = go xs 1
   where
     go Nil _ = pure Nil
-    go (Cons x xs) n = do
+    go (x:xs) n = do
       let toEOA l = pure $ singleton $ PositionedToken {
             token:     EOA (D.StringValue <$> xs)
           , sourcePos: P.Position 1 n

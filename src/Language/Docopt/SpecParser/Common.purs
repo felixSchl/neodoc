@@ -9,7 +9,7 @@ import Control.Monad.Trans (lift)
 import Control.MonadPlus (guard)
 import Control.Monad.Transformerless.State (State, evalState)
 import Control.Monad.Transformerless.State (get, modify) as State
-import Data.List (List(..))
+import Data.List (List(..), (:))
 import Data.Either (Either(..))
 import Language.Docopt.SpecParser.Lexer (TokenParser, PositionedToken(..))
 import Language.Docopt.SpecParser.State
@@ -29,10 +29,8 @@ traceState = do
 getTokenPosition :: TokenParser P.Position
 getTokenPosition = P.ParserT $ \(P.PState s pos) ->
   pure case s of
-    Cons (PositionedToken spos _) _ ->
-      P.Result s (Right spos) false pos
-    otherwise ->
-      P.Result s (Right pos) false pos
+    (PositionedToken spos _):_ -> P.Result s (Right spos) false pos
+    otherwise                  -> P.Result s (Right pos)  false pos
 
 -- |
 -- Mark the current indentation level

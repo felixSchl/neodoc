@@ -117,7 +117,7 @@ solveBranch as ds = go as
         expand ds surroundingArgs = reverse $ go ds surroundingArgs Nil
           where
           go :: List SpecParser.Desc -> List Argument -> List Argument -> List Argument
-          go (Cons (x@(Desc.OptionDesc desc)) xs) surroundingArgs acc = do
+          go ((x@(Desc.OptionDesc desc)):xs) surroundingArgs acc = do
             -- Assuming description and usage have already been merged,
             -- find all options that are not present in the surrounding
             -- "free" area and add them.
@@ -141,7 +141,7 @@ solveBranch as ds = go as
               isMatch aliases (Group grp) = any (isMatch aliases) (concat grp.branches)
               isMatch _ _                 = false
 
-          go (Cons _ xs) surroundingArgs acc = go xs surroundingArgs acc
+          go (_:xs) surroundingArgs acc = go xs surroundingArgs acc
           go _ _ acc = acc
 
         isFree :: forall b . ResolveTo Argument b -> Boolean
@@ -156,13 +156,13 @@ solveBranch as ds = go as
                                     (List (ResolveTo Argument
                                                      Reference))
     solveArgs Nil = pure Nil
-    solveArgs (Cons x Nil) = do
+    solveArgs (x:Nil) = do
       m <- solveArg x Nothing
       pure case m of
            Resolved (Slurp xs) -> Resolved <$> xs
            Resolved (Keep xs)  -> Resolved <$> xs
            Unresolved a        -> singleton $ Unresolved a
-    solveArgs (Cons x (Cons y xs)) = do
+    solveArgs (x:y:xs) = do
       m <- solveArg x (Just y)
       case m of
            Resolved (Keep  zs) -> ((Resolved <$> zs) <> _) <$> solveArgs (y:xs)
@@ -519,7 +519,7 @@ solveBranch as ds = go as
                     $ "Multiple option descriptions for option -"
                         <> String.singleton f
 
-            (Cons (Desc.OptionDesc desc) Nil) -> do
+            (Desc.OptionDesc desc):Nil -> do
               arg <- if isTrailing
                           then resolveOptArg o.arg desc.arg
                           else if isNothing desc.arg

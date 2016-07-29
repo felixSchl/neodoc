@@ -613,7 +613,7 @@ evalParsers parsers p = do
               (do
                 es <- losers
                 pure case es of
-                  Cons e es | null es || not (null i) -> do
+                  e:es | null es || not (null i) -> do
                     pure (P.Result e.input (Left e.result.error) e.consumed e.position)
                   otherwise -> pure $ P.parseFailed i pos ""
               )
@@ -658,10 +658,10 @@ clump
 clump xs lax optsFirst = reverse $ foldl go Nil xs
   where
   go (Nil) x = pure $ (if isFree x then Free else Fixed) $ singleton x
-  go   (Cons (Free a)  zs) x | isFree x = (Free (a <> (singleton x))) : zs
-  go u@(Cons (Free _)   _) x = (Fixed $ singleton x) : u
-  go u@(Cons (Fixed _)  _) x | isFree x = (Free $ singleton x): u
-  go   (Cons (Fixed a) zs) x = (Fixed (a <> (singleton x))) : zs
+  go   ((Free a) :zs) x | isFree x = (Free (a <> (singleton x))) : zs
+  go u@((Free _) :_ ) x = (Fixed $ singleton x) : u
+  go u@((Fixed _):_ ) x | isFree x = (Free $ singleton x): u
+  go   ((Fixed a):zs) x = (Fixed (a <> (singleton x))) : zs
   isFree x = (lax || D.isFree x) && (not (optsFirst && isTerm x))
 
 -- Note: Unfortunate re-implementation of the 'Alt' instance for 'ParserT'.

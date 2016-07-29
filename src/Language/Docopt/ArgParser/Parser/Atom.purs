@@ -61,7 +61,7 @@ longOption :: Boolean -> String -> (Maybe D.OptionArgumentObj) -> Parser Value
 longOption term n a = unsafePartial $
  P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
-    Cons (PositionedToken { token: tok, sourcePos: npos, source: s }) xs ->
+    (PositionedToken { token: tok, sourcePos: npos, source: s }):xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks npos e
         Right result -> do
@@ -169,7 +169,7 @@ shortOption
 shortOption term f a = unsafePartial $
  P.ParserT $ \(P.PState toks pos) -> do
   pure $ case toks of
-    Cons (PositionedToken { token: tok, source: s }) xs ->
+    (PositionedToken { token: tok, source: s }):xs ->
       case go tok (_.token <<< unPositionedToken <$> head xs) of
         Left e -> P.parseFailed toks pos e
         Right result -> do

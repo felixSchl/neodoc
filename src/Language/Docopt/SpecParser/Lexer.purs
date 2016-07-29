@@ -455,12 +455,12 @@ type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
 token :: forall a. (Token -> Maybe a) -> TokenParser a
 token test = P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
-    Cons x@(PositionedToken ppos tok) xs ->
+    x@(PositionedToken ppos tok):xs ->
       case test tok of
         Just a ->
           let nextpos =
                 case xs of
-                  Cons (PositionedToken npos _) _ -> npos
+                  (PositionedToken npos _):_ -> npos
                   Nil -> ppos
           in P.Result xs (Right a) true nextpos
         -- XXX: Fix this error message, it makes no sense!
@@ -569,7 +569,7 @@ shoutName = token go P.<?> "NAME"
 nextTokPos :: TokenParser P.Position
 nextTokPos = P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
-    Cons x@(PositionedToken ppos _) xs ->
+    x@(PositionedToken ppos _):xs ->
       P.Result toks (Right ppos) false pos
     otherwise -> P.parseFailed toks pos "expected token, met EOF"
 

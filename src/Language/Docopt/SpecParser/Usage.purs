@@ -18,7 +18,7 @@ import Control.Bind ((=<<))
 import Control.Lazy (defer)
 import Control.MonadPlus (guard)
 import Data.Either (Either)
-import Data.List (List(..), many, some, singleton, length, modifyAt)
+import Data.List (List(..), many, some, singleton, length, modifyAt, (:))
 import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
 import Data.Tuple (Tuple(Tuple), snd, fst)
 import Data.Tuple.Nested (tuple3)
@@ -61,7 +61,7 @@ usageParser smartOpts = do
   name   <- program
   usages <- markLine do
     markIndent' startCol $ do
-      Cons
+     (:)
       <$> (usageLine name)
       <*> many do
             P.optional $ P.try do
@@ -134,7 +134,7 @@ usageParser smartOpts = do
     trySmartOpt :: Argument -> Argument
     trySmartOpt grp'@(Group grp) = fromMaybe grp' $ do
       Tuple opt optarg <- case grp.branches of
-                              (Cons (Cons opt' (Cons arg' Nil)) Nil) ->
+                              ((opt':(arg':Nil)):Nil) ->
                                 pure $ Tuple opt' arg'
                               otherwise -> Nothing
 
@@ -170,7 +170,7 @@ usageParser smartOpts = do
                 pure $ tuple3 cmd.name
                               (cmd.repeatable)
                               false
-              (Group (grp''@{ branches: Cons (Cons a Nil) Nil })) ->
+              (Group (grp''@{ branches: (a:Nil):Nil })) ->
                 case a of
                   (Positional pos) ->
                     pure $ tuple3 pos.name

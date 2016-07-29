@@ -13,7 +13,7 @@ import Prelude
 import Data.Generic (class Generic)
 import Data.Either (Either(), either)
 import Data.Maybe (fromJust)
-import Data.List (List(..), toUnfoldable, many, some)
+import Data.List (List(..), toUnfoldable, many, some, (:))
 import Data.Foldable (foldMap)
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
@@ -119,8 +119,8 @@ parse s split = P.runParser s $ if split then values else value <* P.eof
       ]
 
       pure $ case vs of
-            Cons x Nil -> x
-            _          -> ArrayValue (toUnfoldable vs)
+            x:Nil -> x
+            _     -> ArrayValue (toUnfoldable vs)
 
     inner = do
       P.try value <|> do

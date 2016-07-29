@@ -2,7 +2,7 @@ module Language.Docopt.Errors where
 
 import Prelude
 import Data.Maybe (Maybe(..))
-import Data.List (List(Nil, Cons), reverse)
+import Data.List (List(Nil), (:), reverse)
 import Data.Generic (class Generic, gShow)
 import Text.Wrap (dedent)
 import Data.String (uncons, singleton) as String
@@ -14,7 +14,7 @@ mapWithIndex :: forall a b. (a -> Int -> b) -> List a -> List b
 mapWithIndex f lst = reverse $ go 0 lst Nil
   where
   go _ Nil acc = acc
-  go n (Cons x xs) acc = go (n+1) xs $ Cons (f x n) acc
+  go n (x:xs) acc = go (n+1) xs $ (f x n):acc
 
 --------------------------------------------------------------------------------
 -- Errors (XXX: needs migration and improvement) -------------------------------

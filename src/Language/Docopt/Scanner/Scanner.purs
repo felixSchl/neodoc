@@ -6,7 +6,7 @@ module Language.Docopt.Scanner (
 import Prelude
 import Text.Parsing.Parser (ParseError(ParseError)) as P
 import Text.Parsing.Parser.Pos (initialPos) as P
-import Data.List (List(Nil, Cons), fromFoldable, catMaybes)
+import Data.List (List(Nil), (:), fromFoldable, catMaybes)
 import Data.String.Regex as Regex
 import Data.String.Regex (regex, Regex())
 import Data.String (length, trim) as String
@@ -37,9 +37,9 @@ fixSection s
 scan :: String -> Either P.ParseError Docopt
 scan text = do
   u <- case sections "usage" of
-              Nil        -> fail "No usage section found!"
-              Cons x Nil -> pure x
-              _          -> fail "Multiple usage sections found!"
+              Nil   -> fail "No usage section found!"
+              x:Nil -> pure x
+              _     -> fail "Multiple usage sections found!"
 
   pure {
     usage:         fixSection u

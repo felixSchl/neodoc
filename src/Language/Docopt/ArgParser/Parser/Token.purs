@@ -16,7 +16,7 @@ import Language.Docopt.ArgParser.Parser.Types
 token :: forall a. (Token -> Maybe a) -> Parser a
 token test = P.ParserT $ \(P.PState toks ppos) ->
   pure $ case toks of
-    Cons (PositionedToken { token: tok }) xs ->
+    (PositionedToken { token: tok }):xs ->
       case test tok of
         Just a ->
           let nextpos =
