@@ -237,6 +237,7 @@ The internal data structure for arguments looks as follows:
 type Specification = List Usage
 type Usage         = List Branch
 type Branch        = List Argument
+data OptionAlias   = Short Char | Long String
 
 data Argument
   = Command     { name       :: String
@@ -245,8 +246,7 @@ data Argument
   | Positional  { name       :: String
                 , repeatable :: Boolean
                 }
-  | Option      { flag       :: Maybe Char
-                , name       :: Maybe String
+  | Option      { aliases    :: NonEmpty OptionAlias
                 , arg        :: Maybe { name     :: String
                                       , default  :: Maybe Value
                                       , optional :: Boolean
