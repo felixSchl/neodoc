@@ -24,7 +24,7 @@ import Data.Tuple.Nested ((/\))
 import Data.Foldable (any)
 import Data.Either (Either(..), either)
 import Control.Monad.Eff (Eff())
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Node.FS (FS())
 import Node.Process (PROCESS())
 import Node.Process as Process
@@ -35,7 +35,7 @@ import Text.Wrap (dedent)
 import Data.StrMap (StrMap())
 import Data.Array as A
 import Data.StrMap (member)
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (lmap, bimap)
 import Data.String.Yarn (lines, unlines)
 
 import Language.Docopt (Docopt, parseDocopt, evalDocopt)
@@ -72,6 +72,7 @@ type Options r = {
 , stopAt       :: Array String -- ^ stop parsing at these custom EOA markers
 , requireFlags :: Boolean      -- ^ do not ignore missing flags
 , laxPlacement :: Boolean      -- ^ allow positionals/commands to be appear anywhere
+, version      :: Maybe String -- ^ the version string to display
 }
 
 defaultOptions :: Options {}
@@ -84,6 +85,7 @@ defaultOptions = {
 , stopAt:       []
 , laxPlacement: false
 , requireFlags: false
+, version:      Nothing
 }
 
 -- |
@@ -96,6 +98,11 @@ parse :: ∀ e r
 parse helpText opts = do
   either (throwException <<< error) pure do
     parseDocopt helpText opts
+
+data Action a
+  = ShowHelp String
+  | ShowVersion
+  | Return a
 
 -- |
 -- | Run docopt on the given help text.
@@ -111,35 +118,55 @@ run input opts = do
   argv <- maybe (A.drop 2 <$> Process.argv) pure opts.argv
   env  <- maybe Process.getEnv              pure opts.env
 
-  output <- runEither do
+  -- note: these can be singleton lists, so the user can, for example, associate
+  --       "-h" to mean "--help" manually, using the options section. This works
+  --       since aliases are always present in the output mapping (#38).
+  let helpFlags = [ "--help" ]
+      versionFlags = [ "--version" ]
+
+  action <- runEither do
     { program, specification, shortHelp, help } <- case input of
       (Left spec)   -> pure spec
       (Right help') -> parseDocopt help' opts
 
     bimap
       (fmtHelp shortHelp)
-      (\output ->
-        if any (flip member output) ["-?", "-h", "--help"]
-          then Left  help
-          else Right output
-      )
+      case _ of
+        output | output `has` helpFlags    -> ShowHelp help
+        output | output `has` versionFlags -> ShowVersion
+        output                             -> Return output
       (evalDocopt program specification env argv opts)
 
-  case output of
-    Left help -> do
-      Console.log help
-      Process.exit 0
-    Right vs -> pure vs
+  case action of
+    ShowHelp help -> abort 0 help
+    ShowVersion   -> abort 0 =<< maybe readPkgVersion pure opts.version
+    Return v      -> pure v
 
   where
+    has x = any (_ `member` x)
+
+    -- note: purescript needs the `a` for now:
+    abort :: ∀ a. _ -> _ -> _ _ a
+    abort code msg
+      = let log = if code == 0 then Console.log else Console.error
+        in  do
+          log msg
+          Process.exit code
+
     runEither = flip either pure \e ->
       if not opts.dontExit
-        then do
-          Console.error e
-          Process.exit  1
+        then abort 1 e
         else throwException $ error $ e
+
+    readPkgVersion = fromMaybe "" <$> readPkgVersionImpl Just Nothing
 
     fmtHelp shortHelp errmsg
       = errmsg
       <> "\n"
       <> (dedent $ unlines $ ("  " <> _) <$> lines (dedent shortHelp))
+
+foreign import readPkgVersionImpl
+  :: ∀ e
+   . (String -> Maybe String)
+  -> Maybe String
+  -> Eff e (Maybe String)

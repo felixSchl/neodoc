@@ -117,6 +117,11 @@ readCommonOpts o = Docopt.defaultOptions {
               unsafeCoerce <$> do
                 readObject =<< F.readProp "env" o
 
+    -- set the version to be displayed when '--version' is issued.
+  , version = flip alt Docopt.defaultOptions.version do
+            toMaybe do
+                F.readProp "version" o
+
     -- enable "options-first" parsing. Options are only parsed and
     -- validated until the first operand (positional or command) is met.
     -- Trailing options are collected into a designated placeholder.

@@ -148,6 +148,7 @@ readTests filepath = do
                       , stopAt:       []
                       , requireFlags: flags.requireFlags
                       , laxPlacement: flags.laxPlacement
+                      , version:      Nothing
                       }
                     }
 
