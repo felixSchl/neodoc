@@ -7,17 +7,17 @@
     "test": "test"
   },
   "scripts": {
-    "build:src": "mkdir -p dist && pulp build --to dist/docopt.purs.js --skip-entry-point --optimise -m Docopt.FFI && echo 'module.exports = PS;' >> dist/docopt.purs.js",
+    "build:src": "shx mkdir -p dist && pulp build --to dist/docopt.purs.js --skip-entry-point --optimise -m Docopt.FFI && echo 'module.exports = PS;' >> dist/docopt.purs.js",
     "build:lib": "babel lib --out-dir dist",
-    "prebuild": "rm -rf dist",
-    "build": "npm run build:src && npm run build:lib",
-    "pretest": "npm run build",
+    "prebuild": "shx rm -rf dist",
+    "build": "npm run -s build:src && npm run -s build:lib",
+    "pretest": "npm run -s build",
     "test": "pulp test && mocha test-js",
     "watch": "pulp -w test",
     "minify": "uglifyjs dist/docopt.purs.js > dist/docopt.purs.min.js",
     "deps": "bower install",
     "clean": "git stash && git clean -fdX",
-    "prerelease": "npm run clean && npm install && npm run deps && npm test",
+    "prerelease": "npm run -s clean && npm install && npm run -s deps && npm test",
     "release": "npm version",
     "postrelease": "git push --tags && npm publish"
   },
@@ -47,6 +47,7 @@
     "pulp": "^9.0.0",
     "purescript": "^0.9.0",
     "shelljs": "^0.7.0",
+    "shx": "^0.1.2",
     "string-argv": "0.0.2",
     "uglifyjs": "^2.4.10"
   }
