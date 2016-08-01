@@ -122,6 +122,16 @@ readCommonOpts o = Docopt.defaultOptions {
             toMaybe do
                 F.readProp "version" o
 
+    -- set the version flags that trigger 'version'
+  , versionFlags = fromMaybe Docopt.defaultOptions.versionFlags do
+            toMaybe do
+                F.readProp "versionFlags" o
+
+    -- set the version flags that trigger 'version'
+  , helpFlags = fromMaybe Docopt.defaultOptions.helpFlags do
+            toMaybe do
+                F.readProp "helpFlags" o
+
     -- enable "options-first" parsing. Options are only parsed and
     -- validated until the first operand (positional or command) is met.
     -- Trailing options are collected into a designated placeholder.

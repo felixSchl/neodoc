@@ -73,6 +73,8 @@ type Options r = {
 , requireFlags :: Boolean      -- ^ do not ignore missing flags
 , laxPlacement :: Boolean      -- ^ allow positionals/commands to be appear anywhere
 , version      :: Maybe String -- ^ the version string to display
+, versionFlags :: Array String -- ^ list of flags that trigger 'version'
+, helpFlags    :: Array String -- ^ list of flags that trigger 'help'
 }
 
 defaultOptions :: Options {}
@@ -86,6 +88,8 @@ defaultOptions = {
 , laxPlacement: false
 , requireFlags: false
 , version:      Nothing
+, versionFlags: [ "--version" ]
+, helpFlags:    [ "--help"    ]
 }
 
 -- |
@@ -118,12 +122,6 @@ run input opts = do
   argv <- maybe (A.drop 2 <$> Process.argv) pure opts.argv
   env  <- maybe Process.getEnv              pure opts.env
 
-  -- note: these can be singleton lists, so the user can, for example, associate
-  --       "-h" to mean "--help" manually, using the options section. This works
-  --       since aliases are always present in the output mapping (#38).
-  let helpFlags = [ "--help" ]
-      versionFlags = [ "--version" ]
-
   action <- runEither do
     { program, specification, shortHelp, help } <- case input of
       (Left spec)   -> pure spec
@@ -132,9 +130,9 @@ run input opts = do
     bimap
       (fmtHelp shortHelp)
       case _ of
-        output | output `has` helpFlags    -> ShowHelp help
-        output | output `has` versionFlags -> ShowVersion
-        output                             -> Return output
+        output | output `has` opts.helpFlags    -> ShowHelp help
+        output | output `has` opts.versionFlags -> ShowVersion
+        output                                  -> Return output
       (evalDocopt program specification env argv opts)
 
   case action of

@@ -149,6 +149,8 @@ readTests filepath = do
                       , requireFlags: flags.requireFlags
                       , laxPlacement: flags.laxPlacement
                       , version:      Nothing
+                      , versionFlags: []
+                      , helpFlags:    []
                       }
                     }
 

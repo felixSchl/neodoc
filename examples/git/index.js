@@ -21,7 +21,7 @@ The most commonly used git commands are:
 'git help -a' and 'git help -g' lists available subcommands and some
 concept guides. See 'git help <command>' or 'git help <concept>'
 to read about a specific subcommand or concept.
-`, { optionsFirst: true, smartOptions: true, version: '1.0.0' });
+`, { optionsFirst: true, smartOptions: true, version: '1.0.0', versionFlags: ['--info-path'] });
 
 if (args['<command>']) {
   require(`./${args['<command>']}`)(
