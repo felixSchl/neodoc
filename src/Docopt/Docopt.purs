@@ -21,7 +21,7 @@ import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
 import Control.Applicative (liftA1)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
-import Data.Foldable (any)
+import Data.Foldable (any, intercalate)
 import Data.Either (Either(..), either)
 import Control.Monad.Eff (Eff())
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
@@ -129,7 +129,7 @@ run input opts = do
       (Right help') -> parseDocopt help' opts
 
     bimap
-      (fmtHelp shortHelp)
+      (fmtHelp program opts.helpFlags shortHelp)
       case _ of
         output | output `has` opts.helpFlags    -> ShowHelp help
         output | output `has` opts.versionFlags -> ShowVersion
@@ -161,10 +161,15 @@ run input opts = do
 
     readPkgVersion = fromMaybe "" <$> readPkgVersionImpl Just Nothing
 
-    fmtHelp shortHelp errmsg
+    fmtHelp program helpFlags shortHelp errmsg
       = errmsg
       <> "\n"
       <> (dedent $ unlines $ ("  " <> _) <$> lines (dedent shortHelp))
+      <> if A.length helpFlags == 0
+          then ""
+          else "\n" <> "See "
+                        <> program <> " " <> (intercalate "/" helpFlags)
+                        <> " for more information"
 
 foreign import readPkgVersionImpl
   :: ∀ e
