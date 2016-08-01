@@ -37,6 +37,7 @@ import Data.Array as A
 import Data.StrMap (member)
 import Data.Bifunctor (lmap, bimap)
 import Data.String.Yarn (lines, unlines)
+import Data.String (trim) as String
 
 import Language.Docopt (Docopt, parseDocopt, evalDocopt)
 import Language.Docopt.Value (Value())
@@ -136,9 +137,11 @@ run input opts = do
       (evalDocopt program specification env argv opts)
 
   case action of
-    ShowHelp help -> abort 0 help
-    ShowVersion   -> abort 0 =<< maybe readPkgVersion pure opts.version
     Return v      -> pure v
+    ShowHelp help -> abort 0 (String.trim help)
+    ShowVersion   -> abort 0 =<< String.trim <$> maybe readPkgVersion
+                                                       pure
+                                                       opts.version
 
   where
     has x = any (_ `member` x)
