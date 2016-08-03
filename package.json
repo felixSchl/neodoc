@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "build:src": "shx mkdir -p dist && pulp build --to dist/docopt.purs.js --skip-entry-point --optimise -m Docopt.FFI && echo 'module.exports = PS;' >> dist/docopt.purs.js",
+    "build:src": "shx mkdir -p dist && pulp build --to dist/docopt.purs.js --skip-entry-point --optimise -m Docopt.FFI && shx echo module.exports = PS; >> dist/docopt.purs.js",
     "build:lib": "babel lib --out-dir dist",
     "prebuild": "shx rm -rf dist",
     "build": "npm run -s build:src && npm run -s build:lib",
