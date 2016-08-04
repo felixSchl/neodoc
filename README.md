@@ -16,6 +16,10 @@
     <img src="https://travis-ci.org/felixSchl/neodoc.svg?branch=development"
          alt="Build Status">
   </a>
+  <a href="https://ci.appveyor.com/project/felixSchl/neodoc">
+    <img src="https://ci.appveyor.com/api/projects/status/hjchg7in2l74by1d/branch/development?svg=true"
+         alt="Build Status (appveyor)">
+  </a>
   <a href="https://gitter.im/felixSchl/neodoc">
     <img src="https://badges.gitter.im/felixSchl/neodoc.svg"
          alt="Join the chat at https://gitter.im/felixSchl/neodoc">
