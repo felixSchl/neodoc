@@ -18,7 +18,7 @@ exports.readPkgVersionImpl = function (Just) {
     return function() {
       if (!require.main) {
         return Nothing;
-      } else {
+      } else if (require.main && require.main.paths /* in node? */){
         for (var i=0; i < require.main.paths.length; i++) {
           var xs = require.main.paths[i].split(path.sep);
           if (xs.pop() === 'node_modules' && xs.length > 1) {
@@ -31,6 +31,7 @@ exports.readPkgVersionImpl = function (Just) {
         }
         return Nothing;
       }
+      return Nothing;
     }
   }
 };
