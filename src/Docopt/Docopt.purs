@@ -38,6 +38,7 @@ import Data.StrMap (member)
 import Data.Bifunctor (lmap, bimap)
 import Data.String.Yarn (lines, unlines)
 import Data.String (trim) as String
+import Language.Docopt.Errors (developerErrorMessage)
 
 import Language.Docopt (Docopt, parseDocopt, evalDocopt)
 import Language.Docopt.Value (Value())
@@ -123,43 +124,50 @@ run input opts = do
   argv <- maybe (A.drop 2 <$> Process.argv) pure opts.argv
   env  <- maybe Process.getEnv              pure opts.env
 
-  action <- runEither do
+  program /\ action <- runEither do
     { program, specification, shortHelp, help } <- case input of
-      (Left spec)   -> pure spec
-      (Right help') -> parseDocopt help' opts
+        (Left spec)   -> pure spec
+        (Right help') -> parseDocopt help' opts
 
     bimap
       (fmtHelp program opts.helpFlags shortHelp)
-      case _ of
-        output | output `has` opts.helpFlags    -> ShowHelp help
-        output | output `has` opts.versionFlags -> ShowVersion
-        output                                  -> Return output
+      ((program /\ _) <<< case _ of
+        output | canExit && output `has` opts.helpFlags    -> ShowHelp help
+        output | canExit && output `has` opts.versionFlags -> ShowVersion
+        output                                             -> Return output
+      )
       (evalDocopt program specification env argv opts)
 
   case action of
     Return v      -> pure v
     ShowHelp help -> abort 0 (String.trim help)
-    ShowVersion   -> abort 0 =<< String.trim <$> maybe readPkgVersion
-                                                       pure
-                                                       opts.version
+    ShowVersion   -> do
+      mVer <- maybe readPkgVersion (pure <<< pure) opts.version
+      case mVer of
+        Just ver -> abort 0 ver
+        Nothing  -> abort 1
+          $ program
+              <> ": version not detected."
+              <> "\n"
+              <> developerErrorMessage
+      abort 0 ""
 
   where
     has x = any (_ `member` x)
+    canExit = not opts.dontExit
 
     -- note: purescript needs the `a` for now:
     abort :: ∀ a. _ -> _ -> _ _ a
+    abort _ msg | opts.dontExit = throwException (error msg)
     abort code msg
       = let log = if code == 0 then Console.log else Console.error
         in  do
           log msg
           Process.exit code
 
-    runEither = flip either pure \e ->
-      if not opts.dontExit
-        then abort 1 e
-        else throwException $ error $ e
+    runEither = flip either pure (abort 1)
 
-    readPkgVersion = fromMaybe "" <$> readPkgVersionImpl Just Nothing
+    readPkgVersion = readPkgVersionImpl Just Nothing
 
     fmtHelp program helpFlags shortHelp errmsg
       = errmsg
