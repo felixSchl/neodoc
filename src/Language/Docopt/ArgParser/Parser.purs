@@ -20,7 +20,7 @@ import Data.Either (Either(Right, Left))
 import Data.Maybe (Maybe(..), maybe, fromMaybe, maybe', isNothing, isJust, fromJust)
 import Data.List (List(..), reverse, singleton, concat, length, (:),
                   some, filter, head, toUnfoldable, sortBy, groupBy, last, null,
-                  tail, many, mapWithIndex, fromFoldable)
+                  tail, many, mapWithIndex, fromFoldable, take, drop)
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Control.Alt ((<|>))
 import Data.Traversable (traverse, for)
@@ -118,6 +118,9 @@ modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
 
 markDone :: Parser Unit
 markDone = lift (State.modify \s -> s { done = true })
+
+isDone :: Parser Boolean
+isDone = _.done <$> (lift State.get)
 
 eof :: List D.Branch -> Parser Unit
 eof branches = P.ParserT $ \(P.PState s pos) ->
@@ -286,29 +289,36 @@ spec xs options = do
             <> ", requeueing: " <> prettyPrintRequiredIndexedArg x
             <> ", length of xs: " <> show (length xs)
 
-
-          if false -- n == 0 || length xs == 0
+          -- Check if we're done trying to recover.
+          -- See the `draw -1` case below (`markDone`).
+          done <- isDone
+          if done
+            then P.fail (_.message $ unParseError e)
             -- shortcut: there's no point trying again if there's nothing left
             -- to parse.
-            then
-              let xs' = if isFixed arg then xss else (xs <> singleton x)
-               in draw xs' errs' (-1)
-            else
-              let isFixed' = isFixed <<< getIndexedElem <<< unRequired
-                  xs' =
-                    if D.isFree arg
-                      then xs <> singleton x
-                      -- If a fixed, yet optional argument failed to parse, move
-                      -- on without it. We cannot requeue as it would falsify
-                      -- the relationship between all positionals.
+            else if n == 0 || length xs == 0
+              then
+                let xs' = if isFixed arg then xss else (xs <> singleton x)
+                in draw xs' errs' (-1)
+              else
+                let isFixed' = isFixed <<< getIndexedElem <<< unRequired
+                    xs' =
+                      if D.isFree arg
+                        then xs <> singleton x
+                        -- If a fixed, yet optional argument failed to parse, move
+                        -- on without it. We cannot requeue as it would falsify
+                        -- the relationship between all positionals.
 
-                      -- XXX: Future work could include slicing off those
-                      -- branches in the group that are 'free' and re-queueing
-                      -- those.
-                      else if D.isOptional arg
-                            then xs
-                            else sortBy (compare `on` isFixed') xss
-               in draw xs' errs' (n - 1)
+                        -- XXX: Future work could include slicing off those
+                        -- branches in the group that are 'free' and re-queueing
+                        -- those.
+                        else if D.isOptional arg -- should this be `n - 2`?
+                              then xs
+                              else
+                                let fs = take n xss
+                                    rs = drop n xss
+                                in (sortBy (compare `on` isFixed') fs) <> rs
+                in draw xs' errs' (n - 1)
           )
 
         -- All arguments have been matched (or have failed to be matched) at least
@@ -356,7 +366,9 @@ spec xs options = do
               <> (intercalate " " $ D.prettyPrintArg <$> missing)
 
           if isSkipping && length missing > 0
-            then expected missing i
+            then do
+              markDone
+              expected missing i
             else
               if skippable || null i
                 then
@@ -411,7 +423,7 @@ spec xs options = do
         -- Create a parser for each branch in the group
         let
           parsers = grp.branches <#> \branch ->
-            withLocalCache do
+            -- withLocalCache do
               exhaustP toplevel skippable isSkipping l branch
 
         -- Evaluate the parsers, selecting the result with the most
