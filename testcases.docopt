@@ -3129,6 +3129,23 @@ $ prog -f foo -f bar
 $ prog -f foo bar
 {"-f": ["foo", "bar"]}
 
+
+# do not repeat if arg is explicitly bound
+
+r"""
+usage: prog --foo=<bar>... cool
+"""
+
+$ prog --foo=bar cool
+{"--foo": ["bar"], "cool": true}
+
+r"""
+usage: prog -f=<bar>... cool
+"""
+
+$ prog -f=bar cool
+{"-f": ["bar"], "cool": true}
+
 #
 # Disallow varying program names - issue #62
 #
@@ -3249,3 +3266,17 @@ $ prog/l b a
 
 $ prog/l a b
 {"a": 1, "b": 1}
+
+r"""
+usage: prog move --speed=<kn>...
+"""
+
+$ prog/l --speed 100
+"prog: expected move"
+
+r"""
+usage: prog move [--speed=<kn>...]...
+"""
+
+$ prog/l --speed=100 move --speed 200 300
+{"move": true, "--speed": [100, 200, 300]}

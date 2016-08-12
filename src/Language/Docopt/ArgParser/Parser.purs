@@ -84,9 +84,10 @@ debug = false
 
 initialState :: StateObj
 initialState = {
-  depth: 0
-, done:  false
-, cache: Map.empty
+  depth:  0
+, done:   false
+, failed: false
+, cache:  Map.empty
 }
 
 withLocalCache :: ∀ a. Parser a -> Parser a
@@ -118,6 +119,15 @@ modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
 
 markDone :: Parser Unit
 markDone = lift (State.modify \s -> s { done = true })
+
+markFailed :: Parser Unit
+markFailed = lift (State.modify \s -> s { failed = true })
+
+unmarkFailed :: Parser Unit
+unmarkFailed = lift (State.modify \s -> s { failed = false })
+
+hasFailed :: Parser Boolean
+hasFailed = _.failed <$> (lift State.get)
 
 isDone :: Parser Boolean
 isDone = _.done <$> (lift State.get)
@@ -159,6 +169,7 @@ spec xs options = do
     toplevel = concat xs
     parsers
       = toplevel <#> \branch -> do
+          unmarkFailed
           vs <- withLocalCache do
             exhaustP toplevel true false 0 branch
           pure (Tuple branch vs)
@@ -166,7 +177,7 @@ spec xs options = do
 
   -- Evaluate the parsers, selecting the result with the most
   -- non-substituted values.
-  evalParsers parsers \(Tuple _ vs) ->
+  evalParsers parsers \(Tuple _ vs) -> do
     sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
 
   where
@@ -265,8 +276,7 @@ spec xs options = do
                     "draw: repeating as optional: "
                       <> D.prettyPrintArg arg
                   -- Make successive matches of this repeated group optional.
-                  P.option Nil do
-                    draw (xs <> pure (toOptional x)) errs (length xss)
+                  draw (xs <> pure (toOptional x)) errs (length xss)
                 else draw xs errs (length xs)
 
           _debug \_->
@@ -290,10 +300,12 @@ spec xs options = do
             <> ", length of xs: " <> show (length xs)
 
           -- Check if we're done trying to recover.
-          -- See the `draw -1` case below (`markDone`).
-          done <- isDone
-          if done
-            then P.fail (_.message $ unParseError e)
+          -- See the `draw -1` case below (`markFailed`).
+          failed <- hasFailed
+          if failed
+            then do
+              _debug \_ -> "draw: aborting (failed)"
+              P.fail (_.message $ unParseError e)
             -- shortcut: there's no point trying again if there's nothing left
             -- to parse.
             else if n == 0 || length xs == 0
@@ -367,7 +379,8 @@ spec xs options = do
 
           if isSkipping && length missing > 0
             then do
-              markDone
+              _debug \_-> "draw: marking as failed"
+              markFailed
               expected missing i
             else
               if skippable || null i
@@ -502,22 +515,23 @@ spec xs options = do
                       OptionAlias.Long  n -> "--" ~~ n
 
           -- try each alias
-          v /\ canTerm <- case 0 of
+          v /\ canTerm /\ canRepeat <- case 0 of
             _ | isLoptAhead ->
               let ls = mrights ns
                in if null ls
                     then P.fail "Option has no long alias"
                     else P.choice $ ls <#> \n -> P.try do
                       let mOptArg = D.unOptionArgument <$> o.arg
-                      v <- longOption term n mOptArg
-                      pure (v /\ true)
+                      { value, canRepeat } <- longOption term n mOptArg
+                      pure (value /\ true /\ canRepeat)
             _ | isSoptAhead ->
               let cs = mlefts ns
                in if null cs
                     then P.fail "Option has no short alias"
                     else P.choice $ cs <#> \c -> P.try do
                       let mOptArg = D.unOptionArgument <$> o.arg
-                      shortOption term c mOptArg
+                      { value, canRepeat, canTerm } <- shortOption term c mOptArg
+                      pure (value /\ canTerm /\ canRepeat)
             _ -> P.fail "Expected long or short option"
 
           -- try terminating at this option
@@ -526,7 +540,7 @@ spec xs options = do
                 vs <- terminate x
                 pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
               else do
-                if isJust o.arg && o.repeatable
+                if isJust o.arg && o.repeatable && canRepeat
                     then do
                       vs <- A.many optionArgument
                       pure (ArrayValue (Value.intoArray v <> vs))

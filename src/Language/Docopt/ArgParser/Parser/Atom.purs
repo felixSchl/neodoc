@@ -10,7 +10,7 @@ import Data.Either (Either(..))
 import Data.List (List(..), reverse, singleton, concat, length, (:),
                   some, filter, head, toUnfoldable, sortBy, groupBy, last, null,
                   tail, many, mapWithIndex)
-import Data.Maybe (Maybe(..), maybe, fromMaybe, isNothing)
+import Data.Maybe (Maybe(..), maybe, fromMaybe, isNothing, isJust)
 import Text.Parsing.Parser (PState(..), ParseError(..), ParserT(..), Result(..), fail,
                             parseFailedFatal, parseFailed, unParserT, fatal) as P
 import Text.Parsing.Parser.Combinators (option, try, lookAhead, (<?>), choice) as P
@@ -57,7 +57,11 @@ stdin = token go P.<?> "-"
     go Stdin = Just (BoolValue true)
     go _     = Nothing
 
-longOption :: Boolean -> String -> (Maybe D.OptionArgumentObj) -> Parser Value
+longOption
+  :: Boolean
+  -> String
+  -> (Maybe D.OptionArgumentObj)
+  -> Parser { value :: Value, canRepeat :: Boolean }
 longOption term n a = unsafePartial $
  P.ParserT $ \(P.PState toks pos) ->
   pure $ case toks of
@@ -79,7 +83,7 @@ longOption term n a = unsafePartial $
                 (let
                     -- recover the argument in it's string form.
                     va = maybe [] (A.singleton <<< StringValue) result.rawValue
-                  in Right (ArrayValue va))
+                  in Right { value: ArrayValue va, canRepeat: false })
                 true
                 pos
             else
@@ -95,7 +99,10 @@ longOption term n a = unsafePartial $
                           result.remainder
                     rest = if result.hasConsumedArg then LU.tail xs else xs
                   in pushed <> rest)
-                (Right value)
+                (Right {
+                  value:     value
+                , canRepeat: not result.explicitArg
+                })
                 (maybe true (const false) result.remainder)
                 (maybe pos (_.sourcePos <<< unPositionedToken) (head xs))
     _ -> P.parseFailed toks pos "Expected token, met EOF"
@@ -112,6 +119,7 @@ longOption term n a = unsafePartial $
       = pure { rawValue:       Nothing
              , remainder:      Nothing
              , hasConsumedArg: false
+             , explicitArg:    false
              }
 
     -- case 1:
@@ -122,18 +130,21 @@ longOption term n a = unsafePartial $
             pure { rawValue:       Just s
                  , remainder:      Nothing
                  , hasConsumedArg: false
+                 , explicitArg:    true
                  }
           _  -> case atok of
             Just (Lit s) ->
               pure { rawValue:       Just s
                    , remainder:      Nothing
                    , hasConsumedArg: true
+                   , explicitArg:    false
                    }
             otherwise    ->
               if term || (fromMaybe true (_.optional <$> a))
                  then pure { rawValue:       Nothing
                            , remainder:      Nothing
                            , hasConsumedArg: false
+                           , explicitArg:    false
                            }
                  else Left $ "Option requires argument: --" <> n'
 
@@ -145,6 +156,7 @@ longOption term n a = unsafePartial $
              Nothing -> pure { rawValue:       Nothing
                              , remainder:      Nothing
                              , hasConsumedArg: false
+                             , explicitArg:    false
                              }
 
     -- case 3:
@@ -156,6 +168,7 @@ longOption term n a = unsafePartial $
             pure { rawValue:       Just s
                  , remainder:      Nothing
                  , hasConsumedArg: false
+                 , explicitArg:    false
                  }
           otherwise -> Left "Invalid substring"
 
@@ -165,7 +178,7 @@ shortOption
   :: Boolean
   -> Char
   -> (Maybe D.OptionArgumentObj)
-  -> Parser (Tuple Value Boolean)
+  -> Parser { value :: Value, canRepeat :: Boolean, canTerm :: Boolean }
 shortOption term f a = unsafePartial $
  P.ParserT $ \(P.PState toks pos) -> do
   pure $ case toks of
@@ -186,7 +199,11 @@ shortOption term f a = unsafePartial $
                     -- recover the argument in it's string form.
                     v = maybe [] (\_ -> [ StringValue $ String.drop 2 s ]) result.remainder
                     va = maybe [] (A.singleton <<< StringValue) result.rawValue
-                  in Right (Tuple (ArrayValue $ v <> va) true))
+                  in Right {
+                        value:     ArrayValue $ v <> va
+                      , canTerm:   true
+                      , canRepeat: false
+                      })
                 true
                 pos
             else
@@ -208,7 +225,11 @@ shortOption term f a = unsafePartial $
                                 P.Position n x -> P.Position (n + 1) x
                             }
                 in pushed <> rest')
-                (Right (Tuple value false))
+                (Right {
+                    value:     value
+                  , canTerm:   false
+                  , canRepeat: not result.explicitArg
+                })
                 (maybe true (const false) result.remainder)
                 (maybe pos (_.sourcePos <<< unPositionedToken) (head xs))
     _ -> P.parseFailed toks pos "Expected token, met EOF"
@@ -225,18 +246,21 @@ shortOption term f a = unsafePartial $
             pure { rawValue:       Just s
                  , remainder:      Nothing
                  , hasConsumedArg: false
+                 , explicitArg:    true
                  }
           otherwise -> case atok of
             Just (Lit s) ->
               pure { rawValue:       Just s
                    , remainder:      Nothing
                    , hasConsumedArg: true
+                   , explicitArg:    false
                    }
             otherwise ->
               if term || (fromMaybe true (_.optional <$> a))
                  then pure { rawValue:       Nothing
                            , remainder:      Nothing
                            , hasConsumedArg: false
+                           , explicitArg:    false
                            }
                  else  Left $ "Option requires argument: -" <> String.singleton f'
 
@@ -249,6 +273,7 @@ shortOption term f a = unsafePartial $
         pure { rawValue:       Just arg
              , remainder:      Nothing
              , hasConsumedArg: false
+             , explicitArg:    isJust v
              }
 
     -- case 3:
@@ -260,6 +285,7 @@ shortOption term f a = unsafePartial $
                                           (unsafePartial $ AU.tail xs)
                                           v)
              , hasConsumedArg: false
+             , explicitArg:    isJust v
              }
 
     -- case 4:
@@ -271,6 +297,7 @@ shortOption term f a = unsafePartial $
               Nothing -> pure { rawValue:       Nothing
                               , remainder:      Nothing
                               , hasConsumedArg: false
+                              , explicitArg:    false
                               }
 
     go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"

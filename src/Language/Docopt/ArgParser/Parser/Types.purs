@@ -49,9 +49,10 @@ type CacheVal = P.Result (List PositionedToken) (List (Tuple D.Argument RichValu
 
 -- | The backing parser state.
 type StateObj = {
-  depth :: Int     -- ^ the current tracked parse-depth
-, done  :: Boolean -- ^ stop parsing now?
-, cache :: Cache   -- ^ the cache of previous parse results, given an input
+  depth  :: Int     -- ^ the current tracked parse-depth
+, done   :: Boolean -- ^ stop parsing now?
+, failed :: Boolean -- ^ stop trying to recover now?
+, cache  :: Cache   -- ^ the cache of previous parse results, given an input
 }
 
 --------------------------------------------------------------------------------
