@@ -3,7 +3,7 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
-## [0.10.0] - 2016-08-06
+## [0.10.0] - 2016-08-12
 
 ### New features
 
@@ -17,6 +17,22 @@
   The flags that trigger this behavior can be overriden using
   `options.versionFlags`. Again, use the empty list to turn this behavior of
   entirely.
+
+#### Changes
+
+* Only parse repeating option-arguments repeatedly if the first argument is
+  **NOT** bound explicitly. Ex:
+  ```
+  usage: prog --foo=<bar>... qux
+
+  $ prog --foo=10 qux => {"--foo": [10], "qux": true }
+  $ prog --foo 10 qux => error! missing 'qux' (got consumed by --foo).
+  ```
+
+#### Fixes
+
+* Fix case where parsing became extremely slow when `options.laxPlacement` was
+  enabled.
 
 ## [0.9.2] - 2016-07-26
 
