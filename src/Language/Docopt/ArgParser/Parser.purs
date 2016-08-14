@@ -132,6 +132,9 @@ hasFailed = _.failed <$> (lift State.get)
 isDone :: Parser Boolean
 isDone = _.done <$> (lift State.get)
 
+skipIf :: ∀ a. Parser Boolean -> a -> Parser a -> Parser a
+skipIf a b c = a >>= if _ then pure b else c
+
 eof :: List D.Branch -> Parser Unit
 eof branches = P.ParserT $ \(P.PState s pos) ->
   pure $ case s of
@@ -235,7 +238,7 @@ spec xs options = do
           -> Int
           -> Parser (List ValueMapping)
 
-        draw xss@(x:xs) errs n | n >= 0 = (do
+        draw xss@(x:xs) errs n | n >= 0 = skipIf isDone Nil (do
 
           i <- getInput
           _debug \_ ->
@@ -336,7 +339,7 @@ spec xs options = do
         -- All arguments have been matched (or have failed to be matched) at least
         -- once by now. See where we're at - is there any required argument that was
         -- not matched at all?
-        draw xss@(x:xs) errs n | (n < 0) = do
+        draw xss@(x:xs) errs n | (n < 0) = skipIf isDone Nil do
 
           i <- getInput
           _debug \_->
@@ -417,9 +420,7 @@ spec xs options = do
       -> Int           -- ^ recursive level
       -> D.Argument    -- ^ the argument to parse
       -> Parser (List ValueMapping)
-    argP' skippable isSkipping l x = do
-      state :: StateObj <- lift State.get
-      if state.done then pure Nil else argP x
+    argP' skippable isSkipping l x = skipIf isDone Nil $ argP x
 
       where
       -- Parse a single argument from argv.
@@ -436,7 +437,7 @@ spec xs options = do
         -- Create a parser for each branch in the group
         let
           parsers = grp.branches <#> \branch ->
-            -- withLocalCache do
+            withLocalCache do
               exhaustP toplevel skippable isSkipping l branch
 
         -- Evaluate the parsers, selecting the result with the most
@@ -583,21 +584,26 @@ evalParsers parsers p = do
         -- reset the depth for every branch
         (P.Result s result consumed pos) <- P.unParserT (modifyDepth (const 0) *> parser) pState
         state' :: StateObj <- State.get
-        let
-          result' = case result of
-            (Left err) -> Left  {
-              input:    s
-            , result:   { error: err, depth: state'.depth + state.depth }
-            , consumed: consumed
-            , position: pos
+        pure case result of
+          (Left err) -> Left  {
+            input:    s
+          , result:   {
+              error: err
+            , depth: state'.depth + state.depth
             }
-            (Right a)  -> Right {
-              input:    s
-            , result: { value: a, depth: state'.depth + state.depth }
-            , consumed: consumed
-            , position: pos
+          , consumed: consumed
+          , position: pos
+          }
+          (Right a)  -> Right {
+            input:    s
+          , result: {
+              value: a
+            , depth: state'.depth + state.depth
+            , done:  state'.done
             }
-        pure result'
+          , consumed: consumed
+          , position: pos
+          }
 
       -- Evaluate the parsers.
       results    = fst $ evalRWS collect env initialState
@@ -644,7 +650,13 @@ evalParsers parsers p = do
                   otherwise -> pure $ P.parseFailed i pos ""
               )
           )
-          (\r -> pure (P.Result r.input (Right r.result.value) r.consumed r.position))
+          (\r ->  do
+            State.modify (_ { done = r.result.done })
+            pure $ P.Result r.input
+                            (Right r.result.value)
+                            r.consumed
+                            r.position
+          )
           winner
       )
       (\x ->
@@ -661,8 +673,7 @@ terminate arg = do
   let rest = ArrayValue $ toUnfoldable $ StringValue <<< Token.getSource <$> input
   markDone
   modifyDepth (const 99999)
-  P.ParserT \(P.PState _ pos) ->
-    pure (P.Result Nil (Right rest) true pos)
+  P.ParserT \(P.PState _ pos) -> pure (P.Result Nil (Right rest) true pos)
 
 isFrom :: Origin -> RichValue -> Boolean
 isFrom o rv = o == RValue.getOrigin rv

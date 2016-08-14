@@ -603,8 +603,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
-            , "ARGS" :> D.array []]
+            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
         ]
 
     , test
@@ -728,6 +727,45 @@ parserGenSpec = \_ -> describe "The parser generator" do
           Nothing
           [ "foo" ]
           [ "foo" :> D.bool true ]
+        ]
+
+    , test
+        """
+        usage: prog move --speed=<kn>
+        """
+        [ pass
+          (Just (defaultOptions {
+            stopAt = [ "--speed" ]
+          , laxPlacement = true
+          }))
+          [ "--speed", "10"  ]
+          [ "--speed" :> D.array [ D.str "10" ] ]
+        ]
+
+    , test
+        """
+        usage: prog move [--speed=<kn>]
+        """
+        [ pass
+          (Just (defaultOptions {
+            stopAt = [ "--speed" ]
+          , laxPlacement = true
+          }))
+          [ "--speed", "10"  ]
+          [ "--speed" :> D.array [ D.str "10" ] ]
+        ]
+
+    , test
+        """
+        usage: prog move [[[[[[--speed=<kn>]]]]]]
+        """
+        [ pass
+          (Just (defaultOptions {
+            stopAt = [ "--speed" ]
+          , laxPlacement = true
+          }))
+          [ "--speed", "10"  ]
+          [ "--speed" :> D.array [ D.str "10" ] ]
         ]
       ]
 
