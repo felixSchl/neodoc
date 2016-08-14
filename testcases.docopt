@@ -3280,3 +3280,80 @@ usage: prog move [--speed=<kn>...]...
 
 $ prog/l --speed=100 move --speed 200 300
 {"move": true, "--speed": [100, 200, 300]}
+
+# Ensure optional positionals are retried still in lax-placement mode
+r"""
+usage: prog [foo] -a
+"""
+
+$ prog/l -a foo
+{"-a": true, "foo": true}
+
+r"""
+usage: prog [foo] -a [bar]
+"""
+
+$ prog/l -a foo bar
+{"-a": true, "foo": true, "bar": true}
+
+r"""
+usage: prog [foo] -a [bar]
+"""
+
+$ prog/l foo -a bar
+{"-a": true, "foo": true, "bar": true}
+
+r"""
+usage: prog [foo] -a [bar]
+"""
+
+$ prog/l foo bar -a
+{"-a": true, "foo": true, "bar": true}
+
+r"""
+usage: prog [foo] -a [bar]
+"""
+
+$ prog/l bar foo -a
+"prog: unexpected command foo"
+
+r"""
+usage: prog [foo] -a [bar]
+"""
+
+$ prog/l bar -a foo
+"prog: unexpected command foo"
+
+r"""
+usage: prog [foo] -a [bar]
+"""
+
+$ prog/l bar foo
+"prog: unexpected command foo"
+
+r"""
+usage: prog [foo] -a [bar]
+"""
+
+$ prog/l -a bar foo
+"prog: unexpected command foo"
+
+r"""
+usage: prog [foo] -a [bar]
+"""
+
+$ prog/l -a bar
+{"-a": true, "bar": true}
+
+$ prog/l bar -a
+{"-a": true, "bar": true}
+
+r"""
+usage: prog [foo] -a bar
+"""
+
+$ prog/l -a bar
+{"-a": true, "bar": true}
+
+$ prog/l bar -a
+{"-a": true, "bar": true}

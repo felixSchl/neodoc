@@ -254,7 +254,9 @@ spec xs options = do
             p   = argP' isSkipping  -- propagate the 'isSkipping' property
                         false       -- reset 'isSkipping' to false
                         (l + 1)     -- increase the recursive level
-                        (D.setRequired arg true)
+                        if not isSkipping
+                           then D.setRequired arg true
+                           else arg
 
           -- Try parsing the argument 'x'. If 'x' fails, enqueue it for a later
           -- try.  Should 'x' fail and should 'x' be skippable (i.e. it defines
@@ -320,19 +322,13 @@ spec xs options = do
                     xs' =
                       if D.isFree arg
                         then xs <> singleton x
-                        -- If a fixed, yet optional argument failed to parse, move
-                        -- on without it. We cannot requeue as it would falsify
-                        -- the relationship between all positionals.
-
                         -- XXX: Future work could include slicing off those
                         -- branches in the group that are 'free' and re-queueing
                         -- those.
-                        else if D.isOptional arg -- should this be `n - 2`?
-                              then xs
-                              else
-                                let fs = take n xss
-                                    rs = drop n xss
-                                in (sortBy (compare `on` isFixed') fs) <> rs
+                        else
+                          let fs = take n xss
+                              rs = drop n xss
+                          in sortBy (compare `on` isFixed') fs <> rs
                 in draw xs' errs' (n - 1)
           )
 

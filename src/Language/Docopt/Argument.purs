@@ -9,8 +9,8 @@ module Language.Docopt.Argument (
   , prettyPrintArgNaked
   , isRepeatable
   , setRepeatable
-  , setRequired
   , setRepeatableOr
+  , setRequired
   , hasDefault
   , getEnvKey
   , hasEnvBacking
