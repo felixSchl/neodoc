@@ -11,9 +11,10 @@ import Data.String.Regex as Regex
 import Data.String.Regex (regex, Regex())
 import Data.String (length, trim) as String
 import Data.String.Yarn (replicate) as String
-import Data.Maybe (maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Either (Either(Left), fromRight)
 import Partial.Unsafe (unsafePartial)
+import Data.String.Regex.AnsiRegex (regex) as AnsiRegex
 
 type Docopt = {
   usage         :: String
@@ -27,11 +28,14 @@ section name = unsafePartial $ fromRight $
         (Regex.parseFlags "gmi")
 
 fixSection :: String -> String
-fixSection s
-  = Regex.replace'
-      (unsafePartial $ fromRight $ regex ("(^[^:]+:)") (Regex.noFlags))
-      (\m _ -> String.replicate (String.length m) ' ')
-      s
+fixSection = fixHeaders <<< removeEscapes
+  where
+    removeEscapes = to (Just ' ') AnsiRegex.regex
+    fixHeaders    = to (Just ' ') $ unsafePartial
+                                  $ fromRight
+                                  $ regex "(^[^:]+:)" Regex.noFlags
+    to c = flip Regex.replace' $ \m _ ->
+              maybe "" (String.replicate (String.length m)) c
 
 
 scan :: String -> Either P.ParseError Docopt
