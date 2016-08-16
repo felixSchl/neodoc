@@ -14,6 +14,7 @@ import Data.Either (fromRight)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.String.Chalk as Chalk
 import Data.String.Ext as String
+import Data.String.Yarn (replicate) as String
 import Text.Parsing.Parser (ParseError(..))
 import Data.String.Regex as Regex
 import Data.String.Regex (regex, Regex())
@@ -41,9 +42,9 @@ scannerSpec = \_ ->
             Advanced Options: qux
             """
         length options `shouldEq` 2
-        usage                    =?= "______ foo"
-        fromJust' (options !! 0) =?= "________ bar"
-        fromJust' (options !! 1) =?= "_________________ qux"
+        usage                    =?= "%Usage:% foo"
+        fromJust' (options !! 0) =?= "%Options:% bar"
+        fromJust' (options !! 1) =?= "%Advanced Options:% qux"
 
     it "should scan sections with new line after colon" do
       vliftEff do
@@ -61,46 +62,42 @@ scannerSpec = \_ ->
         length options `shouldEq` 2
         usage =?=
           """
-          ______
-          __foo
+          %Usage:%
+            foo
           """
         fromJust' (options !! 0) =?=
           """
-          ________
-          __bar
+          %Options:%
+            bar
           """
         fromJust' (options !! 1) =?=
           """
-          _________________
-          __qux
+          %Advanced Options:%
+            qux
           """
 
     it "should ignore ascii escape codes" do
       vliftEff do
         { usage, options } <- runEitherEff do
-          scan do
-            (Chalk.blue "Usage:")
-              <> " foo"
-              <> "\n"
+          scan $ (Chalk.blue "Usage:") <> " foo\n"
         length options `shouldEq` 0
-        usage =?= "_________________foo\n"
+        usage =?= ("%" <> (Chalk.blue "Usage:") <> "% foo")
 
     it "should ignore ascii escape codes" do
+      let usageHeader = Chalk.blue "Usage:"
       vliftEff do
         { usage, options } <- runEitherEff do
           scan $ dedent do
             """
             ${usageHeader}
               foo
-            """ <~> {
-              usageHeader: Chalk.blue "Usage:"
-            }
+            """ <~> { usageHeader: usageHeader }
         length options `shouldEq` 0
         usage =?=
           """
-          ________________
-          __foo
-          """
+          %${usageHeader}%
+            foo
+          """ <~> { usageHeader: usageHeader }
 
     it "should fail w/o a usage section" do
       vliftEff do
@@ -133,24 +130,21 @@ shouldEq a b = if a /= b
                       "Expected " <> show a <> " to equal " <> show b
                   else pure unit
 
-
 shouldEqS :: String -> String -> Eff _ Unit
-shouldEqS a b = shouldEq a
-  $ addTrailingNewline  -- ensure trailing '\n'
-  $ stripInitialNewline -- remove leading '\n'
-  $ Regex.replace       -- replace all '_' with ' '
-      (unsafePartial $ fromRight $ regex "_" $ Regex.parseFlags "g")
-      " "
-      (dedent b)
+shouldEqS a = shouldEq a
+  <<< stripInitialNewline
+  <<< addTrailingNewline
+  <<< replaceUnderScores
+  <<< dedent
+  <<< placeHoldersToUnderscores
   where
-    stripInitialNewline s =
-          if String.startsWith "\n" s
-              then String.drop 1 s
-              else s
-    addTrailingNewline s =
-          if String.endsWith "\n" s
-              then s
-              else s <> "\n"
+    placeHoldersToUnderscores = Regex.replace'
+      (regex' "%[^%]+%" "g")
+      (\m _ -> String.replicate (String.length m - 2) '_')
+    replaceUnderScores    = Regex.replace (regex' "_" "g") " "
+    addTrailingNewline s  = if String.endsWith "\n" s then s else s <> "\n"
+    stripInitialNewline s = if String.startsWith "\n" s then String.drop 1 s else s
+    regex' a b = unsafePartial $ fromRight $ regex a (Regex.parseFlags b)
 
 fromJust' :: ∀ a. Maybe a -> a
 fromJust' ma = unsafePartial $ fromJust ma
