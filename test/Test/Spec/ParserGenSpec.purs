@@ -184,7 +184,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         options:
           -i, --input FILE
         """
-        [ fail Nothing [] "Missing (-i/--input=FILE)"
+        [ fail Nothing [] "Missing -i/--input=FILE"
         , pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> D.str "bar"
@@ -199,10 +199,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
         """
         [ fail Nothing []
-          $ "Missing (-i/--input=FILE)"
+          $ "Missing -i/--input=FILE, -o/--output=FILE"
 
         , fail Nothing [ "-i", "bar" ]
-          $ "Missing (-o/--output=FILE)"
+          $ "Missing -o/--output=FILE"
 
         , pass Nothing
             [ "-i", "bar", "-o", "bar" ]
@@ -229,10 +229,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -r, --redirect FILE [env: QUX]
         """
         [ fail Nothing []
-          $ "Missing (-i/--input=FILE)"
+          $ "Missing -i/--input=FILE, -r/--redirect=FILE"
 
         , fail Nothing [ "-i", "bar", "-r", "bar" ]
-            "Missing (-o/--output=FILE)"
+            "Missing -o/--output=FILE"
 
         , pass Nothing
             [ "-i", "bar", "-r", "bar", "-o", "bar" ]
@@ -272,7 +272,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE
         """
-        [ fail Nothing [] "Missing (-i/--input=FILE)"
+        [ fail Nothing [] "Missing -i/--input=FILE"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail Nothing [ "-i", "bar" ] "Expected <env>"
         , pass Nothing
@@ -284,7 +284,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
             , "-o"       :> D.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-            "Unexpected option -o. Expected (-i/--input=FILE)"
+            "Unexpected option -o. Expected -i/--input=FILE"
         ]
 
     , test
@@ -439,10 +439,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
         , fail Nothing
             [ "foo" ]
-            "Missing (-f/--foo=FOZ)"
+            "Missing -f/--foo=FOZ"
         , fail Nothing
             [ "foo", "-o", "-i", "-bax" ]
-            "Missing (-f/--foo=FOZ)"
+            "Missing -f/--foo=FOZ"
         ]
 
     , test

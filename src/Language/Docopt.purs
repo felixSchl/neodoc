@@ -103,11 +103,11 @@ parseDocopt helpText options = do
   u   <- toUsageParseErr $ SpecParser.parseUsage doc.usage options.smartOptions
   ds  <- toDescParseErr  $ concat <$> SpecParser.parseDesc `traverse` doc.options
   prg <- toSolveErr      $ Solver.solve u.usages ds
-  pure $ { specification: prg
-         , shortHelp:     doc.originalUsage
-         , program:       u.program
-         , help:          helpText
-         }
+  pure { specification: prg
+       , shortHelp:     doc.originalUsage
+       , program:       u.program
+       , help:          helpText
+       }
 
 -- |
 -- | Apply the neodoc parser to user input.

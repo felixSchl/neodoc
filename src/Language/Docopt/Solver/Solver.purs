@@ -1,7 +1,9 @@
 -- | Resolve ambiguities by combining the parsed usage section with any parsed
 -- | Option sections, as well as some best effort guessing.
 
-module Language.Docopt.Solver where
+module Language.Docopt.Solver (
+  solve
+  ) where
 
 import Prelude
 import Debug.Trace
@@ -29,6 +31,7 @@ import Data.Tuple.Nested ((/\))
 import Data.String as Str
 import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.NonEmpty as NonEmpty
+import Language.Docopt.Solver.Canonicalise (canonicalise)
 
 import Language.Docopt.Argument
 import Language.Docopt.Argument (isFree) as Arg
@@ -593,4 +596,4 @@ solve
   :: List SpecParser.Usage
   -> List SpecParser.Desc
   -> Either SolveError (List Usage)
-solve us ds = traverse (flip solveUsage ds) us
+solve us ds = canonicalise <$> traverse (flip solveUsage ds) us

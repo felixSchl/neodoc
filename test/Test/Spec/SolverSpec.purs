@@ -261,6 +261,90 @@ solverSpec = \_ ->
             ] ] ] ]
         ]
 
+      -- Canonicalisation / simplification
+
+    , test
+        "Usage: prog [-a]"
+        [ pass
+            "options: -a, --all"
+            [ [ gro false [ [ opt_ 'a' "all" ] ] ] ]
+        ]
+
+    , test
+        "Usage: prog [[-a]]"
+        [ pass
+            "options: -a, --all"
+            [ [ gro false [ [ opt_ 'a' "all" ] ] ] ]
+        ]
+
+    , test
+        "Usage: prog [[[-a]]]"
+        [ pass
+            "options: -a, --all"
+            [ [ gro false [ [ opt_ 'a' "all" ] ] ] ]
+        ]
+
+    , test
+        "Usage: prog [[[-a|-b]]]"
+        [ pass
+            ""
+            [ [ gro false [ [ sopt_ 'a' ], [ sopt_ 'b' ] ] ] ]
+        ]
+
+    , test
+        "Usage: prog [[[-a|[-b]]]]"
+        [ pass
+            ""
+            [ [ gro false [ [ sopt_ 'a' ], [ sopt_ 'b' ] ] ] ]
+        ]
+
+    , test
+        "Usage: prog [[[-a|[-b]]]]"
+        [ pass
+            ""
+            [ [ gro false [ [ sopt_ 'a' ], [ sopt_ 'b' ] ] ] ]
+        ]
+
+    , test
+        "Usage: prog [<name> [<name>]]"
+        [ pass
+            ""
+            [ [ gro false [ [
+                po "<name>"
+              , gro false [ [ po "<name>" ] ]
+            ] ] ] ]
+        ]
+
+    , test
+        "Usage: prog [[-a=FOO] | [[-a=FOO] [-b=FOO]]]"
+        [ pass
+            ""
+            [ [ gro false [
+                [ sopt 'a' (oa_ "FOO") ]
+              , [ gro false [ [  sopt 'a' (oa_ "FOO")  ] ]
+                , gro false [ [  sopt 'b' (oa_ "FOO")  ] ]
+                ]
+            ] ] ]
+        ]
+
+    , test
+        "Usage: prog ((-i=FILE) -o=FILE)"
+        [ pass
+            ""
+            [ [ grr false [
+                [ sopt 'i' (oa_ "FILE")
+                , sopt 'o' (oa_ "FILE")
+                ] ]
+            ] ]
+        ]
+
+    , test
+        "Usage: prog (-i=FILE) | (-o=FILE)"
+        [ pass
+            ""
+            [ [ sopt 'i' (oa_ "FILE") ], [ sopt 'o' (oa_ "FILE") ] ]
+        ]
+
     ]) runtest
 
   where
