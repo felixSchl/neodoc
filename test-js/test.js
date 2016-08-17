@@ -1,22 +1,46 @@
 const neodoc = require('../');
 const path = require('path');
 const $ = require('shelljs');
+const chalk = require('chalk');
 const expect = require('chai').expect;
 
 const EXAMPLES = path.resolve(__dirname, '..', 'examples');
 const GIT_EXAMPLE = path.resolve(EXAMPLES, 'git');
 const NODE_CMD = $.which('node');
 
+function exec(script, args) {
+  const p = $.exec(`"${NODE_CMD}" "${script}" ${args}`, { silent: true });
+  if (p.code === 0) {
+    return p.stdout;
+  } else {
+    throw new Error(p.stdout || p.stderr);
+  }
+}
+
+function runFakeProc(f) {
+  let code;
+  const stderr = [], stdout = [];
+  const clog = console.log, cerror = console.error, pexit = process.exit;
+  console.log = stdout.push.bind(stdout);
+  console.error = stderr.push.bind(stderr);
+  process.exit = (_code) => { code = _code; };
+  try {
+    f();
+  } finally {
+    console.log = clog;
+    console.error = cerror;
+    process.exit = pexit;
+  }
+  return {
+    stderr: stderr.join('\n')
+  , stdout: stdout.join('\n')
+  , code
+  };
+}
+
 describe('neodoc', () => {
   describe('examples - git', () => {
-    const git = (args) => {
-      const p = $.exec(`"${NODE_CMD}" "${GIT_EXAMPLE}" ${args}`, { silent: true });
-      if (p.code === 0) {
-        return JSON.parse(p.stdout);
-      } else {
-        throw new Error(p.stdout || p.stderr);
-      }
-    }
+    const git = (args) => JSON.parse(exec(GIT_EXAMPLE, args));
 
     it('git branch -u origin master', () => {
       expect(git('branch -u origin master'))
@@ -165,5 +189,28 @@ describe('neodoc', () => {
         , '-f': 'test'
         });
     })
+  });
+
+  describe('issues', () => {
+    describe('#71 - remove left & right trimming', () => {
+      it('should not trim the help text', () => {
+        const { stdout } = runFakeProc(() => {
+          neodoc.run(`
+            ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
+            ${chalk.blue('I. Usage')}:
+              thimble <command> [<args>...]
+              thimble -h | --help
+              thimble --version
+          `, { argv: [ '--help' ] });
+        });
+        expect(stdout).to.equal(`
+            ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
+            ${chalk.blue('I. Usage')}:
+              thimble <command> [<args>...]
+              thimble -h | --help
+              thimble --version
+          `);
+      });
+    });
   });
 });
