@@ -42,6 +42,7 @@
     "purescript-free": "^1.0.0",
     "purescript-transformerless": "^1.0.1",
     "purescript-memoize": "~2.0.1",
-    "purescript-nonempty": "~1.1.0"
+    "purescript-nonempty": "~1.1.0",
+    "purescript-template-strings": "~2.0.0"
   }
 }

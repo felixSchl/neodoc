@@ -15,7 +15,7 @@ import Data.Maybe (Maybe(..), fromMaybe, fromJust)
 import Data.List (List, many, toUnfoldable)
 import Test.Spec (Spec(), describe, it)
 import Data.String as String
-import Test.Support (vliftEff, runEitherEff)
+import Test.Support (vliftEff)
 import Partial.Unsafe (unsafePartial)
 import Control.Apply ((*>), (<*))
 import Node.FS (FS)

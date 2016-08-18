@@ -17,6 +17,8 @@ import Data.Map as Map
 import Data.Array as A
 import Data.Foldable (for_, intercalate)
 import Control.Monad.Eff.Exception (error, throwException)
+import Data.String.Chalk as Chalk
+import Data.TemplateString.Unsafe ((<~>))
 import Text.Parsing.Parser as P
 
 import Test.Assert (assert)
@@ -906,6 +908,28 @@ parserGenSpec = \_ -> describe "The parser generator" do
               ]
           ))
         ])
+
+      <>
+        -- issue #70 - Ignore ANSI escape codes
+        [ test ("${h} prog foo" <~> { h: Chalk.blue "Usage:" })
+            [ pass Nothing ["foo"] ["foo" :> D.bool true ] ]
+        , test (
+            """
+            ${h}
+              prog foo
+            """ <~> { h: Chalk.blue "Usage:" })
+            [ pass Nothing ["foo"] ["foo" :> D.bool true ] ]
+
+        -- Ignore ANSI escape codes anywhere:
+        , test ("${h}: prog foo" <~> { h: Chalk.blue "Usage" })
+            [ pass Nothing ["foo"] ["foo" :> D.bool true ] ]
+        , test (
+            """
+            ${h}:
+              prog foo
+            """ <~> { h: Chalk.blue "Usage" })
+            [ pass Nothing ["foo"] ["foo" :> D.bool true ] ]
+        ]
       )
 
   for_ testCases \(({ help, cases, skip })) -> do
