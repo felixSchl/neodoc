@@ -197,7 +197,7 @@ describe('neodoc', () => {
         const { stdout } = runFakeProc(() => {
           neodoc.run(`
             ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
-            ${chalk.blue('I. Usage')}:
+            ${chalk.blue('I. Usage:')}
               thimble <command> [<args>...]
               thimble -h | --help
               thimble --version
@@ -205,7 +205,7 @@ describe('neodoc', () => {
         });
         expect(stdout).to.equal(
 `            ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
-            ${chalk.blue('I. Usage')}:
+            ${chalk.blue('I. Usage:')}
               thimble <command> [<args>...]
               thimble -h | --help
               thimble --version`);
