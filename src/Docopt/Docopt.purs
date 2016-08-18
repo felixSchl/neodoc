@@ -140,7 +140,7 @@ run input opts = do
 
   case action of
     Return v      -> pure v
-    ShowHelp help -> abort 0 (String.trim help)
+    ShowHelp help -> abort 0 help
     ShowVersion   -> do
       mVer <- maybe readPkgVersion (pure <<< pure) opts.version
       case mVer of
