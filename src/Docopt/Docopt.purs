@@ -22,7 +22,7 @@ import Control.Applicative (liftA1)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Data.Foldable (any, intercalate)
-import Data.Either (Either(..), either)
+import Data.Either (Either(..), either, fromRight)
 import Control.Monad.Eff (Eff())
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Node.FS (FS())
@@ -31,6 +31,8 @@ import Node.Process as Process
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Console as Console
+import Data.String.Regex as Regex
+import Data.String.Regex (regex, Regex())
 import Text.Wrap (dedent)
 import Data.StrMap (StrMap())
 import Data.Array as A
@@ -39,6 +41,7 @@ import Data.Bifunctor (lmap, bimap)
 import Data.String.Yarn (lines, unlines)
 import Data.String (trim) as String
 import Language.Docopt.Errors (developerErrorMessage)
+import Partial.Unsafe (unsafePartial)
 
 import Language.Docopt (Docopt, parseDocopt, evalDocopt)
 import Language.Docopt.Value (Value())
@@ -140,7 +143,7 @@ run input opts = do
 
   case action of
     Return v      -> pure v
-    ShowHelp help -> abort 0 (String.trim help)
+    ShowHelp help -> abort 0 (trimHelp help)
     ShowVersion   -> do
       mVer <- maybe readPkgVersion (pure <<< pure) opts.version
       case mVer of
@@ -178,6 +181,9 @@ run input opts = do
           else "\n" <> "See "
                         <> program <> " " <> (intercalate "/" helpFlags)
                         <> " for more information"
+
+    trimHelp = Regex.replace (regex' "(^\\s*(\r\n|\n|\r))|((\r\n|\n|\r)\\s*$)" "g") ""
+    regex' a b = unsafePartial $ fromRight $ regex a (Regex.parseFlags b)
 
 foreign import readPkgVersionImpl
   :: ∀ e
