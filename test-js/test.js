@@ -203,13 +203,12 @@ describe('neodoc', () => {
               thimble --version
           `, { argv: [ '--help' ] });
         });
-        expect(stdout).to.equal(`
-            ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
+        expect(stdout).to.equal(
+`            ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
             ${chalk.blue('I. Usage')}:
               thimble <command> [<args>...]
               thimble -h | --help
-              thimble --version
-          `);
+              thimble --version`);
       });
     });
   });
