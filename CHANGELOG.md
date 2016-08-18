@@ -3,6 +3,35 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
+## [0.10.1] - 2016-08-18
+
+### Fixes
+
+* Fix [#70] - Ignore ANSI escape codes in parser. This allows the neodoc to
+  be colored. For example:
+
+  ```
+  neodoc.run(`
+  ${chalk.blue('Usage:')}
+      prog <command> [<args>...]
+  `);
+  ```
+
+  Thanks [@matthewmueller] for reporting
+* Fix [#71] - Do not trim help text. This allows the developer to keep some left
+  padding on the help text. The leading and trailing newlines are still removed,
+  however, in order to make working with JS template strings easy.
+
+  Thanks [@matthewmueller] for reporting
+* Fix optional positionals in lax-placement mode.
+  For example:
+  ```
+  usage: prog [foo] -a
+  ```
+  Would fail: `-a foo` before this patch because `[foo]` simply fails at `-a`
+  and gets omitted. The added tests cover these cases.
+* Fix 'stop-at' not working in groups in certain cases
+
 ## [0.10.0] - 2016-08-12
 
 ### New features
@@ -430,6 +459,12 @@ section &mdash; let it fail at the lexing stage.
 
 :tada: This marks the first generally available release of neodoc
 
+[@matthewmueller]: https://github.com/matthewmueller
+
+[#71]: https://github.com/felixSchl/neodoc/issues/71
+[#70]: https://github.com/felixSchl/neodoc/issues/70
+[#69]: https://github.com/felixSchl/neodoc/issues/69
+[#68]: https://github.com/felixSchl/neodoc/issues/68
 [#67]: https://github.com/felixSchl/neodoc/issues/67
 [#66]: https://github.com/felixSchl/neodoc/issues/66
 [#65]: https://github.com/felixSchl/neodoc/issues/65
@@ -498,6 +533,7 @@ section &mdash; let it fail at the lexing stage.
 [#2]: https://github.com/felixSchl/neodoc/issues/2
 [#1]: https://github.com/felixSchl/neodoc/issues/1
 
+[0.10.1]: https://github.com/felixschl/neodoc/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/felixschl/neodoc/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/felixschl/neodoc/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/felixschl/neodoc/compare/v0.9.0...v0.9.1
