@@ -36,7 +36,10 @@
   | <b><a href="https://felixschl.github.com/neodoc">Playground <sup>new</sup></a></b>
 </p>
 
-![preview](https://raw.githubusercontent.com/felixSchl/felixSchl.github.io/master/neodoc/neodoc.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/felixSchl/felixSchl.github.io/master/neodoc/neodoc.png"
+       alt="preview" />
+</p>
 
 <hr>
 
