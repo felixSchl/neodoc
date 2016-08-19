@@ -271,6 +271,18 @@ solverSpec = \_ ->
       -- Canonicalisation / simplification
 
     , test
+        "Usage: prog (-a)"
+        [ pass' "" "Usage: prog (-a)" ]
+
+    , test
+        "Usage: prog (a)"
+        [ pass' "" "Usage: prog a" ]
+
+    , test
+        "Usage: prog [a]"
+        [ pass' "" "Usage: prog [a]" ]
+
+    , test
         "Usage: prog [-a]"
         [ pass' "" "Usage: prog [-a]" ]
 
@@ -281,6 +293,28 @@ solverSpec = \_ ->
     , test
         "Usage: prog [[[-a]]]"
         [ pass' "" "Usage: prog [-a]" ]
+
+    , test
+        "Usage: prog [[-a]...]"
+        [ pass' "" "Usage: prog [-a]..." ]
+
+    , test
+        "Usage: prog [(-a)...]"
+        [ pass' "" "Usage: prog [-a]..." ]
+
+    , test
+        "Usage: prog [(-a...)]"
+        [ pass' "" "Usage: prog [-a...]" ]
+
+    , test
+        "Usage: prog [(-a...)...]..."
+        -- XXX: this could be reduced even further: `[-a]...`, but little to
+        -- gain here, so low priority
+        [ pass' "" "Usage: prog [-a...]..." ]
+
+    , test
+        "Usage: prog ([-a]...)"
+        [ pass' "" "Usage: prog [-a]..." ]
 
     , test
         "Usage: prog [[[-a|-b]]]"
