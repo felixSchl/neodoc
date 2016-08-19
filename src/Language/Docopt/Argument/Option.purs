@@ -115,10 +115,7 @@ prettyPrintOption o = aliases <> arg' <> rep <> default <> env
     env = flip (maybe "") o.env \k -> " [env: " <> k <> "]"
 
 prettyPrintOptionNaked :: OptionObj -> String
-prettyPrintOptionNaked o =
-     (if hasAlias then "(" else "")
-  <> (aliases <> arg' <> rep)
-  <> (if hasAlias then ")" else "")
+prettyPrintOptionNaked o = aliases <> arg' <> rep
   where
     hasAlias = length (NonEmpty.tail o.aliases) > 0
     prettyAliases = prettyPrintOptionAlias <$> (sort $ toAliasList o.aliases)

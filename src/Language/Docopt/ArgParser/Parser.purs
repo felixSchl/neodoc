@@ -117,6 +117,17 @@ cached a p = P.ParserT \(s@(P.PState i _)) -> do
 modifyDepth :: (Int -> Int) -> Parser Unit
 modifyDepth f = lift (State.modify \s -> s { depth = f s.depth })
 
+setDepth :: Int -> Parser Unit
+setDepth = modifyDepth <<< const
+
+getDepth :: Parser Int
+getDepth = _.depth <$> lift State.get
+
+withLocalDepth :: ∀ a. Int -> Parser a -> Parser a
+withLocalDepth d p = do
+  d' <- getDepth
+  setDepth 0 *> p <* setDepth d'
+
 markDone :: Parser Unit
 markDone = lift (State.modify \s -> s { done = true })
 
@@ -578,7 +589,7 @@ evalParsers parsers p = do
       -- `ParserT`'s bind instance.
       collect = for parsers \parser -> do
         -- reset the depth for every branch
-        (P.Result s result consumed pos) <- P.unParserT (modifyDepth (const 0) *> parser) pState
+        (P.Result s result consumed pos) <- P.unParserT (withLocalDepth 0 parser) pState
         state' :: StateObj <- State.get
         pure case result of
           (Left err) -> Left  {
