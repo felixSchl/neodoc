@@ -2,10 +2,11 @@ module Test.Spec.SolverSpec (solverSpec) where
 
 import Prelude
 import Debug.Trace
-import Data.Either (Either(..), either)
+import Data.Either (Either(..), either, fromRight)
 import Control.Bind ((=<<))
 import Control.Apply ((*>))
 import Data.List (List(..), fromFoldable)
+import Data.Bifunctor (lmap, rmap)
 import Control.Plus (empty)
 import Data.Foldable (intercalate, for_)
 import Data.Traversable (for)
@@ -39,11 +40,14 @@ import Language.Docopt.SpecParser.Desc           as DE
 import Language.Docopt.Scanner (scan)
 import Language.Docopt.SpecParser.Lexer (lex)
 import Text.Wrap (dedent)
+import Partial.Unsafe
+
+data Expected = Source String | Parsed (Array (Array Argument))
 
 newtype TestSuite = TestSuite { help  :: String
                               , cases :: Array TestCase
                               }
-newtype TestCase = TestCase { expected :: Either String (Array (Array Argument))
+newtype TestCase = TestCase { expected :: Either String Expected
                             , desctext :: String
                             }
 
@@ -51,7 +55,10 @@ test :: String -> Array TestCase -> TestSuite
 test help cs = TestSuite { help: help, cases: cs }
 
 pass :: String -> Array (Array Argument) -> TestCase
-pass text as = TestCase { expected: Right as, desctext: text  }
+pass text as = TestCase { expected: Right (Parsed as), desctext: text  }
+
+pass' :: String -> String -> TestCase
+pass' text s = TestCase { expected: Right (Source s), desctext: text  }
 
 fail :: String -> String -> TestCase
 fail text msg = TestCase { expected: Left msg, desctext: text }
@@ -265,85 +272,43 @@ solverSpec = \_ ->
 
     , test
         "Usage: prog [-a]"
-        [ pass
-            "options: -a, --all"
-            [ [ gro false [ [ opt_ 'a' "all" ] ] ] ]
-        ]
+        [ pass' "" "Usage: prog [-a]" ]
 
     , test
         "Usage: prog [[-a]]"
-        [ pass
-            "options: -a, --all"
-            [ [ gro false [ [ opt_ 'a' "all" ] ] ] ]
-        ]
+        [ pass' "" "Usage: prog [-a]" ]
 
     , test
         "Usage: prog [[[-a]]]"
-        [ pass
-            "options: -a, --all"
-            [ [ gro false [ [ opt_ 'a' "all" ] ] ] ]
-        ]
+        [ pass' "" "Usage: prog [-a]" ]
 
     , test
         "Usage: prog [[[-a|-b]]]"
-        [ pass
-            ""
-            [ [ gro false [ [ sopt_ 'a' ], [ sopt_ 'b' ] ] ] ]
-        ]
+        [ pass' "" "Usage: prog [-a|-b]" ]
 
     , test
         "Usage: prog [[[-a|[-b]]]]"
-        [ pass
-            ""
-            [ [ gro false [ [ sopt_ 'a' ], [ sopt_ 'b' ] ] ] ]
-        ]
+        [ pass' "" "Usage: prog [-a|-b]" ]
 
     , test
         "Usage: prog [[[-a|[-b]]]]"
-        [ pass
-            ""
-            [ [ gro false [ [ sopt_ 'a' ], [ sopt_ 'b' ] ] ] ]
-        ]
+        [ pass' "" "Usage: prog [-a|-b]" ]
 
     , test
         "Usage: prog [<name> [<name>]]"
-        [ pass
-            ""
-            [ [ gro false [ [
-                po "<name>"
-              , gro false [ [ po "<name>" ] ]
-            ] ] ] ]
-        ]
+        [ pass' "" "Usage: prog [<name> [<name>]]" ]
 
     , test
         "Usage: prog [[-a=FOO] | [[-a=FOO] [-b=FOO]]]"
-        [ pass
-            ""
-            [ [ gro false [
-                [ sopt 'a' (oa_ "FOO") ]
-              , [ gro false [ [  sopt 'a' (oa_ "FOO")  ] ]
-                , gro false [ [  sopt 'b' (oa_ "FOO")  ] ]
-                ]
-            ] ] ]
-        ]
+        [ pass' "" "Usage: prog [-a=FOO | [[-a=FOO] [-b=FOO]]]" ]
 
     , test
         "Usage: prog ((-i=FILE) -o=FILE)"
-        [ pass
-            ""
-            [ [ grr false [
-                [ sopt 'i' (oa_ "FILE")
-                , sopt 'o' (oa_ "FILE")
-                ] ]
-            ] ]
-        ]
+        [ pass' "" "Usage: prog (-i=FILE -o=FILE)" ]
 
     , test
         "Usage: prog (-i=FILE) | (-o=FILE)"
-        [ pass
-            ""
-            [ [ sopt 'i' (oa_ "FILE") ], [ sopt 'o' (oa_ "FILE") ] ]
-        ]
+        [ pass' "" "Usage: prog -i=FILE | -o=FILE" ]
 
     ]) runtest
 
@@ -359,28 +324,42 @@ solverSpec = \_ ->
         describe ("\n" <> help <> "\n" <> dedent desctext) do
           it (
             either
-              (\msg  -> "Should fail with:\n" <> msg)
-              (\args -> "Should resolve to:\n"
-                  <> (intercalate "\n" (
-                      ("Usage: prog " <> _)
-                        <$> (intercalate " " <<< (prettyPrintArg <$> _))
-                              <$> args)))
+              (\msg      -> "Should fail with:\n" <> msg)
+              (\expected ->
+                let msg = case expected of
+                      Source s  -> s
+                      Parsed xs -> intercalate "\n" $
+                        ("Usage: prog " <> _)
+                          <$> (intercalate " " <<< (prettyPrintArg <$> _))
+                                <$> xs
+                 in "Should resolve to:\n" <> msg)
               expected
           ) do
             vliftEff do
               { usages, descriptions } <- runEitherEff do
-                (preparseDocopt
+                preparseDocopt
                   (help <> "\n" <> dedent desctext)
-                  { smartOptions: false })
+                  { smartOptions: false }
               evaltest
                 (solve usages descriptions)
-                (expected)
+                (rmap (case _ of
+                  Parsed xs -> Parsed xs
+                  Source  s -> Source $ s <> "\n" <> dedent desctext)
+                expected)
 
-    evaltest (Right output) (Right expected)
-      = if output == (pure $ fromFoldable $ fromFoldable <$> expected)
-            then pure unit
-            else throwException $ error $
-              "Unexpected output:\n\n" <> prettyPrintOutput output
+    evaltest (Right output) (Right expected) = do
+      expected' <- case expected of
+        Parsed xs   -> pure $ pure $ fromFoldable $ fromFoldable <$> xs
+        Source help -> do
+          runEitherEff do
+            { usages, descriptions } <- preparseDocopt help {
+              smartOptions: false
+            }
+            lmap show (solve usages descriptions)
+      if output == expected'
+          then pure unit
+          else throwException $ error $
+            "Unexpected output:\n\n" <> prettyPrintOutput output
 
     evaltest (Right output) (Left _)
       = throwException $ error $
