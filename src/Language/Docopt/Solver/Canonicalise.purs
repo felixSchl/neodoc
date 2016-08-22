@@ -1,26 +1,27 @@
 {-
 # Simplify the spec by unnesting groups.
 
-  Consider:
-    * (a)       = a
-    * ((a))     = (a) = a
-    * ((a b c)) = (a b c)
-    * ([a])     = [a]
-    * [([a])]   = [a]
-    * [-abc]    = [-a] [-b] [-c]                                  (special case)
-    * [-abc -e] = [-a] [-b] [-c] [-e]                             (special case)
-    * [-abc -e] = [-a] [-b] [-c] [-e]                             (special case)
-    * [-abc  x] = [-abc x]                   (note: no expansion because of 'x')
-    * (a...)    = a...
-    * (a)...    = a...
-    * ((a)...)  = (a)... = a...
-    * ((a... b c)...) = ((a... b c)...)    (note: no expansion because of '...')
-    * ([a])     = [a]
-    * [([a])]   = [a]
+Consider:
 
-  This essentially canonicalises the specification. No meaning is lost in the
-  process. At least not in terms of parsing user input against the specification
-  later on.
+* (a)       = a
+* ((a))     = (a) = a
+* ((a b c)) = (a b c)
+* ([a])     = [a]
+* [([a])]   = [a]
+* [-abc]    = [-a] [-b] [-c]                                      (special case)
+* [-abc -e] = [-a] [-b] [-c] [-e]                                 (special case)
+* [-abc -e] = [-a] [-b] [-c] [-e]                                 (special case)
+* [-abc  x] = [-abc x]                       (note: no expansion because of 'x')
+* (a...)    = a...
+* (a)...    = a...
+* ((a)...)  = (a)... = a...
+* ((a... b c)...) = ((a... b c)...)        (note: no expansion because of '...')
+* ([a])     = [a]
+* [([a])]   = [a]
+
+This essentially canonicalises the specification. No meaning is lost in the
+process. At least not in terms of parsing user input against the specification
+later on.
 -}
 
 module Language.Docopt.Solver.Canonicalise where
