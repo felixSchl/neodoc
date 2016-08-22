@@ -18,4 +18,4 @@ The idea is that this should make parsing a bit more intuitive for the end-user
 as a partial match won't necessarily consume the entire group.
 -}
 
-module Language.Docopt.Solver.Expand where
+module Language.Docopt.Transforms.Expand where
