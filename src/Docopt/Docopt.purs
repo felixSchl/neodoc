@@ -36,11 +36,12 @@ import Data.String.Regex (regex, Regex())
 import Text.Wrap (dedent)
 import Data.StrMap (StrMap())
 import Data.Array as A
-import Data.StrMap (member)
+import Data.StrMap (lookup)
 import Data.Bifunctor (lmap, bimap)
 import Data.String.Yarn (lines, unlines)
 import Data.String (trim) as String
 import Language.Docopt.Errors (developerErrorMessage)
+import Language.Docopt.Value (Value(..))
 import Partial.Unsafe (unsafePartial)
 
 import Language.Docopt (Docopt, parseDocopt, evalDocopt)
@@ -156,7 +157,13 @@ run input opts = do
       abort 0 ""
 
   where
-    has x = any (_ `member` x)
+    has x = any \s ->
+                maybe false (case _ of
+                              IntValue  0     -> false
+                              BoolValue false -> false
+                              ArrayValue []   -> false
+                              _               -> true
+                              ) (lookup s x)
     canExit = not opts.dontExit
 
     -- note: purescript needs the `a` for now:
