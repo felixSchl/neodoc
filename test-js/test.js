@@ -163,6 +163,47 @@ describe('neodoc', () => {
 
   describe('special arguments', () => {
     describe('option.helpFlags', () => {
+      it('should print help', () => {
+        for (let flag of ['-h', '--help', '-?']) {
+          const result = runFakeProc(() => {
+            console.log(JSON.stringify(neodoc.run(`
+              usage: prog -h
+              options:
+                -?, -h, --help
+            `, { argv: [flag] }
+            )))
+          });
+          expect(result).to.deep.equal({
+            code: 0
+          , stderr: ''
+          , stdout: `\
+              usage: prog -h
+              options:
+                -?, -h, --help`
+          });
+        }
+      });
+    });
+
+    describe('option.versionFlags', () => {
+      it('should print help', () => {
+        for (let flag of ['-v', '--version']) {
+          const result = runFakeProc(() => {
+            console.log(JSON.stringify(neodoc.run(`
+              usage: prog -v
+              options:
+                -v, --version
+            `, { argv: [flag], version: '1.0.0' }
+            )))
+          });
+          expect(result).to.deep.equal({
+            code: 0
+          , stderr: ''
+          , stdout: '1.0.0'
+          });
+        }
+      });
+
       describe('#73 - false positive check of special flags', () => {
         it('should not trigger on negative fallback', () => {
           const result = runFakeProc(() => {
@@ -198,8 +239,8 @@ describe('neodoc', () => {
         expect(result).to.deep.equal({
           code: 0
         , stderr: ''
-        , stdout:
-`            ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
+        , stdout: `\
+            ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
             ${chalk.blue('I. Usage:')}
               thimble <command> [<args>...]
               thimble -h | --help
