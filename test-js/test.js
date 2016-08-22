@@ -1,42 +1,12 @@
 const neodoc = require('../');
 const path = require('path');
-const $ = require('shelljs');
 const chalk = require('chalk');
 const expect = require('chai').expect;
 
 const EXAMPLES = path.resolve(__dirname, '..', 'examples');
 const GIT_EXAMPLE = path.resolve(EXAMPLES, 'git');
-const NODE_CMD = $.which('node');
 
-function exec(script, args) {
-  const p = $.exec(`"${NODE_CMD}" "${script}" ${args}`, { silent: true });
-  if (p.code === 0) {
-    return p.stdout;
-  } else {
-    throw new Error(p.stdout || p.stderr);
-  }
-}
-
-function runFakeProc(f) {
-  let code;
-  const stderr = [], stdout = [];
-  const clog = console.log, cerror = console.error, pexit = process.exit;
-  console.log = stdout.push.bind(stdout);
-  console.error = stderr.push.bind(stderr);
-  process.exit = (_code) => { code = _code; };
-  try {
-    f();
-  } finally {
-    console.log = clog;
-    console.error = cerror;
-    process.exit = pexit;
-  }
-  return {
-    stderr: stderr.join('\n')
-  , stdout: stdout.join('\n')
-  , code
-  };
-}
+const { runFakeProc, exec } = require('./support');
 
 describe('neodoc', () => {
   describe('examples - git', () => {
@@ -191,10 +161,32 @@ describe('neodoc', () => {
     })
   });
 
+  describe('special arguments', () => {
+    describe('option.helpFlags', () => {
+      describe('#73 - false positive check of special flags', () => {
+        it('should not trigger on negative fallback', () => {
+          const result = runFakeProc(() => {
+            console.log(JSON.stringify(neodoc.run(`
+              usage: prog [a -h]
+              options:
+                -h, --help
+            `, { argv: ['a'] }
+            )))
+          });
+          expect(result).to.deep.equal({
+            code: 0
+          , stderr: ''
+          , stdout: JSON.stringify({ 'a': true })
+          });
+        });
+      });
+    });
+  });
+
   describe('issues', () => {
     describe('#71 - remove left & right trimming', () => {
       it('should not trim the help text', () => {
-        const { stdout } = runFakeProc(() => {
+        const result = runFakeProc(() => {
           neodoc.run(`
             ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
             ${chalk.blue('I. Usage:')}
@@ -203,12 +195,16 @@ describe('neodoc', () => {
               thimble --version
           `, { argv: [ '--help' ] });
         });
-        expect(stdout).to.equal(
+        expect(result).to.deep.equal({
+          code: 0
+        , stderr: ''
+        , stdout:
 `            ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
             ${chalk.blue('I. Usage:')}
               thimble <command> [<args>...]
               thimble -h | --help
-              thimble --version`);
+              thimble --version`
+        });
       });
     });
   });
