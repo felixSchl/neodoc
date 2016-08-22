@@ -140,6 +140,14 @@ Options:
 * `opts.laxPlacement` - Relax placement rules. Positionals and commands are no
   longer solid anchors. The order amongs them, however, remains fixed. This
   implies that options can appear anywhere.
+* `opts.versionFlags` - An array of flags that trigger the special version
+  behavior: Print the program version and exit with code 0.
+* `opts.version` - The version to print for the special version behavior.
+  Defaults to finding the version of the nearest package.json file, relative
+  to the executing main module. Note that disk IO is only performed if
+  `opts.versionFlags` is non-empty and `opts.version` is not set.
+* `opts.helpFlags` - An array of flags that trigger the special help
+  behavior: Print the full program help text and exit with code 0.
 
 For example:
 
