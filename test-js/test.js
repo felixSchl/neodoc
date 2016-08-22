@@ -1,3 +1,4 @@
+const _ = require('lodash');
 const neodoc = require('../');
 const path = require('path');
 const chalk = require('chalk');
@@ -206,19 +207,35 @@ describe('neodoc', () => {
 
       describe('#73 - false positive check of special flags', () => {
         it('should not trigger on negative fallback', () => {
-          const result = runFakeProc(() => {
-            console.log(JSON.stringify(neodoc.run(`
-              usage: prog [a -h]
-              options:
-                -h, --help
-            `, { argv: ['a'] }
-            )))
-          });
-          expect(result).to.deep.equal({
-            code: 0
-          , stderr: ''
-          , stdout: JSON.stringify({ 'a': true })
-          });
+          for (let [ help, args, expected ] of [
+            [ '', [], {} ]
+          , [ '[-h]', [], {} ]
+          , [ '[-xh]', [], {} ]
+          , [ '[-xh]', ['-x'], {'-x': true} ]
+          , [ '[-xh]', ['-h=false'], 'option takes no argument' ]
+          ]) {
+            const result = runFakeProc(() => {
+              console.log(JSON.stringify(neodoc.run(`
+                usage: prog ${help}
+                options:
+                  -h, --help
+              `, { argv: args }
+              )))
+            });
+            if (typeof expected === 'string') {
+              expect(_.omit(result, 'stderr')).to.deep.equal({
+                code: 1
+              , stdout: ''
+              });
+              expect(result.stderr).to.contains(expected);
+            } else {
+              expect(result).to.deep.equal({
+                code: 0
+              , stderr: ''
+              , stdout: JSON.stringify(expected)
+              });
+            }
+          }
         });
       });
     });
