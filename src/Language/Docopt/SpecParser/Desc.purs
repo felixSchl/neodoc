@@ -12,6 +12,7 @@ import Debug.Trace
 import Data.Tuple (Tuple (Tuple))
 import Data.Tuple.Nested ((/\))
 import Data.Tuple (swap) as Tuple
+import Data.NonEmpty ((:|))
 import Data.Functor (($>))
 import Data.Function (on)
 import Data.Foldable (intercalate, foldl, elem)
@@ -282,10 +283,10 @@ descParser = markIndent do
 
         short :: L.TokenParser _
         short = do
-          opt <- do
-            opt <- L.sopt
-            (guard $ (A.length opt.stack == 0)) P.<?> "No stacked options"
-            pure { flag: opt.flag, arg: opt.arg }
+          { flag, arg } <- do
+            { chars: c :| cs, arg } <- L.sopt
+            (guard $ A.length cs == 0) P.<?> "No stacked options"
+            pure { flag: c, arg: arg }
 
           -- Grab the adjacent positional-looking argument
           -- in case the token did not have an explicit
@@ -301,11 +302,11 @@ descParser = markIndent do
                     pure { name: n, optional: optional }
                   )
                   (pure <<< Just)
-                  opt.arg
+                  arg
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          pure  { alias:      OptionAlias.Short opt.flag
+          pure  { alias:      OptionAlias.Short flag
                 , arg:        arg
                 , repeatable: repeatable
                 }

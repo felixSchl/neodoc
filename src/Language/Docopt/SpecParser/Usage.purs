@@ -7,6 +7,7 @@ import Prelude
 import Data.List (List)
 import Data.Either (Either)
 import Text.Parsing.Parser (ParseError) as P
+
 import Language.Docopt.SpecParser.Lexer as Lexer
 import Language.Docopt.SpecParser.Usage.Parser as UsageParser
 import Language.Docopt.SpecParser.Usage.Parser (parse) as Reexports

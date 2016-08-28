@@ -7,6 +7,7 @@ import Prelude
 import Debug.Trace
 import Debug.Profile
 import Data.Functor (($>))
+import Data.NonEmpty (NonEmpty, (:|))
 import Language.Docopt.SpecParser.Lexer as L
 import Language.Docopt.SpecParser.Usage.Option as O
 import Control.Alt ((<|>))
@@ -199,7 +200,7 @@ usageParser smartOpts = do
 
     shortOption :: L.TokenParser Argument
     shortOption = OptionStack <$> do
-      { flag, stack, arg } <- L.sopt
+      { chars: (flag :| stack), arg } <- L.sopt
       r <- repetition
       pure  { flag:       flag
             , stack:      stack

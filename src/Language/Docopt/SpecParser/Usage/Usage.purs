@@ -6,8 +6,8 @@ module Language.Docopt.SpecParser.Usage.Usage (
 import Prelude
 import Data.List (List())
 import Data.Foldable (intercalate)
-
 import Language.Docopt.SpecParser.Usage.Argument as U
+
 type Usage = List U.Branch
 
 prettyPrintUsage :: Usage -> String

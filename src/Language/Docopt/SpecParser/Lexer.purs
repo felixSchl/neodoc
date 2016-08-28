@@ -4,6 +4,8 @@ import Prelude
 import Data.Array as A
 import Debug.Trace
 import Debug.Profile
+import Data.NonEmpty (NonEmpty, (:|))
+import Data.NonEmpty as NonEmpty
 import Data.List as L
 import Data.Monoid (mempty)
 import Data.Functor (($>))
@@ -98,6 +100,8 @@ lexDescs = lex Descriptions
 lexUsage :: String -> Either P.ParseError (List PositionedToken)
 lexUsage = lex Usage
 
+type OptionArgument = { name :: String, optional :: Boolean }
+
 data Token
   = LParen
   | RParen
@@ -110,8 +114,8 @@ data Token
   | Newline
   | TripleDot
   | Reference String
-  | LOpt String (Maybe { name :: String, optional :: Boolean })
-  | SOpt Char (Array Char) (Maybe { name :: String, optional :: Boolean })
+  | LOpt String (Maybe OptionArgument)
+  | SOpt (NonEmpty Array Char) (Maybe OptionArgument)
   | Tag String String
   | Name String
   | ShoutName String
@@ -137,22 +141,19 @@ prettyPrintToken (Tag k v)     = "Tag "       ~~ (show k) ~~ " "  ~~ (show v)
 prettyPrintToken (Name      n) = "Name "      ~~ show n
 prettyPrintToken (ShoutName n) = "ShoutName " ~~ show n
 prettyPrintToken (AngleName n) = "AngleName " ~~ show n
-prettyPrintToken (LOpt n arg)
-  = "--" ~~ n
-         ~~ (fromMaybe "" do
-              a <- arg
-              pure $ if a.optional then "[" else ""
-                ~~ a.name
-                ~~ if a.optional then "]" else ""
-            )
-prettyPrintToken (SOpt n s arg)
-  = "-" ~~ (fromCharArray (A.cons n s))
-        ~~ (fromMaybe "" do
-              a <- arg
-              pure $ if a.optional then "[" else ""
-                ~~ a.name
-                ~~ if a.optional then "]" else ""
-            )
+prettyPrintToken (LOpt n arg)  = "--" <> n <> arg'
+  where arg' = fromMaybe "" do
+                arg <#> \a ->
+                  if a.optional then "[" else ""
+                    <> a.name
+                    <> if a.optional then "]" else ""
+prettyPrintToken (SOpt (c :| cs) arg) = "-" <> n <> arg'
+  where n = fromCharArray $ A.cons c cs
+        arg' = fromMaybe "" do
+                arg <#> \a ->
+                  if a.optional then "[" else ""
+                    <> a.name
+                    <> if a.optional then "]" else ""
 
 data PositionedToken = PositionedToken P.Position Token
 
@@ -178,17 +179,17 @@ instance eqToken :: Eq Token where
         || (fromMaybe false do
               a  <- arg
               a' <- arg'
-              pure $ (a.name == a.name)
-                    && (a.optional == a.optional)
+              pure $ (a.name == a'.name)
+                  && (a.optional == a'.optional)
             ))
-  eq (SOpt n s arg)    (SOpt n' s' arg')
-    = (n == n') && (s' == s')
+  eq (SOpt (c:|cs) arg) (SOpt (c':|cs') arg')
+    = (c == c') && (cs == cs')
     && ((isNothing arg && isNothing arg')
         || (fromMaybe false do
               a  <- arg
               a' <- arg'
-              pure $ (a.name == a.name)
-                    && (a.optional == a.optional)
+              pure $ (a.name == a'.name)
+                  && (a.optional == a'.optional)
             ))
   eq (AngleName n)     (AngleName n')     = n == n'
   eq (ShoutName n)     (ShoutName n')     = n == n'
@@ -390,7 +391,7 @@ _shortOption = do
   , void $ P.char ',' -- desc mode only
   ])
 
-  pure $ SOpt x xs arg
+  pure $ SOpt (x:|xs) arg
   where bind = bindP
 
 _longOption :: P.Parser String Token
@@ -517,22 +518,19 @@ garbage = token go P.<?> "garbage"
     go _           = Nothing
 
 lopt :: TokenParser { name :: String
-                    , arg  :: Maybe { name :: String
-                                    , optional :: Boolean
-                                    } }
+                    , arg  :: Maybe OptionArgument
+                    }
 lopt = token go P.<?> "long-option"
   where
     go (LOpt n a) = Just { name: n, arg: a }
     go _          = Nothing
 
-sopt :: TokenParser { flag  :: Char
-                    , stack :: Array Char
-                    , arg   :: Maybe { name :: String
-                                     , optional :: Boolean
-                                     } }
+sopt :: TokenParser { chars :: NonEmpty Array Char
+                    , arg   :: Maybe OptionArgument
+                    }
 sopt = token go P.<?> "short-option"
   where
-    go (SOpt n s a) = Just { flag: n , stack: s , arg: a }
+    go (SOpt cs a) = Just { chars: cs , arg: a }
     go _ = Nothing
 
 name :: TokenParser String
