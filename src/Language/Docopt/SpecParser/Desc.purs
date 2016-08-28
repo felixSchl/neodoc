@@ -233,7 +233,7 @@ descParser = markIndent do
     positionalsDesc :: L.TokenParser Desc
     positionalsDesc = do
       L.angleName <|> L.shoutName
-      repeatable <- P.option false $ L.tripleDot $> true
+      P.option false $ L.tripleDot $> true
       descContent false
       pure CommandDesc
 
@@ -245,38 +245,30 @@ descParser = markIndent do
 
       let defaults = getDefaultValue <$> filter isDefaultTag description
           envs     = getEnvKey       <$> filter isEnvTag     description
+          default  = head defaults >>= id
+          env      = head envs     >>= id
 
-      if (length defaults > 1)
-         then P.fail $
+      when (length defaults > 1) do
+        P.fail $
           "Option " <> (intercalate ", " $ prettyPrintOptionAlias <$> xopt.aliases)
                     <> " has multiple defaults!"
-         else pure unit
 
-      if (length envs > 1)
-         then P.fail $
+      when (length envs > 1) do
+        P.fail $
           "Option " <> (intercalate ", " $ prettyPrintOptionAlias <$> xopt.aliases)
                     <> " has multiple environment mappings!"
-         else pure unit
 
-      let default = head defaults >>= id
-          env     = head envs     >>= id
-
-      if (isJust default) && (isNothing xopt.arg)
-         then P.fail $
+      when (isJust default && isNothing xopt.arg) do
+        P.fail $
           "Option " <> (intercalate ", " $ prettyPrintOptionAlias <$> xopt.aliases)
                     <> " does not take arguments. "
                     <> "Cannot specify defaults."
-         else pure unit
 
       pure $ OptionDesc $
         xopt  { env = env
               , arg = do
-                  arg <- xopt.arg
-                  pure $ {
-                    name:     arg.name
-                  , optional: arg.optional
-                  , default:  default
-                  }
+                  { name, optional } <- xopt.arg
+                  pure $ { name, optional, default }
               }
 
       where
@@ -293,6 +285,34 @@ descParser = markIndent do
           -- binding via `=`.
           arg <- maybe
                   (P.optionMaybe do
+                    c <- P.optionMaybe $ P.choice [
+                          L.lparen  $> (L.rparen  $> false)
+                        , L.lsquare $> (L.rsquare $> true)
+                        ]
+                    n <- L.shoutName <|> L.angleName
+                    optional <- fromMaybe (pure false) c
+                    pure { name: n, optional: optional }
+                  )
+                  (pure <<< Just)
+                  arg
+
+          repeatable <- P.option false $ L.tripleDot $> true
+
+          pure {
+            alias: OptionAlias.Short flag
+          , arg
+          , repeatable
+          }
+
+        long :: L.TokenParser _
+        long = do
+          { name, arg } <- L.lopt
+
+          -- Grab the adjacent positional-looking argument
+          -- in case the token did not have an explicit
+          -- binding via `=`.
+          arg' <- maybe
+                  (P.optionMaybe do
                     c <- P.optionMaybe (P.choice [
                           L.lparen  $> (L.rparen  $> false)
                         , L.lsquare $> (L.rsquare $> true)
@@ -306,42 +326,20 @@ descParser = markIndent do
 
           repeatable <- P.option false $ L.tripleDot $> true
 
-          pure  { alias:      OptionAlias.Short flag
-                , arg:        arg
-                , repeatable: repeatable
-                }
-
-        long :: L.TokenParser _
-        long = do
-          opt <- L.lopt
-
-          -- Grab the adjacent positional-looking argument
-          -- in case the token did not have an explicit
-          -- binding via `=`.
-          arg <- maybe
-                  (P.optionMaybe do
-                    c <- P.optionMaybe (P.choice [
-                          L.lparen  $> (L.rparen  $> false)
-                        , L.lsquare $> (L.rsquare $> true)
-                        ])
-                    n <- L.shoutName <|> L.angleName
-                    optional <- fromMaybe (pure false) c
-                    pure { name: n, optional: optional }
-                  )
-                  (pure <<< Just)
-                  opt.arg
-
-          repeatable <- P.option false $ L.tripleDot $> true
-
-          pure  { alias:      OptionAlias.Long opt.name
-                , arg:        arg
-                , repeatable: repeatable
-                }
+          pure {
+            alias: OptionAlias.Long name
+          , arg:   arg'
+          , repeatable
+          }
 
         opt :: L.TokenParser _
         opt = do
           let optsP = "option" P.<??> P.choice [ P.try short, long ]
-          xs <- optsP `P.sepBy1` (P.optional $ L.comma *> many L.newline *> indented)
+          xs <- optsP `P.sepBy1` do  -- extra options: [, -f]
+            P.optional do
+              L.comma
+                *> many L.newline
+                *> indented
 
           -- check integrity of the option-aliases
           aliases <- foldl (\acc next -> do
