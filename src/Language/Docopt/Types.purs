@@ -7,14 +7,9 @@ import Data.Generic (class Generic, gShow)
 import Text.Wrap (dedent)
 import Data.String (uncons, singleton) as String
 import Data.Char (toLower) as Char
+import Data.Pretty (class Pretty)
 import Text.Parsing.Parser (ParseError(..)) as P
 import Text.Parsing.Parser.Pos (Position) as P
-
-mapWithIndex :: ∀ a b. (a -> Int -> b) -> List a -> List b
-mapWithIndex f lst = reverse $ go 0 lst Nil
-  where
-  go _ Nil acc = acc
-  go n (x:xs) acc = go (n+1) xs $ (f x n):acc
 
 --------------------------------------------------------------------------------
 -- Errors (XXX: needs migration and improvement) -------------------------------
@@ -54,37 +49,35 @@ developerErrorMessage = dedent """
   Please bring this to the program author's attention.
 """
 
-prettyPrintDocoptError :: DocoptError -> String
-prettyPrintDocoptError (DocoptScanError err) =
-  "Failed to disect docopt text:"
-    <> "\n"
-    <> (unParseError err).message
-    <> "\n"
-    <> developerErrorMessage
-prettyPrintDocoptError (DocoptUsageParseError err) =
-  "Failed to parse the formal usage specification:"
-    <> "\n"
-    <> (unParseError err).message
-    <> "\n"
-    <> developerErrorMessage
-prettyPrintDocoptError (DocoptDescParseError err) =
-  "Failed to parse the option descriptions:"
-    <> "\n"
-    <> (unParseError err).message
-    <> "\n"
-    <> developerErrorMessage
-prettyPrintDocoptError (DocoptSolveError (SolveError err)) =
-  "Incoherent specification:"
-    <> "\n"
-    <> err
-    <> "\n"
-    <> developerErrorMessage
-prettyPrintDocoptError
-  (DocoptUserParseError
-    program argv (P.ParseError message _ _))
-      -- de-capitalize the error message after the colon
-      = case String.uncons message of
-          Nothing -> message
-          Just { head, tail } ->
-            let msg = String.singleton (Char.toLower head) <> tail
-             in program <> ": " <> msg
+instance prettyDocoptError :: Pretty DocoptError where
+  pretty (DocoptScanError err)
+    = "Failed to disect docopt text:"
+        <> "\n"
+        <> (unParseError err).message
+        <> "\n"
+        <> developerErrorMessage
+  pretty (DocoptUsageParseError err)
+    = "Failed to parse the formal usage specification:"
+        <> "\n"
+        <> (unParseError err).message
+        <> "\n"
+        <> developerErrorMessage
+  pretty (DocoptDescParseError err)
+    = "Failed to parse the option descriptions:"
+        <> "\n"
+        <> (unParseError err).message
+        <> "\n"
+        <> developerErrorMessage
+  pretty (DocoptSolveError (SolveError err))
+    = "Incoherent specification:"
+        <> "\n"
+        <> err
+        <> "\n"
+        <> developerErrorMessage
+  pretty (DocoptUserParseError program argv (P.ParseError message _ _))
+    -- de-capitalize the error message after the colon
+    = case String.uncons message of
+        Nothing -> message
+        Just { head, tail } ->
+          let msg = String.singleton (Char.toLower head) <> tail
+          in program <> ": " <> msg

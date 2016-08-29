@@ -23,11 +23,10 @@ import Data.Bifunctor (lmap)
 import Data.Traversable (traverse)
 import Text.Parsing.Parser as P
 import Text.Wrap (dedent)
+import Data.Pretty (pretty)
 
 import Language.Docopt.Specification
-import Language.Docopt.Errors (Argv, DocoptError(..), SolveError(..),
-                              prettyPrintDocoptError
-                              ) as D
+import Language.Docopt.Errors (Argv, DocoptError(..), SolveError(..)) as D
 import Language.Docopt.Value (Value()) as D
 import Language.Docopt.ArgParser  as G
 import Language.Docopt.Trans.Flat as T
@@ -139,16 +138,16 @@ runDocopt docopt env argv options = do
   evalDocopt program specification env argv options
 
 toScanErr :: ∀ a. Either P.ParseError a -> Either String a
-toScanErr  = lmap (D.prettyPrintDocoptError <<< D.DocoptScanError)
+toScanErr  = lmap (pretty <<< D.DocoptScanError)
 
 toUsageParseErr :: ∀ a. Either P.ParseError a -> Either String a
-toUsageParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptUsageParseError)
+toUsageParseErr = lmap (pretty <<< D.DocoptUsageParseError)
 
 toDescParseErr :: ∀ a. Either P.ParseError a -> Either String a
-toDescParseErr = lmap (D.prettyPrintDocoptError <<< D.DocoptDescParseError)
+toDescParseErr = lmap (pretty <<< D.DocoptDescParseError)
 
 toUserParseErr :: ∀ a. String -> Array String -> Either P.ParseError a -> Either String a
-toUserParseErr prog argv = lmap (D.prettyPrintDocoptError <<< D.DocoptUserParseError prog argv)
+toUserParseErr prog argv = lmap (pretty <<< D.DocoptUserParseError prog argv)
 
 toSolveErr :: ∀ a. Either D.SolveError a -> Either String a
-toSolveErr = lmap (D.prettyPrintDocoptError <<< D.DocoptSolveError)
+toSolveErr = lmap (pretty <<< D.DocoptSolveError)

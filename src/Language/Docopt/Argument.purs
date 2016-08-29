@@ -5,7 +5,6 @@ module Language.Docopt.Argument (
   , PositionalObj ()
   , GroupObj ()
   , prettyPrintBranch
-  , prettyPrintArg
   , prettyPrintArgNaked
   , isRepeatable
   , setRepeatable
@@ -40,6 +39,7 @@ import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
 import Data.NonEmpty as NonEmpty
 import Data.Lazy (defer)
 import Data.Generic
+import Data.Pretty (class Pretty, pretty)
 import Partial.Unsafe
 
 import Language.Docopt.Value (Value(..))
@@ -160,20 +160,20 @@ isOptional (Group g) = g.optional
 isOptional _         = false
 
 prettyPrintBranch :: Branch -> String
-prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
+prettyPrintBranch xs = intercalate " " (pretty <$> xs)
 
-prettyPrintArg :: Argument -> String
-prettyPrintArg (Stdin)        = "-"
-prettyPrintArg (EOA)          = "--"
-prettyPrintArg (Command x)    = x.name <> (if x.repeatable then "..." else "")
-prettyPrintArg (Positional x) = x.name <> (if x.repeatable then "..." else "")
-prettyPrintArg (Option o)     = O.prettyPrintOption o
-prettyPrintArg (Group g)      = open <> inner <> close <> repetition
-  where
-    open       = if g.optional then "[" else "("
-    close      = if g.optional then "]" else ")"
-    inner      = intercalate " | " (prettyPrintBranch <$> g.branches)
-    repetition = if g.repeatable then "..." else ""
+instance prettyArgument :: Pretty Argument where
+  pretty (Stdin)        = "-"
+  pretty (EOA)          = "--"
+  pretty (Command x)    = x.name <> (if x.repeatable then "..." else "")
+  pretty (Positional x) = x.name <> (if x.repeatable then "..." else "")
+  pretty (Option o)     = O.prettyPrintOptionObj o
+  pretty (Group g)      = open <> inner <> close <> repetition
+    where
+      open       = if g.optional then "[" else "("
+      close      = if g.optional then "]" else ")"
+      inner      = intercalate " | " (prettyPrintBranch <$> g.branches)
+      repetition = if g.repeatable then "..." else ""
 
 prettyPrintBranchNaked :: Branch -> String
 prettyPrintBranchNaked xs = intercalate " " (prettyPrintArgNaked <$> xs)
@@ -183,7 +183,7 @@ prettyPrintArgNaked (Stdin)        = "-"
 prettyPrintArgNaked (EOA)          = "-- ARGS..."
 prettyPrintArgNaked (Command x)    = x.name <> (if x.repeatable then "..." else "")
 prettyPrintArgNaked (Positional x) = x.name <> (if x.repeatable then "..." else "")
-prettyPrintArgNaked (Option o)     = O.prettyPrintOptionNaked o
+prettyPrintArgNaked (Option o)     = O.prettyPrintOptionNakedObj o
 prettyPrintArgNaked (Group g)      = open <> inner <> close <> repetition
   where
     showParens = g.optional ||

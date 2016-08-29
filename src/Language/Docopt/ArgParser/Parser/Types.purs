@@ -7,7 +7,6 @@ module Language.Docopt.ArgParser.Parser.Types (
   , unRequired
   , isRequired
   , toOptional
-  , prettyPrintRequiredIndexedArg
 
   , Indexed (..)
   , getIndexedElem
@@ -15,7 +14,6 @@ module Language.Docopt.ArgParser.Parser.Types (
 
   , Clump (..)
   , isFree
-  , prettyPrintArgClump
 
   , Cache ()
   , CacheKey ()
@@ -34,8 +32,9 @@ import Text.Parsing.Parser (ParserT())
 import Control.Monad.Transformerless.RWS (RWS())
 import Language.Docopt.RichValue (RichValue())
 import Language.Docopt.ArgParser.Token (PositionedToken(..))
-import Language.Docopt.Argument (Argument(..), prettyPrintArg) as D
+import Language.Docopt.Argument (Argument(..)) as D
 import Text.Parsing.Parser (PState(), Result()) as P
+import Data.Pretty (class Pretty, pretty)
 import Data.Foldable (intercalate)
 
 type Parser a = ParserT (List PositionedToken)
@@ -77,6 +76,10 @@ instance showRequired :: (Show a) => Show (Required a) where
   show (Required a) = "Required " <> show a
   show (Optional a) = "Optional " <> show a
 
+instance pretty :: (Pretty a) => Pretty (Required a) where
+  pretty (Required x) = "Required " <> pretty x
+  pretty (Optional x) = "Optional " <> pretty x
+
 unRequired :: ∀ a. Required a -> a
 unRequired (Required a) = a
 unRequired (Optional a) = a
@@ -89,10 +92,6 @@ toOptional :: ∀ a. Required a -> Required a
 toOptional (Required a) = Optional a
 toOptional (Optional a) = Optional a
 
-prettyPrintRequiredIndexedArg :: Required (Indexed D.Argument) -> String
-prettyPrintRequiredIndexedArg (Required (Indexed _ x)) = "Required " <> D.prettyPrintArg x
-prettyPrintRequiredIndexedArg (Optional (Indexed _ x)) = "Optional " <> D.prettyPrintArg x
-
 -- | Auxiliary data structure for permutation parsing to preserve the original
 -- | order of arguments.
 data Indexed a = Indexed Int a
@@ -102,6 +101,12 @@ instance eqIndexed :: (Eq a) => Eq (Indexed a) where
 
 instance showIndexed :: (Show a) => Show (Indexed a) where
   show (Indexed n a) = "Indexed " <> show n <> " " <> show a
+
+instance prettyIndexed :: (Pretty a) => Pretty (Indexed a) where
+  pretty (Indexed n a) = "Indexed " <> show n <> " " <> pretty a
+
+instance prettyIndexed' :: (Show a) => Pretty (Indexed a) where
+  pretty (Indexed n a) = "Indexed " <> show n <> " " <> show a
 
 -- | Note: use the tuple semantics for comparisons.
 -- | Refer to the Ord instance of tuples for an explanation.
@@ -127,6 +132,6 @@ isFree :: ∀ a. Clump a -> Boolean
 isFree (Free _) = true
 isFree _        = false
 
-prettyPrintArgClump :: Clump (List D.Argument) -> String
-prettyPrintArgClump (Fixed xs) = "Fixed " <> (intercalate " " $ D.prettyPrintArg <$> xs)
-prettyPrintArgClump (Free  xs) = "Free "  <> (intercalate " " $ D.prettyPrintArg <$> xs)
+instance prettyArgClump :: Pretty (Clump (List D.Argument)) where
+  pretty (Fixed xs) = "Fixed " <> (intercalate " " $ pretty <$> xs)
+  pretty (Free  xs) = "Free "  <> (intercalate " " $ pretty <$> xs)

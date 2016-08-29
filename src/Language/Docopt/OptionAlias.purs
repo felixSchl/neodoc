@@ -1,7 +1,6 @@
 module Language.Docopt.OptionAlias (
     OptionAlias (..)
   , Aliases ()
-  , prettyPrintOptionAlias
   , isLong
   , isShort
   , toAliasList
@@ -15,9 +14,14 @@ import Data.Generic (class Generic, gEq, gShow)
 import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
 import Data.NonEmpty as NonEmpty
+import Data.Pretty (class Pretty)
 
 type Aliases = NonEmpty List OptionAlias
 data OptionAlias = Short Char | Long String
+
+instance prettyAlias :: Pretty OptionAlias where
+  pretty (Short c) = "-"  <> (String.singleton c)
+  pretty (Long  n) = "--" <> n
 
 instance showAlias :: Show OptionAlias where
   show (Short c) = "Short " <> show c
@@ -35,10 +39,6 @@ instance ordAlias :: Ord OptionAlias where
   compare (Short _) _          = LT -- move short names to the front
 
 derive instance genericOptionAlias :: Generic OptionAlias
-
-prettyPrintOptionAlias :: OptionAlias -> String
-prettyPrintOptionAlias (Short c) = "-"  <> (String.singleton c)
-prettyPrintOptionAlias (Long  n) = "--" <> n
 
 isLong :: OptionAlias -> Boolean
 isLong (Long _) = true

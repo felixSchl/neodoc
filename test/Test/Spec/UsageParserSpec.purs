@@ -13,6 +13,7 @@ import Data.Either (Either(..), isRight, isLeft, either)
 import Data.Maybe (Maybe(..))
 import Data.Foldable (intercalate, foldMap, traverse_, for_)
 import Data.Array ((..))
+import Data.Pretty (pretty)
 
 import Language.Docopt
 import Test.Support.Usage                        as U
@@ -272,7 +273,7 @@ usageParserSpec = \_ ->
             case o of
               P v -> do
                 let expected = v isRepeated
-                it (input <> " -> " <> U.prettyPrintArg expected)  do
+                it (input <> " -> " <> pretty expected)  do
                   vliftEff do
                     { program, usages } <- runEitherEff do
                       Lexer.lexUsage input >>= U.parse false

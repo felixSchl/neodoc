@@ -12,6 +12,7 @@ import Debug.Trace
 import Data.Foreign
 import Data.Map as Map
 import Data.Map (Map())
+import Data.Pretty (pretty)
 import Control.Apply ((<*), (*>))
 import Data.Function (on)
 import Data.Function.Uncurried
@@ -58,7 +59,7 @@ import Language.Docopt.ArgParser.Parser.Fallback
 import Language.Docopt.ArgParser.Parser.Atom
 
 import Language.Docopt.Argument (Argument(..), Branch, isFree,
-                                prettyPrintArg, prettyPrintArgNaked,
+                                prettyPrintArgNaked,
                                 isRepeatable, OptionArgumentObj(),
                                 setRequired, isOptional, isGroup,
                                 unOptionArgument, isPositional, isCommand) as D
@@ -70,12 +71,12 @@ import Language.Docopt.Origin as Origin
 import Language.Docopt.Origin (Origin())
 import Language.Docopt.Value as Value
 import Language.Docopt.Value (Value(..))
-import Language.Docopt.RichValue (RichValue(..), unRichValue, prettyPrintRichValue)
+import Language.Docopt.RichValue (RichValue(..), unRichValue)
 import Language.Docopt.RichValue (from, getOrigin) as RValue
 import Language.Docopt.SpecParser.Base (getInput)
 import Language.Docopt.ArgParser.Token (getSource) as Token
 import Language.Docopt.ArgParser.Token (PositionedToken(..), Token(..),
-                                        unPositionedToken, prettyPrintToken)
+                                        unPositionedToken)
 import Data.String.Ext (startsWith, (~~))
 
 -- | Toggle debugging on/off during development
@@ -208,7 +209,7 @@ spec xs options = do
     -> Parser (List ValueMapping)
   exhaustP toplevel skippable isSkipping l xs = do
     _debug \_->
-        "exhaustP: "      <> (intercalate " " $ D.prettyPrintArg <$> xs)
+        "exhaustP: "      <> (intercalate " " $ pretty <$> xs)
       <> ", skippable: "  <> show skippable
       <> ", isSkipping: " <> show isSkipping
 
@@ -227,7 +228,7 @@ spec xs options = do
 
       i <- getInput
       _debug \_->
-          "parsing clump: " <> prettyPrintArgClump c
+          "parsing clump: " <> pretty c
         <> ", skippable: "  <> show skippable
         <> ", isSkipping: " <> show isSkipping
         <> ", input: "      <> show (intercalate " " $ Token.getSource <$> i)
@@ -253,7 +254,7 @@ spec xs options = do
 
           i <- getInput
           _debug \_ ->
-              "draw: "          <> (intercalate " " $ prettyPrintRequiredIndexedArg <$> xss)
+              "draw: "          <> (intercalate " " $ pretty <$> xss)
             <> ", n: "          <> show n
             <> ", skippable: "  <> show skippable
             <> ", isSkipping: " <> show isSkipping
@@ -281,7 +282,7 @@ spec xs options = do
           _debug \_->
             "draw: matched: " <> (intercalate ", " $
               (vs) <#> \(Tuple k v) ->
-                D.prettyPrintArg k <> " => " <> prettyPrintRichValue v
+                pretty k <> " => " <> pretty v
             )
 
           vss <- P.try do
@@ -289,8 +290,7 @@ spec xs options = do
               length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
                 then do
                   _debug \_->
-                    "draw: repeating as optional: "
-                      <> D.prettyPrintArg arg
+                    "draw: repeating as optional: " <> pretty arg
                   -- Make successive matches of this repeated group optional.
                   draw (xs <> pure (toOptional x)) errs (length xss)
                 else draw xs errs (length xs)
@@ -298,7 +298,7 @@ spec xs options = do
           _debug \_->
             "draw: matched (2): " <> (intercalate ", " $
               (vs <> vss) <#> \(Tuple k v) ->
-                D.prettyPrintArg k <> " => " <> prettyPrintRichValue v
+                pretty k <> " => " <> pretty v
             )
 
           pure (vs <> vss)
@@ -312,7 +312,7 @@ spec xs options = do
 
           _debug \_->
               "draw: failure"
-            <> ", requeueing: " <> prettyPrintRequiredIndexedArg x
+            <> ", requeueing: " <> pretty x
             <> ", length of xs: " <> show (length xs)
 
           -- Check if we're done trying to recover.
@@ -351,7 +351,7 @@ spec xs options = do
           i <- getInput
           _debug \_->
               "draw: edge-case"
-            <> ", left-over: "  <> (intercalate " " $ prettyPrintRequiredIndexedArg <$> xss)
+            <> ", left-over: "  <> (intercalate " " $ pretty <$> xss)
             <> ", n: "          <> show n
             <> ", skippable: "  <> show skippable
             <> ", isSkipping: " <> show isSkipping
@@ -385,7 +385,7 @@ spec xs options = do
 
           _debug \_->
             "draw: missing: "
-              <> (intercalate " " $ D.prettyPrintArg <$> missing)
+              <> (intercalate " " $ pretty <$> missing)
 
           if isSkipping && length missing > 0
             then do

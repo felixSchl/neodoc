@@ -8,8 +8,8 @@ module Language.Docopt.Argument.Option (
   , hasDefault
   , isFlag
   , takesArgument
-  , prettyPrintOption
-  , prettyPrintOptionNaked
+  , prettyPrintOptionObj
+  , prettyPrintOptionNakedObj
   ) where
 
 import Prelude
@@ -24,7 +24,8 @@ import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
 import Data.NonEmpty as NonEmpty
 import Language.Docopt.Value (Value(..), prettyPrintValue)
-import Language.Docopt.OptionAlias 
+import Language.Docopt.OptionAlias
+import Data.Pretty (pretty)
 
 type OptionObj =  { aliases    :: Aliases
                   , arg        :: Maybe OptionArgument
@@ -99,10 +100,10 @@ isFlag { arg: Just (OptionArgument { default: Just (BoolValue _) }) } = true
 isFlag { arg: Nothing }                                               = true
 isFlag _                                                              = false
 
-prettyPrintOption :: OptionObj -> String
-prettyPrintOption o = aliases <> arg' <> rep <> default <> env
+prettyPrintOptionObj :: OptionObj -> String
+prettyPrintOptionObj o = aliases <> arg' <> rep <> default <> env
   where
-    prettyAliases = prettyPrintOptionAlias <$> (sort $ toAliasList o.aliases)
+    prettyAliases = pretty <$> (sort $ toAliasList o.aliases)
     aliases = intercalate "/" prettyAliases
     rep  = if o.repeatable then "..." else ""
     arg' = flip (maybe "") o.arg \(OptionArgument { name, optional }) ->
@@ -114,11 +115,11 @@ prettyPrintOption o = aliases <> arg' <> rep <> default <> env
                   " [default: " <> (prettyPrintValue v) <>  "]"
     env = flip (maybe "") o.env \k -> " [env: " <> k <> "]"
 
-prettyPrintOptionNaked :: OptionObj -> String
-prettyPrintOptionNaked o = aliases <> arg' <> rep
+prettyPrintOptionNakedObj :: OptionObj -> String
+prettyPrintOptionNakedObj o = aliases <> arg' <> rep
   where
     hasAlias = length (NonEmpty.tail o.aliases) > 0
-    prettyAliases = prettyPrintOptionAlias <$> (sort $ toAliasList o.aliases)
+    prettyAliases = pretty <$> (sort $ toAliasList o.aliases)
     aliases = intercalate "/" prettyAliases
     rep  = if o.repeatable then "..." else ""
     arg' = flip (maybe "") o.arg \(OptionArgument { name }) -> "="  <> name

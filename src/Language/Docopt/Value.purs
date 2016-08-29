@@ -25,6 +25,7 @@ import Data.Array as A
 import Data.Int (toNumber, fromString) as Int
 import Data.String (singleton) as String
 import Partial.Unsafe (unsafePartial)
+import Data.Pretty (class Pretty, pretty)
 import Global (readFloat)
 
 data Value
@@ -42,6 +43,9 @@ instance showValue :: Show Value where
   show (ArrayValue xs) = "ArrayValue "  <> show (show <$> xs)
   show (IntValue    x) = "IntValue "    <> show x
   show (FloatValue  x) = "FloatValue "  <> show x
+
+instance prettyValue :: Pretty Value where
+  pretty = prettyPrintValue
 
 instance eqValue :: Eq Value where
   eq (StringValue s) (StringValue s') = s  == s'

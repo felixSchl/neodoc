@@ -7,10 +7,10 @@ module Language.Docopt.RichValue (
 , setOrigin
 , getValue
 , getOrigin
-, prettyPrintRichValue
 ) where
 
 import Prelude
+import Data.Pretty (class Pretty, pretty)
 import Language.Docopt.Value (Value(), prettyPrintValue)
 import Language.Docopt.Origin (Origin())
 
@@ -49,7 +49,5 @@ instance eqRichValue :: Eq RichValue where
 from :: Origin -> Value -> RichValue
 from o v = RichValue $ { value: v, origin: o }
 
-prettyPrintRichValue :: RichValue -> String
-prettyPrintRichValue (RichValue v) = prettyPrintValue v.value
-                                      <> " "
-                                      <> "(" <> show v.origin <> ")"
+instance prettyRichValue :: Pretty RichValue where
+  pretty (RichValue v) = pretty v.value <> " " <> "(" <> show v.origin <> ")"

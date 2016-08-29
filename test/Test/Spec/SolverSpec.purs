@@ -3,6 +3,7 @@ module Test.Spec.SolverSpec (solverSpec) where
 import Prelude
 import Debug.Trace
 import Data.Either (Either(..), either, fromRight)
+import Data.Pretty (pretty)
 import Control.Bind ((=<<))
 import Control.Apply ((*>))
 import Data.List (List(..), fromFoldable)
@@ -364,7 +365,7 @@ solverSpec = \_ ->
                       Source s  -> s
                       Parsed xs -> intercalate "\n" $
                         ("Usage: prog " <> _)
-                          <$> (intercalate " " <<< (prettyPrintArg <$> _))
+                          <$> (intercalate " " <<< (pretty <$> _))
                                 <$> xs
                  in "Should resolve to:\n" <> msg)
               expected

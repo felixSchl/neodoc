@@ -9,13 +9,13 @@ module Language.Docopt.SpecParser.Usage.Argument (
   , isOption
   , isPositional
   , isCommand
-  , prettyPrintArg
   , prettyPrintBranch
   , module O
   ) where
 
 import Prelude
 import Data.List (List())
+import Data.Pretty (class Pretty, pretty)
 import Data.Foldable (intercalate, all)
 import Language.Docopt.SpecParser.Usage.Option as O
 
@@ -120,18 +120,19 @@ instance eqArgument :: Eq Argument where
   eq _                _                  = false
 
 prettyPrintBranch :: Branch -> String
-prettyPrintBranch xs = intercalate " " (prettyPrintArg <$> xs)
+prettyPrintBranch xs = intercalate " " (pretty <$> xs)
 
-prettyPrintArg :: Argument -> String
-prettyPrintArg (Command cmd)    = cmd.name <> if cmd.repeatable then "..." else ""
-prettyPrintArg (Positional pos) = pos.name <> if pos.repeatable then "..." else ""
-prettyPrintArg (Option o)       = O.prettyPrintLOptObj o
-prettyPrintArg (OptionStack o)  = O.prettyPrintSOptObj o
-prettyPrintArg (EOA)            = "--"
-prettyPrintArg (Stdin)          = "-"
-prettyPrintArg (Reference r)    = "[" <> show r <> " options...]"
-prettyPrintArg (Group grp)
-  =  (if grp.optional then "[" else "(")
-  <> (intercalate " | " (prettyPrintBranch <$> grp.branches))
-  <> (if grp.optional then "]" else ")")
-  <> (if grp.repeatable then "..." else "")
+instance prettyArgument :: Pretty Argument where
+  pretty (Command cmd)    = cmd.name <> if cmd.repeatable then "..." else ""
+  pretty (Positional pos) = pos.name <> if pos.repeatable then "..." else ""
+  pretty (Option o)       = O.prettyPrintLOptObj o
+  pretty (OptionStack o)  = O.prettyPrintSOptObj o
+  pretty (EOA)            = "--"
+  pretty (Stdin)          = "-"
+  pretty (Reference r)    = "[" <> show r <> " options...]"
+  pretty (Group grp)      = parens contents <> repetition
+    where parens s   = open <> s <> close
+          open       = if grp.optional then "[" else "("
+          close      = if grp.optional then "]" else ")"
+          contents   = intercalate " | " $ prettyPrintBranch <$> grp.branches
+          repetition = if grp.repeatable then "..." else ""

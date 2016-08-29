@@ -41,9 +41,10 @@ import Language.Docopt.SpecParser.Common (sameIndent, markIndent, indented,
                                      moreIndented, lessIndented)
 import Language.Docopt.SpecParser.Lexer (lexDescs)
 import Language.Docopt.SpecParser.Lexer as L
-import Language.Docopt.OptionAlias (Aliases(), OptionAlias(), (:|), prettyPrintOptionAlias)
+import Language.Docopt.OptionAlias (Aliases(), OptionAlias(), (:|))
 import Language.Docopt.OptionAlias (OptionAlias(..)) as OptionAlias
 import Language.Docopt.Value as Value
+import Data.Pretty (class Pretty, pretty)
 import Partial.Unsafe
 
 -- XXX: This is duplicated from Solver.purs.
@@ -140,6 +141,9 @@ prettyPrintDesc :: Desc -> String
 prettyPrintDesc (OptionDesc opt) = "Option " <> prettyPrintOption opt
 prettyPrintDesc (CommandDesc) = "Command"
 
+instance prettyDesc :: Pretty Desc where
+  pretty = prettyPrintDesc
+
 instance showDesc :: Show Desc where
   show (OptionDesc o) = "OptionDesc " <> showOptionObj o
   show (CommandDesc)  = "CommandDesc"
@@ -153,7 +157,7 @@ prettyPrintOption :: OptionObj -> String
 prettyPrintOption opt
   = aliases <> arg <> env
   where
-      aliases = intercalate ", " (prettyPrintOptionAlias <$> opt.aliases)
+      aliases = intercalate ", " (pretty <$> opt.aliases)
 
       arg = maybe "" id do
         a <- opt.arg
@@ -220,8 +224,7 @@ descParser = markIndent do
             L.eof
           , void $ P.lookAhead do
               L.newline
-              when (not toplevel)
-                lessIndented
+              when (not toplevel) lessIndented
               P.choice [
                 void L.sopt
               , void L.lopt
@@ -250,17 +253,17 @@ descParser = markIndent do
 
       when (length defaults > 1) do
         P.fail $
-          "Option " <> (intercalate ", " $ prettyPrintOptionAlias <$> xopt.aliases)
+          "Option " <> (intercalate ", " $ pretty <$> xopt.aliases)
                     <> " has multiple defaults!"
 
       when (length envs > 1) do
         P.fail $
-          "Option " <> (intercalate ", " $ prettyPrintOptionAlias <$> xopt.aliases)
+          "Option " <> (intercalate ", " $ pretty <$> xopt.aliases)
                     <> " has multiple environment mappings!"
 
       when (isJust default && isNothing xopt.arg) do
         P.fail $
-          "Option " <> (intercalate ", " $ prettyPrintOptionAlias <$> xopt.aliases)
+          "Option " <> (intercalate ", " $ pretty <$> xopt.aliases)
                     <> " does not take arguments. "
                     <> "Cannot specify defaults."
 
@@ -345,9 +348,7 @@ descParser = markIndent do
           aliases <- foldl (\acc next -> do
             cur <- acc
             if next `elem` cur
-              then P.fail $
-                "Option appears multiple times: "
-                  <> prettyPrintOptionAlias next
+              then P.fail $ "Option appears multiple times: " <> pretty next
               else pure $ cur <> singleton next
           ) (pure Nil) (_.alias <$> xs)
 
