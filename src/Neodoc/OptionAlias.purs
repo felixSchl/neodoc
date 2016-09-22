@@ -1,4 +1,4 @@
-module Language.Docopt.OptionAlias (
+module Neodoc.OptionAlias (
     OptionAlias (..)
   , Aliases ()
   , isLong
@@ -9,9 +9,10 @@ module Language.Docopt.OptionAlias (
 
 import Prelude
 import Data.List (List(), (:))
-import Data.Generic (class Generic)
+import Data.Function (on)
+import Data.Generic (class Generic, gEq, gShow)
 import Data.String (singleton) as String
-import Data.NonEmpty (NonEmpty, fromNonEmpty)
+import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
 import Data.NonEmpty as NonEmpty
 import Data.Pretty (class Pretty)
 
