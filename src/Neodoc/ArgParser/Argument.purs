@@ -56,8 +56,8 @@ stdin = token "-" case _ of
 
 token :: ∀ r a. String -> (Token -> Maybe a) -> ArgParser r a
 token name test = Parser \c -> \s ->
-  let _return = Step c
-      _fail m = Step c s (Left $ ParseError false (Left m))
+  let _return = Step true c
+      _fail m = Step false c s (Left $ ParseError false (Left m))
    in case s of
     (PositionedToken { token, source }) : ss ->
       case test token of

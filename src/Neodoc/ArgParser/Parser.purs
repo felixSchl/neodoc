@@ -53,21 +53,30 @@ module Neodoc.ArgParser.Parser where
 import Prelude
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
-, null)
+, null, concat, mapWithIndex, length, take, drop)
 import Data.Function (on)
+import Data.Tuple (Tuple(..), snd)
 import Data.Either (Either(..))
 import Data.NonEmpty (NonEmpty(..), (:|))
-import Data.Maybe (Maybe(..))
-import Data.Traversable (for)
-import Data.Foldable (class Foldable, maximumBy)
+import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Traversable (for, traverse)
+import Data.Foldable (class Foldable, maximumBy, all)
+import Data.Map as Map
+import Data.Map (Map)
 import Control.Alt ((<|>))
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Partial.Unsafe
 
 import Neodoc.Value (Value(..))
+import Neodoc.Value as Value
+import Neodoc.Value.RichValue (RichValue(..), unRichValue)
+import Neodoc.Value.RichValue as RichValue
+import Neodoc.Value.Origin (Origin(..))
+import Neodoc.Value.Origin as Origin
 import Neodoc.Spec (Spec(..))
 import Neodoc.Env
 import Neodoc.Data.Layout
+import Neodoc.Data.Layout as Layout
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
 import Neodoc.ArgParser.Type
@@ -76,15 +85,14 @@ import Neodoc.ArgParser.Token
 import Neodoc.ArgParser.Argument
 import Neodoc.ArgParser.Chunk
 import Neodoc.ArgParser.Lexer as L
+import Neodoc.ArgParser.Evaluate
+import Neodoc.ArgParser.Indexed
+import Neodoc.ArgParser.Required
+import Neodoc.ArgParser.Combinators
+import Neodoc.ArgParser.Fallback
 
 type ChunkedLayout a = Layout (Chunk a)
-
--- Chunk a branch
---   E(foo) G(-a -b -c) E(-x) => [Fixed([E(foo)]), Free([G(-a -b -c), E(-x)])]
-chunkBranch :: NonEmpty List SolvedLayout -> List (Chunk (List SolvedLayout))
-chunkBranch = fromFoldable >>> chunk case _ of
-  Elem _      -> false
-  Group _ _ _ -> false
+type ValueMapping = Tuple SolvedLayoutArg RichValue
 
 parse
   :: ∀ r
@@ -92,22 +100,27 @@ parse
   -> Options r
   -> Env
   -> List PositionedToken
-  -> Either (ParseError ArgParserError) Unit
+  -> Either (ParseError ArgParseError) Unit
 parse (Spec { layouts, descriptions }) options env tokens =
   runParser { env, options, descriptions } tokens $
     let parsers = layouts <#> \layout ->
                     pure unit
      in void $ evalParsers (\_  -> 0 {- XXX -}) parsers
 
-parseLayout :: ∀ r. SolvedLayout -> ArgParser r Unit
+parseLayout
+  :: ∀ r
+   . Boolean  -- ^ can we skip using fallback values?
+  -> Boolean  -- ^ are we currently skipping using fallback values?
+  -> Int      -- ^ recursive level
+  -> SolvedLayout
+  -> ArgParser r (List ValueMapping)
 
-parseLayout (Group o r xs) = do
-  pure unit
+parseLayout _ _ _ (Group o r xs) = do
+  pure Nil
 
-parseLayout (Elem x) =
-  let nTimes = if Solved.isRepeatable x then some else liftM1 singleton
-   in unit <$ nTimes do
-        go x
+parseLayout _ _ _ e@(Elem x) =
+  let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
+   in Nil <$ nTimes do go x
 
   where
   go (Solved.Positional n _) = positional n
@@ -116,75 +129,198 @@ parseLayout (Elem x) =
   go (Solved.EOA           ) = eoa <|> (pure $ ArrayValue [])
   go (Solved.Option a  mA _) = fail "..."
 
-data ParserCont s c = ParserCont s c
-data Evaluation s c e a
-  = ErrorEvaluation   (ParserCont s c) Int (ParseError e)
-  | SuccessEvaluation (ParserCont s c) Int a
+parseExhaustively
+  :: ∀ r
+   . Boolean -- ^ can we skip using fallback values?
+  -> Boolean -- ^ are we currently skipping using fallback values?
+  -> Int     -- ^ recursive level
+  -> Layout.Branch SolvedLayoutArg
+  -> ArgParser r (List ValueMapping)
+parseExhaustively skippable isSkipping l xs = do
+  { options } <- getConfig
+  let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
+  concat <$> traverse (parseChunk skippable isSkipping l) chunks
 
-isErrorEvaluation :: ∀ s c e a. Evaluation s c e a -> Boolean
-isErrorEvaluation (ErrorEvaluation _ _ _) = true
-isErrorEvaluation _ = false
+parseChunk
+  :: ∀ r
+   . Boolean  -- ^ can we skip using fallback values?
+  -> Boolean  -- ^ are we currently skipping using fallback values?
+  -> Int      -- ^ recursive level
+  -> Chunk (List SolvedLayout)
+  -> ArgParser r (List ValueMapping)
+parseChunk skippable isSkipping l = go
+  where
+  go (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
+  go (Free  xs) =
+    let indexedLayouts = flip mapWithIndex xs \x ix -> Required (Indexed ix x)
+     in draw Map.empty (length xs) indexedLayouts
 
-isSuccessEvaluation :: ∀ s c e a. Evaluation s c e a -> Boolean
-isSuccessEvaluation (SuccessEvaluation _ _ _) = true
-isSuccessEvaluation _ = false
+    where
+    draw
+      :: ∀ r
+       . Map SolvedLayout (ParseError ArgParseError)
+      -> Int
+      -> List (Required (Indexed SolvedLayout))
+      -> ArgParser r (List ValueMapping)
 
-getEvaluationDepth :: ∀ s c e a. Evaluation s c e a -> Int
-getEvaluationDepth (ErrorEvaluation _ i _) = i
-getEvaluationDepth (SuccessEvaluation _ i _) = i
+    -- Try "drawing" from the input list
+    draw errs n xss@(x:xs) | n >= 0 =
+      let layout = getIndexedElem (unRequired x)
+       in catch' (recover layout) $
+          let
+            mod = if isRequired x then id else option Nil
+            p = parseLayout
+                  isSkipping  -- propagate the 'isSkipping' property
+                  false       -- reset 'isSkipping' to false
+                  (l + 1)     -- increase the recursive level
+                  if not isSkipping
+                      then setLayoutRequired true layout
+                      else layout
+           in do
+            -- Try parsing the argument 'x'. If 'x' fails, enqueue it for a later
+            -- try.  Should 'x' fail and should 'x' be skippable (i.e. it defines
+            -- a default value or is backed by an environment variable),
+            -- substitute x. For groups, temporarily set the required flag to
+            -- "true", such that it will fail and we have a chance to retry as
+            -- part of the exhaustive parsing mechanism. The 'cached' call
+            -- ensures that we only parse a (arg, input) combo once per group.
+            vs <- cached x $ try $ mod p
+            vss <- try do
+              if (Solved.isRepeatable layout &&
+                  length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
+                  then draw errs (length xss) (xs <> pure (toOptional x))
+                  else draw errs (length xs) xs
+            pure $ vs <> vss
 
--- Evaluate multiple parsers, producing a new parser that chooses the best
--- succeeding match or fails otherwise. If any of the parsers yields a fatal
--- error, it is propagated immediately.
-evalParsers
-  :: ∀ b s a e c f
-   . (Foldable f, Functor f, Ord b)
-  => (a -> b)
-  -> f (Parser e c (List s) a)
-  -> Parser e c (List s) a
-evalParsers p parsers = do
-  config <- getConfig
-  input  <- getInput
+      where
+      recover layout err =
+        let
+          isFixed = not <<< isFreeLayout
+          errs' = if isGroup layout || isFixed layout
+                      then Map.alter (const (Just err)) layout errs
+                      else errs
+         in do
+          -- Check if we're done trying to recover.
+          -- See the `draw -1` case below (`markFailed`).
 
-  -- Run all parsers and collect their results for further evaluation
-  let collected = fromFoldable $ parsers <#> \parser ->
-        runParser config input $ Parser \c s ->
-          case unParser parser c s of
-            Step c' s' result ->
-              let cont = ParserCont c' s'
-               in Step c' s' case result of
-                  Left  (err@(ParseError true _)) -> Left err
-                  Left  err -> Right $ ErrorEvaluation   cont 0 {- XXX: store depth on parser -} err
-                  Right val -> Right $ SuccessEvaluation cont 0 {- XXX: store depth on parser -} val
+          -- XXX: failed <- hasFailed
+          if false {- XXX: failed-}
+            then throw err
+            -- shortcut: there's no point trying again if there's nothing left
+            -- to parse.
+            else if n == 0 || length xs == 0
+              then
+                let xs' = if isFixed layout then xss else (xs <> singleton x)
+                 in draw errs' (-1) xs'
+              else
+                let isFixed' = isFixed <<< getIndexedElem <<< unRequired
+                    xs' =
+                      if isFreeLayout layout
+                        then xs <> singleton x
+                        -- XXX: Future work could include slicing off those
+                        -- branches in the group that are 'free' and re-queueing
+                        -- those.
+                        else
+                            let fs = take n xss
+                                rs = drop n xss
+                            in sortBy (compare `on` isFixed') fs <> rs
+                 in draw errs' (n - 1) xs'
 
-  -- Now, check to see if we have any fatal errors, winnders or soft errors.
-  -- We know we must have either, but this is not encoded at the type-level,
-  -- we have to fail with an internal error message in the impossible case this
-  -- is not true.
-  case mlefts collected of
-    error:_ -> Parser \c s -> Step c s (Left error)
-    _       -> pure unit
+    -- All arguments have been matched (or have failed to be matched) at least
+    -- once by now. See where we're at - is there any required argument that was
+    -- not matched at all?
+    draw errs n xss@(x:xs) | n < 0 = {- XXX: skipIf isDone Nil -} do
+      input <- getInput
+      { options, env, descriptions } <- getConfig
 
-  let
-    results = mrights collected
-    errors = filter isErrorEvaluation results
-    successes = filter isSuccessEvaluation results
-    eqByDepth = eq `on` getEvaluationDepth
-    cmpByDepth = compare `on` getEvaluationDepth
-    deepestErrors = last $ groupBy eqByDepth $ sortBy cmpByDepth errors
-    bestSuccess = do
-      deepest <- last $ groupBy eqByDepth $ sortBy cmpByDepth successes
-      unsafePartial $ flip maximumBy deepest $ compare `on` case _ of
-        SuccessEvaluation _ _ v -> p v
+      let
+        xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss
+        layouts = getIndexedElem <<< unRequired <$> xss'
+        vs = layouts <#> case _ of
+          layout@(Group _ _ _) -> Left layout
+          layout@(Elem arg) -> maybe (Left layout) (Right <<< Tuple arg) do
+            v <- unRichValue <$> getFallbackValue options env descriptions arg
+            pure $ RichValue v {
+              value = if isRepeatable layout
+                  then ArrayValue $ Value.intoArray v.value
+                  else v.value
+            }
+        missing = mlefts vs `flip filter` \layout ->
+          isRequired x &&
+          -- This may look very counter-intuitive, yet getting fallback
+          -- values for entire groups is not possible and not logical.
+          -- If a group that is allowed to be omitted fails, there won't
+          -- be any values to fall back onto.
+          not (isGroup layout && isOptional layout)
+        fallbacks = mrights vs
 
-  -- Ok, now that we have a potentially "best error" and a potentially "best
-  -- match", take a pick.
-  case bestSuccess of
-    Just (SuccessEvaluation (ParserCont c s) _ val) ->
-      Parser \_ _ -> Step c s (Right val)
-    _ -> case deepestErrors of
-      Just errors -> case errors of
-        (ErrorEvaluation (ParserCont c s) _ e):es | null es || not (null input) ->
-          Parser \_ _ -> Step c s (Left e)
-        _ -> fail "" -- XXX: explain this
-      _ -> fail "The impossible happened. Failure without error"
+      if isSkipping && length missing > 0
+        then do
+          {- XXX: markFailed -}
+          expected missing input
+        else fail "..."
+        -- else
+        --   if skippable || null input
+        --     then
+        --       if not isSkipping
+        --         {- XXX: then withLocalCache do -}
+        --           parseExhaustively true true l args
+        --         else pure fallbacks
+        --     else expected args input
+
+      pure Nil
+
+      -- where
+      -- expected xs i =
+      -- let
+      --     x = unsafePartial (LU.head xs)
+      --     msg = maybe'
+      --     (\_ -> case i of
+      --         i':_ -> unexpected toplevel i'
+      --                 <> ". Expected "
+      --                 <> (intercalate ", " $ D.prettyPrintArgNaked <$> xs)
+      --         Nil  -> "Missing "
+      --                 <> (intercalate ", " $ D.prettyPrintArgNaked <$> xs)
+      --     )
+      --     (\(P.ParseError msg _ _) -> msg)
+      --     (x `Map.lookup` errs)
+      -- in P.fail msg
+
+    draw _ _ _ = pure Nil
+
+setLayoutRequired :: Boolean -> SolvedLayout -> SolvedLayout
+setLayoutRequired b (Group o _ xs) = Group o b xs
+setLayoutRequired _ x = x
+
+-- Check if a given layout qualifies as a terminating argument for options-first
+-- and if so, return the argument it should be associated with.
+termAs :: SolvedLayout -> Maybe SolvedLayoutArg
+termAs (Group _ gR (((Elem x@(Solved.Positional _ pR)) :| Nil) :| Nil)) | gR || pR = Just x
+termAs (Elem x@(Solved.Positional _ r)) | r = Just x
+termAs _ = Nothing
+
+-- Is this layout capable of acting as a terminator for options-first?
+canTerm :: SolvedLayout -> Boolean
+canTerm = isJust <<< termAs
+
+-- TODO: implement
+cached _ = id
+
+-- Chunk a branch
+--   E(foo) G(-a -b -c) E(-x) => [Fixed([E(foo)]), Free([G(-a -b -c), E(-x)])]
+chunkBranch
+  :: Boolean -- enable lax-placement mode
+  -> Boolean -- enable options-first mode
+  -> Layout.Branch SolvedLayoutArg
+  -> List (Chunk (List SolvedLayout))
+chunkBranch lax optsFirst = fromFoldable >>> chunk \x ->
+  (not (optsFirst && canTerm x)) && (lax || isFreeLayout x)
+
+-- Is this layout considered "free"?
+isFreeLayout :: SolvedLayout -> Boolean
+isFreeLayout (Elem (Solved.Option _ _ _)) = true
+isFreeLayout (Elem _) = false
+isFreeLayout (Group _ _ xs) = all (all isFreeLayout) xs
+
+isFrom :: Origin -> RichValue -> Boolean
+isFrom o rv = o == RichValue.getOrigin rv

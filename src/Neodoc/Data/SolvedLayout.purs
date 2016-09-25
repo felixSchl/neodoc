@@ -9,6 +9,7 @@ import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty)
 import Neodoc.Data.Layout
 import Neodoc.OptionAlias
+import Data.Function (on)
 
 data OptionArgument
   = OptionArgument
@@ -50,6 +51,10 @@ instance showSolvedLayoutArg :: Show SolvedLayoutArg where
   show Stdin = "Stdin"
   show (Option n mA r) = "Option " <> show n <> " " <> show mA <> " " <> show r
 
+-- XXX: implement this properly
+instance ordSolvedLayoutArg :: Ord SolvedLayoutArg where
+  compare = compare `on` show
+
 instance prettySolvedLayoutArg :: Pretty SolvedLayoutArg where
   pretty = go
     where
@@ -60,8 +65,17 @@ instance prettySolvedLayoutArg :: Pretty SolvedLayoutArg where
     go (Option n mA r) = pretty n <> maybe "" pretty mA <> rep r
     rep r = if r then "..." else ""
 
-isRepeatable :: SolvedLayoutArg -> Boolean
-isRepeatable (Command _ r) = r
-isRepeatable (Positional _ r) = r
-isRepeatable (Option _ _ r) = r
+isRepeatable :: SolvedLayout -> Boolean
+isRepeatable (Group           _ r _) = r
+isRepeatable (Elem (Command    _ r)) = r
+isRepeatable (Elem (Positional _ r)) = r
+isRepeatable (Elem (Option   _ _ r)) = r
 isRepeatable _ = false
+
+isOptional :: SolvedLayout -> Boolean
+isOptional (Group o _ _) = o
+isOptional _ = false
+
+isGroup :: SolvedLayout -> Boolean
+isGroup (Group _ _ _) = true
+isGroup _ = false
