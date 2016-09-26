@@ -29,20 +29,20 @@ import Neodoc.ArgParser.Lexer as L
 
 type ChunkedLayout a = Layout (Chunk a)
 
-data ParserCont s c = ParserCont s c
-data Evaluation s c e a
-  = ErrorEvaluation   (ParserCont s c) Int (ParseError e)
-  | SuccessEvaluation (ParserCont s c) Int a
+data ParserCont c s i = ParserCont c s i
+data Evaluation c s i e a
+  = ErrorEvaluation   (ParserCont c s i) Int (ParseError e)
+  | SuccessEvaluation (ParserCont c s i) Int a
 
-isErrorEvaluation :: ∀ s c e a. Evaluation s c e a -> Boolean
+isErrorEvaluation :: ∀ c s i e a. Evaluation c s i e a -> Boolean
 isErrorEvaluation (ErrorEvaluation _ _ _) = true
 isErrorEvaluation _ = false
 
-isSuccessEvaluation :: ∀ s c e a. Evaluation s c e a -> Boolean
+isSuccessEvaluation :: ∀ c s i e a. Evaluation c s i e a -> Boolean
 isSuccessEvaluation (SuccessEvaluation _ _ _) = true
 isSuccessEvaluation _ = false
 
-getEvaluationDepth :: ∀ s c e a. Evaluation s c e a -> Int
+getEvaluationDepth :: ∀ c s i e a. Evaluation c s i e a -> Int
 getEvaluationDepth (ErrorEvaluation _ i _) = i
 getEvaluationDepth (SuccessEvaluation _ i _) = i
 
@@ -50,22 +50,23 @@ getEvaluationDepth (SuccessEvaluation _ i _) = i
 -- succeeding match or fails otherwise. If any of the parsers yields a fatal
 -- error, it is propagated immediately.
 evalParsers
-  :: ∀ b s a e c f
+  :: ∀ b s i a e c f
    . (Foldable f, Functor f, Ord b)
   => (a -> b)
-  -> f (Parser e c (List s) a)
-  -> Parser e c (List s) a
+  -> f (Parser e c s (List i) a)
+  -> Parser e c s (List i) a
 evalParsers p parsers = do
   config <- getConfig
+  state  <- getState
   input  <- getInput
 
   -- Run all parsers and collect their results for further evaluation
   let collected = fromFoldable $ parsers <#> \parser ->
-        runParser config input $ Parser \c s ->
-          case unParser parser c s of
-            Step b' c' s' result ->
-              let cont = ParserCont c' s'
-               in Step b' c' s' case result of
+        runParser config state input $ Parser \c s i ->
+          case unParser parser c s i of
+            Step b' c' s' i' result ->
+              let cont = ParserCont c' s' i'
+               in Step b' c' s' i' case result of
                   Left  (err@(ParseError true _)) -> Left err
                   Left  err -> Right $ ErrorEvaluation   cont 0 {- XXX: store depth on parser -} err
                   Right val -> Right $ SuccessEvaluation cont 0 {- XXX: store depth on parser -} val
@@ -75,7 +76,7 @@ evalParsers p parsers = do
   -- we have to fail with an internal error message in the impossible case this
   -- is not true.
   case mlefts collected of
-    error:_ -> Parser \c s -> Step false c s (Left error)
+    error:_ -> Parser \c s i -> Step false c s i (Left error)
     _       -> pure unit
 
   let
@@ -93,11 +94,11 @@ evalParsers p parsers = do
   -- Ok, now that we have a potentially "best error" and a potentially "best
   -- match", take a pick.
   case bestSuccess of
-    Just (SuccessEvaluation (ParserCont c s) _ val) ->
-      Parser \_ _ -> Step true c s (Right val)
+    Just (SuccessEvaluation (ParserCont c s i) _ val) ->
+      Parser \_ _ _ -> Step true c s i (Right val)
     _ -> case deepestErrors of
       Just errors -> case errors of
-        (ErrorEvaluation (ParserCont c s) _ e):es | null es || not (null input) ->
-          Parser \_ _ -> Step false c s (Left e)
+        (ErrorEvaluation (ParserCont c s i) _ e):es | null es || not (null input) ->
+          Parser \_ _ _ -> Step false c s i (Left e)
         _ -> fail "" -- XXX: explain this
       _ -> fail "The impossible happened. Failure without error"

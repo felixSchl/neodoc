@@ -7,6 +7,7 @@ module Neodoc.ArgParser.Type (
 , unParser
 , runParser
 , getConfig
+, getState
 , getInput
 , setInput
 , fail
@@ -21,6 +22,7 @@ module Neodoc.ArgParser.Type (
 , ArgParser
 , ArgParseError (..)
 , ParseConfig
+, ParseState
 , lookupDescription
 , lookupDescription'
 ) where
@@ -57,82 +59,85 @@ instance showParseError :: (Show e) => Show (ParseError e) where
 
 type IsConsumed = Boolean
 type Result e a = Either (ParseError e) a
-data Step e c s a = Step IsConsumed c s (Result e a)
-data Parser e c s a = Parser (c -> s -> Step e c s a)
+data Step e c s i a = Step IsConsumed c s i (Result e a)
+data Parser e c s i a = Parser (c -> s -> i -> Step e c s i a)
 
-setConsumed :: ∀ e c s a. Boolean -> Step e c s a -> Step e c s a
-setConsumed b (Step _ c s a) = Step b c s a
+setConsumed :: ∀ e c s i a. Boolean -> Step e c s i a -> Step e c s i a
+setConsumed b (Step _ c s i a) = Step b c s i a
 
-setConsumedOr :: ∀ e c s a. Boolean -> Step e c s a -> Step e c s a
-setConsumedOr b (Step b' c s a) = Step (b || b') c s a
+setConsumedOr :: ∀ e c s i a. Boolean -> Step e c s i a -> Step e c s i a
+setConsumedOr b (Step b' c s i a) = Step (b || b') c s i a
 
-unParser :: ∀ e c s a. Parser e c s a -> c -> s -> Step e c s a
+unParser :: ∀ e c s i a. Parser e c s i a -> c -> s -> i -> Step e c s i a
 unParser (Parser f) = f
 
-instance applyParser :: Apply (Parser e c s) where
+instance applyParser :: Apply (Parser e c s i) where
   apply = ap
 
-instance applicativeParser :: Applicative (Parser e c s) where
-  pure a = Parser \c s -> Step false c s (Right a)
+instance applicativeParser :: Applicative (Parser e c s i) where
+  pure a = Parser \c s i -> Step false c s i (Right a)
 
-instance functorParser :: Functor (Parser e c s) where
-  map f p = Parser \c s ->
-    let step = unParser p c s
-     in case step of (Step b c' s' a) -> Step b c' s' (f <$> a)
+instance functorParser :: Functor (Parser e c s i) where
+  map f p = Parser \c s i ->
+    let step = unParser p c s i
+     in case step of (Step b c' s' i' a) -> Step b c' s' i' (f <$> a)
 
-instance bindParser :: Bind (Parser e c s) where
-  bind p f = Parser \c s ->
-    let step = unParser p c s
+instance bindParser :: Bind (Parser e c s i) where
+  bind p f = Parser \c s i ->
+    let step = unParser p c s i
      in case step of
-          Step b c' s' (Left  err) -> Step b c' s' (Left err)
-          Step b c' s' (Right res) -> setConsumedOr b $ unParser (f res) c' s'
+          Step b c' s' i' (Left  err) -> Step b c' s' i' (Left err)
+          Step b c' s' i' (Right res) -> setConsumedOr b $ unParser (f res) c' s' i'
 
-instance monadParser :: Monad (Parser e c s)
+instance monadParser :: Monad (Parser e c s i)
 
-catch :: ∀ e c s a. Parser e c s a -> (ParseError e -> Parser e c s a) -> Parser e c s a
-catch p f = Parser \c s ->
-  let step = unParser p c s
+catch :: ∀ e c s i a. Parser e c s i a -> (ParseError e -> Parser e c s i a) -> Parser e c s i a
+catch p f = Parser \c s i ->
+  let step = unParser p c s i
    in case step of
-      Step consumed _ _ (Left (e@(ParseError fatal _)))
-        | not (fatal || consumed) -> unParser (f e) c s
+      Step consumed _ _ _ (Left (e@(ParseError fatal _)))
+        | not (fatal || consumed) -> unParser (f e) c s i
       _ -> step
 
-catch' :: ∀ e c s a. (ParseError e -> Parser e c s a) -> Parser e c s a -> Parser e c s a
+catch' :: ∀ e c s i a. (ParseError e -> Parser e c s i a) -> Parser e c s i a -> Parser e c s i a
 catch' = flip catch
 
-throw :: ∀ e c s a. ParseError e -> Parser e c s a
-throw e = Parser \c s -> Step false c s (Left e)
+throw :: ∀ e c s i a. ParseError e -> Parser e c s i a
+throw e = Parser \c s i -> Step false c s i (Left e)
 
-instance altParser :: Alt (Parser e c s) where
+instance altParser :: Alt (Parser e c s i) where
   alt p1 p2 = catch p1 (const p2)
 
-instance plusParser :: Plus (Parser e c s) where
+instance plusParser :: Plus (Parser e c s i) where
   empty = fail "No alternative"
 
-instance alternativeParser :: Alternative (Parser e c s)
+instance alternativeParser :: Alternative (Parser e c s i)
 
-instance lazyParser :: Lazy (Parser e c s a) where
-  defer f = Parser \c s -> unParser (f unit) c s
+instance lazyParser :: Lazy (Parser e c s i a) where
+  defer f = Parser \c i -> unParser (f unit) c i
 
-getConfig :: ∀ e c s. Parser e c s c
-getConfig = Parser \c s -> Step false c s (Right c)
+getConfig :: ∀ e c s i. Parser e c s i c
+getConfig = Parser \c s i -> Step false c s i (Right c)
 
-getInput :: ∀ e c s. Parser e c s s
-getInput = Parser \c s -> Step false c s (Right s)
+getState :: ∀ e c s i. Parser e c s i s
+getState = Parser \c s i -> Step false c s i (Right s)
 
-setInput :: ∀ e c s. s -> Parser e c s Unit
-setInput s = Parser \c _ -> Step false c s (Right unit)
+getInput :: ∀ e c s i. Parser e c s i i
+getInput = Parser \c s i -> Step false c s i (Right i)
 
-runParser :: ∀ e c s a. c -> s -> Parser e c s a -> Either (ParseError e) a
-runParser c s p =
-  let step = unParser p c s
-   in case step of (Step _ _ _ r) -> r
+setInput :: ∀ e c s i. i -> Parser e c s i Unit
+setInput i = Parser \c s _ -> Step false c s i (Right unit)
 
-fail :: ∀ e c s a. String -> Parser e c s a
-fail message = Parser \c s -> Step false c s (Left $ ParseError false (Left message))
+runParser :: ∀ e c s i a. c -> s -> i -> Parser e c s i a -> Either (ParseError e) a
+runParser c s i p =
+  let step = unParser p c s i
+   in case step of (Step _ _ _ _ r) -> r
 
-fail' :: ∀ e c s a. e -> Parser e c s a
-fail' e = Parser \c s -> Step false c s (Left $ ParseError false (Right e))
+fail :: ∀ e c s i a. String -> Parser e c s i a
+fail message = Parser \c s i -> Step false c s i (Left $ ParseError false (Left message))
+
+fail' :: ∀ e c s i a. e -> Parser e c s i a
+fail' e = Parser \c s i -> Step false c s i (Left $ ParseError false (Right e))
 
 extractError :: ∀ e . (String -> e) -> ParseError e -> e
 extractError f (ParseError _ (Left  s)) = f s
@@ -173,7 +178,9 @@ type ParseConfig r = {
 , descriptions :: List Description
 }
 
-type ArgParser r a = Parser ArgParseError (ParseConfig r) Input a
+type ParseState = {}
+
+type ArgParser r a = Parser ArgParseError (ParseConfig r) ParseState Input a
 
 -- XXX: This could be more efficient using a table lookup
 lookupDescription :: ∀ r. OptionAlias -> ArgParser r (Maybe Description)

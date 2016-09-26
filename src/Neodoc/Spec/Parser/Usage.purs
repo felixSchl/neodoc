@@ -15,7 +15,8 @@ import Control.Lazy (defer)
 import Control.MonadPlus (guard)
 import Data.Either (Either)
 import Data.List (
-  List(..), many, some, singleton, length, modifyAt, (:), fromFoldable)
+  List(..), many, some, singleton, length, modifyAt, (:), fromFoldable
+, reverse)
 import Data.List.Partial (head, tail) as PartialList
 import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
 import Data.Tuple (Tuple(Tuple), snd, fst)
@@ -80,8 +81,8 @@ parse = flip L.runTokenParser do
 
   layout :: String -> L.TokenParser (Maybe UsageLayout)
   layout name = do
-    xs <- "Option, Positional, Command, Group or Reference elements" <??> do
-            (many $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
+    branches <- "Option, Positional, Command, Group or Reference elements" <??> do
+      (many $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
     eoa <- P.choice [
       P.try $ do
         maybeInParens do
@@ -90,22 +91,27 @@ parse = flip L.runTokenParser do
             many elem
           many elem
         many elem
-        pure $ singleton $ singleton $ Elem EOA
+        pure $ Just $ Elem EOA
     , (do
         L.eof <|> (P.lookAhead $ lessIndented <|> sameIndent)
-        pure Nil
+        pure Nothing
       )
       -- XXX: We could show the last token that failed to be consumed, here
       <?> "End of usage line"
     ]
 
-    pure $ case xs <> eoa of
+    -- attach the 'eoa' to the last branch
+    let branches' = reverse case reverse branches of
+          Nil  -> maybe Nil (singleton <<< singleton) eoa
+          x:xs -> (x <> (maybe Nil (singleton) eoa)) : xs
+
+    pure $ case branches' of
       Nil -> Nothing
-      xs  -> pure do
+      _ -> pure do
         Group
           false -- not optional
           false -- not repeatable
-          (unsafePartial $ listToNonEmpty $ listToNonEmpty <$> xs)
+          (unsafePartial $ listToNonEmpty $ listToNonEmpty <$> branches')
 
   command :: L.TokenParser UsageLayoutArg
   command = Command

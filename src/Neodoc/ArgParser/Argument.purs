@@ -32,13 +32,13 @@ import Neodoc.Value (Value(..))
 import Neodoc.Data.SolvedLayout (
   SolvedLayoutArg, OptionArgument, isOptionArgumentOptional)
 
-command :: ∀ r. String -> ArgParser r Value
-command n = token ("command " <> show n) case _ of
+command :: ∀ r. String -> String -> ArgParser r Value
+command rep n = token rep case _ of
   Lit s | s == n -> Just (BoolValue true)
   _              -> Nothing
 
-positional :: ∀ r. String -> ArgParser r Value
-positional n = token ("positional argument " <> show n) case _ of
+positional :: ∀ r. String -> String -> ArgParser r Value
+positional rep n = token rep case _ of
   Lit v -> Just (Value.read v false)
   _     -> Nothing
 
@@ -58,10 +58,10 @@ stdin = token "-" case _ of
   _     -> Nothing
 
 token :: ∀ r a. String -> (Token -> Maybe a) -> ArgParser r a
-token name test = Parser \c s ->
-  let _return = Step true c
-      _fail m = Step false c s (Left $ ParseError false (Left m))
-   in case s of
+token name test = Parser \c s i ->
+  let _return = Step true c s
+      _fail m = Step false c s i (Left $ ParseError false (Left m))
+   in case i of
     (PositionedToken { token, source }) : ss ->
       case test token of
         Nothing -> _fail $ "Expected " <> name <> ", but got: " <> source
@@ -178,7 +178,6 @@ shortOption term f mArg = do
       let nextToken = _.token <<< unPositionedToken <$> head xs
        in do
         result <- go token nextToken
-        fail "..."
         if term && isNothing result.remainder
           then
             let

@@ -56,6 +56,7 @@ import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
 , null, concat, mapWithIndex, length, take, drop)
 import Data.List.Partial as LU
+import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Data.Function (on)
 import Data.Tuple (Tuple(..), snd)
 import Data.Tuple.Nested ((/\))
@@ -99,6 +100,9 @@ import Neodoc.ArgParser.Required
 import Neodoc.ArgParser.Combinators
 import Neodoc.ArgParser.Fallback
 
+_ENABLE_DEBUG_ :: Boolean
+_ENABLE_DEBUG_ = true
+
 type ChunkedLayout a = Layout (Chunk a)
 type ValueMapping = Tuple SolvedLayoutArg RichValue
 
@@ -110,7 +114,7 @@ parse
   -> List PositionedToken
   -> Either (ParseError ArgParseError) Unit
 parse (Spec { layouts, descriptions }) options env tokens =
-  runParser { env, options, descriptions } tokens $
+  runParser { env, options, descriptions } {} tokens $
     let parsers = concat (fromFoldable layouts) <#> \layout -> do
           {- XXX: unmarkFailed -}
           vs <- {-withLocalCache-} do
@@ -133,67 +137,95 @@ parseLayout
   -> Int      -- ^ recursive level
   -> SolvedLayout
   -> ArgParser r (List ValueMapping)
+parseLayout skippable isSkipping l layout = do
 
-parseLayout _ _ _ (Group o r xs) = do
-  pure Nil
-
-parseLayout _ _ _ e@(Elem x) =
-  let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
-   in Nil <$ nTimes do go x
+  _debug \_ -> "parsing layout: " <> pretty layout
+  go layout
 
   where
-  go (Solved.Positional n _) = positional n
-  go (Solved.Command    n _) = command    n
-  go (Solved.Stdin         ) = stdin
-  go (Solved.EOA           ) = eoa <|> (pure $ ArrayValue [])
-  go (Solved.Option a  mA _) = do
-    input       <- getInput
-    { options } <- getConfig
-    case input of
-      (PositionedToken { token }) : _
-        | case token of
-            LOpt _ _   -> true
-            SOpt _ _ _ -> true
-            _          -> false
-        -> do
-          aliases /\ def /\ env <- do
-            description <- lookupDescription' a
-            case description of
-              (OptionDescription aliases _ _ def env) ->
-                pure $ aliases /\ def /\ env
-              _ -> fail' $ InternalError "invalid option description"
-          let
-            ns = fromFoldable $ aliases <#> case _ of
-                  OptionAlias.Short f -> Left  f
-                  OptionAlias.Long  n -> Right n
-            longAliases = mrights ns
-            shortAliases = mlefts ns
-            term = any (_ `elem` options.stopAt) $ aliases <#> case _ of
-                      OptionAlias.Short s -> "-"  <> String.singleton s
-                      OptionAlias.Long  n -> "--" <> n
+  indentation :: String
+  indentation = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
+  _debug s = if _ENABLE_DEBUG_
+                then traceA $ indentation <> (s unit)
+                else pure unit
 
-          traceA $ pretty a <> " => " <> show aliases
+  go (Group o r branches) =
+    let parsers = branches <#> \branch ->
+          {-withLocalCache do-}
+            parseExhaustively skippable isSkipping l (fromFoldable branch)
+    in do
+        vs <- (if o then option Nil else id) do
+          flip evalParsers parsers \vs ->
+            sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+        hasInput <- not <<< null <$> getInput
+        vss <- if (hasInput && r &&
+                length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
+                  then loop Nil
+                  else pure Nil
+        pure $ vs <> vss
 
-          -- note: safe to be unsafe because of pattern match above
-          OptRes value canTerm canRepeat <- unsafePartial case token of
-            LOpt _ _ ->
-              case longAliases of
-                Nil -> fail "Option has no long alias"
-                _   -> choice $ longAliases <#> \alias -> try do
-                        longOption term alias mA
-            SOpt _ _ _ ->
-              case shortAliases of
-                Nil -> fail "Option has no short alias"
-                _   -> choice $ shortAliases <#> \alias -> try do
-                        shortOption term alias mA
-          pure value
+    where
+      loop acc = do
+        -- parse this group repeatedly, but make successive matches optional.
+        vs <- go (Group true r branches)
+        if (length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
+          then loop $ acc <> vs
+          else pure acc
 
-            -- SOpt _ _ _ -> pure true
-          -- fail "..."
+  go e@(Elem x) =
+    let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
+    in Nil <$ nTimes do go' x
 
-      -- (PositionedToken { token: SOpt _ _ }) : _ -> fail "Expected long or short option"
-      -- (PositionedToken { token: LOpt _ _ }) : _ -> fail "Expected long or short option"
-      _ -> fail "Expected long or short option"
+    where
+    go' (Solved.Positional n _) = positional (pretty x) n
+    go' (Solved.Command    n _) = command    (pretty x) n
+    go' (Solved.Stdin         ) = stdin
+    go' (Solved.EOA           ) = eoa <|> (pure $ ArrayValue [])
+    go' (Solved.Option a  mA _) = do
+      input       <- getInput
+      { options } <- getConfig
+      case input of
+        (PositionedToken { token }) : _
+          | case token of
+              LOpt _ _   -> true
+              SOpt _ _ _ -> true
+              _          -> false
+          -> do
+            aliases /\ def /\ env <- do
+              description <- lookupDescription' a
+              case description of
+                (OptionDescription aliases _ _ def env) ->
+                  pure $ aliases /\ def /\ env
+                _ -> fail' $ InternalError "invalid option description"
+            let
+              ns = fromFoldable $ aliases <#> case _ of
+                    OptionAlias.Short f -> Left  f
+                    OptionAlias.Long  n -> Right n
+              longAliases = mrights ns
+              shortAliases = mlefts ns
+              term = any (_ `elem` options.stopAt) $ aliases <#> case _ of
+                        OptionAlias.Short s -> "-"  <> String.singleton s
+                        OptionAlias.Long  n -> "--" <> n
+
+
+            -- note: safe to be unsafe because of pattern match above
+            OptRes value canTerm canRepeat <- unsafePartial case token of
+              LOpt _ _ ->
+                case longAliases of
+                  Nil -> fail "Option has no long alias"
+                  _   -> choice $ longAliases <#> \alias -> try do
+                          longOption term alias mA
+              SOpt _ _ _ ->
+                case shortAliases of
+                  Nil -> fail "Option has no short alias"
+                  _   -> choice $ shortAliases <#> \alias -> try do
+                          shortOption term alias mA
+
+
+            -- XXX (TODO): Parse value repeatedly / terminate
+
+            pure value
+        _ -> fail "Expected long or short option"
 
 parseExhaustively
   :: ∀ r
@@ -205,12 +237,7 @@ parseExhaustively
 parseExhaustively skippable isSkipping l xs = do
   { options } <- getConfig
   let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
-  -- concat <$> traverse (parseChunk skippable isSkipping l) chunks
-  for chunks \chunk-> do -- (parseChunk skippable isSkipping l) chunks
-    i <- getInput
-    traceShowA i
-    setInput Nil
-  fail "..."
+  concat <$> traverse (parseChunk skippable isSkipping l) chunks
 
 parseChunk
   :: ∀ r
@@ -219,7 +246,7 @@ parseChunk
   -> Int      -- ^ recursive level
   -> Chunk (List SolvedLayout)
   -> ArgParser r (List ValueMapping)
-parseChunk skippable isSkipping l chunk = (getInput >>= traceShowA) *> go chunk
+parseChunk skippable isSkipping l = go
   where
   go (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
   go (Free  xs) =
@@ -392,3 +419,5 @@ isFreeLayout (Group _ _ xs) = all (all isFreeLayout) xs
 
 isFrom :: Origin -> RichValue -> Boolean
 isFrom o rv = o == RichValue.getOrigin rv
+
+traceError = catch' (\e -> traceShowA e *> throw e)

@@ -126,12 +126,12 @@ argParserSpec = \_ -> describe "The parser generator" do
   -- Some options that will be used for these tests
   let
     testCases = ([
-      -- test
-      --   "usage: prog <qux>..."
-      --   [ pass Nothing
-      --       [ "a", "b", "c" ]
-      --       [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
-      --       ]
+    --   test
+    --     "usage: prog <qux>..."
+    --     [ pass Nothing
+    --         [ "a", "b", "c" ]
+    --         [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+    --         ]
     --     , fail
     --         Nothing
     --         [ "--foo", "baz" ]
@@ -140,21 +140,21 @@ argParserSpec = \_ -> describe "The parser generator" do
     --         Nothing
     --         [ "a", "--foo", "-f=10" ]
     --         "Unknown option --foo"
-        -- ]
-
-      test
-        "usage: prog <qux>... --"
-        [ pass Nothing
-            [ "a", "b", "c", "--" ]
-            [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
-            , "--"    :> V.array []
-            ]
-        -- , pass Nothing
-        --     [ "a", "b", "c", "--", "--", "--" ]
-        --     [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
-        --     , "--"    :> V.array [ V.str "--" , V.str "--" ]
-        --     ]
-        ]
+    --     ]
+    --
+    -- , test
+    --     "usage: prog <qux>... --"
+    --     [ pass Nothing
+    --         [ "a", "b", "c", "--" ]
+    --         [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+    --         , "--"    :> V.array []
+    --         ]
+    --     , pass Nothing
+    --         [ "a", "b", "c", "--", "--", "--" ]
+    --         [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+    --         , "--"    :> V.array [ V.str "--" , V.str "--" ]
+    --         ]
+    --     ]
 
     -- , test
     --     """
@@ -184,93 +184,119 @@ argParserSpec = \_ -> describe "The parser generator" do
     --         , "--host" :> V.str "HOME"
     --         ]
     --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog (-iFILE)
-    --     options:
-    --       -i, --input FILE
-    --     """
-    --     [ fail Nothing [] "Missing -i/--input=FILE"
-    --     , pass Nothing
-    --         [ "-i", "bar" ]
-    --         [ "-i"      :> V.str "bar"
-    --         , "--input" :> V.str "bar" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog (-iFILE) -oFILE
-    --     options:
-    --       -i, --input FILE
-    --       -o, --output FILE
-    --     """
-    --     [ fail Nothing []
-    --       $ "Missing -i/--input=FILE, -o/--output=FILE"
-    --
-    --     , fail Nothing [ "-i", "bar" ]
-    --       $ "Missing -o/--output=FILE"
-    --
-    --     , pass Nothing
-    --         [ "-i", "bar", "-o", "bar" ]
-    --         [ "--input"  :> V.str "bar"
-    --         , "-i"       :> V.str "bar"
-    --         , "--output" :> V.str "bar"
-    --         , "-o"       :> V.str "bar" ]
-    --
-    --       -- group should be interchangable if it's only of options:
-    --     , pass Nothing
-    --         [ "-o", "bar", "-i", "bar" ]
-    --         [ "--input"  :> V.str "bar"
-    --         , "-i"       :> V.str "bar"
-    --         , "--output" :> V.str "bar"
-    --         , "-o"       :> V.str "bar" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog ((-iFILE) -rFILE) -oFILE
-    --     options:
-    --       -i, --input FILE
-    --       -o, --output FILE
-    --       -r, --redirect FILE [env: QUX]
-    --     """
-    --     [ fail Nothing []
-    --       $ "Missing -i/--input=FILE, -r/--redirect=FILE"
-    --
-    --     , fail Nothing [ "-i", "bar", "-r", "bar" ]
-    --         "Missing -o/--output=FILE"
-    --
-    --     , pass Nothing
-    --         [ "-i", "bar", "-r", "bar", "-o", "bar" ]
-    --         [ "--input"    :> V.str "bar"
-    --         , "-i"         :> V.str "bar"
-    --         , "--redirect" :> V.str "bar"
-    --         , "-r"         :> V.str "bar"
-    --         , "--output"   :> V.str "bar"
-    --         , "-o"         :> V.str "bar" ]
-    --
-    --       -- group should be interchangable if it's only of options:
-    --     , pass Nothing
-    --         [ "-o", "bar", "-r", "bar", "-i", "bar" ]
-    --         [ "--input"    :> V.str "bar"
-    --         , "-i"         :> V.str "bar"
-    --         , "--redirect" :> V.str "bar"
-    --         , "-r"         :> V.str "bar"
-    --         , "--output"   :> V.str "bar"
-    --         , "-o"         :> V.str "bar" ]
-    --
-    --     , pass' Nothing
-    --         [ "-o", "bar", "-i", "bar" ]
-    --         [ "QUX" :> "BAR" ]
-    --         [ "--input"    :> V.str "bar"
-    --         , "-i"         :> V.str "bar"
-    --         , "--redirect" :> V.str "BAR"
-    --         , "-r"         :> V.str "BAR"
-    --         , "--output"   :> V.str "bar"
-    --         , "-o"         :> V.str "bar" ]
-    --     ]
-    --
+
+      -- test
+      --   """
+      --   usage: prog -iFILE
+      --   options:
+      --     -i, --input FILE
+      --   """
+      --   [ --fail Nothing [] "Missing -i/--input=FILE"
+      --     pass Nothing
+      --       [ "-i", "bar" ]
+      --       [ "-i"      :> V.str "bar"
+      --       , "--input" :> V.str "bar" ]
+      --   ]
+
+      -- test
+      --   """
+      --   usage: prog -i FILE
+      --   options:
+      --     -i, --input FILE
+      --   """
+      --   [ --fail Nothing [] "Missing -i/--input=FILE"
+      --     pass Nothing
+      --       [ "-i", "bar" ]
+      --       [ "-i"      :> V.str "bar"
+      --       , "--input" :> V.str "bar" ]
+      --   ]
+
+      -- test
+      --   """
+      --   usage: prog (-iFILE)
+      --   options:
+      --     -i, --input FILE
+      --   """
+      --   [ --fail Nothing [] "Missing -i/--input=FILE"
+      --     pass Nothing
+      --       [ "-i", "bar" ]
+      --       [ "-i"      :> V.str "bar"
+      --       , "--input" :> V.str "bar" ]
+      --   ]
+
+      -- test
+      --   """
+      --   usage: prog (-iFILE) -oFILE
+      --   options:
+      --     -i, --input FILE
+      --     -o, --output FILE
+      --   """
+      --   [ fail Nothing []
+      --     $ "Missing -i/--input=FILE, -o/--output=FILE"
+      --
+      --   , fail Nothing [ "-i", "bar" ]
+      --     $ "Missing -o/--output=FILE"
+      --
+      --   , pass Nothing
+      --       [ "-i", "bar", "-o", "bar" ]
+      --       [ "--input"  :> V.str "bar"
+      --       , "-i"       :> V.str "bar"
+      --       , "--output" :> V.str "bar"
+      --       , "-o"       :> V.str "bar" ]
+      --
+      --     -- group should be interchangable if it's only of options:
+      --   , pass Nothing
+      --       [ "-o", "bar", "-i", "bar" ]
+      --       [ "--input"  :> V.str "bar"
+      --       , "-i"       :> V.str "bar"
+      --       , "--output" :> V.str "bar"
+      --       , "-o"       :> V.str "bar" ]
+      --   ]
+
+      test
+        """
+        usage: prog ((-iFILE) -rFILE) -oFILE
+        options:
+          -i, --input FILE
+          -o, --output FILE
+          -r, --redirect FILE [env: QUX]
+        """
+        -- [ fail Nothing []
+        --   $ "Missing -i/--input=FILE, -r/--redirect=FILE"
+        --
+        -- , fail Nothing [ "-i", "bar", "-r", "bar" ]
+        --     "Missing -o/--output=FILE"
+        --
+        -- , pass Nothing
+        --     [ "-i", "bar", "-r", "bar", "-o", "bar" ]
+        --     [ "--input"    :> V.str "bar"
+        --     , "-i"         :> V.str "bar"
+        --     , "--redirect" :> V.str "bar"
+        --     , "-r"         :> V.str "bar"
+        --     , "--output"   :> V.str "bar"
+        --     , "-o"         :> V.str "bar" ]
+        --
+        --   -- group should be interchangable if it's only of options:
+        -- , pass Nothing
+        --     [ "-o", "bar", "-r", "bar", "-i", "bar" ]
+        --     [ "--input"    :> V.str "bar"
+        --     , "-i"         :> V.str "bar"
+        --     , "--redirect" :> V.str "bar"
+        --     , "-r"         :> V.str "bar"
+        --     , "--output"   :> V.str "bar"
+        --     , "-o"         :> V.str "bar" ]
+        --
+        [ pass' Nothing
+            [ "-o", "bar", "-i", "bar" ]
+            [ "QUX" :> "BAR" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "BAR"
+            , "-r"         :> V.str "BAR"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
+        ]
+
     -- , test
     --     """
     --     usage: prog ((-i FILE) <env>) -oFILE
