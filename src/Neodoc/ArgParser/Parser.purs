@@ -175,10 +175,21 @@ parseLayout _ _ _ e@(Elem x) =
           traceA $ pretty a <> " => " <> show aliases
 
           -- note: safe to be unsafe because of pattern match above
-          unsafePartial case token of
-            LOpt _ _   -> pure true
-            SOpt _ _ _ -> pure true
-          fail "..."
+          OptRes value canTerm canRepeat <- unsafePartial case token of
+            LOpt _ _ ->
+              case longAliases of
+                Nil -> fail "Option has no long alias"
+                _   -> choice $ longAliases <#> \alias -> try do
+                        longOption term alias mA
+            SOpt _ _ _ ->
+              case shortAliases of
+                Nil -> fail "Option has no short alias"
+                _   -> choice $ shortAliases <#> \alias -> try do
+                        shortOption term alias mA
+          pure value
+
+            -- SOpt _ _ _ -> pure true
+          -- fail "..."
 
       -- (PositionedToken { token: SOpt _ _ }) : _ -> fail "Expected long or short option"
       -- (PositionedToken { token: LOpt _ _ }) : _ -> fail "Expected long or short option"
@@ -194,7 +205,12 @@ parseExhaustively
 parseExhaustively skippable isSkipping l xs = do
   { options } <- getConfig
   let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
-  concat <$> traverse (parseChunk skippable isSkipping l) chunks
+  -- concat <$> traverse (parseChunk skippable isSkipping l) chunks
+  for chunks \chunk-> do -- (parseChunk skippable isSkipping l) chunks
+    i <- getInput
+    traceShowA i
+    setInput Nil
+  fail "..."
 
 parseChunk
   :: ∀ r
@@ -203,7 +219,7 @@ parseChunk
   -> Int      -- ^ recursive level
   -> Chunk (List SolvedLayout)
   -> ArgParser r (List ValueMapping)
-parseChunk skippable isSkipping l = go
+parseChunk skippable isSkipping l chunk = (getInput >>= traceShowA) *> go chunk
   where
   go (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
   go (Free  xs) =

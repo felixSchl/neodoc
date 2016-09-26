@@ -1,6 +1,7 @@
 module Neodoc.ArgParser.Argument where
 
 import Prelude
+import Debug.Trace
 import Data.List.Partial as LU
 import Data.Array as A
 import Data.Array.Partial as AU
@@ -25,9 +26,11 @@ import Partial.Unsafe (unsafePartial)
 
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Token
+import Neodoc.OptionAlias as OptionAlias
 import Neodoc.Value as Value
 import Neodoc.Value (Value(..))
-import Neodoc.Data.SolvedLayout (SolvedLayoutArg)
+import Neodoc.Data.SolvedLayout (
+  SolvedLayoutArg, OptionArgument, isOptionArgumentOptional)
 
 command :: ∀ r. String -> ArgParser r Value
 command n = token ("command " <> show n) case _ of
@@ -55,7 +58,7 @@ stdin = token "-" case _ of
   _     -> Nothing
 
 token :: ∀ r a. String -> (Token -> Maybe a) -> ArgParser r a
-token name test = Parser \c -> \s ->
+token name test = Parser \c s ->
   let _return = Step true c
       _fail m = Step false c s (Left $ ParseError false (Left m))
    in case s of
@@ -65,248 +68,227 @@ token name test = Parser \c -> \s ->
         Just a  -> _return ss (Right a)
     _ -> _fail $ "Expected " <> name
 
--- longOption
---   :: Boolean
---   -> String
---   -> (Maybe D.OptionArgumentObj)
---   -> Parser { value :: Value, canRepeat :: Boolean }
--- longOption term n a = unsafePartial $
---  P.ParserT $ \(P.PState toks pos) ->
---   pure $ case toks of
---     (PositionedToken { token: tok, sourcePos: npos, source: s }):xs ->
---       case go tok (_.token <<< unPositionedToken <$> head xs) of
---         Left e -> P.parseFailed toks npos e
---         Right result -> do
---           let value = fromMaybe (BoolValue true) do
---                                 rawValue <- result.rawValue
---                                 pure (Value.read rawValue false)
---           if term
---             then
---               -- consume the rest of the source of this short option into a
---               -- single value.
---               P.Result
---                 (if result.hasConsumedArg
---                       then unsafePartial $ LU.tail xs
---                       else xs)
---                 (let
---                     -- recover the argument in it's string form.
---                     va = maybe [] (A.singleton <<< StringValue) result.rawValue
---                   in Right { value: ArrayValue va, canRepeat: false })
---                 true
---                 pos
---             else
---               P.Result
---                 (let
---                     pushed
---                       = maybe empty
---                           (\v' -> singleton $ PositionedToken {
---                                     token:     v'
---                                   , sourcePos: pos
---                                   , source:    s
---                                   })
---                           result.remainder
---                     rest = if result.hasConsumedArg then LU.tail xs else xs
---                   in pushed <> rest)
---                 (Right {
---                   value:     value
---                 , canRepeat: not result.explicitArg
---                 })
---                 (maybe true (const false) result.remainder)
---                 (maybe pos (_.sourcePos <<< unPositionedToken) (head xs))
---     _ -> P.parseFailed toks pos "Expected token, met EOF"
---
---   where
---     isFlag = isNothing a
---
---     -- case 0:
---     -- The name is an exact match and found in 'options.stopAt'.
---     -- Note that the option may *NOT* have an explicitly assigned
---     -- option-argument. Finally, let the caller do the actual termination
---     -- (updating parser state / consuming all input)
---     go (LOpt n' Nothing) _ | (n' == n) && term
---       = pure { rawValue:       Nothing
---              , remainder:      Nothing
---              , hasConsumedArg: false
---              , explicitArg:    false
---              }
---
---     -- case 1:
---     -- The name is an exact match
---     go (LOpt n' v) atok | (not isFlag) && (n' == n)
---       = case v of
---           Just s ->
---             pure { rawValue:       Just s
---                  , remainder:      Nothing
---                  , hasConsumedArg: false
---                  , explicitArg:    true
---                  }
---           _  -> case atok of
---             Just (Lit s) ->
---               pure { rawValue:       Just s
---                    , remainder:      Nothing
---                    , hasConsumedArg: true
---                    , explicitArg:    false
---                    }
---             otherwise    ->
---               if term || (fromMaybe true (_.optional <$> a))
---                  then pure { rawValue:       Nothing
---                            , remainder:      Nothing
---                            , hasConsumedArg: false
---                            , explicitArg:    false
---                            }
---                  else Left $ "Option requires argument: --" <> n'
---
---     -- case 2:
---     -- The name is an exact match and takes no argument
---     go (LOpt n' v) _ | isFlag && (n' == n)
---       = case v of
---              Just _  -> Left $ "Option takes no argument: --" <> n'
---              Nothing -> pure { rawValue:       Nothing
---                              , remainder:      Nothing
---                              , hasConsumedArg: false
---                              , explicitArg:    false
---                              }
---
---     -- case 3:
---     -- The name is a substring of the input and no explicit argument has been
---     -- provdided.
---     go (LOpt n' Nothing) _ | not isFlag
---       = case stripPrefix n n' of
---           Just s ->
---             pure { rawValue:       Just s
---                  , remainder:      Nothing
---                  , hasConsumedArg: false
---                  , explicitArg:    false
---                  }
---           otherwise -> Left "Invalid substring"
---
---     go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
---
--- shortOption
---   :: Boolean
---   -> Char
---   -> (Maybe D.OptionArgumentObj)
---   -> Parser { value :: Value, canRepeat :: Boolean, canTerm :: Boolean }
--- shortOption term f a = unsafePartial $
---  P.ParserT $ \(P.PState toks pos) -> do
---   pure $ case toks of
---     (PositionedToken { token: tok, source: s }):xs ->
---       case go tok (_.token <<< unPositionedToken <$> head xs) of
---         Left e -> P.parseFailed toks pos e
---         Right result -> do
---           let value = fromMaybe (BoolValue true) do
---                                 rawValue <- result.rawValue
---                                 pure (Value.read rawValue false)
---           if term && isNothing result.remainder
---             then
---               -- consume the rest of the source of this short option into a
---               -- single value.
---               P.Result
---                 (if result.hasConsumedArg then LU.tail xs else xs)
---                 (let
---                     -- recover the argument in it's string form.
---                     v = maybe [] (\_ -> [ StringValue $ String.drop 2 s ]) result.remainder
---                     va = maybe [] (A.singleton <<< StringValue) result.rawValue
---                   in Right {
---                         value:     ArrayValue $ v <> va
---                       , canTerm:   true
---                       , canRepeat: false
---                       })
---                 true
---                 pos
---             else
---               P.Result
---                 (let
---                   pushed = maybe empty
---                                   (\v' ->
---                                     singleton
---                                       $ PositionedToken
---                                           { token:     v'
---                                           , sourcePos: pos
---                                           , source:    "-" <> String.drop 2 s
---                                           })
---                                   result.remainder
---                   rest = if result.hasConsumedArg then LU.tail xs else xs
---                   rest' = rest <#> \(PositionedToken p) ->
---                             PositionedToken $ p {
---                               sourcePos = case p.sourcePos of
---                                 P.Position n x -> P.Position (n + 1) x
---                             }
---                 in pushed <> rest')
---                 (Right {
---                     value:     value
---                   , canTerm:   false
---                   , canRepeat: not result.explicitArg
---                 })
---                 (maybe true (const false) result.remainder)
---                 (maybe pos (_.sourcePos <<< unPositionedToken) (head xs))
---     _ -> P.parseFailed toks pos "Expected token, met EOF"
---
---   where
---     isFlag = isNothing a
---
---     -- case 1:
---     -- The leading flag matches, there are no stacked options, and an explicit
---     -- argument may have been passed.
---     go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.null xs)
---       = case v of
---           Just s ->
---             pure { rawValue:       Just s
---                  , remainder:      Nothing
---                  , hasConsumedArg: false
---                  , explicitArg:    true
---                  }
---           otherwise -> case atok of
---             Just (Lit s) ->
---               pure { rawValue:       Just s
---                    , remainder:      Nothing
---                    , hasConsumedArg: true
---                    , explicitArg:    false
---                    }
---             otherwise ->
---               if term || (fromMaybe true (_.optional <$> a))
---                  then pure { rawValue:       Nothing
---                            , remainder:      Nothing
---                            , hasConsumedArg: false
---                            , explicitArg:    false
---                            }
---                  else  Left $ "Option requires argument: -" <> String.singleton f'
---
---     -- case 2:
---     -- The leading flag matches, there are stacked options, a explicit
---     -- argument may have been passed and the option takes an argument.
---     go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
---       = do
---         let arg = fromCharArray xs <> maybe "" ("=" <> _) v
---         pure { rawValue:       Just arg
---              , remainder:      Nothing
---              , hasConsumedArg: false
---              , explicitArg:    isJust v
---              }
---
---     -- case 3:
---     -- The leading flag matches, there are stacked options, the option takes
---     -- no argument and an explicit argument has not been provided.
---     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
---       = pure { rawValue:       Nothing
---              , remainder:      pure (SOpt (unsafePartial $ AU.head xs)
---                                           (unsafePartial $ AU.tail xs)
---                                           v)
---              , hasConsumedArg: false
---              , explicitArg:    isJust v
---              }
---
---     -- case 4:
---     -- The leading flag matches, there are no stacked options and the option
---     -- takes no argument - total consumption!
---     go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
---       = case v of
---               Just _  -> Left $ "Option takes no argument: -" <> String.singleton f'
---               Nothing -> pure { rawValue:       Nothing
---                               , remainder:      Nothing
---                               , hasConsumedArg: false
---                               , explicitArg:    false
---                               }
---
---     go a b = Left $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
---
+type CanRepeat = Boolean
+type CanTerminate = Boolean
+data OptRes = OptRes Value CanTerminate CanRepeat
+
+longOption
+  :: ∀ r
+   . Boolean -- ^ does this option attempt to terminate the parse?
+  -> String  -- ^ name of the option w/o leading dashes, i.e.: '--foo' => "foo"
+  -> (Maybe OptionArgument)
+  -> ArgParser r OptRes
+longOption term n mArg = do
+  input <- getInput
+  case input of
+    (ptok@PositionedToken { token, sourcePos, source }):xs ->
+      let nextToken = _.token <<< unPositionedToken <$> head xs
+       in do
+        result <- go token nextToken
+
+        -- update the parser input
+        setInput case xs of
+          _:xs' | result.hasConsumedArg -> xs'
+          _ -> xs
+
+        pure if term
+          then
+            -- remove the consumed arg from the input, if necessary
+            let val = ArrayValue $ maybe [] (A.singleton <<< StringValue) result.rawValue
+             in OptRes val true false
+          else
+            -- remove the consumed arg from the input, if necessary
+            let val = maybe (BoolValue true) (flip Value.read false) result.rawValue
+             in OptRes val true $ not result.explicitArg
+
+    _ -> fail "Expected token, met EOF" -- XXX: improve message
+
+  where
+  isFlag = isNothing mArg
+
+  -- case 0:
+  -- The name is an exact match and found in 'options.stopAt'.
+  -- Note that the option may *NOT* have an explicitly assigned
+  -- option-argument. Finally, let the caller do the actual termination
+  -- (updating parser state / consuming all input)
+  go (LOpt n' Nothing) _ | (n' == n) && term
+    = pure { rawValue:       Nothing
+           , hasConsumedArg: false
+           , explicitArg:    false
+           }
+
+  -- case 1:
+  -- The name is an exact match
+  go (LOpt n' v) atok | (not isFlag) && (n' == n)
+    = case v of
+        Just s ->
+          pure  { rawValue:       Just s
+                , hasConsumedArg: false
+                , explicitArg:    true
+                }
+        _  -> case atok of
+          Just (Lit s) ->
+            pure  { rawValue:       Just s
+                  , hasConsumedArg: true
+                  , explicitArg:    false
+                  }
+          _ ->
+            let argIsOptional = maybe true isOptionArgumentOptional mArg
+             in if term || argIsOptional
+                then pure { rawValue:       Nothing
+                          , hasConsumedArg: false
+                          , explicitArg:    false
+                          }
+                else fail' $ OptionRequiresArgumentError (OptionAlias.Long n)
+
+  -- case 2:
+  -- The name is an exact match and takes no argument
+  go (LOpt n' v) _ | isFlag && (n' == n)
+    = case v of
+        Just _  -> fail' $ OptionTakesNoArgumentError (OptionAlias.Long n)
+        Nothing -> pure { rawValue:       Nothing
+                        , hasConsumedArg: false
+                        , explicitArg:    false
+                        }
+
+  -- case 3:
+  -- The name is a substring of the input and no explicit argument has been
+  -- provdided.
+  go (LOpt n' Nothing) _ | not isFlag
+    = case stripPrefix n n' of
+        Just s ->
+          pure { rawValue:        Just s
+                , hasConsumedArg: false
+                , explicitArg:    false
+                }
+        _ -> fail "Invalid substring"
+
+  go a b = fail $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
+
+shortOption
+  :: ∀ r
+   . Boolean -- ^ does this option attempt to terminate the parse?
+  -> Char    -- ^ flag of the option w/o leading dash, i.e.: '-f' => "f"
+  -> (Maybe OptionArgument)
+  -> ArgParser r OptRes
+shortOption term f mArg = do
+  input <- getInput
+  case input of
+    (PositionedToken (ptok@{ token, sourcePos, source })):xs ->
+      let nextToken = _.token <<< unPositionedToken <$> head xs
+       in do
+        result <- go token nextToken
+        fail "..."
+        if term && isNothing result.remainder
+          then
+            let
+              -- note: recover the argument in it's string form.
+              -- the `drop 2` drops the leading dash and the first character
+              -- from the input. this makes the assumption that the source will
+              -- *always* start with a dash and then a character.
+              v = maybe [] (const [ StringValue $ String.drop 2 source ]) result.remainder
+              va = maybe [] (A.singleton <<< StringValue) result.rawValue
+              val = ArrayValue $ v <> va
+              newInput = case xs of
+                            _:xs' | result.hasConsumedArg -> xs'
+                            _ -> xs
+             in setInput newInput $> do
+                  OptRes val true false
+          else
+            let newSource = "-" <> String.drop 2 source
+                pushed = maybe empty
+                          (singleton <<< PositionedToken <<< ptok {
+                            token = _
+                          , source = newSource
+                          })
+                          result.remainder
+                rest = case xs of
+                        _:xs' | result.hasConsumedArg -> xs'
+                        _ -> xs
+                -- shift the positions of the artificial tokens by the number
+                -- of pushed tokens (which is always 1, but we check for
+                -- completeness sake).
+                nPushed = length pushed
+                rest' = if nPushed > 0
+                          then rest <#> \(PositionedToken p) ->
+                                PositionedToken $ p {
+                                  sourcePos = case p.sourcePos of
+                                    P.Position n x -> P.Position (n + nPushed) x
+                                }
+                          else rest
+                val = maybe (BoolValue true) (flip Value.read false) result.rawValue
+                newInput = pushed <> rest'
+             in setInput newInput $> do
+                  OptRes val false $ not result.explicitArg
+
+    _ -> fail "Expected token, met EOF" -- XXX: improve message
+
+  where
+  isFlag = isNothing mArg
+
+  -- case 1:
+  -- The leading flag matches, there are no stacked options, and an explicit
+  -- argument may have been passed.
+  go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.null xs)
+    = case v of
+        Just s ->
+          pure { rawValue:       Just s
+                , remainder:      Nothing
+                , hasConsumedArg: false
+                , explicitArg:    true
+                }
+        otherwise -> case atok of
+          Just (Lit s) ->
+            pure { rawValue:       Just s
+                  , remainder:      Nothing
+                  , hasConsumedArg: true
+                  , explicitArg:    false
+                  }
+          otherwise ->
+            let argIsOptional = maybe true isOptionArgumentOptional mArg
+             in if term || argIsOptional
+                then pure { rawValue:       Nothing
+                          , remainder:      Nothing
+                          , hasConsumedArg: false
+                          , explicitArg:    false
+                          }
+                else fail' $ OptionRequiresArgumentError (OptionAlias.Short f)
+
+  -- case 2:
+  -- The leading flag matches, there are stacked options, a explicit
+  -- argument may have been passed and the option takes an argument.
+  go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
+    -- note: we put the '=' back on. this assumes that explicit arguments will
+    --       *always* be bound with a '='.
+    = let arg = fromCharArray xs <> maybe "" ("=" <> _) v
+       in pure  { rawValue:       Just arg
+                , remainder:      Nothing
+                , hasConsumedArg: false
+                , explicitArg:    isJust v
+                }
+
+  -- case 3:
+  -- The leading flag matches, there are stacked options, the option takes
+  -- no argument and an explicit argument has not been provided.
+  go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
+    = pure  { rawValue:       Nothing
+            , hasConsumedArg: false
+            , explicitArg:    isJust v
+            , remainder:      pure (SOpt (unsafePartial $ AU.head xs)
+                                        (unsafePartial $ AU.tail xs)
+                                        v)
+            }
+
+  -- case 4:
+  -- The leading flag matches, there are no stacked options and the option
+  -- takes no argument - total consumption!
+  go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
+    = case v of
+        Just _  -> fail' $ OptionTakesNoArgumentError (OptionAlias.Short f')
+        Nothing -> pure { rawValue:       Nothing
+                        , remainder:      Nothing
+                        , hasConsumedArg: false
+                        , explicitArg:    false
+                        }
+
+  go a b = fail $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"

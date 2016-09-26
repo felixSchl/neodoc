@@ -90,16 +90,16 @@ parse = flip L.runTokenParser do
             many elem
           many elem
         many elem
-        pure $ Just EOA
+        pure $ singleton $ singleton $ Elem EOA
     , (do
         L.eof <|> (P.lookAhead $ lessIndented <|> sameIndent)
-        pure Nothing
+        pure Nil
       )
       -- XXX: We could show the last token that failed to be consumed, here
       <?> "End of usage line"
     ]
 
-    pure $ case xs of
+    pure $ case xs <> eoa of
       Nil -> Nothing
       xs  -> pure do
         Group

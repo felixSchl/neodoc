@@ -8,6 +8,7 @@ module Neodoc.ArgParser.Type (
 , runParser
 , getConfig
 , getInput
+, setInput
 , fail
 , fail'
 , throw
@@ -41,7 +42,8 @@ import Neodoc.OptionAlias (OptionAlias)
 -- `ArgParser`
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.List (head, filter)
-import Data.Foldable (any)
+import Data.Pretty (pretty, class Pretty)
+import Data.Foldable (any, intercalate)
 import Data.NonEmpty ((:|))
 import Data.NonEmpty (singleton) as NonEmpty
 import Control.Alt ((<|>))
@@ -73,14 +75,14 @@ instance applicativeParser :: Applicative (Parser e c s) where
 instance functorParser :: Functor (Parser e c s) where
   map f p = Parser \c s ->
     let step = unParser p c s
-     in case step of (Step b c s' a) -> Step b c s' (f <$> a)
+     in case step of (Step b c' s' a) -> Step b c' s' (f <$> a)
 
 instance bindParser :: Bind (Parser e c s) where
   bind p f = Parser \c s ->
     let step = unParser p c s
      in case step of
-          Step b c s' (Left  err) -> Step b c s' (Left err)
-          Step b c s' (Right res) -> setConsumedOr b $ unParser (f res) c s'
+          Step b c' s' (Left  err) -> Step b c' s' (Left err)
+          Step b c' s' (Right res) -> setConsumedOr b $ unParser (f res) c' s'
 
 instance monadParser :: Monad (Parser e c s)
 
@@ -109,11 +111,14 @@ instance alternativeParser :: Alternative (Parser e c s)
 instance lazyParser :: Lazy (Parser e c s a) where
   defer f = Parser \c s -> unParser (f unit) c s
 
-getConfig :: ∀ e c s a. Parser e c s c
+getConfig :: ∀ e c s. Parser e c s c
 getConfig = Parser \c s -> Step false c s (Right c)
 
-getInput :: ∀ e c s a. Parser e c s s
+getInput :: ∀ e c s. Parser e c s s
 getInput = Parser \c s -> Step false c s (Right s)
+
+setInput :: ∀ e c s. s -> Parser e c s Unit
+setInput s = Parser \c _ -> Step false c s (Right unit)
 
 runParser :: ∀ e c s a. c -> s -> Parser e c s a -> Either (ParseError e) a
 runParser c s p =
@@ -149,6 +154,15 @@ instance showArgParseError :: Show ArgParseError where
   show (MalformedInputError s) = "MalformedInputError " <> show s
   show (GenericError s) = "GenericError " <> show s
   show (InternalError s) = "InternalError " <> show s
+
+instance prettyArgParseError :: Show ArgParseError where
+  show (OptionTakesNoArgumentError a) = "Option takes no argument: " <> pretty a
+  show (OptionRequiresArgumentError a) = "Option requires argument: " <> pretty a
+  show (MissingArgumentsError xs) = "Missing arguments: " <> (intercalate ", " $ pretty <$> xs)
+  show (UnexpectedInputError xs) = "Unexpected Input: " <> (intercalate " " $ show <$> xs)
+  show (MalformedInputError s) = "Malformed Input: " <> show s
+  show (GenericError s) = s
+  show (InternalError s) = "Internal error: " <> s
 
 type ParseConfig r = {
   env :: Env

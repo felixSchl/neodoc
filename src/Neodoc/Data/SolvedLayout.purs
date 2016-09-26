@@ -16,6 +16,9 @@ data OptionArgument
       String  -- name
       Boolean -- optional
 
+isOptionArgumentOptional :: OptionArgument -> Boolean
+isOptionArgumentOptional (OptionArgument _ o) = o
+
 instance eqOptionArgument :: Eq OptionArgument where
   eq (OptionArgument n o) (OptionArgument n' o') = n == n' && o == o'
 

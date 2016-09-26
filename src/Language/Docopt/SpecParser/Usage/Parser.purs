@@ -73,6 +73,7 @@ usageParser smartOpts = do
                else usageLine name
 
   L.eof <?> "End of usage section"
+
   pure {
     program: name
   , usages:  usages
