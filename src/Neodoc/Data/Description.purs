@@ -41,4 +41,3 @@ instance prettyDescription :: Pretty Description where
     <> (if r then "..." else "")
     <> (maybe "" (\v -> " [default: " <> pretty v <> "]") mDef)
     <> (maybe "" (\v -> " [env: " <> v <> "]") mEnv)
-

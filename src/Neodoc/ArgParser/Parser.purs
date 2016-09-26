@@ -51,18 +51,24 @@
 module Neodoc.ArgParser.Parser where
 
 import Prelude
+import Debug.Trace
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
 , null, concat, mapWithIndex, length, take, drop)
+import Data.List.Partial as LU
 import Data.Function (on)
 import Data.Tuple (Tuple(..), snd)
+import Data.Tuple.Nested ((/\))
 import Data.Either (Either(..))
+import Data.String as String
 import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Traversable (for, traverse)
-import Data.Foldable (class Foldable, maximumBy, all)
+import Data.Foldable (
+  class Foldable, maximumBy, all, intercalate, sum, any, elem)
 import Data.Map as Map
 import Data.Map (Map)
+import Data.Pretty (pretty)
 import Control.Alt ((<|>))
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Partial.Unsafe
@@ -77,8 +83,10 @@ import Neodoc.Spec (Spec(..))
 import Neodoc.Env
 import Neodoc.Data.Layout
 import Neodoc.Data.Layout as Layout
+import Neodoc.Data.Description
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
+import Neodoc.OptionAlias as OptionAlias
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
@@ -103,9 +111,20 @@ parse
   -> Either (ParseError ArgParseError) Unit
 parse (Spec { layouts, descriptions }) options env tokens =
   runParser { env, options, descriptions } tokens $
-    let parsers = layouts <#> \layout ->
-                    pure unit
-     in void $ evalParsers (\_  -> 0 {- XXX -}) parsers
+    let parsers = concat (fromFoldable layouts) <#> \layout -> do
+          {- XXX: unmarkFailed -}
+          vs <- {-withLocalCache-} do
+            parseExhaustively true false 0 (fromFoldable layout)
+          eof $> Tuple layout vs
+     in void $ flip evalParsers parsers \(Tuple _ vs) ->
+          sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+  where
+  eof :: ∀ r. ArgParser r Unit
+  eof = do
+    input <- getInput
+    case input of
+      Nil -> pure unit
+      xs  -> fail' $ UnexpectedInputError xs
 
 parseLayout
   :: ∀ r
@@ -127,14 +146,50 @@ parseLayout _ _ _ e@(Elem x) =
   go (Solved.Command    n _) = command    n
   go (Solved.Stdin         ) = stdin
   go (Solved.EOA           ) = eoa <|> (pure $ ArrayValue [])
-  go (Solved.Option a  mA _) = fail "..."
+  go (Solved.Option a  mA _) = do
+    input       <- getInput
+    { options } <- getConfig
+    case input of
+      (PositionedToken { token }) : _
+        | case token of
+            LOpt _ _   -> true
+            SOpt _ _ _ -> true
+            _          -> false
+        -> do
+          aliases /\ def /\ env <- do
+            description <- lookupDescription' a
+            case description of
+              (OptionDescription aliases _ _ def env) ->
+                pure $ aliases /\ def /\ env
+              _ -> fail' $ InternalError "invalid option description"
+          let
+            ns = fromFoldable $ aliases <#> case _ of
+                  OptionAlias.Short f -> Left  f
+                  OptionAlias.Long  n -> Right n
+            longAliases = mrights ns
+            shortAliases = mlefts ns
+            term = any (_ `elem` options.stopAt) $ aliases <#> case _ of
+                      OptionAlias.Short s -> "-"  <> String.singleton s
+                      OptionAlias.Long  n -> "--" <> n
+
+          traceA $ pretty a <> " => " <> show aliases
+
+          -- note: safe to be unsafe because of pattern match above
+          unsafePartial case token of
+            LOpt _ _   -> pure true
+            SOpt _ _ _ -> pure true
+          fail "..."
+
+      -- (PositionedToken { token: SOpt _ _ }) : _ -> fail "Expected long or short option"
+      -- (PositionedToken { token: LOpt _ _ }) : _ -> fail "Expected long or short option"
+      _ -> fail "Expected long or short option"
 
 parseExhaustively
   :: ∀ r
    . Boolean -- ^ can we skip using fallback values?
   -> Boolean -- ^ are we currently skipping using fallback values?
   -> Int     -- ^ recursive level
-  -> Layout.Branch SolvedLayoutArg
+  -> List SolvedLayout
   -> ArgParser r (List ValueMapping)
 parseExhaustively skippable isSkipping l xs = do
   { options } <- getConfig
@@ -257,34 +312,31 @@ parseChunk skippable isSkipping l = go
       if isSkipping && length missing > 0
         then do
           {- XXX: markFailed -}
-          expected missing input
-        else fail "..."
-        -- else
-        --   if skippable || null input
-        --     then
-        --       if not isSkipping
-        --         {- XXX: then withLocalCache do -}
-        --           parseExhaustively true true l args
-        --         else pure fallbacks
-        --     else expected args input
+          throwExpectedError missing input
+        else
+          if skippable || null input
+            then
+              if not isSkipping
+                then {- XXX: withLocalCache do -}
+                  parseExhaustively true true l layouts
+                else pure fallbacks
+            else throwExpectedError layouts input
 
       pure Nil
 
-      -- where
-      -- expected xs i =
-      -- let
-      --     x = unsafePartial (LU.head xs)
-      --     msg = maybe'
-      --     (\_ -> case i of
-      --         i':_ -> unexpected toplevel i'
-      --                 <> ". Expected "
-      --                 <> (intercalate ", " $ D.prettyPrintArgNaked <$> xs)
-      --         Nil  -> "Missing "
-      --                 <> (intercalate ", " $ D.prettyPrintArgNaked <$> xs)
-      --     )
-      --     (\(P.ParseError msg _ _) -> msg)
-      --     (x `Map.lookup` errs)
-      -- in P.fail msg
+      where
+        throwExpectedError
+          :: ∀ r
+           . List SolvedLayout
+          -> List PositionedToken
+          -> ArgParser r _
+        throwExpectedError xs input =
+          let x = unsafePartial (LU.head xs)
+              e = case Map.lookup x errs of
+                _ -> case input of
+                  Nil  -> MissingArgumentsError xs
+                  toks -> UnexpectedInputError toks
+           in fail' e
 
     draw _ _ _ = pure Nil
 
@@ -311,7 +363,7 @@ cached _ = id
 chunkBranch
   :: Boolean -- enable lax-placement mode
   -> Boolean -- enable options-first mode
-  -> Layout.Branch SolvedLayoutArg
+  -> List SolvedLayout
   -> List (Chunk (List SolvedLayout))
 chunkBranch lax optsFirst = fromFoldable >>> chunk \x ->
   (not (optsFirst && canTerm x)) && (lax || isFreeLayout x)

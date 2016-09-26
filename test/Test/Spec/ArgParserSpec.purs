@@ -1,4 +1,4 @@
-module Test.Spec.ArgParserSpec (parserGenSpec) where
+module Test.Spec.ArgParserSpec (argParserSpec) where
 
 import Prelude
 import Debug.Trace
@@ -8,7 +8,8 @@ import Control.Monad (when)
 import Control.Monad.Eff.Exception (EXCEPTION())
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Either (Either(..), either)
-import Data.List (List(..), fromFoldable, length, singleton)
+import Data.List (List(..), fromFoldable, length, singleton, concat)
+import Data.Traversable (for)
 import Data.Map (Map(..))
 import Data.StrMap as StrMap
 import Data.StrMap (StrMap())
@@ -20,24 +21,30 @@ import Control.Monad.Eff.Exception (error, throwException)
 import Data.String.Chalk as Chalk
 import Data.TemplateString.Unsafe ((<~>))
 import Text.Parsing.Parser as P
+import Data.Bifunctor (lmap, rmap)
+import Text.Wrap (dedent)
+import Partial.Unsafe
+import Data.Pretty (pretty)
 
 import Test.Assert (assert)
 import Test.Spec (describe, it, Spec())
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Support (vliftEff, runMaybeEff, runEitherEff)
 import Test.Support.Arguments
+import Test.Support.Value as V
 
-import Language.Docopt (parseDocopt)
-import Language.Docopt.Errors
-import Language.Docopt.Argument
-import Language.Docopt.Value
-import Language.Docopt.Usage
-import Language.Docopt.Env (Env())
-import Language.Docopt.ArgParser (run) as ArgParser
-import Language.Docopt.Argument   as D
-import Language.Docopt.Env        as Env
-import Language.Docopt.Trans.Flat as T
-import Test.Support.Docopt        as D
+import Neodoc.Value
+import Neodoc.Env (Env)
+import Neodoc.Env as Env
+import Neodoc.Spec as Neodoc
+import Neodoc.Spec (Spec(..))
+import Neodoc.Spec.Parser as Spec
+import Neodoc.Spec.Lexer as Lexer
+import Neodoc.Scanner as Scanner
+import Neodoc.Transform.SolveError (SolveError(..))
+import Neodoc.Transform.PreSolve (preSolve, PreSolvedLayout(..), PreSolvedLayoutArg(..))
+import Neodoc.Data.SolvedLayout (SolvedLayout(..))
+import Neodoc.ArgParser as ArgParser
 
 -- hack to easily isolate tests
 isolate :: Boolean
@@ -112,7 +119,7 @@ infixr 0 Tuple as :>
 
 data TestArgs = TestRequired | TestOptional | TestNone
 
-parserGenSpec = \_ -> describe "The parser generator" do
+argParserSpec = \_ -> describe "The parser generator" do
   it "" do
     pure unit
 
@@ -123,7 +130,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         "usage: prog <qux>..."
         [ pass Nothing
             [ "a", "b", "c" ]
-            [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
+            [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
             ]
         , fail
             Nothing
@@ -139,13 +146,13 @@ parserGenSpec = \_ -> describe "The parser generator" do
         "usage: prog <qux>... --"
         [ pass Nothing
             [ "a", "b", "c", "--" ]
-            [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
-            , "--"    :> D.array []
+            [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+            , "--"    :> V.array []
             ]
         , pass Nothing
             [ "a", "b", "c", "--", "--", "--" ]
-            [ "<qux>" :> D.array [ D.str "a", D.str "b", D.str "c" ]
-            , "--"    :> D.array [ D.str "--" , D.str "--" ]
+            [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+            , "--"    :> V.array [ V.str "--" , V.str "--" ]
             ]
         ]
 
@@ -158,8 +165,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ pass
             Nothing
             [ "-hhttp://localhost:5000" ]
-            [ "-h"     :> D.str "http://localhost:5000"
-            , "--host" :> D.str "http://localhost:5000"
+            [ "-h"     :> V.str "http://localhost:5000"
+            , "--host" :> V.str "http://localhost:5000"
             ]
         ]
 
@@ -173,8 +180,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
             Nothing
             []
             [ "HOST" :> "HOME" ]
-            [ "-h"     :> D.str "HOME"
-            , "--host" :> D.str "HOME"
+            [ "-h"     :> V.str "HOME"
+            , "--host" :> V.str "HOME"
             ]
         ]
 
@@ -187,8 +194,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ fail Nothing [] "Missing -i/--input=FILE"
         , pass Nothing
             [ "-i", "bar" ]
-            [ "-i"      :> D.str "bar"
-            , "--input" :> D.str "bar" ]
+            [ "-i"      :> V.str "bar"
+            , "--input" :> V.str "bar" ]
         ]
 
     , test
@@ -206,18 +213,18 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
         , pass Nothing
             [ "-i", "bar", "-o", "bar" ]
-            [ "--input"  :> D.str "bar"
-            , "-i"       :> D.str "bar"
-            , "--output" :> D.str "bar"
-            , "-o"       :> D.str "bar" ]
+            [ "--input"  :> V.str "bar"
+            , "-i"       :> V.str "bar"
+            , "--output" :> V.str "bar"
+            , "-o"       :> V.str "bar" ]
 
           -- group should be interchangable if it's only of options:
         , pass Nothing
             [ "-o", "bar", "-i", "bar" ]
-            [ "--input"  :> D.str "bar"
-            , "-i"       :> D.str "bar"
-            , "--output" :> D.str "bar"
-            , "-o"       :> D.str "bar" ]
+            [ "--input"  :> V.str "bar"
+            , "-i"       :> V.str "bar"
+            , "--output" :> V.str "bar"
+            , "-o"       :> V.str "bar" ]
         ]
 
     , test
@@ -236,32 +243,32 @@ parserGenSpec = \_ -> describe "The parser generator" do
 
         , pass Nothing
             [ "-i", "bar", "-r", "bar", "-o", "bar" ]
-            [ "--input"    :> D.str "bar"
-            , "-i"         :> D.str "bar"
-            , "--redirect" :> D.str "bar"
-            , "-r"         :> D.str "bar"
-            , "--output"   :> D.str "bar"
-            , "-o"         :> D.str "bar" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "bar"
+            , "-r"         :> V.str "bar"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
 
           -- group should be interchangable if it's only of options:
         , pass Nothing
             [ "-o", "bar", "-r", "bar", "-i", "bar" ]
-            [ "--input"    :> D.str "bar"
-            , "-i"         :> D.str "bar"
-            , "--redirect" :> D.str "bar"
-            , "-r"         :> D.str "bar"
-            , "--output"   :> D.str "bar"
-            , "-o"         :> D.str "bar" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "bar"
+            , "-r"         :> V.str "bar"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
 
         , pass' Nothing
             [ "-o", "bar", "-i", "bar" ]
             [ "QUX" :> "BAR" ]
-            [ "--input"    :> D.str "bar"
-            , "-i"         :> D.str "bar"
-            , "--redirect" :> D.str "BAR"
-            , "-r"         :> D.str "BAR"
-            , "--output"   :> D.str "bar"
-            , "-o"         :> D.str "bar" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "BAR"
+            , "-r"         :> V.str "BAR"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
         ]
 
     , test
@@ -277,11 +284,11 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , fail Nothing [ "-i", "bar" ] "Expected <env>"
         , pass Nothing
             [ "-i", "bar", "x", "-o", "bar" ]
-            [ "--input"  :> D.str "bar"
-            , "-i"       :> D.str "bar"
-            , "<env>"    :> D.str "x"
-            , "--output" :> D.str "bar"
-            , "-o"       :> D.str "bar" ]
+            [ "--input"  :> V.str "bar"
+            , "-i"       :> V.str "bar"
+            , "<env>"    :> V.str "x"
+            , "--output" :> V.str "bar"
+            , "-o"       :> V.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
             "Unexpected option -o. Expected -i/--input=FILE"
@@ -296,8 +303,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ pass' Nothing
             []
             [ "FOO"    :> "BAR" ]
-            [  "--out" :> D.str "BAR"
-            ,  "-o"    :> D.str "BAR" ]
+            [  "--out" :> V.str "BAR"
+            ,  "-o"    :> V.str "BAR" ]
         ]
 
     , test
@@ -309,8 +316,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ pass' Nothing
             []
             [ "FOO" :> "BAR" ]
-            [  "--out" :> D.str "BAR"
-            ,  "-o"    :> D.str "BAR" ]
+            [  "--out" :> V.str "BAR"
+            ,  "-o"    :> V.str "BAR" ]
         ]
 
     , test
@@ -320,10 +327,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
         """
         [ pass Nothing
             [ "-a" ]
-            [ "-a" :> D.bool true ]
+            [ "-a" :> V.bool true ]
         , pass Nothing
             [ "-b" ]
-            [ "-b" :> D.bool true ]
+            [ "-b" :> V.bool true ]
         , pass Nothing
             []
             []
@@ -336,10 +343,10 @@ parserGenSpec = \_ -> describe "The parser generator" do
         """
         [ pass Nothing
             [ "a" ]
-            [ "a" :> D.bool true ]
+            [ "a" :> V.bool true ]
         , pass Nothing
             [ "b" ]
-            [ "b" :> D.bool true ]
+            [ "b" :> V.bool true ]
         , fail Nothing
             [ "a", "b" ]
             "Unexpected command b"
@@ -361,80 +368,80 @@ parserGenSpec = \_ -> describe "The parser generator" do
         """
         [ pass Nothing
             [ "foo", "--out", "--input", "--qux", "--foo=ox", "baz" ]
-            [ "foo"     :> D.bool true
-            , "--out"   :> D.bool true
-            , "-o"      :> D.bool true
-            , "--input" :> D.bool true
-            , "-i"      :> D.bool true
-            , "--qux"   :> D.int 1
-            , "-q"      :> D.int 1
-            , "--foo"   :> D.array [ D.str "ox" ]
-            , "-f"      :> D.array [ D.str "ox" ]
-            , "baz"     :> D.bool true
-            , "--baz"   :> D.str "ax"
-            , "-b"      :> D.str "ax"
+            [ "foo"     :> V.bool true
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "--qux"   :> V.int 1
+            , "-q"      :> V.int 1
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "baz"     :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
             ]
 
         , pass Nothing
             [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
-            [ "foo"     :> D.bool true
-            , "--out"   :> D.bool true
-            , "-o"      :> D.bool true
-            , "--qux"   :> D.int 3
-            , "-q"      :> D.int 3
-            , "--foo"   :> D.array [ D.str "ox" ]
-            , "-f"      :> D.array [ D.str "ox" ]
-            , "--baz"   :> D.str "ax"
-            , "-b"      :> D.str "ax"
-            , "--input" :> D.bool true
-            , "-i"      :> D.bool true
-            , "baz"     :> D.bool true
+            [ "foo"     :> V.bool true
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--qux"   :> V.int 3
+            , "-q"      :> V.int 3
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "baz"     :> V.bool true
             ]
 
         , pass Nothing
             [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
-            [ "foo"     :> D.bool true
-            , "--qux"   :> D.int 2
-            , "-q"      :> D.int 2
-            , "--out"   :> D.bool true
-            , "-o"      :> D.bool true
-            , "--input" :> D.bool true
-            , "-i"      :> D.bool true
-            , "--baz"   :> D.str "ax"
-            , "-b"      :> D.str "ax"
-            , "--foo"   :> D.array [ D.str "ox" ]
-            , "-f"      :> D.array [ D.str "ox" ]
-            , "baz"     :> D.bool true
+            [ "foo"     :> V.bool true
+            , "--qux"   :> V.int 2
+            , "-q"      :> V.int 2
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "baz"     :> V.bool true
             ]
 
         , pass Nothing
             [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
-            [ "foo"     :> D.bool true
-            , "--baz"   :> D.str "ax"
-            , "-b"      :> D.str "ax"
-            , "--out"   :> D.bool true
-            , "-o"      :> D.bool true
-            , "--foo"   :> D.array [ D.str "ox" ]
-            , "-f"      :> D.array [ D.str "ox" ]
-            , "--input" :> D.bool true
-            , "-i"      :> D.bool true
-            , "baz"     :> D.bool true
+            [ "foo"     :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "baz"     :> V.bool true
             ]
 
         , pass Nothing
             [ "foo", "-o", "-i", "-bax", "-f=ox", "baz" ]
-            [ "foo"     :> D.bool true
-            , "--out"   :> D.bool true
-            , "-o"      :> D.bool true
-            , "--input" :> D.bool true
-            , "-i"      :> D.bool true
-            , "--baz"   :> D.str "ax"
-            , "-b"      :> D.str "ax"
-            , "baz"     :> D.bool true
-            , "--baz"   :> D.str "ax"
-            , "-b"      :> D.str "ax"
-            , "--foo"   :> D.array [ D.str "ox" ]
-            , "-f"      :> D.array [ D.str "ox" ]
+            [ "foo"     :> V.bool true
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "baz"     :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
             ]
 
         , fail Nothing
@@ -469,14 +476,14 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         , pass
             (Just (defaultOptions
                     { stopAt = [ "-n" ]
                     , optionsFirst = true
                     }))
             [ "-n", "true", "false" ]
-            [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
         ]
 
     , test
@@ -491,14 +498,14 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         , pass
             (Just (defaultOptions
                     { stopAt = [ "-n" ]
                     , optionsFirst = true
                     }))
             [ "-n", "true", "false" ]
-            [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
         ]
 
     , test
@@ -513,14 +520,14 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         , pass
             (Just (defaultOptions
                     { stopAt = [ "-n" ]
                     , optionsFirst = true
                     }))
             [ "-n", "true", "false" ]
-            [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
         ]
 
     , test
@@ -535,14 +542,14 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         , pass
             (Just (defaultOptions
                     { stopAt = [ "-n" ]
                     , optionsFirst = true
                     }))
             [ "-n", "true", "false" ]
-            [ "-n" :> D.array [ D.str "true",  D.str "false" ] ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
         ]
 
     , test
@@ -557,24 +564,24 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
-            , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
+            , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         , pass
             (Just (defaultOptions
                     { stopAt = [ "--noop" ]
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
-            , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
+            , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         , pass
             (Just (defaultOptions
                     { stopAt = [ "-n", "--noop" ]
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n"     :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ]
-            , "--noop" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
+            , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         ]
 
     , test
@@ -589,7 +596,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         ]
 
 
@@ -605,7 +612,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         ]
 
     , test
@@ -619,7 +626,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , smartOptions = false
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         ]
 
     , test
@@ -634,7 +641,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> D.array [ D.str "-a",  D.str "-b",  D.str "-c" ] ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         ]
 
     , test
@@ -644,18 +651,18 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ pass
             Nothing
             [ "-q", "-i", "-q" ]
-            [ "-i" :> D.bool true
-            , "-q" :> D.int 2 ]
+            [ "-i" :> V.bool true
+            , "-q" :> V.int 2 ]
         , pass
             Nothing
             [ "-i", "-q", "-q" ]
-            [ "-i" :> D.bool true
-            , "-q" :> D.int 2 ]
+            [ "-i" :> V.bool true
+            , "-q" :> V.int 2 ]
         , pass
             Nothing
             [ "-q", "-q", "-i" ]
-            [ "-i" :> D.bool true
-            , "-q" :> D.int 2 ]
+            [ "-i" :> V.bool true
+            , "-q" :> V.int 2 ]
         ]
 
     , test
@@ -665,28 +672,28 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ pass
             Nothing
             [ "-a", "-d" ]
-            [ "-a" :> D.int 1
-            , "-d" :> D.int 1 ]
+            [ "-a" :> V.int 1
+            , "-d" :> V.int 1 ]
         , pass
             Nothing
             [ "-a", "-a", "-d" ]
-            [ "-a" :> D.int 2
-            , "-d" :> D.int 1 ]
+            [ "-a" :> V.int 2
+            , "-d" :> V.int 1 ]
         , pass
             Nothing
             [ "-a", "-a", "-d", "-d" ]
-            [ "-a" :> D.int 2
-            , "-d" :> D.int 2 ]
+            [ "-a" :> V.int 2
+            , "-d" :> V.int 2 ]
         , pass
             Nothing
             [ "-a", "-d", "-a", "-a", "-d", "-a" ]
-            [ "-a" :> D.int 4
-            , "-d" :> D.int 2 ]
+            [ "-a" :> V.int 4
+            , "-d" :> V.int 2 ]
         , pass
             Nothing
             [ "-a", "-b" ]
-            [ "-a" :> D.int 1
-            , "-b" :> D.int 1 ]
+            [ "-a" :> V.int 1
+            , "-b" :> V.int 1 ]
         ]
 
     , test
@@ -697,18 +704,18 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ pass
             Nothing
             [ "100", "200" ]
-            [ "<env>" :> D.array [ D.int 100, D.int 200 ] ]
+            [ "<env>" :> V.array [ V.int 100, V.int 200 ] ]
         , pass
             Nothing
             [ "foo", "--foo", "--foo" ]
-            [ "foo"   :> D.bool true
-            , "--foo" :> D.int 2 ]
+            [ "foo"   :> V.bool true
+            , "--foo" :> V.int 2 ]
         , pass
             Nothing
             [ "foo", "--foo", "--bar", "--foo" ]
-            [ "foo"   :> D.bool true
-            , "--foo" :> D.int 2
-            , "--bar" :> D.int 1 ]
+            [ "foo"   :> V.bool true
+            , "--foo" :> V.int 2
+            , "--bar" :> V.int 1 ]
         ]
 
     , test
@@ -719,8 +726,8 @@ parserGenSpec = \_ -> describe "The parser generator" do
         [ pass
           Nothing
           [ "foo", "bar" ]
-          [ "<foo>" :> D.str "foo"
-          , "<bar>" :> D.str "bar" ]
+          [ "<foo>" :> V.str "foo"
+          , "<bar>" :> V.str "bar" ]
         , pass
           Nothing
           []
@@ -728,7 +735,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
         , pass
           Nothing
           [ "foo" ]
-          [ "foo" :> D.bool true ]
+          [ "foo" :> V.bool true ]
         ]
 
     , test
@@ -741,7 +748,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           , laxPlacement = true
           }))
           [ "--speed", "10"  ]
-          [ "--speed" :> D.array [ D.str "10" ] ]
+          [ "--speed" :> V.array [ V.str "10" ] ]
         ]
 
     , test
@@ -754,7 +761,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           , laxPlacement = true
           }))
           [ "--speed", "10"  ]
-          [ "--speed" :> D.array [ D.str "10" ] ]
+          [ "--speed" :> V.array [ V.str "10" ] ]
         ]
 
     , test
@@ -767,7 +774,7 @@ parserGenSpec = \_ -> describe "The parser generator" do
           , laxPlacement = true
           }))
           [ "--speed", "10"  ]
-          [ "--speed" :> D.array [ D.str "10" ] ]
+          [ "--speed" :> V.array [ V.str "10" ] ]
         ]
       ]
 
@@ -782,16 +789,16 @@ parserGenSpec = \_ -> describe "The parser generator" do
          ([ pass
               (Just (defaultOptions { stopAt = [ "-x" ] }))
               [ "-ifx" ,"foo", "-i" ]
-              [ "-i" :> D.bool true
-              , "-f" :> D.bool true
-              , "-x" :> D.array [ D.str "foo",  D.str "-i"  ] ]
+              [ "-i" :> V.bool true
+              , "-f" :> V.bool true
+              , "-x" :> V.array [ V.str "foo",  V.str "-i"  ] ]
 
           , pass
               (Just (defaultOptions { stopAt = [ "-x" ] }))
               [ "-i", "-f", "-x" ]
-              [ "-i" :> D.bool true
-              , "-f" :> D.bool true
-              , "-x" :> D.array [] ]
+              [ "-i" :> V.bool true
+              , "-f" :> V.bool true
+              , "-x" :> V.array [] ]
           ]
           <>
           (case scenario of
@@ -825,46 +832,46 @@ parserGenSpec = \_ -> describe "The parser generator" do
               [ pass
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-x=foo", "-i" ]
-                  [ "-i" :> D.bool true
-                  , "-f" :> D.bool true
-                  , "-x" :> D.array [ D.str "foo",  D.str "-i"  ] ]
+                  [ "-i" :> V.bool true
+                  , "-f" :> V.bool true
+                  , "-x" :> V.array [ V.str "foo",  V.str "-i"  ] ]
 
               , pass
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-ifx=foo", "-i" ]
-                  [ "-i" :> D.bool true
-                  , "-f" :> D.bool true
-                  , "-x" :> D.array [ D.str "foo",  D.str "-i"  ] ]
+                  [ "-i" :> V.bool true
+                  , "-f" :> V.bool true
+                  , "-x" :> V.array [ V.str "foo",  V.str "-i"  ] ]
 
               , pass
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-ifxy=foo", "-i" ]
-                  [ "-i" :> D.bool true
-                  , "-f" :> D.bool true
-                  , "-x" :> D.array [ D.str "y=foo",  D.str "-i"  ] ]
+                  [ "-i" :> V.bool true
+                  , "-f" :> V.bool true
+                  , "-x" :> V.array [ V.str "y=foo",  V.str "-i"  ] ]
 
               , pass
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-xoz" ]
-                  [ "-i" :> D.bool true
-                  , "-f" :> D.bool true
-                  , "-x" :> D.array [ D.str "oz" ] ]
+                  [ "-i" :> V.bool true
+                  , "-f" :> V.bool true
+                  , "-x" :> V.array [ V.str "oz" ] ]
 
               , pass
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-oxzfoo", "-i" ]
-                  [ "-i" :> D.bool true
-                  , "-f" :> D.bool true
-                  , "-o" :> D.bool true
-                  , "-x" :> D.array [ D.str "zfoo",  D.str "-i"  ] ]
+                  [ "-i" :> V.bool true
+                  , "-f" :> V.bool true
+                  , "-o" :> V.bool true
+                  , "-x" :> V.array [ V.str "zfoo",  V.str "-i"  ] ]
 
               , pass
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-oxfoo", "-i" ]
-                  [ "-i" :> D.bool true
-                  , "-f" :> D.bool true
-                  , "-o" :> D.bool true
-                  , "-x" :> D.array [ D.str "foo",  D.str "-i"  ] ]
+                  [ "-i" :> V.bool true
+                  , "-f" :> V.bool true
+                  , "-o" :> V.bool true
+                  , "-x" :> V.array [ V.str "foo",  V.str "-i"  ] ]
               ]
           ))
 
@@ -878,11 +885,11 @@ parserGenSpec = \_ -> describe "The parser generator" do
          ([ pass
               (Just (defaultOptions { stopAt = [ "--foo" ] }))
               [ "--foo" ]
-              [ "--foo" :> D.array [] ]
+              [ "--foo" :> V.array [] ]
           , pass
               (Just (defaultOptions { stopAt = [ "--foo" ] }))
               [ "--foo", "-f", "-o", "-x" ]
-              [ "--foo" :> D.array [ D.str "-f", D.str "-o", D.str "-x" ] ]
+              [ "--foo" :> V.array [ V.str "-f", V.str "-o", V.str "-x" ] ]
           ]
           <>
           (case scenario of
@@ -900,11 +907,11 @@ parserGenSpec = \_ -> describe "The parser generator" do
               [ pass
                   (Just (defaultOptions { stopAt = [ "--foo" ] }))
                   [ "--foo=BAR", "-f"]
-                  [ "--foo" :> D.array [ D.str "BAR", D.str "-f" ] ]
+                  [ "--foo" :> V.array [ V.str "BAR", V.str "-f" ] ]
               , pass
                   (Just (defaultOptions { stopAt = [ "--foo" ] }))
                   [ "--fooBAR", "-f"]
-                  [ "--foo" :> D.array [ D.str "BAR", D.str "-f" ] ]
+                  [ "--foo" :> V.array [ V.str "BAR", V.str "-f" ] ]
               ]
           ))
         ])
@@ -912,23 +919,23 @@ parserGenSpec = \_ -> describe "The parser generator" do
       <>
         -- issue #70 - Ignore ANSI escape codes
         [ test ("${h} prog foo" <~> { h: Chalk.blue "Usage:" })
-            [ pass Nothing ["foo"] ["foo" :> D.bool true ] ]
+            [ pass Nothing ["foo"] ["foo" :> V.bool true ] ]
         , test (
             """
             ${h}
               prog foo
             """ <~> { h: Chalk.blue "Usage:" })
-            [ pass Nothing ["foo"] ["foo" :> D.bool true ] ]
+            [ pass Nothing ["foo"] ["foo" :> V.bool true ] ]
 
         -- Ignore ANSI escape codes anywhere:
         , test ("${h}: prog foo" <~> { h: Chalk.blue "Usage" })
-            [ pass Nothing ["foo"] ["foo" :> D.bool true ] ]
+            [ pass Nothing ["foo"] ["foo" :> V.bool true ] ]
         , test (
             """
             ${h}:
               prog foo
             """ <~> { h: Chalk.blue "Usage" })
-            [ pass Nothing ["foo"] ["foo" :> D.bool true ] ]
+            [ pass Nothing ["foo"] ["foo" :> V.bool true ] ]
         ]
       )
 
@@ -942,17 +949,35 @@ parserGenSpec = \_ -> describe "The parser generator" do
                   premsg = if A.length argv > 0
                               then intercalate " " argv
                               else "(no input)"
-              in it (premsg <> " -> " <> msg) do
-                    vliftEff do
-                      { specification } <- runEitherEff do
-                        parseDocopt help (fromMaybe defaultOptions options)
-                      validate (specification)
-                              argv
-                              (Env.fromFoldable env)
-                              options
-                              expected
+              in it (premsg <> " -> " <> msg) $ vliftEff do
+                  let help' = dedent help
+
+                  -- parse the document
+                  spec <- runEitherEff do
+                    { usage, options } <- Scanner.scan help'
+                    { program, layouts } <- Lexer.lexUsage usage >>= Spec.parseUsage
+                    descriptions <- concat <$> for options \description ->
+                      Lexer.lexDescs description >>= Spec.parseDescription
+                    pure (Spec { program, layouts, descriptions })
+
+                  -- pre-solve the spec (TODO: hide and remove this step)
+                  Spec spec' <- runEitherEff $ preSolve spec
+
+                  -- fake "solve" the spec
+                  let spec'' = unsafePartial $ Spec $ spec' {
+                        layouts = ((fakeSolve <$> _) <$> _) <$> spec'.layouts
+                      }
+
+                  validate spec'' argv (Env.fromFoldable env) options expected
 
     where
+
+      fakeSolve
+        :: Partial
+        => PreSolvedLayout
+        -> SolvedLayout
+      fakeSolve x = x <#> case _ of
+                               SolvedArg x -> x
 
       prettyPrintOut :: StrMap Value -> String
       prettyPrintOut m = "\n\t" <> prettyPrintStrMap m
@@ -962,45 +987,57 @@ parserGenSpec = \_ -> describe "The parser generator" do
         StrMap.toList m <#> \(Tuple arg val) ->
           arg <> " => " <> prettyPrintValue val
 
-      validate :: ∀ eff.  List Usage
-                            -> Array String
-                            -> Env
-                            -> Maybe Options
-                            -> Either String (StrMap Value)
-                            -> Eff (err :: EXCEPTION | eff) Unit
-      validate spec argv env options expected = do
-        let result = uncurry (T.reduce spec env) <$> do
-                      ArgParser.run spec
-                                   env
-                                   argv
-                                   (fromMaybe defaultOptions options)
+      validate
+        :: ∀ eff
+         . Neodoc.Spec SolvedLayout
+        -> Array String
+        -> Env
+        -> Maybe Options
+        -> Either String (StrMap Value)
+        -> Eff (err :: EXCEPTION | eff) Unit
+      validate spec argv env mOptions expected =
+        let opts = fromMaybe defaultOptions mOptions
+         in runEitherEff do
+             ArgParser.run spec opts env argv
 
-        case result of
-          Left (e@(P.ParseError msg _ _)) ->
-            either
-              (\e' ->
-                if (msg /= e')
-                  then throwException $ error $
-                    "Unexpected error:\n" <> msg
-                  else pure unit)
-              (const $ throwException $ error $ show e)
-              expected
-          Right r -> do
-            either
-              (\e ->
-                throwException $ error $
-                  "Missing expected exception:"
-                    <> "\n"
-                    <> show e
-                    <> "\n"
-                    <> "\n"
-                    <> "instead received output:"
-                    <> "\n"
-                    <> prettyPrintOut r)
-              (\r' ->
-                if (r /= r')
-                  then throwException $ error $
-                    "Unexpected output:\n"
-                      <> prettyPrintOut r
-                  else pure unit)
-              expected
+        -- let result = uncurry (T.reduce spec env) <$> do
+        --               ArgParser.run spec
+        --                            env
+        --                            argv
+        --                            (fromMaybe defaultOptions options)
+        --
+        -- case result of
+        --   Left (e@(P.ParseError msg _ _)) ->
+        --     either
+        --       (\e' ->
+        --         if (msg /= e')
+        --           then throwException $ error $
+        --             "Unexpected error:\n" <> msg
+        --           else pure unit)
+        --       (const $ throwException $ error $ show e)
+        --       expected
+        --   Right r -> do
+        --     either
+        --       (\e ->
+        --         throwException $ error $
+        --           "Missing expected exception:"
+        --             <> "\n"
+        --             <> show e
+        --             <> "\n"
+        --             <> "\n"
+        --             <> "instead received output:"
+        --             <> "\n"
+        --             <> prettyPrintOut r)
+        --       (\r' ->
+        --         if (r /= r')
+        --           then throwException $ error $
+        --             "Unexpected output:\n"
+        --               <> prettyPrintOut r
+        --           else pure unit)
+        --       expected
+
+getParseErrorMessage :: P.ParseError -> String
+getParseErrorMessage (P.ParseError s _ _) = s
+
+getSolveErrorMessage :: SolveError -> String
+getSolveErrorMessage (SolveError s) = s

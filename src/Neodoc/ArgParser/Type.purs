@@ -13,10 +13,15 @@ module Neodoc.ArgParser.Type (
 , throw
 , catch
 , catch'
+, extractError
+
+-- `ArgParser`
 , Input
 , ArgParser
-, ArgParseError
+, ArgParseError (..)
 , ParseConfig
+, lookupDescription
+, lookupDescription'
 ) where
 
 import Prelude
@@ -34,6 +39,12 @@ import Neodoc.ArgParser.Lexer as L
 import Neodoc.OptionAlias (OptionAlias)
 
 -- `ArgParser`
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.List (head, filter)
+import Data.Foldable (any)
+import Data.NonEmpty ((:|))
+import Data.NonEmpty (singleton) as NonEmpty
+import Control.Alt ((<|>))
 import Neodoc.Env
 import Neodoc.Data.Description (Description(..))
 
@@ -115,11 +126,29 @@ fail message = Parser \c s -> Step false c s (Left $ ParseError false (Left mess
 fail' :: ∀ e c s a. e -> Parser e c s a
 fail' e = Parser \c s -> Step false c s (Left $ ParseError false (Right e))
 
+extractError :: ∀ e . (String -> e) -> ParseError e -> e
+extractError f (ParseError _ (Left  s)) = f s
+extractError _ (ParseError _ (Right e)) = e
+
 type Input = List PositionedToken
 
 data ArgParseError
   = OptionTakesNoArgumentError OptionAlias
   | OptionRequiresArgumentError OptionAlias
+  | MissingArgumentsError (List SolvedLayout)
+  | UnexpectedInputError (List PositionedToken)
+  | MalformedInputError String
+  | GenericError String
+  | InternalError String
+
+instance showArgParseError :: Show ArgParseError where
+  show (OptionTakesNoArgumentError a) = "OptionTakesNoArgumentError " <> show a
+  show (OptionRequiresArgumentError a) = "OptionRequiresArgumentError " <> show a
+  show (MissingArgumentsError xs) = "MissingArgumentsError " <> show xs
+  show (UnexpectedInputError xs) = "UnexpectedInputError " <> show xs
+  show (MalformedInputError s) = "MalformedInputError " <> show s
+  show (GenericError s) = "GenericError " <> show s
+  show (InternalError s) = "InternalError " <> show s
 
 type ParseConfig r = {
   env :: Env
@@ -128,3 +157,17 @@ type ParseConfig r = {
 }
 
 type ArgParser r a = Parser ArgParseError (ParseConfig r) Input a
+
+-- XXX: This could be more efficient using a table lookup
+lookupDescription :: ∀ r. OptionAlias -> ArgParser r (Maybe Description)
+lookupDescription alias = do
+  { descriptions } <- getConfig
+  pure $ head $ filter matchesAlias descriptions
+
+  where
+  matchesAlias (OptionDescription aliases _ _ _ _) = any (_ == alias) aliases
+  matchesAlias _ = false
+
+lookupDescription' :: ∀ r. OptionAlias -> ArgParser r Description
+lookupDescription' a = fromMaybe default <$> lookupDescription a
+  where default = OptionDescription (NonEmpty.singleton a) false Nothing Nothing Nothing

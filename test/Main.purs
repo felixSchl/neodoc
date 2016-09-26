@@ -8,7 +8,7 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.ScannerSpec (scannerSpec)
 import Test.Spec.UsageParserSpec (usageParserSpec)
 import Test.Spec.DescParserSpec (descParserSpec)
-import Test.Spec.ArgParserSpec (parserGenSpec)
+import Test.Spec.ArgParserSpec (argParserSpec)
 import Test.Spec.ForeignSpec (foreignSpec)
 import Test.Spec.PreSolveSpec (preSolveSpec)
 import Test.Spec.CompatSpec (compatSpec)
@@ -40,7 +40,7 @@ main = launchAff do
     usageParserSpec unit
     descParserSpec  unit
     preSolveSpec   unit
-    -- parserGenSpec   unit
+    argParserSpec   unit
     -- docoptSpec      unit
     -- foreignSpec     tests
     -- compatSpec      tests

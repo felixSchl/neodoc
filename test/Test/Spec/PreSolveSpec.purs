@@ -167,7 +167,7 @@ preSolveSpec = \_ ->
       for_ cases \(TestCase description expected) ->
         let description' = if S.length description > 0
                               then description
-                              else "<no description>"
+                              else "(no description)"
          in describe description' $
           let message = case expected of
                 Left err     -> "should fail with: " <> show err
@@ -211,4 +211,3 @@ getParseErrorMessage (P.ParseError s _ _) = s
 
 getSolveErrorMessage :: SolveError -> String
 getSolveErrorMessage (SolveError s) = s
-
