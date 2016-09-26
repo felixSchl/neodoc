@@ -52,6 +52,9 @@ import Neodoc.Data.Description (Description(..))
 
 data ParseError e = ParseError Boolean (Either String e)
 
+instance showParseError :: (Show e) => Show (ParseError e) where
+  show (ParseError b e) = "ParseError " <> show b <> " "<> show e
+
 type IsConsumed = Boolean
 type Result e a = Either (ParseError e) a
 data Step e c s a = Step IsConsumed c s (Result e a)
