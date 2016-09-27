@@ -54,7 +54,8 @@ import Prelude
 import Debug.Trace
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
-, null, concat, mapWithIndex, length, take, drop)
+, null, concat, mapWithIndex, length, take, drop, toUnfoldable)
+import Data.Array as Array
 import Data.List.Partial as LU
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Data.Function (on)
@@ -63,7 +64,7 @@ import Data.Tuple.Nested ((/\))
 import Data.Either (Either(..))
 import Data.String as String
 import Data.NonEmpty (NonEmpty(..), (:|))
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), isJust, maybe, fromJust)
 import Data.Traversable (for, traverse)
 import Data.Foldable (
   class Foldable, maximumBy, all, intercalate, sum, any, elem)
@@ -91,6 +92,7 @@ import Neodoc.OptionAlias as OptionAlias
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
+import Neodoc.ArgParser.Token as Token
 import Neodoc.ArgParser.Argument
 import Neodoc.ArgParser.Chunk
 import Neodoc.ArgParser.Lexer as L
@@ -122,15 +124,14 @@ parse
   -> Either (ParseError ArgParseError) Unit
 parse (Spec { layouts, descriptions }) options env tokens =
   runParser { env, options, descriptions } initialState tokens $
-    let parsers = concat (fromFoldable layouts) <#> \layout -> do
-          unsetFailed
-          vs <- {-withLocalCache-} do
-            parseExhaustively true false 0 (fromFoldable layout)
-          eof $> Tuple layout vs
-     in do
-        traceA $ pretty (fromFoldable layouts)
-        void $ flip evalParsers parsers \(Tuple _ vs) ->
-              sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+    let parsers = concat (fromFoldable layouts) <#> \layout ->
+          traceBracket 0 ("top-level (" <> pretty layout <> ")") do
+            unsetFailed
+            vs <- {-withLocalCache-} do
+              parseExhaustively true false 0 (fromFoldable layout)
+            eof $> Tuple layout vs
+     in void $ flip evalParsers parsers \(Tuple _ vs) ->
+          sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
   where
   eof :: ∀ r. ArgParser r Unit
   eof = do
@@ -147,13 +148,22 @@ parseLayout
   -> SolvedLayout
   -> ArgParser r (List ValueMapping)
 parseLayout skippable isSkipping l layout = do
+  { options } <- getConfig
   traceBracket l ("layout (" <> pretty layout <> ")") do
-    go layout
+    go options layout
 
   where
 
-  go (Group o r branches) =
-    let parsers = branches <#> \branch ->
+  -- Terminate at singleton groups that house only positionals.
+  go options x | options.optionsFirst && isJust (termAs x)
+    = let y = unsafePartial (fromJust (termAs x))
+      in singleton <<< Tuple y <<< (RichValue.from Origin.Argv) <$> terminate y
+
+  go options (Group o r branches) =
+    let branches' = fromFoldable branches
+        nEvaluations = length branches'
+        parsers = flip mapWithIndex branches' \branch ix ->
+          traceBracket (l + 1) ("EVALUTATION " <> show (ix + 1) <> "/" <> show nEvaluations) do
           {-withLocalCache do-}
             parseExhaustively skippable isSkipping l (fromFoldable branch)
     in do
@@ -170,12 +180,12 @@ parseLayout skippable isSkipping l layout = do
     where
       loop acc = do
         -- parse this group repeatedly, but make successive matches optional.
-        vs <- go (Group true r branches)
+        vs <- go options (Group true r branches)
         if (length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
           then loop $ acc <> vs
           else pure acc
 
-  go e@(Elem x) =
+  go _ e@(Elem x) =
     let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
      in nTimes do
           Tuple x <<< (RichValue.from Origin.Argv) <$> go' x
@@ -186,7 +196,7 @@ parseLayout skippable isSkipping l layout = do
     go' (Solved.Command    n _) = command    (pretty x) n
     go' (Solved.Stdin         ) = stdin
     go' (Solved.EOA           ) = eoa <|> (pure $ ArrayValue [])
-    go' (Solved.Option a  mA _) = do
+    go' (Solved.Option a  mA r) = do
       input       <- getInput
       { options } <- getConfig
       case input of
@@ -214,7 +224,7 @@ parseLayout skippable isSkipping l layout = do
 
 
             -- note: safe to be unsafe because of pattern match above
-            OptRes value canTerm canRepeat <- unsafePartial case token of
+            OptRes v canTerm canRepeat <- unsafePartial case token of
               LOpt _ _ ->
                 case longAliases of
                   Nil -> fail "Option has no long alias"
@@ -226,11 +236,19 @@ parseLayout skippable isSkipping l layout = do
                   _   -> choice $ shortAliases <#> \alias -> try do
                           shortOption term alias mA
 
-
-            -- XXX (TODO): Parse value repeatedly / terminate
-
-            pure value
+            -- try terminating at this option
+            if term && canTerm
+                then do
+                  vs <- terminate x
+                  pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
+                else do
+                  if isJust mA && r && canRepeat
+                      then do
+                        vs <- Array.many optionArgument
+                        pure (ArrayValue (Value.intoArray v <> vs))
+                      else pure v
         _ -> fail "Expected long or short option"
+
 
 parseExhaustively
   :: ∀ r
@@ -317,10 +335,11 @@ parseChunk skippable isSkipping l chunk = do
           -- Check if we're done trying to recover.
           -- See the `draw -1` case below (`markFailed`).
           failed <- hasFailed
-          traceDraw n xss $ "! ERROR - (state.failed = " <> show failed <> ")"
+          traceDraw n xss $ "! ERROR - (state.failed = " <> show failed
+                            <> ", error = " <> pretty err <> ")"
           if failed
             then do
-              -- _debug \_ -> "draw: aborting (failed)"
+              traceDraw n xss $ "! ABORTING (failed)"
               throw err
 
             -- shortcut: there's no point trying again if there's nothing left
@@ -328,7 +347,9 @@ parseChunk skippable isSkipping l chunk = do
             else if n == 0 || length xs == 0
               then
                 let xs' = if isFixed layout then xss else (xs <> singleton x)
-                 in draw errs' (-1) xs'
+                 in do
+                    traceDraw n xss $ "! Skipping (shortcut)"
+                    draw errs' (-1) xs'
               else
                 let isFixed' = isFixed <<< getIndexedElem <<< unRequired
                     xs' =
@@ -341,7 +362,9 @@ parseChunk skippable isSkipping l chunk = do
                             let fs = take n xss
                                 rs = drop n xss
                             in sortBy (compare `on` isFixed') fs <> rs
-                 in draw errs' (n - 1) xs'
+                 in do
+                    traceDraw n xss $ "...retrying"
+                    draw errs' (n - 1) xs'
 
     -- All arguments have been matched (or have failed to be matched) at least
     -- once by now. See where we're at - is there any required argument that was
@@ -440,6 +463,22 @@ isFreeLayout (Group _ _ xs) = all (all isFreeLayout) xs
 
 isFrom :: Origin -> RichValue -> Boolean
 isFrom o rv = o == RichValue.getOrigin rv
+
+
+-- Terminate the parser at the given argument and collect all subsequent
+-- values int an array ("options-first" and "stop-at")
+terminate :: ∀ r. SolvedLayoutArg -> ArgParser r Value
+terminate arg = do
+  input <- getInput
+  let rest = ArrayValue $ toUnfoldable $ StringValue <<< Token.getSource <$> input
+
+  -- XXX: yeah, this is functional programming, alright. this needs to be
+  -- re-visited. How can we avoid at least `setDone` and `setDepth`?
+  setDone
+  setDepth 99999
+  setInput Nil
+
+  pure rest
 
 trace :: ∀ r. Int -> (List PositionedToken -> String) -> ArgParser r Unit
 trace l f = if _ENABLE_DEBUG_

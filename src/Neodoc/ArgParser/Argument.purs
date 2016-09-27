@@ -21,6 +21,7 @@ import Text.Parsing.Parser.Combinators (
 import Text.Parsing.Parser.Pos (Position(..)) as P
 import Data.String.Ext ((~~))
 import Data.String as String
+import Data.Pretty (pretty)
 import Data.String (fromCharArray, stripPrefix)
 import Partial.Unsafe (unsafePartial)
 
@@ -163,7 +164,7 @@ longOption term n mArg = do
                 }
         _ -> fail "Invalid substring"
 
-  go a b = fail $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
+  go a _ = fail $ "Invalid token: " <> pretty a
 
 shortOption
   :: ∀ r
@@ -290,4 +291,4 @@ shortOption term f mArg = do
                         , explicitArg:    false
                         }
 
-  go a b = fail $ "Invalid token: " <> show a <> " (input: " <> show b <> ")"
+  go a _ = fail $ "Invalid token: " <> pretty a

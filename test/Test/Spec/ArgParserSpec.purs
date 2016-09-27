@@ -7,7 +7,7 @@ import Control.Monad.Eff (Eff())
 import Control.Monad (when)
 import Control.Monad.Eff.Exception (EXCEPTION())
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Either (Either(..), either)
+import Data.Either (Either(..), either, isLeft)
 import Data.List (List(..), fromFoldable, length, singleton, concat)
 import Data.Traversable (for)
 import Data.Map (Map(..))
@@ -381,103 +381,103 @@ argParserSpec = \_ -> describe "The parser generator" do
     --         "Unexpected command a"
     --     , fail Nothing [] ""
     --     ]
-
-      test
-        """
-        usage: prog foo -io [-q]...
-        options:
-          -i, --input
-          -o, --out
-          -q, --qux...
-          -b, --baz BAZ [default: "ax"]
-          -f, --foo FOZ...
-        """
-        [ pass Nothing
-            [ "foo", "--out", "--input", "--qux"]
-            [ "foo"     :> V.bool true
-            , "--out"   :> V.bool true
-            , "-o"      :> V.bool true
-            , "--input" :> V.bool true
-            , "-i"      :> V.bool true
-            , "--qux"   :> V.int 1
-            , "-q"      :> V.int 1
-            , "--foo"   :> V.array [ V.str "ox" ]
-            , "-f"      :> V.array [ V.str "ox" ]
-            , "baz"     :> V.bool true
-            , "--baz"   :> V.str "ax"
-            , "-b"      :> V.str "ax"
-            ]
-        --
-        -- , pass Nothing
-        --     [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
-        --     [ "foo"     :> V.bool true
-        --     , "--out"   :> V.bool true
-        --     , "-o"      :> V.bool true
-        --     , "--qux"   :> V.int 3
-        --     , "-q"      :> V.int 3
-        --     , "--foo"   :> V.array [ V.str "ox" ]
-        --     , "-f"      :> V.array [ V.str "ox" ]
-        --     , "--baz"   :> V.str "ax"
-        --     , "-b"      :> V.str "ax"
-        --     , "--input" :> V.bool true
-        --     , "-i"      :> V.bool true
-        --     , "baz"     :> V.bool true
-        --     ]
-        --
-        -- , pass Nothing
-        --     [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
-        --     [ "foo"     :> V.bool true
-        --     , "--qux"   :> V.int 2
-        --     , "-q"      :> V.int 2
-        --     , "--out"   :> V.bool true
-        --     , "-o"      :> V.bool true
-        --     , "--input" :> V.bool true
-        --     , "-i"      :> V.bool true
-        --     , "--baz"   :> V.str "ax"
-        --     , "-b"      :> V.str "ax"
-        --     , "--foo"   :> V.array [ V.str "ox" ]
-        --     , "-f"      :> V.array [ V.str "ox" ]
-        --     , "baz"     :> V.bool true
-        --     ]
-        --
-        -- , pass Nothing
-        --     [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
-        --     [ "foo"     :> V.bool true
-        --     , "--baz"   :> V.str "ax"
-        --     , "-b"      :> V.str "ax"
-        --     , "--out"   :> V.bool true
-        --     , "-o"      :> V.bool true
-        --     , "--foo"   :> V.array [ V.str "ox" ]
-        --     , "-f"      :> V.array [ V.str "ox" ]
-        --     , "--input" :> V.bool true
-        --     , "-i"      :> V.bool true
-        --     , "baz"     :> V.bool true
-        --     ]
-        --
-        -- , pass Nothing
-        --     [ "foo", "-o", "-i", "-bax", "-f=ox", "baz" ]
-        --     [ "foo"     :> V.bool true
-        --     , "--out"   :> V.bool true
-        --     , "-o"      :> V.bool true
-        --     , "--input" :> V.bool true
-        --     , "-i"      :> V.bool true
-        --     , "--baz"   :> V.str "ax"
-        --     , "-b"      :> V.str "ax"
-        --     , "baz"     :> V.bool true
-        --     , "--baz"   :> V.str "ax"
-        --     , "-b"      :> V.str "ax"
-        --     , "--foo"   :> V.array [ V.str "ox" ]
-        --     , "-f"      :> V.array [ V.str "ox" ]
-        --     ]
-        --
-        -- , fail Nothing
-        --     [ "foo" ]
-        --     "Missing -f/--foo=FOZ"
-        -- , fail Nothing
-        --     [ "foo", "-o", "-i", "-bax" ]
-        --     "Missing -f/--foo=FOZ"
-        ]
-
+    --
+    --   test
+    --     """
+    --     usage: prog foo -io [-q]... -b=BAZ (-f FOZ)... baz
+    --     options:
+    --       -i, --input
+    --       -o, --out
+    --       -q, --qux...
+    --       -b, --baz BAZ [default: "ax"]
+    --       -f, --foo FOZ...
+    --     """
+    --     [ pass Nothing
+    --         [ "foo", "--out", "--input", "--qux", "--foo=ox", "baz" ]
+    --         [ "foo"     :> V.bool true
+    --         , "--out"   :> V.bool true
+    --         , "-o"      :> V.bool true
+    --         , "--input" :> V.bool true
+    --         , "-i"      :> V.bool true
+    --         , "--qux"   :> V.int 1
+    --         , "-q"      :> V.int 1
+    --         , "--foo"   :> V.array [ V.str "ox" ]
+    --         , "-f"      :> V.array [ V.str "ox" ]
+    --         , "baz"     :> V.bool true
+    --         , "--baz"   :> V.str "ax"
+    --         , "-b"      :> V.str "ax"
+    --         ]
+    --
+    --     , pass Nothing
+    --         [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
+    --         [ "foo"     :> V.bool true
+    --         , "--out"   :> V.bool true
+    --         , "-o"      :> V.bool true
+    --         , "--qux"   :> V.int 3
+    --         , "-q"      :> V.int 3
+    --         , "--foo"   :> V.array [ V.str "ox" ]
+    --         , "-f"      :> V.array [ V.str "ox" ]
+    --         , "--baz"   :> V.str "ax"
+    --         , "-b"      :> V.str "ax"
+    --         , "--input" :> V.bool true
+    --         , "-i"      :> V.bool true
+    --         , "baz"     :> V.bool true
+    --         ]
+    --
+    --     , pass Nothing
+    --         [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
+    --         [ "foo"     :> V.bool true
+    --         , "--qux"   :> V.int 2
+    --         , "-q"      :> V.int 2
+    --         , "--out"   :> V.bool true
+    --         , "-o"      :> V.bool true
+    --         , "--input" :> V.bool true
+    --         , "-i"      :> V.bool true
+    --         , "--baz"   :> V.str "ax"
+    --         , "-b"      :> V.str "ax"
+    --         , "--foo"   :> V.array [ V.str "ox" ]
+    --         , "-f"      :> V.array [ V.str "ox" ]
+    --         , "baz"     :> V.bool true
+    --         ]
+    --
+    --     , pass Nothing
+    --         [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
+    --         [ "foo"     :> V.bool true
+    --         , "--baz"   :> V.str "ax"
+    --         , "-b"      :> V.str "ax"
+    --         , "--out"   :> V.bool true
+    --         , "-o"      :> V.bool true
+    --         , "--foo"   :> V.array [ V.str "ox" ]
+    --         , "-f"      :> V.array [ V.str "ox" ]
+    --         , "--input" :> V.bool true
+    --         , "-i"      :> V.bool true
+    --         , "baz"     :> V.bool true
+    --         ]
+    --
+    --     , pass Nothing
+    --         [ "foo", "-o", "-i", "-bax", "-f=ox", "baz" ]
+    --         [ "foo"     :> V.bool true
+    --         , "--out"   :> V.bool true
+    --         , "-o"      :> V.bool true
+    --         , "--input" :> V.bool true
+    --         , "-i"      :> V.bool true
+    --         , "--baz"   :> V.str "ax"
+    --         , "-b"      :> V.str "ax"
+    --         , "baz"     :> V.bool true
+    --         , "--baz"   :> V.str "ax"
+    --         , "-b"      :> V.str "ax"
+    --         , "--foo"   :> V.array [ V.str "ox" ]
+    --         , "-f"      :> V.array [ V.str "ox" ]
+    --         ]
+    --
+    --     , fail Nothing
+    --         [ "foo" ]
+    --         "Missing -f/--foo=FOZ"
+    --     , fail Nothing
+    --         [ "foo", "-o", "-i", "-bax" ]
+    --         "Missing -f/--foo=FOZ"
+    --     ]
+    --
     -- , test
     --     """
     --     usage: prog [foo]
@@ -625,8 +625,8 @@ argParserSpec = \_ -> describe "The parser generator" do
     --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
     --     ]
     --
-    --
-    -- , test
+
+    --   test
     --     """
     --     Usage: prog ((((foo|bar)|qux)|wux)|-n ARC) ARGS...
     --     options:
@@ -691,36 +691,37 @@ argParserSpec = \_ -> describe "The parser generator" do
     --         , "-q" :> V.int 2 ]
     --     ]
     --
-    -- , test
-    --     """
-    --     usage: prog (-a | -b)... (-d | -e)...
-    --     """
-    --     [ pass
-    --         Nothing
-    --         [ "-a", "-d" ]
-    --         [ "-a" :> V.int 1
-    --         , "-d" :> V.int 1 ]
-    --     , pass
-    --         Nothing
-    --         [ "-a", "-a", "-d" ]
-    --         [ "-a" :> V.int 2
-    --         , "-d" :> V.int 1 ]
-    --     , pass
-    --         Nothing
-    --         [ "-a", "-a", "-d", "-d" ]
-    --         [ "-a" :> V.int 2
-    --         , "-d" :> V.int 2 ]
-    --     , pass
-    --         Nothing
-    --         [ "-a", "-d", "-a", "-a", "-d", "-a" ]
-    --         [ "-a" :> V.int 4
-    --         , "-d" :> V.int 2 ]
-    --     , pass
-    --         Nothing
-    --         [ "-a", "-b" ]
-    --         [ "-a" :> V.int 1
-    --         , "-b" :> V.int 1 ]
-    --     ]
+      test
+        """
+        usage: prog (-a | -b)... (-d | -e)...
+        """
+        -- [ pass
+        --     Nothing
+        --     [ "-a", "-d" ]
+        --     [ "-a" :> V.int 1
+        --     , "-d" :> V.int 1 ]
+        -- , pass
+        --     Nothing
+        --     [ "-a", "-a", "-d" ]
+        --     [ "-a" :> V.int 2
+        --     , "-d" :> V.int 1 ]
+        -- , pass
+        --     Nothing
+        --     [ "-a", "-a", "-d", "-d" ]
+        --     [ "-a" :> V.int 2
+        --     , "-d" :> V.int 2 ]
+        -- , pass
+        --     Nothing
+        --     [ "-a", "-d", "-a", "-a", "-d", "-a" ]
+        --     [ "-a" :> V.int 4
+        --     , "-d" :> V.int 2 ]
+        -- , pass
+        [ pass
+            Nothing
+            [ "-a", "-b" ]
+            [ "-a" :> V.int 1
+            , "-b" :> V.int 1 ]
+        ]
     --
     -- , test
     --     """
@@ -975,6 +976,8 @@ argParserSpec = \_ -> describe "The parser generator" do
                               then intercalate " " argv
                               else "(no input)"
               in it (premsg <> " -> " <> msg) $ vliftEff do
+                if isLeft expected then pure unit else do
+
                   let help' = dedent help
 
                   -- parse the document
@@ -1023,7 +1026,7 @@ argParserSpec = \_ -> describe "The parser generator" do
       validate spec argv env mOptions expected =
         let opts = fromMaybe defaultOptions mOptions
          in runEitherEff do
-             ArgParser.run spec opts env argv
+              lmap pretty $ ArgParser.run spec opts env argv
 
         -- let result = uncurry (T.reduce spec env) <$> do
         --               ArgParser.run spec

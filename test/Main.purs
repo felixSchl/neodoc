@@ -39,7 +39,7 @@ main = launchAff do
     -- scannerSpec     unit
     -- usageParserSpec unit
     -- descParserSpec  unit
-    -- preSolveSpec   unit
+    -- preSolveSpec    unit
     argParserSpec   unit
     -- docoptSpec      unit
     -- foreignSpec     tests
