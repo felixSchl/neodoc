@@ -28,10 +28,10 @@ instance showIndexed :: (Show a) => Show (Indexed a) where
   show (Indexed n a) = "Indexed " <> show n <> " " <> show a
 
 instance prettyIndexed :: (Pretty a) => Pretty (Indexed a) where
-  pretty (Indexed n a) = "Indexed " <> show n <> " " <> pretty a
+  pretty (Indexed n a) = "#" <> show n <> ": " <> pretty a
 
 instance prettyIndexed' :: (Show a) => Pretty (Indexed a) where
-  pretty (Indexed n a) = "Indexed " <> show n <> " " <> show a
+  pretty (Indexed n a) = "#" <> show n <> ": " <> show a
 
 -- | Note: use the tuple semantics for comparisons.
 -- | Refer to the Ord instance of tuples for an explanation.

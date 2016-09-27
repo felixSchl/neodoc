@@ -260,6 +260,8 @@ preSolve (Spec { program, layouts, descriptions }) = do
         mDesc <- lookupValidDescription true h
         leading <- fromFoldable <$> for ts \t -> do
           lookupValidDescription false t
+          -- note: return a function to override the stacked option's
+          -- repeatability later.
           pure $ \r' -> Solved.Option (OptionAlias.Short t) Nothing (r || r')
         case mDesc of
           Just (_ /\ (Just (Usage.OptionArgument aN' aO'))) -> do
@@ -268,9 +270,12 @@ preSolve (Spec { program, layouts, descriptions }) = do
                 if not aO' then
                   fail $ "Option-Argument specified in options-section missing"
                         <> " -" <> S.singleton h
-                else solved
-                  $ (Solved.Option (OptionAlias.Short h) Nothing r)
-                  :| ((_ $ false) <$> leading)
+                else
+                  let leading' = (_ $ false) <$> leading
+                      opt = Solved.Option (OptionAlias.Short h) Nothing r
+                  in solved case leading' of
+                        x : xs -> x :| xs <> singleton opt
+                        Nil    -> opt :| Nil
               )
               (\(adjR /\ adjN /\ adjO) -> do
                 guardArgNames adjN aN'
@@ -294,9 +299,12 @@ preSolve (Spec { program, layouts, descriptions }) = do
                     Elem (Usage.Command    n r') -> pure ((r || r') /\ n /\ o)
                     _ -> Nothing
                   _ -> Nothing
-          _ -> solved
-                $ (Solved.Option (OptionAlias.Short h) Nothing r)
-                :| ((_ $ false) <$> leading)
+          _ ->
+            let leading' = (_ $ false) <$> leading
+                opt = Solved.Option (OptionAlias.Short h) Nothing r
+             in solved case leading' of
+                  x : xs -> x :| xs <> singleton opt
+                  Nil    -> opt :| Nil
 
         where
         guardArgNames aN aN' | aN ^=^ aN' = pure true
@@ -342,7 +350,7 @@ zipTraverseM f = go
         Nothing -> pure (a :| as)
         Just y  -> do
           b :| bs <- go (y :| Nil)
-          pure (a :| b : bs)
+          pure (a :| as <> (b : bs)) -- note: `as` won't be run again
 
     go (x :| y : xss) = do
       ma /\ (a :| as) <- f (Just y) x
@@ -350,7 +358,7 @@ zipTraverseM f = go
         Nothing -> pure (a :| as)
         Just z  -> do
           b :| bs <- go (z :| xss)
-          pure (a :| b : bs)
+          pure (a :| as <> (b : bs)) -- note: `as` won't be run again
 
 posArgsEq :: String -> String -> Boolean
 posArgsEq = eq `on` (S.toUpper <<< stripAngles)

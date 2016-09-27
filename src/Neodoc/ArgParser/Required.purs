@@ -36,8 +36,8 @@ instance showRequired :: (Show a) => Show (Required a) where
   show (Optional a) = "Optional " <> show a
 
 instance pretty :: (Pretty a) => Pretty (Required a) where
-  pretty (Required x) = "Required " <> pretty x
-  pretty (Optional x) = "Optional " <> pretty x
+  pretty (Required x) = "R(" <> pretty x <> ")"
+  pretty (Optional x) = "O(" <> pretty x <> ")"
 
 unRequired :: ∀ a. Required a -> a
 unRequired (Required a) = a

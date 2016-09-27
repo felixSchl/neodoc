@@ -127,8 +127,10 @@ parse (Spec { layouts, descriptions }) options env tokens =
           vs <- {-withLocalCache-} do
             parseExhaustively true false 0 (fromFoldable layout)
           eof $> Tuple layout vs
-     in void $ flip evalParsers parsers \(Tuple _ vs) ->
-          sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+     in do
+        traceA $ pretty (fromFoldable layouts)
+        void $ flip evalParsers parsers \(Tuple _ vs) ->
+              sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
   where
   eof :: ∀ r. ArgParser r Unit
   eof = do
@@ -254,6 +256,12 @@ parseChunk skippable isSkipping l chunk = do
     go chunk
 
   where
+  traceDraw :: ∀ a. (Pretty a) => Int -> (List a) -> String -> ArgParser r Unit
+  traceDraw n xss msg = trace l \input -> do
+    "draw (" <> show n <> "|" <> show skippable <> "|" <> show isSkipping <> "): "
+      <> (if String.length msg > 0 then " " <> msg else "")
+      <> " (elems: " <> pretty xss <> ")"
+      <> " (input: " <> pretty input <> ")"
 
   go (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
   go (Free  xs) =
@@ -262,8 +270,7 @@ parseChunk skippable isSkipping l chunk = do
 
     where
     draw
-      :: ∀ r
-       . Map SolvedLayout (ParseError ArgParseError)
+      :: Map SolvedLayout (ParseError ArgParseError)
       -> Int
       -> List (Required (Indexed SolvedLayout))
       -> ArgParser r (List ValueMapping)
@@ -282,13 +289,7 @@ parseChunk skippable isSkipping l chunk = do
                       then setLayoutRequired true layout
                       else layout
            in do
-            input <- getInput
-            -- _debug \_ ->
-            --     "draw: "
-            --   <> "- n: "          <> show n
-            --   <> ", skippable: "  <> show skippable
-            --   <> ", isSkipping: " <> show isSkipping
-            --   <> ", input: "      <> show (intercalate " " $ pretty <$> input)
+            traceDraw n xss ""
 
             -- Try parsing the argument 'x'. If 'x' fails, enqueue it for a later
             -- try.  Should 'x' fail and should 'x' be skippable (i.e. it defines
@@ -315,13 +316,8 @@ parseChunk skippable isSkipping l chunk = do
          in do
           -- Check if we're done trying to recover.
           -- See the `draw -1` case below (`markFailed`).
-
-          -- _debug \_->
-          --     "draw: failure"
-          --   <> ", requeueing: " <> pretty x
-          --   <> ", length of xs: " <> show (length xs)
-
           failed <- hasFailed
+          traceDraw n xss $ "! ERROR - (state.failed = " <> show failed <> ")"
           if failed
             then do
               -- _debug \_ -> "draw: aborting (failed)"
@@ -353,13 +349,7 @@ parseChunk skippable isSkipping l chunk = do
     draw errs n xss@(x:xs) | n < 0 = skipIf isDone Nil do
       input <- getInput
       { options, env, descriptions } <- getConfig
-
-      -- _debug \_ ->
-      --     "draw: "
-      --   <> "- n: "          <> show n
-      --   <> ", skippable: "  <> show skippable
-      --   <> ", isSkipping: " <> show isSkipping
-      --   <> ", input: "      <> show (intercalate " " $ pretty <$> input)
+      traceDraw n xss $ ""
 
       let
         xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss

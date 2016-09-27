@@ -118,6 +118,7 @@ usageParserSpec = \_ -> do
     describe "stacked options" do
       runSingleArgumentTests
         [ pass "-b"         $ sopt_ 'b' []
+        , pass "-io"        $ sopt_ 'i' ['o']
         , pass "-?"         $ sopt_ '?' [] -- special chars
         , pass "-bFOO"      $ sopt_ 'b' ['F', 'O', 'O']
         , pass "-bFoo"      $ sopt_ 'b' ['F', 'o', 'o']

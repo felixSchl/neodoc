@@ -72,6 +72,12 @@ preSolveSpec = \_ ->
     , TestSuite "prog <prog>..." [ pass "" "prog <prog>..." ]
 
       -- options:
+    , TestSuite "prog -io"
+        [ pass "" "prog -i -o" ]
+
+    , TestSuite "prog -io [-q]..."
+        [ pass "" "prog -i -o [-q]..." ]
+
     , TestSuite "prog --foo..."
         [ fail "-f --foo=bar [default: qux]"
             "Option-Argument specified in options-section missing --foo" ]
