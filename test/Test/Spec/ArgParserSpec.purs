@@ -46,6 +46,7 @@ import Neodoc.Transform.SolveError (SolveError(..))
 import Neodoc.Transform.PreSolve (preSolve, PreSolvedLayout(..), PreSolvedLayoutArg(..))
 import Neodoc.Data.SolvedLayout (SolvedLayout(..))
 import Neodoc.ArgParser as ArgParser
+import Neodoc.ArgParser (ArgParseResult(..))
 
 -- hack to easily isolate tests
 isolate :: Boolean
@@ -1031,8 +1032,11 @@ argParserSpec = \_ -> describe "The parser generator" do
         -> Eff (err :: EXCEPTION | eff) Unit
       validate spec argv env mOptions expected =
         let opts = fromMaybe defaultOptions mOptions
-         in runEitherEff do
-              lmap pretty $ ArgParser.run spec opts env argv
+         in void do
+          result@(ArgParseResult branch vs) <- runEitherEff do
+            lmap pretty $ ArgParser.run spec opts env argv
+          traceA (pretty result)
+          pure unit
 
         -- let result = uncurry (T.reduce spec env) <$> do
         --               ArgParser.run spec

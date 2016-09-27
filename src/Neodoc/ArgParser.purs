@@ -1,4 +1,7 @@
-module Neodoc.ArgParser where
+module Neodoc.ArgParser (
+  run
+, module Reexports
+) where
 
 import Prelude
 import Data.Either
@@ -10,8 +13,12 @@ import Neodoc.Data.SolvedLayout (SolvedLayout)
 import Neodoc.ArgParser.Options (Options)
 import Neodoc.ArgParser.Type (ParseError, ArgParser, ArgParseError(..), extractError)
 import Neodoc.ArgParser.Parser (parse)
+import Neodoc.ArgParser.Result (ArgParseResult(..))
 import Neodoc.ArgParser.Lexer as Lexer
 import Text.Parsing.Parser (ParseError(..)) as P
+
+import Neodoc.ArgParser.Options as Reexports
+import Neodoc.ArgParser.Result as Reexports
 
 run
   :: ∀ r
@@ -19,7 +26,7 @@ run
   -> Options r
   -> Env
   -> Array String
-  -> Either ArgParseError Unit
+  -> Either ArgParseError ArgParseResult
 run spec opts env input = do
   toks <- runLexer $ Lexer.lex (fromFoldable input) opts
   runParser $ parse spec opts env toks

@@ -81,7 +81,7 @@ import Neodoc.Value.RichValue (RichValue(..), unRichValue)
 import Neodoc.Value.RichValue as RichValue
 import Neodoc.Value.Origin (Origin(..))
 import Neodoc.Value.Origin as Origin
-import Neodoc.Spec (Spec(..))
+import Neodoc.Spec (Spec(..), Toplevel)
 import Neodoc.Env
 import Neodoc.Data.Layout
 import Neodoc.Data.Layout as Layout
@@ -89,6 +89,8 @@ import Neodoc.Data.Description
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
 import Neodoc.OptionAlias as OptionAlias
+import Neodoc.ArgKey (ArgKey)
+import Neodoc.ArgKey.Class (toArgKey)
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
@@ -101,9 +103,11 @@ import Neodoc.ArgParser.Indexed
 import Neodoc.ArgParser.Required
 import Neodoc.ArgParser.Combinators
 import Neodoc.ArgParser.Fallback
+import Neodoc.ArgParser.Result
+import Neodoc.ArgParser.KeyValue
 
 _ENABLE_DEBUG_ :: Boolean
-_ENABLE_DEBUG_ = true
+_ENABLE_DEBUG_ = false
 
 initialState :: ParseState
 initialState = {
@@ -113,7 +117,6 @@ initialState = {
 }
 
 type ChunkedLayout a = Layout (Chunk a)
-type ValueMapping = Tuple SolvedLayoutArg RichValue
 
 parse
   :: ∀ r
@@ -121,16 +124,17 @@ parse
   -> Options r
   -> Env
   -> List PositionedToken
-  -> Either (ParseError ArgParseError) Unit
+  -> Either (ParseError ArgParseError) ArgParseResult
 parse (Spec { layouts, descriptions }) options env tokens =
   runParser { env, options, descriptions } initialState tokens $
-    let parsers = concat (fromFoldable layouts) <#> \layout ->
-          traceBracket 0 ("top-level (" <> pretty layout <> ")") do
+    let parsers = concat (fromFoldable layouts) <#> \toplevel ->
+          traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
             unsetFailed
             vs <- {-withLocalCache-} do
-              parseExhaustively true false 0 (fromFoldable layout)
-            eof $> Tuple layout vs
-     in void $ flip evalParsers parsers \(Tuple _ vs) ->
+              parseExhaustively true false 0 (fromFoldable toplevel)
+            eof
+            pure $ ArgParseResult toplevel vs
+     in flip evalParsers parsers \(ArgParseResult _ vs) ->
           sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
   where
   eof :: ∀ r. ArgParser r Unit
@@ -146,7 +150,7 @@ parseLayout
   -> Boolean  -- ^ are we currently skipping using fallback values?
   -> Int      -- ^ recursive level
   -> SolvedLayout
-  -> ArgParser r (List ValueMapping)
+  -> ArgParser r (List KeyValue)
 parseLayout skippable isSkipping l layout = do
   { options } <- getConfig
   traceBracket l ("layout (" <> pretty layout <> ")") do
@@ -157,7 +161,8 @@ parseLayout skippable isSkipping l layout = do
   -- Terminate at singleton groups that house only positionals.
   go options x | options.optionsFirst && isJust (termAs x)
     = let y = unsafePartial (fromJust (termAs x))
-      in singleton <<< Tuple y <<< (RichValue.from Origin.Argv) <$> terminate y
+      in singleton <<< Tuple (toArgKey y) <<< (RichValue.from Origin.Argv) <$>
+          terminate y
 
   go options (Group o r branches) =
     let branches' = fromFoldable branches
@@ -188,7 +193,7 @@ parseLayout skippable isSkipping l layout = do
   go _ e@(Elem x) =
     let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
      in nTimes do
-          Tuple x <<< (RichValue.from Origin.Argv) <$> go' x
+          Tuple (toArgKey x) <<< (RichValue.from Origin.Argv) <$> go' x
             <* modifyDepth (_ + 1)
 
     where
@@ -256,7 +261,7 @@ parseExhaustively
   -> Boolean -- ^ are we currently skipping using fallback values?
   -> Int     -- ^ recursive level
   -> List SolvedLayout
-  -> ArgParser r (List ValueMapping)
+  -> ArgParser r (List KeyValue)
 parseExhaustively skippable isSkipping l xs = do
   { options } <- getConfig
   let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
@@ -268,7 +273,7 @@ parseChunk
   -> Boolean  -- ^ are we currently skipping using fallback values?
   -> Int      -- ^ recursive level
   -> Chunk (List SolvedLayout)
-  -> ArgParser r (List ValueMapping)
+  -> ArgParser r (List KeyValue)
 parseChunk skippable isSkipping l chunk = do
   traceBracket l ("chunk (" <> pretty chunk <> ")") do
     go chunk
@@ -291,7 +296,7 @@ parseChunk skippable isSkipping l chunk = do
       :: Map SolvedLayout (ParseError ArgParseError)
       -> Int
       -> List (Required (Indexed SolvedLayout))
-      -> ArgParser r (List ValueMapping)
+      -> ArgParser r (List KeyValue)
 
     -- Try "drawing" from the input list
     draw errs n xss@(x:xs) | n >= 0 =
@@ -372,6 +377,7 @@ parseChunk skippable isSkipping l chunk = do
     draw errs n xss@(x:xs) | n < 0 = skipIf isDone Nil do
       input <- getInput
       { options, env, descriptions } <- getConfig
+
       traceDraw n xss $ ""
 
       let
@@ -379,7 +385,7 @@ parseChunk skippable isSkipping l chunk = do
         layouts = getIndexedElem <<< unRequired <$> xss'
         vs = layouts <#> case _ of
           layout@(Group _ _ _) -> Left layout
-          layout@(Elem arg) -> maybe (Left layout) (Right <<< Tuple arg) do
+          layout@(Elem arg) -> maybe (Left layout) (Right <<< Tuple (toArgKey arg)) do
             let description = case arg of
                   (Option alias _ _) -> findDescription alias descriptions
                   _                  -> Nothing

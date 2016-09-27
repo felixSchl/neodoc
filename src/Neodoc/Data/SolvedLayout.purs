@@ -9,6 +9,8 @@ import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty)
 import Neodoc.Data.Layout
 import Neodoc.OptionAlias
+import Neodoc.ArgKey (ArgKey(..))
+import Neodoc.ArgKey.Class (class ToArgKey)
 import Data.Function (on)
 
 data OptionArgument
@@ -38,6 +40,13 @@ data SolvedLayoutArg
   | Option      OptionAlias (Maybe OptionArgument) Boolean
   | EOA
   | Stdin
+
+instance toArgKeySolvedLayoutArg :: ToArgKey SolvedLayoutArg where
+  toArgKey (Command     n   _) = CommandKey n
+  toArgKey (Positional  n   _) = PositionalKey n
+  toArgKey (Option      a _ _) = OptionKey a
+  toArgKey (EOA              ) = EOAKey
+  toArgKey (Stdin            ) = StdinKey
 
 instance eqSolvedLayoutArg :: Eq SolvedLayoutArg where
   eq (Command n r) (Command n' r') = n == n' && r == r'
