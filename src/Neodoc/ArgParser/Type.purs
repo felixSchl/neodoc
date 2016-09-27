@@ -42,8 +42,8 @@ module Neodoc.ArgParser.Type (
 ) where
 
 import Prelude
-import Data.List (List)
-import Data.Either (Either(..))
+import Data.List (List(..))
+import Data.Either (Either(..), either)
 import Control.Lazy (class Lazy)
 import Control.MonadPlus (class MonadPlus, class MonadZero, class Alternative)
 import Control.Plus (class Plus, class Alt)
@@ -70,6 +70,10 @@ data ParseError e = ParseError Boolean (Either String e)
 
 instance showParseError :: (Show e) => Show (ParseError e) where
   show (ParseError b e) = "ParseError " <> show b <> " "<> show e
+
+instance prettyParseError :: (Pretty e) => Pretty (ParseError e) where
+  pretty (ParseError false e) = either id pretty e
+  pretty (ParseError true e) = "Fatal: " <> either id pretty e
 
 type IsConsumed = Boolean
 type Result e a = Either (ParseError e) a
@@ -177,7 +181,7 @@ data ArgParseError
   = OptionTakesNoArgumentError OptionAlias
   | OptionRequiresArgumentError OptionAlias
   | MissingArgumentsError (List SolvedLayout)
-  | UnexpectedInputError (List PositionedToken)
+  | UnexpectedInputError (List PositionedToken) (List SolvedLayout)
   | MalformedInputError String
   | GenericError String
   | InternalError String
@@ -186,19 +190,23 @@ instance showArgParseError :: Show ArgParseError where
   show (OptionTakesNoArgumentError a) = "OptionTakesNoArgumentError " <> show a
   show (OptionRequiresArgumentError a) = "OptionRequiresArgumentError " <> show a
   show (MissingArgumentsError xs) = "MissingArgumentsError " <> show xs
-  show (UnexpectedInputError xs) = "UnexpectedInputError " <> show xs
+  show (UnexpectedInputError xs ys) = "UnexpectedInputError " <> show xs <> " " <> show ys
   show (MalformedInputError s) = "MalformedInputError " <> show s
   show (GenericError s) = "GenericError " <> show s
   show (InternalError s) = "InternalError " <> show s
 
-instance prettyArgParseError :: Show ArgParseError where
-  show (OptionTakesNoArgumentError a) = "Option takes no argument: " <> pretty a
-  show (OptionRequiresArgumentError a) = "Option requires argument: " <> pretty a
-  show (MissingArgumentsError xs) = "Missing arguments: " <> (intercalate ", " $ pretty <$> xs)
-  show (UnexpectedInputError xs) = "Unexpected Input: " <> (intercalate " " $ show <$> xs)
-  show (MalformedInputError s) = "Malformed Input: " <> show s
-  show (GenericError s) = s
-  show (InternalError s) = "Internal error: " <> s
+instance prettyArgParseError :: Pretty ArgParseError where
+  pretty (OptionTakesNoArgumentError a) = "Option takes no argument: " <> pretty a
+  pretty (OptionRequiresArgumentError a) = "Option requires argument: " <> pretty a
+  pretty (MissingArgumentsError xs) = "Missing arguments: " <> (intercalate ", " $ pretty <$> xs)
+  pretty (UnexpectedInputError xs ys)
+    = "Unexpected Input: " <> (intercalate " " $ pretty <$> xs)
+     <> expected ys
+    where expected Nil = ""
+          expected ys = ". Expected: " <> (intercalate " " $ pretty <$> ys)
+  pretty (MalformedInputError s) = "Malformed Input: " <> show s
+  pretty (GenericError s) = s
+  pretty (InternalError s) = "Internal error: " <> s
 
 type ParseConfig r = {
   env :: Env

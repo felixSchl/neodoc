@@ -2,7 +2,7 @@ module Neodoc.ArgParser.Chunk where
 
 import Prelude
 import Data.List (List(..), singleton, (:), reverse)
-import Data.Foldable (foldl)
+import Data.Foldable (foldl, intercalate)
 import Data.Pretty (class Pretty, pretty)
 
 -- | Auxiliary data structure to indiciate whether or not the contained elements
@@ -13,6 +13,10 @@ data Chunk a = Free a | Fixed a
 instance showClump :: (Show a) => Show (Chunk a) where
   show (Fixed a) = "Fixed " <> show a
   show (Free  a) = "Free "  <> show a
+
+instance prettyClump :: (Pretty a) => Pretty (Chunk (List a)) where
+  pretty (Fixed as) = "<! " <> (intercalate " " $ pretty <$> as) <> " !>"
+  pretty (Free  as) = "<* " <> (intercalate " " $ pretty <$> as) <> " *>"
 
 isFree :: ∀ a. Chunk a -> Boolean
 isFree (Free _) = true

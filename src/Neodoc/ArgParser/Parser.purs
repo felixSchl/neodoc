@@ -69,7 +69,7 @@ import Data.Foldable (
   class Foldable, maximumBy, all, intercalate, sum, any, elem)
 import Data.Map as Map
 import Data.Map (Map)
-import Data.Pretty (pretty)
+import Data.Pretty (pretty, class Pretty)
 import Control.Alt ((<|>))
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Partial.Unsafe
@@ -135,7 +135,7 @@ parse (Spec { layouts, descriptions }) options env tokens =
     input <- getInput
     case input of
       Nil -> pure unit
-      xs  -> fail' $ UnexpectedInputError xs
+      xs  -> fail' $ UnexpectedInputError xs Nil
 
 parseLayout
   :: ∀ r
@@ -144,9 +144,12 @@ parseLayout
   -> Int      -- ^ recursive level
   -> SolvedLayout
   -> ArgParser r (List ValueMapping)
-parseLayout skippable isSkipping l = go
+parseLayout skippable isSkipping l layout = do
+  traceBracket l ("layout (" <> pretty layout <> ")") do
+    go layout
 
   where
+
   go (Group o r branches) =
     let parsers = branches <#> \branch ->
           {-withLocalCache do-}
@@ -172,8 +175,9 @@ parseLayout skippable isSkipping l = go
 
   go e@(Elem x) =
     let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
-    in Nil <$ nTimes do go' x
-           <* modifyDepth (_ + 1)
+     in nTimes do
+          Tuple x <<< (RichValue.from Origin.Argv) <$> go' x
+            <* modifyDepth (_ + 1)
 
     where
     go' (Solved.Positional n _) = positional (pretty x) n
@@ -236,7 +240,7 @@ parseExhaustively
 parseExhaustively skippable isSkipping l xs = do
   { options } <- getConfig
   let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
-  concat <$> traverse (parseChunk skippable isSkipping l) chunks
+  concat <$> traverse (parseChunk skippable isSkipping (l + 2)) chunks
 
 parseChunk
   :: ∀ r
@@ -245,8 +249,12 @@ parseChunk
   -> Int      -- ^ recursive level
   -> Chunk (List SolvedLayout)
   -> ArgParser r (List ValueMapping)
-parseChunk skippable isSkipping l = go
+parseChunk skippable isSkipping l chunk = do
+  traceBracket l ("chunk (" <> pretty chunk <> ")") do
+    go chunk
+
   where
+
   go (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
   go (Free  xs) =
     let indexedLayouts = flip mapWithIndex xs \x ix -> Required (Indexed ix x)
@@ -274,6 +282,14 @@ parseChunk skippable isSkipping l = go
                       then setLayoutRequired true layout
                       else layout
            in do
+            input <- getInput
+            -- _debug \_ ->
+            --     "draw: "
+            --   <> "- n: "          <> show n
+            --   <> ", skippable: "  <> show skippable
+            --   <> ", isSkipping: " <> show isSkipping
+            --   <> ", input: "      <> show (intercalate " " $ pretty <$> input)
+
             -- Try parsing the argument 'x'. If 'x' fails, enqueue it for a later
             -- try.  Should 'x' fail and should 'x' be skippable (i.e. it defines
             -- a default value or is backed by an environment variable),
@@ -300,9 +316,17 @@ parseChunk skippable isSkipping l = go
           -- Check if we're done trying to recover.
           -- See the `draw -1` case below (`markFailed`).
 
+          -- _debug \_->
+          --     "draw: failure"
+          --   <> ", requeueing: " <> pretty x
+          --   <> ", length of xs: " <> show (length xs)
+
           failed <- hasFailed
           if failed
-            then throw err
+            then do
+              -- _debug \_ -> "draw: aborting (failed)"
+              throw err
+
             -- shortcut: there's no point trying again if there's nothing left
             -- to parse.
             else if n == 0 || length xs == 0
@@ -329,6 +353,13 @@ parseChunk skippable isSkipping l = go
     draw errs n xss@(x:xs) | n < 0 = skipIf isDone Nil do
       input <- getInput
       { options, env, descriptions } <- getConfig
+
+      -- _debug \_ ->
+      --     "draw: "
+      --   <> "- n: "          <> show n
+      --   <> ", skippable: "  <> show skippable
+      --   <> ", isSkipping: " <> show isSkipping
+      --   <> ", input: "      <> show (intercalate " " $ pretty <$> input)
 
       let
         xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss
@@ -367,8 +398,6 @@ parseChunk skippable isSkipping l = go
                 else pure fallbacks
             else throwExpectedError layouts input
 
-      pure Nil
-
       where
         throwExpectedError
           :: ∀ r
@@ -380,7 +409,7 @@ parseChunk skippable isSkipping l = go
               e = case Map.lookup x errs of
                 _ -> case input of
                   Nil  -> MissingArgumentsError xs
-                  toks -> UnexpectedInputError toks
+                  toks -> UnexpectedInputError toks xs
            in fail' e
 
     draw _ _ _ = pure Nil
@@ -422,5 +451,37 @@ isFreeLayout (Group _ _ xs) = all (all isFreeLayout) xs
 isFrom :: Origin -> RichValue -> Boolean
 isFrom o rv = o == RichValue.getOrigin rv
 
-traceError = catch' (\e -> traceShowA e *> throw e)
+trace :: ∀ r. Int -> (List PositionedToken -> String) -> ArgParser r Unit
+trace l f = if _ENABLE_DEBUG_
+              then do
+                input <- getInput
+                traceA $ indent l <> (f input)
+              else pure unit
+
+traceError :: ∀ r a. Int -> String -> ArgParser r a  -> ArgParser r a
+traceError l s
+  = catch' (\e -> trace l (\_ -> "! " <> s <> ": " <> pretty e) *> throw e)
+
+traceInput :: ∀ r. ArgParser r Unit
 traceInput = traceA =<< pretty <$> getInput
+
+indent :: Int -> String
+indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
+
+traceBracket
+  :: ∀ r a
+   . (Pretty a)
+  => Int
+  -> String
+  -> ArgParser r a
+  -> ArgParser r a
+traceBracket l label p = do
+  input <- getInput
+  trace l \_ -> "parsing " <> label <> "... (input: " <> pretty input <> ")"
+  output <- traceError l ("failed to parse " <> label) p
+  input <- getInput
+  trace l \_ ->
+    "successfully parsed " <> label <> "!"
+      <> " (output: " <> pretty output <> ")"
+      <> " (new input: " <> pretty input <> ")"
+  pure output
