@@ -84,6 +84,16 @@ isRepeatable (Elem (Positional _ r)) = r
 isRepeatable (Elem (Option   _ _ r)) = r
 isRepeatable _ = false
 
+setRepeatable :: Boolean -> SolvedLayout -> SolvedLayout
+setRepeatable r (Group           o _ xs) = Group o r xs
+setRepeatable r (Elem (Command     n _)) = Elem (Command n r)
+setRepeatable r (Elem (Positional  n _)) = Elem (Positional n r)
+setRepeatable r (Elem (Option   a mA _)) = Elem (Option a mA r)
+setRepeatable _ x = x
+
+getElem :: Partial => SolvedLayout -> SolvedLayoutArg
+getElem (Elem x) = x
+
 isOptional :: SolvedLayout -> Boolean
 isOptional (Group o _ _) = o
 isOptional _ = false

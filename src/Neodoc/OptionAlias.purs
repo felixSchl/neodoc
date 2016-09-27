@@ -19,20 +19,20 @@ import Data.Pretty (class Pretty)
 type Aliases = NonEmpty List OptionAlias
 data OptionAlias = Short Char | Long String
 
-instance prettyAlias :: Pretty OptionAlias where
+instance prettyOptionAlias :: Pretty OptionAlias where
   pretty (Short c) = "-"  <> (String.singleton c)
   pretty (Long  n) = "--" <> n
 
-instance showAlias :: Show OptionAlias where
+instance showOptionAlias :: Show OptionAlias where
   show (Short c) = "Short " <> show c
   show (Long  s) = "Long "  <> show s
 
-instance eqAlias :: Eq OptionAlias where
+instance eqOptionAlias :: Eq OptionAlias where
   eq (Short c) (Short c') = c == c'
   eq (Long  s) (Long  s') = s == s'
   eq _         _          = false
 
-instance ordAlias :: Ord OptionAlias where
+instance ordOptionAlias :: Ord OptionAlias where
   compare (Short c) (Short c') = c `compare` c'
   compare (Long  s) (Long  s') = s `compare` s'
   compare (Long  _) _          = GT -- move long names to the back

@@ -124,6 +124,7 @@ reduceUsage = Map.values <<< reduceBranches false
                    -> List D.Branch
                    -> Map Key D.Argument
     reduceBranches r bs =
+
       let ms = combine <<< (expand <$> _) <$> bs
       in foldl (Map.unionWith resolveAcrossBranches)
                 Map.empty
@@ -171,4 +172,4 @@ reduceUsage = Map.values <<< reduceBranches false
                       }
                     , repeatable = true
                     })
-    resolveInSameBranch a b = D.setRepeatable a true
+    resolveInSameBranch a _ = D.setRepeatable a true
