@@ -31,18 +31,17 @@ getFallbackValue
   -> SolvedLayoutArg
   -> Maybe RichValue
 getFallbackValue options env mDescription x = do
-  d <- mDescription
-  (fromEnv       d <#> RValue.from Origin.Environment) <|>
-  (fromDefault x d <#> RValue.from Origin.Default)     <|>
-  (empty       x   <#> RValue.from Origin.Empty)
+  (fromEnv       mDescription <#> RValue.from Origin.Environment) <|>
+  (fromDefault x mDescription <#> RValue.from Origin.Default)     <|>
+  (empty       x              <#> RValue.from Origin.Empty)
 
   where
-  fromEnv :: Description -> Maybe Value
-  fromEnv (OptionDescription _ _ _ _ (Just k)) = StringValue <$> Env.lookup k env
-  fromEnv _                                    = Nothing
+  fromEnv :: Maybe Description -> Maybe Value
+  fromEnv (Just (OptionDescription _ _ _ _ (Just k))) = StringValue <$> Env.lookup k env
+  fromEnv _                                           = Nothing
 
-  fromDefault :: SolvedLayoutArg -> Description -> Maybe Value
-  fromDefault (Option _ _ r) (OptionDescription _ _ _ (Just v) _)
+  fromDefault :: SolvedLayoutArg -> Maybe Description -> Maybe Value
+  fromDefault (Option _ _ r) (Just (OptionDescription _ _ _ (Just v) _))
     = pure if r
               then ArrayValue $ Value.intoArray v
               else v
