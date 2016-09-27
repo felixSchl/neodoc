@@ -5,6 +5,7 @@ import Debug.Trace
 import Control.Monad (when)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.Pretty (class Pretty)
+import Data.Bifunctor (lmap)
 import Control.Monad.Aff (liftEff')
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
@@ -20,9 +21,9 @@ import Partial.Unsafe (unsafePartial)
 
 import Test.Support.Usage as U
 
-import Language.Docopt.Scanner as Scanner
-
+import Neodoc.Error.Class (capture) as Error
 import Neodoc.Spec.Lexer as Lexer
+import Neodoc.Spec.Parser as SpecParser
 import Neodoc.Spec.Parser.Base (debug)
 import Neodoc.Spec.Parser.Usage as U
 import Neodoc.Data.UsageLayout as U
@@ -224,96 +225,90 @@ usageParserSpec = \_ -> do
         ]
 
   where
+  kase :: ∀ a. String -> Expected a -> { i :: String, o :: Expected a }
+  kase i o = { i, o }
 
-    kase :: ∀ a. String -> Expected a -> { i :: String, o :: Expected a }
-    kase i o = { i, o }
+  pass :: ∀ a. String -> a -> { i :: String, o :: Expected a }
+  pass i o = kase i (P o)
 
-    pass :: ∀ a. String -> a -> { i :: String, o :: Expected a }
-    pass i o = kase i (P o)
+  fail :: ∀ a. String -> { i :: String, o :: Expected a }
+  fail i = kase i F
 
-    fail :: ∀ a. String -> { i :: String, o :: Expected a }
-    fail i = kase i F
+  prettyTopLevel
+    :: forall a
+      . (Pretty a)
+    => NonEmpty List (NonEmpty List a)
+    -> String
+  prettyTopLevel xs = intercalate "|" $ xs <#> \x ->
+                        intercalate " " $ pretty <$> x
 
-    prettyTopLevel
-      :: forall a
-       . (Pretty a)
-      => NonEmpty List (NonEmpty List a)
-      -> String
-    prettyTopLevel xs = intercalate "|" $ xs <#> \x ->
-                          intercalate " " $ pretty <$> x
+  runTests :: _
+  runTests xs =
+    for_ xs \{ i, o } -> do
+      let input = "prog " <> i
+      case o of
+        P expectedLayouts -> do
+          -- deeply convert array to list
+          -- (array is used for readability above)
+          let
+            expected'
+              = ((fromFoldable <$> _)  <$> _) fromFoldable
+                                        <$>    fromFoldable
+                                        <$>    fromFoldable expectedLayouts
+            expected = expected' <#> \ex ->
+              unsafePartial $ U.listToNonEmpty $ U.listToNonEmpty <$> ex
 
-    runTests :: _
-    runTests xs =
-      for_ xs \{ i, o } -> do
-        let input = "prog " <> i
-        case o of
-          P expectedLayouts -> do
-            -- deeply convert array to list
-            -- (array is used for readability above)
-            let
-              expected'
-                = ((fromFoldable <$> _)  <$> _) fromFoldable
-                                         <$>    fromFoldable
-                                         <$>    fromFoldable expectedLayouts
-              expected = expected' <#> \ex ->
-                unsafePartial $ U.listToNonEmpty $ U.listToNonEmpty <$> ex
+          it (input
+              <> " -> "
+              <> intercalate "\n" (prettyTopLevel <$> expected))  do
+            vliftEff do
+              pure unit
 
-            it (input
-                <> " -> "
-                <> intercalate "\n" (prettyTopLevel <$> expected))  do
-              vliftEff do
-                pure unit
+              -- { program, layouts } <- runEitherEff do
+              --   Lexer.lexUsage input >>= U.parse
+              -- assertEqual "prog" program
+              -- assertEqual (U.prettyPrintUsage <$> expected')
+              --             (U.prettyPrintUsage <$> usages)
+        otherwise -> do
+          pure unit
+          -- it (input <> " should fail") do
+          -- vliftEff do
+          --   assertThrows (const true) do
+          --     runEitherEff do
+          --       toks       <- Lexer.lexUsage input
+          --       { usages } <- U.parse false toks
+          --       debug usages
 
-                -- { program, layouts } <- runEitherEff do
-                --   Lexer.lexUsage input >>= U.parse
-                -- assertEqual "prog" program
-                -- assertEqual (U.prettyPrintUsage <$> expected')
-                --             (U.prettyPrintUsage <$> usages)
-          otherwise -> do
-            pure unit
-            -- it (input <> " should fail") do
-            -- vliftEff do
-            --   assertThrows (const true) do
-            --     runEitherEff do
-            --       toks       <- Lexer.lexUsage input
-            --       { usages } <- U.parse false toks
-            --       debug usages
-
-    runSingleArgumentTests :: _
-    runSingleArgumentTests xs =
-      for_ xs \{ i, o } -> do
-        for_ [ false, true ] \isRepeated -> do -- Append "..." ?
-          let ys = if isRepeated then (1 .. 2) else (1 .. 1)
-          for_ ys \q -> do -- "..." vs " ..." (note the space)
-            let input = "prog " <> i
-                                <> (if isRepeated
-                                      then (if q == 1 then "..." else " ...")
-                                      else "")
-            case o of
-              P v -> do
-                let expected = v isRepeated
-                it (input <> " -> " <> pretty expected)  do
-                  vliftEff do
-                    { program, layouts } <- runEitherEff do
-                      Lexer.lexUsage input >>= U.parse
-                    assertEqual "prog" program
-                    case layouts of
-                      ((x :| Nil) : Nil) :| Nil -> do
-                        when (x /= expected) do
-                          throwException $ error $
-                            "Unexpected output:\n"
-                              <> (pretty x)
-                      _ -> do
+  runSingleArgumentTests :: _
+  runSingleArgumentTests xs =
+    for_ xs \{ i, o } -> do
+      for_ [ false, true ] \isRepeated -> do -- Append "..." ?
+        let ys = if isRepeated then (1 .. 2) else (1 .. 1)
+        for_ ys \q -> -- "..." vs " ..." (note the space)
+          let input = "prog " <> i
+                              <> (if isRepeated
+                                    then (if q == 1 then "..." else " ...")
+                                    else "")
+           in case o of
+            P v ->
+              let expected = v isRepeated
+               in it (input <> " -> " <> pretty expected) $ vliftEff do
+                  { program, layouts } <- runEitherEff do
+                    toks <- Error.capture $ Lexer.lexUsage input
+                    Error.capture $ SpecParser.parseUsage toks
+                  assertEqual "prog" program
+                  case layouts of
+                    ((x :| Nil) : Nil) :| Nil -> do
+                      when (x /= expected) do
                         throwException $ error $
-                          "Unexpected output:\n"
-                            <> (show layouts)
-
-                    pure unit
-              otherwise -> do
-                it (input <> " should fail") do
-                  vliftEff do
-                    assertThrows (const true) do
-                      runEitherEff do
-                        toks <- Lexer.lexUsage input
-                        { layouts } <- U.parse toks
-                        debug layouts
+                          "Unexpected output:\n" <> pretty x
+                    _ -> do
+                      throwException $ error $
+                        "Unexpected output:\n" <> show layouts
+            _ -> do
+              it (input <> " should fail") $ vliftEff do
+                assertThrows (const true) do
+                  runEitherEff do
+                    toks <- Error.capture $ Lexer.lexUsage input
+                    { layouts } <- Error.capture $ SpecParser.parseUsage toks
+                    debug layouts

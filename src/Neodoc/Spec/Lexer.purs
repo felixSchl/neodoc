@@ -2,6 +2,7 @@ module Neodoc.Spec.Lexer where
 
 import Prelude
 import Data.Array as A
+import Data.Bifunctor (lmap)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty as NonEmpty
 import Data.List as L
@@ -22,20 +23,23 @@ import Data.String.Regex (Regex(), regex)
 import Data.String.Regex (test, parseFlags, replace) as Regex
 import Partial.Unsafe (unsafePartial)
 import Data.String.Ext ((^=), (~~))
-import Neodoc.Spec.Parser.Base (lowerAlphaNum, alphaNum, alpha, space,
-                                lowerAlpha, upperAlpha, string',
-                                getPosition, getInput, spaces, eol)
+import Neodoc.Spec.Error (SpecLexError(..))
+import Neodoc.Spec.Parser.Base (
+  lowerAlphaNum, alphaNum, alpha, space, lowerAlpha, upperAlpha, string'
+, getPosition, getInput, spaces, eol)
 import Neodoc.Spec.ParserState (ParserState(..))
 import Neodoc.Spec.ParserState as ParserState
-import Text.Parsing.Parser (ParseError, Parser, PState(..), ParserT(..), Result(..),
-                            runParserT, parseFailed, fail, runParser, unParserT) as P
+import Text.Parsing.Parser (
+  ParseError, Parser, PState(..), ParserT(..), Result(..)
+, runParserT, parseFailed, fail, runParser, unParserT) as P
 import Text.Parsing.Parser.Combinators ((<??>))
-import Text.Parsing.Parser.Combinators ((<?>), notFollowedBy, try, choice,
-                                        lookAhead, optional, between, manyTill,
-                                        option) as P
+import Text.Parsing.Parser.Combinators (
+  (<?>), notFollowedBy, try, choice, lookAhead, optional, between, manyTill
+, option) as P
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
-import Text.Parsing.Parser.String (skipSpaces, anyChar, string, char, oneOf,
-                                  whiteSpace, eof, noneOf, satisfy) as P
+import Text.Parsing.Parser.String (
+  skipSpaces, anyChar, string, char, oneOf, whiteSpace, eof, noneOf
+, satisfy) as P
 
 
 -- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
@@ -72,8 +76,8 @@ instance showMode :: Show Mode where
   show (Usage)        = "Usage"
   show (Descriptions) = "Descriptions"
 
-lex :: Mode -> String -> Either P.ParseError (List PositionedToken)
-lex m input =
+lex :: Mode -> String -> Either SpecLexError (List PositionedToken)
+lex m input = lmap SpecLexError $
   -- perform a simple transformation to avoid 'manyTill' and safe some millis
   -- lexing. Hopefully this won't be necessary when purescript-parsing improves
   -- performance, a faster parsing library shows up or the purescript compiler
@@ -83,10 +87,10 @@ lex m input =
                 Descriptions -> input
    in P.runParser input' (parseTokens m)
 
-lexDescs :: String -> Either P.ParseError (List PositionedToken)
+lexDescs :: String -> Either SpecLexError (List PositionedToken)
 lexDescs = lex Descriptions
 
-lexUsage :: String -> Either P.ParseError (List PositionedToken)
+lexUsage :: String -> Either SpecLexError (List PositionedToken)
 lexUsage = lex Usage
 
 type OptionArgument = {

@@ -25,6 +25,7 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Support (vliftEff, runEitherEff)
 
 import Neodoc.Value
+import Neodoc.Error.Class (capture) as Error
 import Neodoc.Data.UsageLayout
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.Data.SolvedLayout
@@ -32,6 +33,7 @@ import Neodoc.Data.SolvedLayout as Solved
 import Neodoc.Data.UsageLayout as Usage
 import Neodoc.Spec (Spec (..))
 import Neodoc.Spec.Lexer as Lexer
+import Neodoc.Spec.Parser as SpecParser
 import Neodoc.Spec.Parser.Usage as U
 import Neodoc.Spec.Parser.Description as D
 import Neodoc.Transform.PreSolve (
@@ -183,7 +185,9 @@ preSolveSpec = \_ ->
               case expected of
                 Left err  -> pure (Left err)
                 Right res -> Right <$> do
-                  { program, layouts } <- Lexer.lexUsage res >>= U.parse
+                  { program, layouts } <- do
+                    toks <- Error.capture $ Lexer.lexUsage res
+                    Error.capture $ SpecParser.parseUsage toks
                   pure $ Spec {
                     program
                   , descriptions: Nil
@@ -191,11 +195,15 @@ preSolveSpec = \_ ->
                                 ((usageToSolved <$> _) <$> _) <$> layouts
                   }
             let output' = do
-                  spec <- lmap getParseErrorMessage do
-                    { program, layouts } <- Lexer.lexUsage usage >>= U.parse
-                    descriptions <- Lexer.lexDescs description >>= D.parse
+                  spec <- lmap pretty do
+                    { program, layouts } <- do
+                      toks <- Error.capture $ Lexer.lexUsage usage
+                      Error.capture $ SpecParser.parseUsage toks
+                    descriptions <- do
+                      toks <- Error.capture $ Lexer.lexDescs description
+                      Error.capture $ SpecParser.parseDescription toks
                     pure (Spec { descriptions, program, layouts })
-                  lmap getSolveErrorMessage $ preSolve spec
+                  lmap pretty $ preSolve spec
             case expected' /\ output' of
               Left expected /\ Left actual | expected /= actual  ->
                 throwException $ error $
@@ -210,10 +218,4 @@ preSolveSpec = \_ ->
                       <> "\n\nbut expected:\n" <> pretty (Spec expected)
               Right _ /\ Left err ->
                 throwException $ error $ "Failure!\n" <> err
-              _ -> pure unit -- 
-
-getParseErrorMessage :: P.ParseError -> String
-getParseErrorMessage (P.ParseError s _ _) = s
-
-getSolveErrorMessage :: SolveError -> String
-getSolveErrorMessage (SolveError s) = s
+              _ -> pure unit
