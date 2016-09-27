@@ -8,10 +8,14 @@ module Neodoc.ArgParser.Type (
 , runParser
 , getConfig
 , getState
+, setState
+, modifyState
 , getInput
 , setInput
 , fail
 , fail'
+, fatal
+, fatal'
 , throw
 , catch
 , catch'
@@ -23,8 +27,18 @@ module Neodoc.ArgParser.Type (
 , ArgParseError (..)
 , ParseConfig
 , ParseState
+, findDescription
 , lookupDescription
 , lookupDescription'
+, setFailed
+, unsetFailed
+, hasFailed
+, isDone
+, setDone
+, unsetDone
+, skipIf
+, setDepth
+, modifyDepth
 ) where
 
 import Prelude
@@ -122,6 +136,12 @@ getConfig = Parser \c s i -> Step false c s i (Right c)
 getState :: ∀ e c s i. Parser e c s i s
 getState = Parser \c s i -> Step false c s i (Right s)
 
+setState :: ∀ e c s i. s -> Parser e c s i Unit
+setState s = Parser \c _ i -> Step false c s i (Right unit)
+
+modifyState :: ∀ e c s i. (s -> s) -> Parser e c s i Unit
+modifyState f = Parser \c s i -> Step false c (f s) i (Right unit)
+
 getInput :: ∀ e c s i. Parser e c s i i
 getInput = Parser \c s i -> Step false c s i (Right i)
 
@@ -139,9 +159,17 @@ fail message = Parser \c s i -> Step false c s i (Left $ ParseError false (Left 
 fail' :: ∀ e c s i a. e -> Parser e c s i a
 fail' e = Parser \c s i -> Step false c s i (Left $ ParseError false (Right e))
 
+fatal :: ∀ e c s i a. String -> Parser e c s i a
+fatal message = Parser \c s i -> Step false c s i (Left $ ParseError true (Left message))
+
+fatal' :: ∀ e c s i a. e -> Parser e c s i a
+fatal' e = Parser \c s i -> Step false c s i (Left $ ParseError true (Right e))
+
 extractError :: ∀ e . (String -> e) -> ParseError e -> e
 extractError f (ParseError _ (Left  s)) = f s
 extractError _ (ParseError _ (Right e)) = e
+
+-- ArgParser:
 
 type Input = List PositionedToken
 
@@ -178,20 +206,53 @@ type ParseConfig r = {
 , descriptions :: List Description
 }
 
-type ParseState = {}
+type ParseState = {
+  depth :: Int
+, done :: Boolean
+, failed :: Boolean
+}
 
 type ArgParser r a = Parser ArgParseError (ParseConfig r) ParseState Input a
 
 -- XXX: This could be more efficient using a table lookup
-lookupDescription :: ∀ r. OptionAlias -> ArgParser r (Maybe Description)
-lookupDescription alias = do
-  { descriptions } <- getConfig
-  pure $ head $ filter matchesAlias descriptions
-
+findDescription :: OptionAlias -> List Description -> Maybe Description
+findDescription alias descriptions = head $ filter matchesAlias descriptions
   where
   matchesAlias (OptionDescription aliases _ _ _ _) = any (_ == alias) aliases
   matchesAlias _ = false
 
+lookupDescription :: ∀ r. OptionAlias -> ArgParser r (Maybe Description)
+lookupDescription alias = do
+  { descriptions } <- getConfig
+  pure $ findDescription alias descriptions
+
 lookupDescription' :: ∀ r. OptionAlias -> ArgParser r Description
 lookupDescription' a = fromMaybe default <$> lookupDescription a
   where default = OptionDescription (NonEmpty.singleton a) false Nothing Nothing Nothing
+
+unsetFailed :: ∀ r. ArgParser r Unit
+unsetFailed = modifyState \s -> s { failed = false }
+
+setFailed :: ∀ r. ArgParser r Unit
+setFailed = modifyState \s -> s { failed = true }
+
+hasFailed :: ∀ r. ArgParser r Boolean
+hasFailed = _.failed <$> getState
+
+isDone :: ∀ r. ArgParser r Boolean
+isDone = _.done <$> getState
+
+unsetDone :: ∀ r. ArgParser r Unit
+unsetDone = modifyState \s -> s { done = false }
+
+setDone :: ∀ r. ArgParser r Unit
+setDone = modifyState \s -> s { done = true }
+
+skipIf :: ∀ r a. ArgParser r Boolean -> a -> ArgParser r a -> ArgParser r a
+skipIf a b c = a >>= if _ then pure b else c
+
+modifyDepth :: ∀ r. (Int -> Int) -> ArgParser r Unit
+modifyDepth f = modifyState \s -> s { depth = f s.depth }
+
+setDepth :: ∀ r. Int -> ArgParser r Unit
+setDepth = modifyDepth <<< const

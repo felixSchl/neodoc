@@ -15,9 +15,11 @@ import Neodoc.Value.Origin (Origin())
 import Neodoc.Value.RichValue (RichValue())
 import Neodoc.Value.RichValue (from, getOrigin) as RValue
 import Neodoc.Data.SolvedLayout
+import Neodoc.Data.SolvedLayout as Solved
 
 -- import Language.Docopt.Argument (Argument(..), OptionArgument(..)) as D
 import Neodoc.Data.Description
+import Neodoc.Data.Description as Description
 import Neodoc.ArgParser.Options (Options)
 
 -- Find a fallback value for the given argument.
@@ -25,39 +27,38 @@ getFallbackValue
   :: ∀ r
    . Options r
   -> Env
-  -> List Description
+  -> Maybe Description
   -> SolvedLayoutArg
   -> Maybe RichValue
-getFallbackValue _ _ _ _ = Nothing
+getFallbackValue options env mDescription x = do
+  d <- mDescription
+  (fromEnv       d <#> RValue.from Origin.Environment) <|>
+  (fromDefault x d <#> RValue.from Origin.Default)     <|>
+  (empty       x   <#> RValue.from Origin.Empty)
 
--- getFallbackValue options env x = do
---   (fromEnv     x <#> RValue.from Origin.Environment) <|>
---   (fromDefault x <#> RValue.from Origin.Default)     <|>
---   (empty       x <#> RValue.from Origin.Empty)
---
---   where
---   fromEnv :: D.Argument -> Maybe Value
---   fromEnv (D.Option (o@{ env: Just k })) = StringValue <$> Env.lookup k env
---   fromEnv _                              = Nothing
---
---   fromDefault :: D.Argument -> Maybe Value
---   fromDefault (D.Option (o@{ arg: Just (D.OptionArgument { default: Just v }) }))
---     = pure if o.repeatable
---               then ArrayValue $ Value.intoArray v
---               else v
---   fromDefault _ = Nothing
---
---   empty :: D.Argument -> Maybe Value
---   empty = go
---     where
---     go (D.Option (o@{ arg: Nothing }))
---       | not options.requireFlags
---       = pure if o.repeatable  then ArrayValue []
---                               else BoolValue false
---     go (D.Option (o@{ arg: Just (D.OptionArgument { optional: true }) }))
---       | not options.requireFlags
---       = pure if o.repeatable  then ArrayValue []
---                               else BoolValue false
---     go (D.Stdin) = pure $ BoolValue false
---     go (D.EOA)   = pure $ ArrayValue []
---     go _         = Nothing
+  where
+  fromEnv :: Description -> Maybe Value
+  fromEnv (OptionDescription _ _ _ _ (Just k)) = StringValue <$> Env.lookup k env
+  fromEnv _                                    = Nothing
+
+  fromDefault :: SolvedLayoutArg -> Description -> Maybe Value
+  fromDefault (Option _ _ r) (OptionDescription _ _ _ (Just v) _)
+    = pure if r
+              then ArrayValue $ Value.intoArray v
+              else v
+  fromDefault _ _ = Nothing
+
+  empty :: SolvedLayoutArg -> Maybe Value
+  empty = go
+    where
+    go (Option _ Nothing r)
+      | not options.requireFlags
+      = pure if r then ArrayValue []
+                  else BoolValue false
+    go (Option _ (Just (Solved.OptionArgument _ true)) r)
+      | not options.requireFlags
+      = pure if r then ArrayValue []
+                  else BoolValue false
+    go (Stdin) = pure $ BoolValue false
+    go (EOA)   = pure $ ArrayValue []
+    go _       = Nothing

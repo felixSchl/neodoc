@@ -139,13 +139,13 @@ longOption term n mArg = do
                           , hasConsumedArg: false
                           , explicitArg:    false
                           }
-                else fail' $ OptionRequiresArgumentError (OptionAlias.Long n)
+                else fatal' $ OptionRequiresArgumentError (OptionAlias.Long n)
 
   -- case 2:
   -- The name is an exact match and takes no argument
   go (LOpt n' v) _ | isFlag && (n' == n)
     = case v of
-        Just _  -> fail' $ OptionTakesNoArgumentError (OptionAlias.Long n)
+        Just _  -> fatal' $ OptionTakesNoArgumentError (OptionAlias.Long n)
         Nothing -> pure { rawValue:       Nothing
                         , hasConsumedArg: false
                         , explicitArg:    false
@@ -251,7 +251,7 @@ shortOption term f mArg = do
                           , hasConsumedArg: false
                           , explicitArg:    false
                           }
-                else fail' $ OptionRequiresArgumentError (OptionAlias.Short f)
+                else fatal' $ OptionRequiresArgumentError (OptionAlias.Short f)
 
   -- case 2:
   -- The leading flag matches, there are stacked options, a explicit
@@ -283,7 +283,7 @@ shortOption term f mArg = do
   -- takes no argument - total consumption!
   go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
     = case v of
-        Just _  -> fail' $ OptionTakesNoArgumentError (OptionAlias.Short f')
+        Just _  -> fatal' $ OptionTakesNoArgumentError (OptionAlias.Short f')
         Nothing -> pure { rawValue:       Nothing
                         , remainder:      Nothing
                         , hasConsumedArg: false

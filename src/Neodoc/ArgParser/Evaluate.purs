@@ -53,8 +53,8 @@ evalParsers
   :: ∀ b s i a e c f
    . (Foldable f, Functor f, Ord b)
   => (a -> b)
-  -> f (Parser e c s (List i) a)
-  -> Parser e c s (List i) a
+  -> f (Parser e c ({ done :: Boolean, depth :: Int | s }) (List i) a)
+  -> Parser e c ({ done :: Boolean, depth :: Int | s }) (List i) a
 evalParsers p parsers = do
   config <- getConfig
   state  <- getState
@@ -62,14 +62,14 @@ evalParsers p parsers = do
 
   -- Run all parsers and collect their results for further evaluation
   let collected = fromFoldable $ parsers <#> \parser ->
-        runParser config state input $ Parser \c s i ->
+        runParser config (state { depth = 0 }) input $ Parser \c s i ->
           case unParser parser c s i of
             Step b' c' s' i' result ->
               let cont = ParserCont c' s' i'
                in Step b' c' s' i' case result of
                   Left  (err@(ParseError true _)) -> Left err
-                  Left  err -> Right $ ErrorEvaluation   cont 0 {- XXX: store depth on parser -} err
-                  Right val -> Right $ SuccessEvaluation cont 0 {- XXX: store depth on parser -} val
+                  Left  err -> Right $ ErrorEvaluation   cont s.depth err
+                  Right val -> Right $ SuccessEvaluation cont s.depth val
 
   -- Now, check to see if we have any fatal errors, winnders or soft errors.
   -- We know we must have either, but this is not encoded at the type-level,
@@ -95,7 +95,7 @@ evalParsers p parsers = do
   -- match", take a pick.
   case bestSuccess of
     Just (SuccessEvaluation (ParserCont c s i) _ val) ->
-      Parser \_ _ _ -> Step true c s i (Right val)
+      Parser \_ _ _ -> Step true c (state { done = s.done }) i (Right val)
     _ -> case deepestErrors of
       Just errors -> case errors of
         (ErrorEvaluation (ParserCont c s i) _ e):es | null es || not (null input) ->

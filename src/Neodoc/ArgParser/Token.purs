@@ -78,8 +78,12 @@ getSource :: PositionedToken -> String
 getSource = _.source <<< unPositionedToken
 
 instance showPositionedToken :: Show PositionedToken where
-  show (PositionedToken { sourcePos: pos, token: tok }) =
+  show (PositionedToken { sourcePos, token, source }) =
     "PositionedToken { "
-      <> "sourcePos: " <> show pos
-      <> ", token: " <> show tok
+      <> "sourcePos: " <> show sourcePos
+      <> ", token: " <> show token
+      <> ", source: " <> show source
       <> " }"
+
+instance prettyPositionedToken :: Pretty PositionedToken where
+  pretty (PositionedToken { token }) = pretty token

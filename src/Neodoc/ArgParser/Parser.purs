@@ -103,6 +103,13 @@ import Neodoc.ArgParser.Fallback
 _ENABLE_DEBUG_ :: Boolean
 _ENABLE_DEBUG_ = true
 
+initialState :: ParseState
+initialState = {
+  depth:  0
+, done:   false
+, failed: false
+}
+
 type ChunkedLayout a = Layout (Chunk a)
 type ValueMapping = Tuple SolvedLayoutArg RichValue
 
@@ -114,9 +121,9 @@ parse
   -> List PositionedToken
   -> Either (ParseError ArgParseError) Unit
 parse (Spec { layouts, descriptions }) options env tokens =
-  runParser { env, options, descriptions } {} tokens $
+  runParser { env, options, descriptions } initialState tokens $
     let parsers = concat (fromFoldable layouts) <#> \layout -> do
-          {- XXX: unmarkFailed -}
+          unsetFailed
           vs <- {-withLocalCache-} do
             parseExhaustively true false 0 (fromFoldable layout)
           eof $> Tuple layout vs
@@ -137,18 +144,9 @@ parseLayout
   -> Int      -- ^ recursive level
   -> SolvedLayout
   -> ArgParser r (List ValueMapping)
-parseLayout skippable isSkipping l layout = do
-
-  _debug \_ -> "parsing layout: " <> pretty layout
-  go layout
+parseLayout skippable isSkipping l = go
 
   where
-  indentation :: String
-  indentation = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
-  _debug s = if _ENABLE_DEBUG_
-                then traceA $ indentation <> (s unit)
-                else pure unit
-
   go (Group o r branches) =
     let parsers = branches <#> \branch ->
           {-withLocalCache do-}
@@ -175,6 +173,7 @@ parseLayout skippable isSkipping l layout = do
   go e@(Elem x) =
     let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
     in Nil <$ nTimes do go' x
+           <* modifyDepth (_ + 1)
 
     where
     go' (Solved.Positional n _) = positional (pretty x) n
@@ -301,8 +300,8 @@ parseChunk skippable isSkipping l = go
           -- Check if we're done trying to recover.
           -- See the `draw -1` case below (`markFailed`).
 
-          -- XXX: failed <- hasFailed
-          if false {- XXX: failed-}
+          failed <- hasFailed
+          if failed
             then throw err
             -- shortcut: there's no point trying again if there's nothing left
             -- to parse.
@@ -327,7 +326,7 @@ parseChunk skippable isSkipping l = go
     -- All arguments have been matched (or have failed to be matched) at least
     -- once by now. See where we're at - is there any required argument that was
     -- not matched at all?
-    draw errs n xss@(x:xs) | n < 0 = {- XXX: skipIf isDone Nil -} do
+    draw errs n xss@(x:xs) | n < 0 = skipIf isDone Nil do
       input <- getInput
       { options, env, descriptions } <- getConfig
 
@@ -337,7 +336,10 @@ parseChunk skippable isSkipping l = go
         vs = layouts <#> case _ of
           layout@(Group _ _ _) -> Left layout
           layout@(Elem arg) -> maybe (Left layout) (Right <<< Tuple arg) do
-            v <- unRichValue <$> getFallbackValue options env descriptions arg
+            let description = case arg of
+                  (Option alias _ _) -> findDescription alias descriptions
+                  _                  -> Nothing
+            v <- unRichValue <$> getFallbackValue options env description arg
             pure $ RichValue v {
               value = if isRepeatable layout
                   then ArrayValue $ Value.intoArray v.value
@@ -354,7 +356,7 @@ parseChunk skippable isSkipping l = go
 
       if isSkipping && length missing > 0
         then do
-          {- XXX: markFailed -}
+          setFailed
           throwExpectedError missing input
         else
           if skippable || null input
@@ -384,7 +386,7 @@ parseChunk skippable isSkipping l = go
     draw _ _ _ = pure Nil
 
 setLayoutRequired :: Boolean -> SolvedLayout -> SolvedLayout
-setLayoutRequired b (Group o _ xs) = Group o b xs
+setLayoutRequired b (Group _ r xs) = Group (not b) r xs
 setLayoutRequired _ x = x
 
 -- Check if a given layout qualifies as a terminating argument for options-first
@@ -421,3 +423,4 @@ isFrom :: Origin -> RichValue -> Boolean
 isFrom o rv = o == RichValue.getOrigin rv
 
 traceError = catch' (\e -> traceShowA e *> throw e)
+traceInput = traceA =<< pretty <$> getInput
