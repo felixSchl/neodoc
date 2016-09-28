@@ -1,13 +1,20 @@
 module Neodoc.Solve where
 
+import Prelude
 import Data.Either (Either(..), either)
 import Neodoc.Spec
 import Neodoc.Spec as Spec
-import Neodoc.Solve.Error
 import Neodoc.Data.UsageLayout
 import Neodoc.Data.SolvedLayout
+import Neodoc.Solve.Error
+import Neodoc.Solve.SmartOptions
+import Neodoc.Solve.ExpandOptions
+import Neodoc.Solve.ExpandReferences
 
 solve
   :: Spec UsageLayout
   -> Either SolveError (Spec SolvedLayout)
-solve _ = fail "not implemented"
+solve x = pure x
+  >>= smartOptions
+  >>= expandOptions
+  >>= expandReferences
