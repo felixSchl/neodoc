@@ -16,14 +16,5 @@ type SolveState = {
 
 type Solver a = ExceptT SolveError (State SolveState) a
 
-type Solver a = EitherT SolveState (Either SolveError) a
-
-runSolver
-  :: ∀ a
-   . List Description
-  -> Solver a
-  -> Either SolveError a
-runSolver descriptions = flip evalStateT { descriptions }
-
 fail :: ∀ a. String -> Solver a
 fail = throwError <<< SolveError

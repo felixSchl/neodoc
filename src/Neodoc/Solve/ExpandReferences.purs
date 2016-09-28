@@ -5,12 +5,12 @@
 module Neodoc.Solve.Solve where
 
 import Neodoc.Spec
-import Neodoc.Solve.PreSolve
 import Neodoc.Data.SolvedLayout
 import Neodoc.Solve.Error
+import Neodoc.Solve.ExpandOptions
 import Data.Either (Either)
 
 solve
-  :: Spec PreSolvedLayout
+  :: Spec ExpandedOptionsLayout
   -> Either SolveError (Spec SolvedLayout)
 solve _ = fail "..."
