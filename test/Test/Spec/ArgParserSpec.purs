@@ -47,6 +47,7 @@ import Neodoc.Transform.PreSolve (preSolve, PreSolvedLayout(..), PreSolvedLayout
 import Neodoc.Data.SolvedLayout (SolvedLayout(..))
 import Neodoc.ArgParser as ArgParser
 import Neodoc.ArgParser (ArgParseResult(..))
+import Neodoc.Evaluate as Evaluate
 
 -- hack to easily isolate tests
 isolate :: Boolean
@@ -970,7 +971,7 @@ argParserSpec = \_ -> describe "The parser generator" do
     when (not skip) $ describe help do
       for_ cases \(({ argv, env, expected, options })) ->
         let msg = either (\e -> "Should fail with \"" <> e <> "\"")
-                          prettyPrintOut
+                          pretty
                           expected
             premsg = if A.length argv > 0
                         then intercalate " " argv
@@ -1014,9 +1015,6 @@ argParserSpec = \_ -> describe "The parser generator" do
       fakeSolve x = x <#> case _ of
                                SolvedArg x -> x
 
-      prettyPrintOut :: StrMap Value -> String
-      prettyPrintOut m = "\n\t" <> prettyPrintStrMap m
-
       prettyPrintStrMap :: StrMap Value -> String
       prettyPrintStrMap m = intercalate "\n\t" $
         StrMap.toList m <#> \(Tuple arg val) ->
@@ -1030,49 +1028,41 @@ argParserSpec = \_ -> describe "The parser generator" do
         -> Maybe Options
         -> Either String (StrMap Value)
         -> Eff (err :: EXCEPTION | eff) Unit
-      validate spec argv env mOptions expected =
+      validate (spec@(Spec { descriptions })) argv env mOptions expected =
         let opts = fromMaybe defaultOptions mOptions
-         in void do
-          result@(ArgParseResult branch vs) <- runEitherEff do
-            lmap pretty $ ArgParser.run spec opts env argv
-          traceA (pretty result)
-          pure unit
-
-        -- let result = uncurry (T.reduce spec env) <$> do
-        --               ArgParser.run spec
-        --                            env
-        --                            argv
-        --                            (fromMaybe defaultOptions options)
-        --
-        -- case result of
-        --   Left (e@(P.ParseError msg _ _)) ->
-        --     either
-        --       (\e' ->
-        --         if (msg /= e')
-        --           then throwException $ error $
-        --             "Unexpected error:\n" <> msg
-        --           else pure unit)
-        --       (const $ throwException $ error $ show e)
-        --       expected
-        --   Right r -> do
-        --     either
-        --       (\e ->
-        --         throwException $ error $
-        --           "Missing expected exception:"
-        --             <> "\n"
-        --             <> show e
-        --             <> "\n"
-        --             <> "\n"
-        --             <> "instead received output:"
-        --             <> "\n"
-        --             <> prettyPrintOut r)
-        --       (\r' ->
-        --         if (r /= r')
-        --           then throwException $ error $
-        --             "Unexpected output:\n"
-        --               <> prettyPrintOut r
-        --           else pure unit)
-        --       expected
+            result = do
+              ArgParseResult branch vs <- do
+                lmap pretty $ ArgParser.run spec opts env argv
+              pure $ Evaluate.reduce env descriptions branch vs
+         in case result of
+            Left msg {- XXX: Check against `ArgParserError`? -} ->
+              either
+                (\e' ->
+                  if (msg /= e')
+                    then throwException $ error $
+                      "Unexpected error:\n" <> msg
+                    else pure unit)
+                (const $ throwException $ error $ msg)
+                expected
+            Right r -> do
+              either
+                (\e ->
+                  throwException $ error $
+                    "Missing expected exception:"
+                      <> "\n"
+                      <> show e
+                      <> "\n"
+                      <> "\n"
+                      <> "instead received output:"
+                      <> "\n"
+                      <> pretty r)
+                (\r' ->
+                  if (r /= r')
+                    then throwException $ error $
+                      "Unexpected output:\n"
+                        <> pretty r
+                    else pure unit)
+                expected
 
 getParseErrorMessage :: P.ParseError -> String
 getParseErrorMessage (P.ParseError s _ _) = s

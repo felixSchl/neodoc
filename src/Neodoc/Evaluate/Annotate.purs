@@ -7,8 +7,10 @@ import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.Map (Map)
 import Data.Map as Map
+import Data.Set (Set)
+import Data.Set as Set
 import Data.Maybe (Maybe(..))
-import Data.List (List(..), head, filter)
+import Data.List (List(..), (:), head, filter, singleton, fromFoldable)
 import Data.NonEmpty (NonEmpty)
 import Data.Foldable (any)
 import Neodoc.Env (Env)
@@ -34,9 +36,16 @@ getDescription = snd
 -- Annotate a layout of arguments with it's description
 annotate
   :: List Description
+  -> ArgKey
+  -> WithDescription ArgKey
+annotate descriptions x = x /\ (findDescription descriptions x)
+
+-- Annotate a layout of arguments with it's description
+annotateLayout
+  :: List Description
   -> SolvedLayout
   -> AnnotatedLayout SolvedLayoutArg
-annotate descriptions l = l <#> \x ->
+annotateLayout descriptions l = l <#> \x ->
   x /\ (findDescription descriptions $ toArgKey x)
 
 -- XXX: This could be more efficient using a table lookup
@@ -51,3 +60,14 @@ findDescription descriptions (OptionKey alias)
     matchesAlias (OptionDescription aliases _ _ _ _) = any (_ == alias) aliases
     matchesAlias _ = false
 findDescription _ _ = Nothing
+
+findArgKeys
+  :: List Description
+  -> ArgKey
+  -> Set ArgKey
+findArgKeys descriptions k =
+  let xs = case findDescription descriptions k of
+        Just (OptionDescription aliases _ _ _ _) ->
+          k : (fromFoldable $ OptionKey <$> aliases)
+        _ -> singleton k
+   in Set.fromFoldable xs

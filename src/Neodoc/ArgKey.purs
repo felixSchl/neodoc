@@ -2,6 +2,7 @@ module Neodoc.ArgKey where
 
 import Prelude
 import Data.Pretty (class Pretty, pretty)
+import Data.String as String
 import Neodoc.OptionAlias (OptionAlias)
 
 data ArgKey
@@ -12,7 +13,8 @@ data ArgKey
   | StdinKey
 
 instance eqArgKey :: Eq ArgKey where
-  eq (PositionalKey n) (PositionalKey n') = eq n n'
+  -- XXX: we have to call `String.toUpper` over and over again. Can we cache this?
+  eq (PositionalKey n) (PositionalKey n') = eq (String.toUpper n) (String.toUpper n')
   eq (CommandKey n) (CommandKey n') = eq n n'
   eq (OptionKey a) (OptionKey a') = eq a a'
   eq EOAKey EOAKey = true

@@ -7,6 +7,8 @@ import Prelude
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Data.Map as Map
 import Data.Pretty (class Pretty, pretty)
+import Data.Array as Array
+import Data.List (List)
 import Control.Alt (alt)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
@@ -21,6 +23,7 @@ import Data.Set as Set
 
 import Neodoc.ArgKey (ArgKey(..))
 import Neodoc.ArgKey.Class (toArgKey)
+import Neodoc.OptionAlias as OptionAlias
 import Neodoc.Data.Description (Description(..))
 import Neodoc.Data.SolvedLayout (SolvedLayoutArg(..))
 import Neodoc.Evaluate.Annotate
@@ -51,3 +54,14 @@ instance eqKey :: Eq Key where
 
 instance ordKey :: Ord Key where
   compare (Key keys) (Key keys') = compare keys keys'
+
+-- | Derive a strin based key
+toStrKeys :: Key -> List String
+toStrKeys (Key keys) = go <$> (fromFoldable keys)
+  where
+    go (PositionalKey n)                  = n
+    go (CommandKey    n)                  = n
+    go (OptionKey  (OptionAlias.Long n))  = "--" <> n
+    go (OptionKey  (OptionAlias.Short c)) = "-"  <> String.singleton c
+    go EOAKey                             = "--"
+    go StdinKey                           = "-"

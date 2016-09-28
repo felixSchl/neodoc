@@ -4,6 +4,7 @@ import Prelude
 import Data.Pretty (class Pretty, pretty)
 import Data.Maybe (Maybe, maybe)
 import Data.Foldable (intercalate)
+import Data.String as String
 import Data.List (List)
 import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty)
