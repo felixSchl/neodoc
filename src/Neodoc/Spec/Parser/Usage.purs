@@ -15,7 +15,7 @@ import Control.Lazy (defer)
 import Control.MonadPlus (guard)
 import Data.Either (Either)
 import Data.List (
-  List(..), many, some, singleton, length, modifyAt, (:), fromFoldable
+  List(..), many, some, singleton, length, modifyAt, (:), fromFoldable, filter
 , reverse)
 import Data.List.Partial (head, tail) as PartialList
 import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
@@ -106,13 +106,15 @@ parse = flip L.runTokenParser do
           Nil  -> maybe Nil (singleton <<< singleton) eoa
           x:xs -> (x <> (maybe Nil (singleton) eoa)) : xs
 
-    pure $ case branches' of
+        branches'' = filter (\x -> length x > 0) branches'
+
+    pure $ case branches'' of
       Nil -> Nothing
       _ -> pure do
         Group
           false -- not optional
           false -- not repeatable
-          (unsafePartial $ listToNonEmpty $ listToNonEmpty <$> branches')
+          (unsafePartial $ listToNonEmpty $ listToNonEmpty <$> branches'')
 
   command :: L.TokenParser UsageLayoutArg
   command = Command

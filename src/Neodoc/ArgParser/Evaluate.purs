@@ -1,9 +1,10 @@
 module Neodoc.ArgParser.Evaluate where
 
 import Prelude
+import Debug.Trace
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
-, null)
+, null, length)
 import Data.Function (on)
 import Data.Either (Either(..))
 import Data.NonEmpty (NonEmpty(..), (:|))
@@ -34,6 +35,13 @@ data Evaluation c s i e a
   = ErrorEvaluation   (ParserCont c s i) Int (ParseError e)
   | SuccessEvaluation (ParserCont c s i) Int a
 
+instance showParserCont :: (Show c, Show s, Show i) => Show (ParserCont c s i) where
+  show (ParserCont c s i) = "ParserCont " <> show c <> " " <> show s <> " " <> show i
+
+instance showEvaluation :: (Show c, Show s, Show i, Show e, Show a) => Show (Evaluation c s i e a) where
+  show (ErrorEvaluation   c i e) = "ErrorEvaluation " <> show c <> " " <> show i <> " " <> show e
+  show (SuccessEvaluation c i a) = "SuccessEvaluation " <> show c <> " " <> show i <> " " <> show a
+
 isErrorEvaluation :: ∀ c s i e a. Evaluation c s i e a -> Boolean
 isErrorEvaluation (ErrorEvaluation _ _ _) = true
 isErrorEvaluation _ = false
@@ -50,12 +58,16 @@ getEvaluationDepth (SuccessEvaluation _ i _) = i
 -- succeeding match or fails otherwise. If any of the parsers yields a fatal
 -- error, it is propagated immediately.
 evalParsers
-  :: ∀ b s i a e c f
-   . (Foldable f, Functor f, Ord b)
+  :: ∀ b s i a e c r
+   . (Ord b)
   => (a -> b)
-  -> f (Parser e c ({ done :: Boolean, depth :: Int | s }) (List i) a)
-  -> Parser e c ({ done :: Boolean, depth :: Int | s }) (List i) a
+  -> List (ArgParser r a)
+  -> ArgParser r a
+evalParsers _ parsers | length parsers == 0
+  = fail' $ InternalError "no parsers to evaluate"
+
 evalParsers p parsers = do
+
   config <- getConfig
   state  <- getState
   input  <- getInput
@@ -101,4 +113,5 @@ evalParsers p parsers = do
         (ErrorEvaluation (ParserCont c s i) _ e):es | null es || not (null input) ->
           Parser \_ _ _ -> Step false c s i (Left e)
         _ -> fail "" -- XXX: explain this
-      _ -> fail "The impossible happened. Failure without error"
+      _ -> do
+        fail "The impossible happened. Failure without error"

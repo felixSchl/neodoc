@@ -64,6 +64,8 @@ import Data.NonEmpty ((:|))
 import Data.NonEmpty (singleton) as NonEmpty
 import Control.Alt ((<|>))
 import Neodoc.Env
+import Neodoc.Error (NeodocError(..)) as Neodoc
+import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
 import Neodoc.Data.Description (Description(..))
 
 data ParseError e = ParseError Boolean (Either String e)
@@ -207,6 +209,10 @@ instance prettyArgParseError :: Pretty ArgParseError where
   pretty (MalformedInputError s) = "Malformed Input: " <> show s
   pretty (GenericError s) = s
   pretty (InternalError s) = "Internal error: " <> s
+
+-- XXX: this is a hacky instance for now
+instance toNeodocErrorArgParseError :: ToNeodocError ArgParseError where
+  toNeodocError x = Neodoc.GenericError (pretty x)
 
 type ParseConfig r = {
   env :: Env

@@ -6,6 +6,7 @@ import Data.Tuple.Nested ((/\))
 import Data.List (List)
 import Data.Map (Map)
 import Data.Map as Map
+import Data.Either
 import Data.StrMap (StrMap)
 import Data.StrMap as StrMap
 import Data.Foldable (class Foldable, intercalate)
@@ -31,3 +32,10 @@ instance prettyMap :: (Pretty k, Pretty v) => Pretty (Map k v) where
 instance prettyStrMap :: (Pretty v) => Pretty (StrMap v) where
   pretty kvs = intercalate ", " $ StrMap.toList kvs <#> \(k /\ v) ->
                   k <> " => " <> pretty v
+
+instance prettyEither :: (Pretty e, Pretty a) => Pretty (Either e a) where
+  pretty (Left e) = pretty e
+  pretty (Right a) = pretty a
+
+instance prettyString :: Pretty String where
+  pretty s = s

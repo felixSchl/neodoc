@@ -38,8 +38,8 @@ import Text.Parsing.Parser.String (eof, string, anyChar, skipSpaces,
                                   char, noneOf) as P
 
 import Docopt as Docopt
-import Language.Docopt.Value (Value(..), prettyPrintValue) as D
-import Language.Docopt.SpecParser.Base (space, digit, alpha, upperAlpha, getInput)
+import Neodoc.Value (Value(..), prettyPrintValue) as D
+import Neodoc.Spec.Parser.Base (space, digit, alpha, upperAlpha, getInput)
 
 import Test.Support (runEitherEff)
 

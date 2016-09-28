@@ -1031,9 +1031,9 @@ argParserSpec = \_ -> describe "The parser generator" do
       validate (spec@(Spec { descriptions })) argv env mOptions expected =
         let opts = fromMaybe defaultOptions mOptions
             result = do
-              ArgParseResult branch vs <- do
+              ArgParseResult mBranch vs <- do
                 lmap pretty $ ArgParser.run spec opts env argv
-              pure $ Evaluate.reduce env descriptions branch vs
+              pure $ Evaluate.reduce env descriptions mBranch vs
          in case result of
             Left msg {- XXX: Check against `ArgParserError`? -} ->
               either

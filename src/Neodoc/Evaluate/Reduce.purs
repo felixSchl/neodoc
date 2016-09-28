@@ -57,10 +57,11 @@ data FacelessLayoutArg
 reduce
   :: Env
   -> List Description
-  -> Branch SolvedLayoutArg
+  -> Maybe (Branch SolvedLayoutArg)
   -> List KeyValue
   -> _ -- Map ArgKey RichValue
-reduce env descriptions branch vs = (_.value <<< unRichValue) <$>
+reduce _ _ Nothing _ = StrMap.empty
+reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
   let -- 1. annotate all layout elements with their description
       annotedBranch = annotateLayout descriptions <$> branch
 

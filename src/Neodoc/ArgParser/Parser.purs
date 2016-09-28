@@ -107,7 +107,7 @@ import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.KeyValue
 
 _ENABLE_DEBUG_ :: Boolean
-_ENABLE_DEBUG_ = false
+_ENABLE_DEBUG_ = true
 
 initialState :: ParseState
 initialState = {
@@ -125,7 +125,7 @@ parse
   -> Env
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
-parse (Spec { layouts, descriptions }) options env tokens =
+parse (Spec { layouts, descriptions }) options env tokens = traceShowA layouts *>
   runParser { env, options, descriptions } initialState tokens $
     let parsers = concat (fromFoldable layouts) <#> \toplevel ->
           traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
@@ -133,9 +133,12 @@ parse (Spec { layouts, descriptions }) options env tokens =
             vs <- {-withLocalCache-} do
               parseExhaustively true false 0 (fromFoldable toplevel)
             eof
-            pure $ ArgParseResult toplevel vs
-     in flip evalParsers parsers \(ArgParseResult _ vs) ->
-          sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+            pure $ ArgParseResult (Just toplevel) vs
+     in
+      if length parsers == 0
+        then eof $> ArgParseResult Nothing Nil
+        else flip evalParsers parsers \(ArgParseResult _ vs) ->
+                sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
   where
   eof :: ∀ r. ArgParser r Unit
   eof = do
@@ -173,8 +176,9 @@ parseLayout skippable isSkipping l layout = do
             parseExhaustively skippable isSkipping l (fromFoldable branch)
     in do
         vs <- (if o then option Nil else id) do
-          flip evalParsers parsers \vs ->
-            sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+          if length parsers == 0 then pure Nil else
+            flip evalParsers parsers \vs ->
+              sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
         hasInput <- not <<< null <$> getInput
         vss <- if (hasInput && r &&
                 length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
@@ -262,6 +266,7 @@ parseExhaustively
   -> Int     -- ^ recursive level
   -> List SolvedLayout
   -> ArgParser r (List KeyValue)
+parseExhaustively _ _ _ Nil = pure Nil
 parseExhaustively skippable isSkipping l xs = do
   { options } <- getConfig
   let chunks = chunkBranch options.laxPlacement options.optionsFirst xs

@@ -40,7 +40,7 @@ main = launchAff do
     -- usageParserSpec unit
     -- descParserSpec  unit
     -- preSolveSpec    unit
-    argParserSpec   unit
+    -- argParserSpec   unit
     -- docoptSpec      unit
     -- foreignSpec     tests
-    -- compatSpec      tests
+    compatSpec      tests
