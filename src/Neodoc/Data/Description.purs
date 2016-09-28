@@ -1,6 +1,5 @@
 module Neodoc.Data.Description (
   Description(..)
-, module Reexport
 ) where
 
 import Prelude
@@ -9,8 +8,7 @@ import Data.Foldable (intercalate)
 import Data.Pretty (class Pretty, pretty)
 import Neodoc.Value
 import Neodoc.OptionAlias (Aliases)
-import Neodoc.Data.UsageLayout (OptionArgument)
-import Neodoc.Data.UsageLayout (OptionArgument(..)) as Reexport
+import Neodoc.Data.OptionArgument (OptionArgument)
 
 data Description
   = OptionDescription

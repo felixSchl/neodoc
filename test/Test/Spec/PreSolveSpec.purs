@@ -49,11 +49,10 @@ usageToSolved :: Partial => UsageLayout -> PreSolvedLayout
 usageToSolved layout = layout <#> SolvedArg <<< case _ of
   Usage.Command     n r        -> Solved.Command    n r
   Usage.Positional  n r        -> Solved.Positional n r
-  Usage.Option      n a r      -> Solved.Option (OptionAlias.Long n) (usageOAToSolvedOA <$> a) r
-  Usage.OptionStack (c:|_) a r -> Solved.Option (OptionAlias.Short c) (usageOAToSolvedOA <$> a) r
+  Usage.Option      n a r      -> Solved.Option (OptionAlias.Long n) a r
+  Usage.OptionStack (c:|_) a r -> Solved.Option (OptionAlias.Short c) a r
   Usage.EOA                    -> Solved.EOA
   Usage.Stdin                  -> Solved.Stdin
-  where usageOAToSolvedOA (Usage.OptionArgument n o) = Solved.OptionArgument n o
 
 type Error = String
 type Result = String

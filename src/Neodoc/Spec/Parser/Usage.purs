@@ -30,6 +30,7 @@ import Text.Parsing.Parser.Combinators (
 import Text.Parsing.Parser.Combinators ((<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(Position)) as P
 
+import Neodoc.Data.OptionArgument
 import Neodoc.Spec.Parser.Base (getInput)
 import Neodoc.Spec.Lexer as L
 import Neodoc.Spec.Parser.Combinators (

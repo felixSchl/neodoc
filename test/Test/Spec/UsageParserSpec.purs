@@ -27,6 +27,7 @@ import Neodoc.Spec.Parser as SpecParser
 import Neodoc.Spec.Parser.Base (debug)
 import Neodoc.Spec.Parser.Usage as U
 import Neodoc.Data.UsageLayout as U
+import Neodoc.Data.OptionArgument
 import Neodoc.Data.Layout
 
 import Text.Wrap (dedent)
@@ -44,8 +45,8 @@ lopt_ f      r = (if r then U.loptR_ else U.lopt_) f
 lopt  f    a r = (if r then U.loptR else U.lopt) f a
 po    n      r = (if r then U.poR else U.po) n
 co    n      r = (if r then U.coR else U.co) n
-arg_  n        = U.OptionArgument n true
-arg   n        = U.OptionArgument n false
+arg_  n        = OptionArgument n true
+arg   n        = OptionArgument n false
 
 usageParserSpec = \_ -> do
 

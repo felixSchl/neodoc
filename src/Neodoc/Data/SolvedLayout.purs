@@ -11,26 +11,8 @@ import Neodoc.Data.Layout
 import Neodoc.OptionAlias
 import Neodoc.ArgKey (ArgKey(..))
 import Neodoc.ArgKey.Class (class ToArgKey)
+import Neodoc.Data.OptionArgument
 import Data.Function (on)
-
-data OptionArgument
-  = OptionArgument
-      String  -- name
-      Boolean -- optional
-
-isOptionArgumentOptional :: OptionArgument -> Boolean
-isOptionArgumentOptional (OptionArgument _ o) = o
-
-instance eqOptionArgument :: Eq OptionArgument where
-  eq (OptionArgument n o) (OptionArgument n' o') = n == n' && o == o'
-
-instance showOptionArgument :: Show OptionArgument where
-  show (OptionArgument n o) = "OptionArgument " <> show n <> " " <> show o
-
-instance prettyOptionArgument :: Pretty OptionArgument where
-  pretty (OptionArgument n o) = (if o then "[" else "")
-                              <> n
-                              <> (if o then "]" else "")
 
 -- This type can be specialized for elements of a usage section
 type SolvedLayout = Layout SolvedLayoutArg
@@ -90,9 +72,6 @@ setRepeatable r (Elem (Command     n _)) = Elem (Command n r)
 setRepeatable r (Elem (Positional  n _)) = Elem (Positional n r)
 setRepeatable r (Elem (Option   a mA _)) = Elem (Option a mA r)
 setRepeatable _ x = x
-
-getElem :: Partial => SolvedLayout -> SolvedLayoutArg
-getElem (Elem x) = x
 
 isOptional :: SolvedLayout -> Boolean
 isOptional (Group o _ _) = o

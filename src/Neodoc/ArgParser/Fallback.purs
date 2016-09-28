@@ -16,8 +16,7 @@ import Neodoc.Value.RichValue (RichValue())
 import Neodoc.Value.RichValue (from, getOrigin) as RValue
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
-
--- import Language.Docopt.Argument (Argument(..), OptionArgument(..)) as D
+import Neodoc.Data.OptionArgument
 import Neodoc.Data.Description
 import Neodoc.Data.Description as Description
 import Neodoc.ArgParser.Options (Options)
@@ -54,7 +53,7 @@ getFallbackValue options env mDescription x = do
       | not options.requireFlags
       = pure if r then ArrayValue []
                   else BoolValue false
-    go (Option _ (Just (Solved.OptionArgument _ true)) r)
+    go (Option _ (Just (OptionArgument _ true)) r)
       | not options.requireFlags
       = pure if r then ArrayValue []
                   else BoolValue false

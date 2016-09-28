@@ -27,10 +27,10 @@ import Neodoc.Evaluate.Annotate
 
 -- A key uniquely identify an argument, which in turn may have multiple keys
 -- to refer to it.
-data Key a = Key (Set ArgKey) a
+newtype Key = Key (Set ArgKey)
 
-toKey :: WithDescription SolvedLayoutArg -> Key SolvedLayoutArg
-toKey (x /\ mDesc) = Key (Set.fromFoldable $ go x) x
+toKey :: WithDescription SolvedLayoutArg -> Key
+toKey (x /\ mDesc) = Key (Set.fromFoldable $ go x)
   where
   go (Option a _ _) = OptionKey <$> fromMaybe (singleton a) do
     desc <- mDesc
@@ -40,17 +40,14 @@ toKey (x /\ mDesc) = Key (Set.fromFoldable $ go x) x
   go _ = singleton $ toArgKey x
 
 
-instance showKey :: (Show a) => Show (Key a) where
-  show (Key keys a) = "Key " <> show keys <> " " <> show a
+instance showKey :: (Show a) => Show Key where
+  show (Key keys) = "Key " <> show keys
 
-instance prettyKey :: (Pretty a) => Pretty (Key a) where
-  pretty (Key keys a) = label <> " => " <> pretty a
-    where label = pretty $ fromFoldable keys
+instance prettyKey :: (Pretty a) => Pretty Key where
+  pretty (Key keys) = pretty $ fromFoldable keys
 
-instance eqKey :: Eq (Key a) where
-  -- note: only compare the actual keys, not the payload
-  eq (Key keys a) (Key keys' a') = eq keys keys'
+instance eqKey :: Eq Key where
+  eq (Key keys) (Key keys') = eq keys keys'
 
-instance ordKey :: Ord (Key a) where
-  -- note: only compare the actual keys, not the payload
-  compare (Key keys _) (Key keys' _) = compare keys keys'
+instance ordKey :: Ord Key where
+  compare (Key keys) (Key keys') = compare keys keys'

@@ -36,6 +36,7 @@ import Neodoc.Spec.Lexer as L
 import Neodoc.Spec.Parser.Combinators
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.OptionAlias (Aliases)
+import Neodoc.Data.OptionArgument
 import Neodoc.Data.Description
 
 data Content

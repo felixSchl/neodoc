@@ -43,6 +43,7 @@ import Neodoc.OptionAlias as OptionAlias
 import Neodoc.Data.Description
 import Neodoc.Data.Layout
 import Neodoc.Data.Layout as Layout
+import Neodoc.Data.OptionArgument
 import Neodoc.Data.UsageLayout
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.UsageLayout as Usage
@@ -116,15 +117,15 @@ preSolve (Spec { program, layouts, descriptions }) = do
     preSolveOption mAdjLayout slurped solved n mArg r = do
       mDescription <- lookupValidDescription
       case mArg of
-        Just (Usage.OptionArgument aN aO) ->
+        Just (OptionArgument aN aO) ->
           solved $ Solved.Option
             (OptionAlias.Long n)
-            (Just $ Solved.OptionArgument aN aO)
+            (Just $ OptionArgument aN aO)
             r
 
         Nothing -> do
           case mDescription of
-            Just (_ /\ (Just (Usage.OptionArgument aN' aO'))) -> do
+            Just (_ /\ (Just (OptionArgument aN' aO'))) -> do
               maybe
                 (fail $ "Option-Argument specified in options-section missing"
                         <> " --" <> n)
@@ -132,7 +133,7 @@ preSolve (Spec { program, layouts, descriptions }) = do
                   guardArgNames adjN aN'
                   slurped $ Solved.Option
                     (OptionAlias.Long n)
-                    (Just $ Solved.OptionArgument adjN adjO)
+                    (Just $ OptionArgument adjN adjO)
                     adjR)
                 do
                   guard (not r)
@@ -153,7 +154,7 @@ preSolve (Spec { program, layouts, descriptions }) = do
         $ "Arguments mismatch for option --" <> n <> ": "
             <> show aN <> " and " <> show aN'
 
-      lookupValidDescription :: Either SolveError (Maybe (Tuple Boolean (Maybe Usage.OptionArgument)))
+      lookupValidDescription :: Either SolveError (Maybe (Tuple Boolean (Maybe OptionArgument)))
       lookupValidDescription =
         let matches = filter isMatch descriptions
          in case matches of
@@ -177,7 +178,7 @@ preSolve (Spec { program, layouts, descriptions }) = do
         _                -> c :| []
 
       case mArg of
-        Just (arg@(Usage.OptionArgument aN aO)) -> do
+        Just (arg@(OptionArgument aN aO)) -> do
           lookupValidDescription true h
           leading <- fromFoldable <$> for ts \t -> do
             lookupValidDescription false t
@@ -186,7 +187,7 @@ preSolve (Spec { program, layouts, descriptions }) = do
                     Nothing
                     r
           let opt = Solved.Option (OptionAlias.Short h)
-                                  (Just $ Solved.OptionArgument aN aO)
+                                  (Just $ OptionArgument aN aO)
                                   r
           solved case leading of
             x : xs -> x :| xs <> singleton opt
@@ -216,7 +217,7 @@ preSolve (Spec { program, layouts, descriptions }) = do
         -- XXX: Purescript is not lazy, so this is too expensive.
         --      We could just stop at the first `Just` value.
         match <- head <<< catMaybes <$> for descriptions case _ of
-          OptionDescription aliases _ (Just (Usage.OptionArgument aN aO)) _ _ -> do
+          OptionDescription aliases _ (Just (OptionArgument aN aO)) _ _ -> do
             head <<< catMaybes <<< fromFoldable <$> for aliases case _ of
               OptionAlias.Short f -> pure do
                 -- the haystack needs to be modified, such that the
@@ -232,7 +233,7 @@ preSolve (Spec { program, layouts, descriptions }) = do
                      in if unsafePartial (US.charAt ix fs) == f then
                         let
                           rest = S.toCharArray $ S.take (S.length fs - S.length bareArgname - 1) fs
-                          opt = Solved.Option (OptionAlias.Short f) (Just (Solved.OptionArgument aN aO)) r
+                          opt = Solved.Option (OptionAlias.Short f) (Just (OptionArgument aN aO)) r
                         in Just (rest /\ opt)
                         else Nothing
                   else Nothing
@@ -264,7 +265,7 @@ preSolve (Spec { program, layouts, descriptions }) = do
           -- repeatability later.
           pure $ \r' -> Solved.Option (OptionAlias.Short t) Nothing (r || r')
         case mDesc of
-          Just (_ /\ (Just (Usage.OptionArgument aN' aO'))) -> do
+          Just (_ /\ (Just (OptionArgument aN' aO'))) -> do
             maybe'
               (\_->
                 if not aO' then
@@ -282,7 +283,7 @@ preSolve (Spec { program, layouts, descriptions }) = do
                 let
                   leading' = (_ $ adjR) <$> leading
                   opt = Solved.Option (OptionAlias.Short h)
-                                      (Just $ Solved.OptionArgument adjN adjO)
+                                      (Just $ OptionArgument adjN adjO)
                                       adjR -- XXX: OR-apply description's repeatability here?
                 slurped case leading' of
                   x : xs -> x :| xs <> singleton opt
@@ -315,7 +316,7 @@ preSolve (Spec { program, layouts, descriptions }) = do
       lookupValidDescription
         :: Boolean -- is trailing?
         -> Char    -- the Char to match
-        -> Either SolveError (Maybe (Tuple Boolean (Maybe Usage.OptionArgument)))
+        -> Either SolveError (Maybe (Tuple Boolean (Maybe OptionArgument)))
       lookupValidDescription isTrailing c =
         let matches = filter isMatch descriptions
          in case matches of

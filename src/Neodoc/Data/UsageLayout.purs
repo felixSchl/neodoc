@@ -8,22 +8,7 @@ import Data.List (List)
 import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty)
 import Neodoc.Data.Layout
-
-data OptionArgument
-  = OptionArgument
-      String  -- name
-      Boolean -- optional
-
-instance prettyOptionArgument :: Pretty OptionArgument where
-  pretty (OptionArgument n o) = (if o then "[" else "")
-                              <> n
-                              <> (if o then "]" else "")
-
-instance showOptionArgument :: Show OptionArgument where
-  show (OptionArgument n o) = "OptionArgument " <> show n <> " " <> show o
-
-instance eqOptionArgument :: Eq OptionArgument where
-  eq (OptionArgument n o) (OptionArgument n' o') = n == n' && o == o'
+import Neodoc.Data.OptionArgument
 
 -- This type can be specialized for elements of a usage section
 type UsageLayout = Layout UsageLayoutArg

@@ -30,8 +30,8 @@ import Neodoc.ArgParser.Token
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.Value as Value
 import Neodoc.Value (Value(..))
-import Neodoc.Data.SolvedLayout (
-  SolvedLayoutArg, OptionArgument, isOptionArgumentOptional)
+import Neodoc.Data.OptionArgument (OptionArgument(..), isOptionArgumentOptional)
+import Neodoc.Data.SolvedLayout (SolvedLayoutArg)
 
 command :: ∀ r. String -> String -> ArgParser r Value
 command rep n = token rep case _ of

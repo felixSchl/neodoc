@@ -19,6 +19,9 @@ data Layout a
       (NonEmpty List (Branch a))
   | Elem a
 
+getElem :: ∀ a. Partial => Layout a -> a
+getElem (Elem x) = x
+
 instance functorLayout :: Functor Layout where
   map f (Group o r xs) = Group o r $ ((f <$> _) <$> _) <$> xs
   map f (Elem x)       = Elem (f x)
