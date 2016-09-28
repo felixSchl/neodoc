@@ -14,6 +14,7 @@ import Neodoc.Spec
 import Neodoc.Spec as Spec
 import Neodoc.Data.Layout
 import Neodoc.Data.Layout as Layout
+import Neodoc.Data.SolvedLayout as Solved
 import Neodoc.Solve.Error
 import Neodoc.Solve.ExpandOptions
 import Neodoc.Solve.Traverse
@@ -29,13 +30,11 @@ smartOptions (Spec { program, layouts, descriptions }) = do
   smartOptionsOnBranch
     :: Layout.Branch ExpandedOptionsLayoutArg
     -> Either SolveError (Layout.Branch ExpandedOptionsLayoutArg)
-  smartOptionsOnBranch branch = zipTraverseM' solveAdjacent branch
-
-  solveAdjacent
-    :: ExpandedOptionsLayout
-    -> Maybe ExpandedOptionsLayout
-    -> Either SolveError (Tuple ExpandedOptionsLayout (Maybe ExpandedOptionsLayout))
-  solveAdjacent layout mAdjLayout = go layout mAdjLayout
+  smartOptionsOnBranch branch = traverse go branch
     where
-    untouched = pure $ layout /\ mAdjLayout
-    go _ _ = untouched
+    -- Check for groups 
+    go g@(Group o r (((Solved.Option oN oMA oR) :| x) :| Nil))
+      = case x of
+          _ -> fail "..."
+
+    go x = pure x
