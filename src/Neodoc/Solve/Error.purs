@@ -1,4 +1,4 @@
-module Neodoc.Transform.SolveError where
+module Neodoc.Solve.Error where
 
 import Prelude
 import Data.Either (Either(..))

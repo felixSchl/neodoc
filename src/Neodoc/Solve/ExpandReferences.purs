@@ -2,12 +2,12 @@
 -- |
 -- | This transform expands `[option-...]` reference tags into real options.
 
-module Neodoc.Transform.Solve where
+module Neodoc.Solve.Solve where
 
 import Neodoc.Spec
-import Neodoc.Transform.PreSolve
+import Neodoc.Solve.PreSolve
 import Neodoc.Data.SolvedLayout
-import Neodoc.Transform.SolveError
+import Neodoc.Solve.Error
 import Data.Either (Either)
 
 solve

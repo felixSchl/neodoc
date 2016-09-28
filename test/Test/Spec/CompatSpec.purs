@@ -34,8 +34,9 @@ import Neodoc.Spec (Spec(..))
 import Neodoc.Spec.Parser as Spec
 import Neodoc.Spec.Lexer as Lexer
 import Neodoc.Scanner as Scanner
-import Neodoc.Transform.SolveError (SolveError(..))
-import Neodoc.Transform.PreSolve (preSolve, PreSolvedLayout(..), PreSolvedLayoutArg(..))
+import Neodoc.Solve.Error (SolveError(..))
+import Neodoc.Solve.ExpandOptions (expandOptions, ExpandedOptionsLayout(..)
+, ExpandedOptionsLayoutArg(..))
 import Neodoc.Data.SolvedLayout (SolvedLayout(..))
 import Neodoc.Data.SolvedLayout as Solved
 import Neodoc.ArgParser as ArgParser
@@ -95,7 +96,7 @@ compatSpec tests =
                     -- pre-solve the input spec
                     -- (TODO: hide and remove this step)
                     Spec spec' <- Error.capture do
-                      preSolve $ Spec { program, layouts, descriptions }
+                      expandOptions $ Spec { program, layouts, descriptions }
 
                     -- fake "solve" the spec
                     -- (TODO: remove this step)
@@ -134,14 +135,14 @@ compatSpec tests =
                        in if (StrMap.fromFoldable expected /= output)
                         then throwException $ error $
                           "Unexpected output:\n"
-                            <> show actual
+                            <> pretty actual
                         else pure unit)
                     out
 
     where
     fakeSolve
       :: Partial
-      => PreSolvedLayout
+      => ExpandedOptionsLayout
       -> SolvedLayout
     fakeSolve x = x <#> case _ of
                               SolvedArg x -> x

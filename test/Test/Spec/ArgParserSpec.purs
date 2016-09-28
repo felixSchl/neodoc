@@ -42,8 +42,9 @@ import Neodoc.Spec (Spec(..))
 import Neodoc.Spec.Parser as Spec
 import Neodoc.Spec.Lexer as Lexer
 import Neodoc.Scanner as Scanner
-import Neodoc.Transform.SolveError (SolveError(..))
-import Neodoc.Transform.PreSolve (preSolve, PreSolvedLayout(..), PreSolvedLayoutArg(..))
+import Neodoc.Solve.Error (SolveError(..))
+import Neodoc.Solve.ExpandOptions (expandOptions, ExpandedOptionsLayout(..)
+, ExpandedOptionsLayoutArg(..))
 import Neodoc.Data.SolvedLayout (SolvedLayout(..))
 import Neodoc.ArgParser as ArgParser
 import Neodoc.ArgParser (ArgParseResult(..))
@@ -996,7 +997,7 @@ argParserSpec = \_ -> describe "The parser generator" do
               -- pre-solve the input spec
               -- (TODO: hide and remove this step)
               Spec spec' <- Error.capture do
-                preSolve $ Spec { program, layouts, descriptions }
+                expandOptions $ Spec { program, layouts, descriptions }
 
               -- fake "solve" the spec
               -- (TODO: remove this step)
@@ -1010,7 +1011,7 @@ argParserSpec = \_ -> describe "The parser generator" do
 
       fakeSolve
         :: Partial
-        => PreSolvedLayout
+        => ExpandedOptionsLayout
         -> SolvedLayout
       fakeSolve x = x <#> case _ of
                                SolvedArg x -> x

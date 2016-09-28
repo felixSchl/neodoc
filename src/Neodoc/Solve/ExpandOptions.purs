@@ -1,13 +1,13 @@
--- | Transform a `UsageLayout` into a `PreSolvedLayout`
+-- | Transform a `UsageLayout` into a `ExpandedOptionsLayout`
 -- |
 -- | This transform:
 -- |    1. expands stacked options, ex: '-abc' into '-a -b -c'.
 -- |    2. assigns option-arguments to options, ex: '--foo BAR' => '--foo=BAR'
 
-module Neodoc.Transform.PreSolve (
-  preSolve
-, PreSolvedLayout
-, PreSolvedLayoutArg (..)
+module Neodoc.Solve.ExpandOptions (
+  expandOptions
+, ExpandedOptionsLayout
+, ExpandedOptionsLayoutArg (..)
 ) where
 
 import Prelude
@@ -48,44 +48,44 @@ import Neodoc.Data.UsageLayout
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.UsageLayout as Usage
 import Neodoc.Data.SolvedLayout as Solved
-import Neodoc.Transform.SolveError
+import Neodoc.Solve.Error
 import Partial.Unsafe (unsafePartial)
 
-type PreSolvedLayout = Layout PreSolvedLayoutArg
-data PreSolvedLayoutArg
+type ExpandedOptionsLayout = Layout ExpandedOptionsLayoutArg
+data ExpandedOptionsLayoutArg
   = SolvedArg SolvedLayoutArg
   | ReferenceArg String
 
-instance eqPreSolvedLayoutArg :: Eq PreSolvedLayoutArg where
+instance eqPreSolvedLayoutArg :: Eq ExpandedOptionsLayoutArg where
   eq (SolvedArg a) (SolvedArg a') = a == a'
   eq (ReferenceArg n) (ReferenceArg n') = n == n'
   eq _ _ = false
 
-instance showPreSolvedLayoutArg :: Show PreSolvedLayoutArg where
+instance showPreSolvedLayoutArg :: Show ExpandedOptionsLayoutArg where
   show (SolvedArg a) = "SolvedArg " <> show a
   show (ReferenceArg n) = "ReferenceArg " <> show n
 
-instance prettyPreSolvedLayoutArg :: Pretty PreSolvedLayoutArg where
+instance prettyPreSolvedLayoutArg :: Pretty ExpandedOptionsLayoutArg where
   pretty (SolvedArg a) = pretty a
   pretty (ReferenceArg n) = "[" <> n <> "]"
 
-preSolve
+expandOptions
   :: Spec UsageLayout
-  -> Either SolveError (Spec PreSolvedLayout)
-preSolve (Spec { program, layouts, descriptions }) = do
+  -> Either SolveError (Spec ExpandedOptionsLayout)
+expandOptions (Spec { program, layouts, descriptions }) = do
   layouts <- for layouts (traverse preSolveBranch)
   pure (Spec { program, layouts, descriptions })
 
   where
   preSolveBranch
     :: Layout.Branch UsageLayoutArg
-    -> Either SolveError (Layout.Branch PreSolvedLayoutArg)
+    -> Either SolveError (Layout.Branch ExpandedOptionsLayoutArg)
   preSolveBranch branch = zipTraverseM preSolveAdjacent branch
 
   preSolveAdjacent
     :: Maybe UsageLayout
     -> UsageLayout
-    -> Either SolveError (Tuple (Maybe UsageLayout) (NonEmpty List PreSolvedLayout))
+    -> Either SolveError (Tuple (Maybe UsageLayout) (NonEmpty List ExpandedOptionsLayout))
   preSolveAdjacent mAdjLayout layout =
     let _return xs = pure (mAdjLayout /\ xs)
         _slurp  xs = pure (Nothing    /\ xs)
@@ -370,3 +370,5 @@ stripAngles = stripPrefix <<< stripSuffix
   where
   stripPrefix s = fromMaybe s (S.stripPrefix "<" s)
   stripSuffix s = fromMaybe s (S.stripSuffix ">" s)
+
+

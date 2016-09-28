@@ -1,4 +1,4 @@
-module Test.Spec.PreSolveSpec (preSolveSpec) where
+module Test.Spec.SolveExpandOptionsSpec (solveExpandOptionsSpec) where
 
 import Prelude
 import Debug.Trace
@@ -36,16 +36,16 @@ import Neodoc.Spec.Lexer as Lexer
 import Neodoc.Spec.Parser as SpecParser
 import Neodoc.Spec.Parser.Usage as U
 import Neodoc.Spec.Parser.Description as D
-import Neodoc.Transform.PreSolve (
-  preSolve, PreSolvedLayoutArg(SolvedArg), PreSolvedLayout)
-import Neodoc.Transform.SolveError (SolveError(..))
+import Neodoc.Solve.ExpandOptions (
+  expandOptions, ExpandedOptionsLayoutArg(..), ExpandedOptionsLayout)
+import Neodoc.Solve.Error (SolveError(..))
 import Text.Wrap (dedent)
 import Partial.Unsafe
 
 -- | Since the solver only expands arguments, it's expanded version is valid
 -- | usage input.
 -- | For example: `-abc` expands to `-a -b -c`, which is valid input.
-usageToSolved :: Partial => UsageLayout -> PreSolvedLayout
+usageToSolved :: Partial => UsageLayout -> ExpandedOptionsLayout
 usageToSolved layout = layout <#> SolvedArg <<< case _ of
   Usage.Command     n r        -> Solved.Command    n r
   Usage.Positional  n r        -> Solved.Positional n r
@@ -64,7 +64,7 @@ data TestCase = TestCase DescriptionText (Either Error Result)
 pass description expected = TestCase description (Right expected)
 fail description err      = TestCase description (Left  err)
 
-preSolveSpec = \_ ->
+solveExpandOptionsSpec = \_ ->
   describe "The solver" do
     for_ (fromFoldable [
 
@@ -202,7 +202,7 @@ preSolveSpec = \_ ->
                       toks <- Error.capture $ Lexer.lexDescs description
                       Error.capture $ SpecParser.parseDescription toks
                     pure (Spec { descriptions, program, layouts })
-                  lmap pretty $ preSolve spec
+                  lmap pretty $ expandOptions spec
             case expected' /\ output' of
               Left expected /\ Left actual | expected /= actual  ->
                 throwException $ error $

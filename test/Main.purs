@@ -10,7 +10,7 @@ import Test.Spec.UsageParserSpec (usageParserSpec)
 import Test.Spec.DescParserSpec (descParserSpec)
 import Test.Spec.ArgParserSpec (argParserSpec)
 import Test.Spec.ForeignSpec (foreignSpec)
-import Test.Spec.PreSolveSpec (preSolveSpec)
+import Test.Spec.SolveExpandOptionsSpec (solveExpandOptionsSpec)
 import Test.Spec.CompatSpec (compatSpec)
 import Test.Spec.DocoptSpec (docoptSpec)
 import Control.Monad.Eff.Class (liftEff)
@@ -39,7 +39,7 @@ main = launchAff do
     -- scannerSpec     unit
     -- usageParserSpec unit
     -- descParserSpec  unit
-    -- preSolveSpec    unit
+    -- SolveExpandOptionsSpec    unit
     -- argParserSpec   unit
     -- docoptSpec      unit
     -- foreignSpec     tests
