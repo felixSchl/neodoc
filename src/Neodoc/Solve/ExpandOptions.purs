@@ -48,6 +48,7 @@ import Neodoc.Data.UsageLayout
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.UsageLayout as Usage
 import Neodoc.Data.SolvedLayout as Solved
+import Neodoc.Solve.Traverse
 import Neodoc.Solve.Error
 import Partial.Unsafe (unsafePartial)
 
@@ -83,12 +84,12 @@ expandOptions (Spec { program, layouts, descriptions }) = do
   preSolveBranch branch = zipTraverseM preSolveAdjacent branch
 
   preSolveAdjacent
-    :: Maybe UsageLayout
-    -> UsageLayout
-    -> Either SolveError (Tuple (Maybe UsageLayout) (NonEmpty List ExpandedOptionsLayout))
-  preSolveAdjacent mAdjLayout layout =
-    let _return xs = pure (mAdjLayout /\ xs)
-        _slurp  xs = pure (Nothing    /\ xs)
+    :: UsageLayout
+    -> Maybe UsageLayout
+    -> Either SolveError (Tuple (NonEmpty List ExpandedOptionsLayout) (Maybe UsageLayout))
+  preSolveAdjacent layout mAdjLayout =
+    let _return xs = pure (xs /\ mAdjLayout)
+        _slurp  xs = pure (xs /\ Nothing)
         mAdjArg   = mAdjLayout >>= case _ of
                       Group _ _ _ -> Nothing
                       Elem  x     -> Just x
@@ -336,30 +337,6 @@ expandOptions (Spec { program, layouts, descriptions }) = do
               OptionAlias.Short c' -> c == c'
               _                    -> false
         isMatch _ = false
-
-zipTraverseM
-  :: ∀ a b m
-   . (Monad m)
-  => (Maybe a -> a -> m (Tuple (Maybe a) (NonEmpty List b)))
-  -> NonEmpty List a
-  -> m (NonEmpty List b)
-zipTraverseM f = go
-  where
-    go (x :| Nil) = do
-      ma /\ (a :| as) <- f Nothing x
-      case ma of
-        Nothing -> pure (a :| as)
-        Just y  -> do
-          b :| bs <- go (y :| Nil)
-          pure (a :| as <> (b : bs)) -- note: `as` won't be run again
-
-    go (x :| y : xss) = do
-      ma /\ (a :| as) <- f (Just y) x
-      case ma of
-        Nothing -> pure (a :| as)
-        Just z  -> do
-          b :| bs <- go (z :| xss)
-          pure (a :| as <> (b : bs)) -- note: `as` won't be run again
 
 posArgsEq :: String -> String -> Boolean
 posArgsEq = eq `on` (S.toUpper <<< stripAngles)
