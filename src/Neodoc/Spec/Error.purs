@@ -7,9 +7,9 @@ import Text.Parsing.Parser as P
 newtype SpecParseError = SpecParseError P.ParseError
 
 instance toNeodocErrorSpecParseError :: ToNeodocError SpecParseError where
-  toNeodocError (SpecParseError e) = Neodoc.SpecParseError e
+  toNeodocError (SpecParseError (P.ParseError m _ _)) = Neodoc.SpecParseError m
 
 newtype SpecLexError = SpecLexError P.ParseError
 
 instance toNeodocErrorSpecLexError :: ToNeodocError SpecLexError where
-  toNeodocError (SpecLexError e) = Neodoc.SpecLexError e
+  toNeodocError (SpecLexError (P.ParseError m _ _)) = Neodoc.SpecLexError m

@@ -995,10 +995,10 @@ argParserSpec = \_ -> describe "The parser generator" do
                 toks <- Error.capture $ Lexer.lexDescs description
                 Error.capture $ Spec.parseDescription toks
 
-              -- pre-solve the input spec
-              -- (TODO: hide and remove this step)
               Error.capture do
-                Solver.solve $ Spec { program, layouts, descriptions }
+                Solver.solve
+                  { smartOptions: false }
+                  (Spec { program, layouts, descriptions })
 
             validate spec argv (Env.fromFoldable env) options expected
 

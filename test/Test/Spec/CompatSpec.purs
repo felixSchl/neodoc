@@ -97,7 +97,9 @@ compatSpec tests =
                     -- pre-solve the input spec
                     -- (TODO: hide and remove this step)
                     spec' <- Error.capture do
-                      Solver.solve (Spec { program, layouts, descriptions })
+                      Solver.solve
+                        { smartOptions: opts.smartOptions }
+                        (Spec { program, layouts, descriptions })
 
                     ArgParseResult mBranch vs <- Error.capture do
                       ArgParser.run spec' opts env argv

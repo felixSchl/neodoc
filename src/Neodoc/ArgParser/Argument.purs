@@ -65,9 +65,9 @@ token name test = Parser \c s i ->
    in case i of
     (PositionedToken { token, source }) : ss ->
       case test token of
-        Nothing -> _fail $ "Expected " <> name <> ", but got: " <> source
+        Nothing -> _fail $ "expected " <> name <> ", but got: " <> source
         Just a  -> _return ss (Right a)
-    _ -> _fail $ "Expected " <> name
+    _ -> _fail $ "expected " <> name
 
 type CanRepeat = Boolean
 type CanTerminate = Boolean

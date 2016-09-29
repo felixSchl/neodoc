@@ -58,8 +58,11 @@ type Error = String
 type Result = String
 type UsageText = String
 type DescriptionText = String
-data TestSuite = TestSuite UsageText (Array TestCase)
+data TestSuite = TestSuite Boolean {- smart options? -} UsageText (Array TestCase)
 data TestCase = TestCase DescriptionText (Either Error Result)
+
+test = TestSuite false
+testSmartOpts = TestSuite true
 
 pass description expected = TestCase description (Right expected)
 fail description err      = TestCase description (Left  err)
@@ -67,59 +70,59 @@ fail description err      = TestCase description (Left  err)
 solveSpec = \_ ->
   describe "The solver" do
     for_ (fromFoldable [
-
+    --
     --   -- should not affect positionals and commands:
-    --   TestSuite "prog foo"       [ pass "" "prog foo" ]
-    -- , TestSuite "prog <prog>..." [ pass "" "prog <prog>..." ]
+    --   test "prog foo"       [ pass "" "prog foo" ]
+    -- , test "prog <prog>..." [ pass "" "prog <prog>..." ]
     --
     --   -- options:
-    -- , TestSuite "prog -io"
+    -- , test "prog -io"
     --     [ pass "" "prog -i -o" ]
     --
-    -- , TestSuite "prog -io [-q]..."
+    -- , test "prog -io [-q]..."
     --     [ pass "" "prog -i -o [-q]..." ]
     --
-    -- , TestSuite "prog --foo..."
+    -- , test "prog --foo..."
     --     [ fail "-f --foo=bar [default: qux]"
     --         "Option-Argument specified in options-section missing --foo" ]
     --
-    -- , TestSuite "prog --foo... BAR"
+    -- , test "prog --foo... BAR"
     --     [ fail "-f --foo=BAR [default: qux]"
     --         "Option-Argument specified in options-section missing --foo" ]
     --
-    -- , TestSuite "prog -f... BAR"
+    -- , test "prog -f... BAR"
     --     [ fail "-f --foo=BAR [default: qux]"
     --         "Option-Argument specified in options-section missing -f" ]
     --
-    -- , TestSuite "prog --foo BAR..."
+    -- , test "prog --foo BAR..."
     --     [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR..."
     --     , pass "-f --foo" "prog --foo BAR..." ]
     --
-    -- , TestSuite "prog --foo BAR"
+    -- , test "prog --foo BAR"
     --     [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR"
     --     , pass "-f --foo" "prog --foo BAR" ]
     --
-    -- , TestSuite "prog --foo... BAR..."
+    -- , test "prog --foo... BAR..."
     --     [ fail "-f --foo=BAR [default: qux]"
     --         "Option-Argument specified in options-section missing --foo" ]
     --
-    -- , TestSuite "prog -f... BAR..."
+    -- , test "prog -f... BAR..."
     --     [ fail "-f --foo=BAR [default: qux]"
     --         "Option-Argument specified in options-section missing -f" ]
     --
-    -- , TestSuite "prog -xvzfFILE..."
+    -- , test "prog -xvzfFILE..."
     --     [ pass "-f --file=FILE [default: foo]"
     --         "prog -x... -v... -z... -f=FILE..." ]
     --
-    -- , TestSuite "prog -xvzf=FILE..."
+    -- , test "prog -xvzf=FILE..."
     --     [ pass "-f --file=FILE [default: foo]"
     --         "prog -x... -v... -z... -f=FILE..." ]
     --
-    -- , TestSuite "prog -xvzf FILE..."
+    -- , test "prog -xvzf FILE..."
     --     [ pass "-f --file=FILE  [default: foo]"
     --         "prog -x... -v... -z... -f=FILE..." ]
     --
-    -- , TestSuite "prog --file FILE..."
+    -- , test "prog --file FILE..."
     --     [ fail
     --         """
     --         -f --file=FILE  [default: foo]
@@ -127,7 +130,7 @@ solveSpec = \_ ->
     --         """
     --         "Multiple option descriptions for option --file" ]
     --
-    -- , TestSuite "prog -f FILE..."
+    -- , test "prog -f FILE..."
     --     [ fail
     --         """
     --         -f --file=FILE  [default: foo]
@@ -135,7 +138,7 @@ solveSpec = \_ ->
     --         """
     --         "Multiple option descriptions for option -f" ]
     --
-    -- , TestSuite "prog --file FILE..."
+    -- , test "prog --file FILE..."
     --     [ fail
     --         """
     --         -f --file=FILE  [default: foo]
@@ -143,7 +146,7 @@ solveSpec = \_ ->
     --         """
     --         "Multiple option descriptions for option --file" ]
     --
-    -- , TestSuite "prog -fx..."
+    -- , test "prog -fx..."
     --     [ fail
     --         "-f --file=FILE  [default: foo]"
     --         "Stacked option -f may not specify arguments" ]
@@ -151,41 +154,73 @@ solveSpec = \_ ->
     --   -- Note: `f` should not adopt `file` as it's full name since it's in an
     --   -- option stack and not in trailing position (therefore cannot inherit the
     --   -- description's argument, rendering it an unfit candidate)
-    -- , TestSuite "prog -fvzx..."
+    -- , test "prog -fvzx..."
     --     [ fail
     --         "-f --file=FILE  [default: foo]"
     --         "Stacked option -f may not specify arguments" ]
     --
-    -- , TestSuite "prog -xvzf FILE..."
+    -- , test "prog -xvzf FILE..."
     --     [ pass
     --         "-f --file=FILE  [default: foo]"
     --         "prog -x... -v... -z... -f=FILE..." ]
     --
-    -- , TestSuite "prog -xvzf..."
+    -- , test "prog -xvzf..."
     --     [ fail
     --         "-f --file=FILE  [default: foo]"
     --         "Option-Argument specified in options-section missing -f" ]
     --
-      -- [references]:
-      TestSuite "prog [options]"
-        [ pass
-            """
-            -i
-            -o
-            """
-            "prog [-i -o]" ]
+    --   -- smart options
+    -- , testSmartOpts "prog [-f FILE]"
+    --     [ pass ""   "prog [-f=FILE]"
+    --     , pass "-f" "prog [-f FILE]"
+    --     ]
+    --
+    -- , testSmartOpts "prog (-f FILE)"
+    --     [ pass ""   "prog (-f=FILE)"
+    --     , pass "-f" "prog (-f FILE)"
+    --     ]
+    --
+    -- , testSmartOpts "prog (-x <foo> | -f FILE)"
+    --     [ pass ""                  "prog (-x=<foo> | -f=FILE)"
+    --     , pass "-x"                "prog (-x <foo> | -f=FILE)"
+    --     , pass "-f"                "prog (-x=<foo> | -f FILE)"
+    --     , pass "-f\n-x"            "prog (-x <foo> | -f FILE)"
+    --     , pass "-x=<foo>"          "prog (-x=<foo> | -f=FILE)"
+    --     , pass "-f=FILE"           "prog (-x=<foo> | -f=FILE)"
+    --     , pass "-f=FILE\n-x=<foo>" "prog (-x=<foo> | -f=FILE)"
+    --     ]
 
-    , TestSuite "prog [options]..."
+      -- [references]:
+      test "prog [options]"
         [ pass
             """
-            -i
-            -o
+            -a        Add
+            -r        Remote
+            -m <msg>  Message
             """
-            "prog [-i -o]..." ]
+            "prog ([-a] [-r] [-m<msg>])"
+        ]
+
+    , test "prog [options]"
+        [ pass (intercalate "\n" [ "-i", "-o" ]) "prog ([-i] [-o])"
+        , pass (intercalate "\n" [ "-i=FOO", "-o" ]) "prog ([-i=FOO] [-o])"
+        , pass (intercalate "\n" [ "-i=FOO", "-o=FOO" ]) "prog ([-i=FOO] [-o=FOO])"
+        ]
+
+    , test "prog [options] -o"
+        [ pass (intercalate "\n" [ "-i", "-o" ]) "prog ([-i]) -o"
+        , pass (intercalate "\n" [ "-i=FOO", "-o" ]) "prog ([-i=FOO]) -o"
+        ]
+
+    , test "prog -i [options] -o"
+        [ pass (intercalate "\n" [ "-i", "-o" ]) "prog -i -o"
+        , pass (intercalate "\n" [ "-i", "-o" ]) "prog -i -o"
+        , pass (intercalate "\n" [ "-i[=FOO]", "-o" ]) "prog -i -o"
+        ]
     ]) runTest
 
   where
-  runTest (TestSuite usage cases) = do
+  runTest (TestSuite smartOptions usage cases) = do
     describe ("\nusage: " <> usage <> "\n") do
       for_ cases \(TestCase description expected) ->
         let description' = if S.length description > 0
@@ -218,19 +253,19 @@ solveSpec = \_ ->
                       toks <- Error.capture $ Lexer.lexDescs description
                       Error.capture $ SpecParser.parseDescription toks
                     pure (Spec { descriptions, program, layouts })
-                  lmap pretty $ solve spec
+                  lmap pretty $ solve { smartOptions } spec
             case expected' /\ output' of
               Left expected /\ Left actual | expected /= actual  ->
                 throwException $ error $
-                  "Wrong exception! Got:\n\n" <> show actual
+                  "Wrong exception! Got:\n\n" <> pretty actual
               Left _ /\ Right result ->
                 throwException $ error $
                   "Missing exception! Got:\n\n" <> pretty result
               Right (Spec expected) /\ Right (Spec actual)
                 | expected.layouts /= actual.layouts ->
                     throwException $ error $
-                      "Unexpected output! Got:\n" <> pretty (Spec actual)
-                      <> "\n\nbut expected:\n" <> pretty (Spec expected)
+                      "Unexpected output! expected:\n" <> pretty (Spec expected)
+                      <> "\n\nbut got:\n" <> pretty (Spec actual)
               Right _ /\ Left err ->
                 throwException $ error $ "Failure!\n" <> err
               _ -> pure unit

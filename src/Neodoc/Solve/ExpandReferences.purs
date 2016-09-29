@@ -115,9 +115,10 @@ expandReferences (Spec { program, layouts, descriptions }) =
           (EmptyableGroup o r xs) -> EmptyableGroup o r $ (expand <$> _) <$> xs
           (EmptyableElem (Indexed _ (SolvedArg x))) -> EmptyableElem x
           (EmptyableElem (Indexed ix (ReferenceArg n))) ->
-            EmptyableGroup true false $ maybe Nil (_:Nil) do
+            EmptyableGroup false false $ maybe Nil (_:Nil) do
               args <- Map.lookup ix indexToArgs
-              pure $ EmptyableElem <$> args
+              pure $ args <#> \arg ->
+                EmptyableGroup true false ((EmptyableElem arg:Nil):Nil)
 
      in toStrictBranch $ toEmptyableBranch indexedBranch <#> expand
 

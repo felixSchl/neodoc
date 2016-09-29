@@ -8,14 +8,15 @@ import Neodoc.Spec as Spec
 import Neodoc.Data.UsageLayout
 import Neodoc.Data.SolvedLayout
 import Neodoc.Solve.Error
-import Neodoc.Solve.SmartOptions
-import Neodoc.Solve.ExpandOptions
-import Neodoc.Solve.ExpandReferences
+import Neodoc.Solve.SmartOptions as Solve
+import Neodoc.Solve.ExpandOptions as Solve
+import Neodoc.Solve.ExpandReferences as Solve
 
 solve
-  :: Spec UsageLayout
+  :: { smartOptions :: Boolean }
+  -> Spec UsageLayout
   -> Either SolveError (Spec SolvedLayout)
-solve x = pure x
-  >>= smartOptions
-  >>= expandOptions
-  >>= expandReferences >>= (\x -> traceShowA x *> pure x)
+solve { smartOptions } spec = do
+  (if smartOptions then Solve.smartOptions spec else pure spec)
+    >>= Solve.expandOptions
+    >>= Solve.expandReferences

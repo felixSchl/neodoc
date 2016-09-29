@@ -63,6 +63,8 @@ smartOptions (Spec { program, layouts, descriptions }) = do
               (Elem (Usage.Command    n r)) -> Just $ OptionArgument n o' /\ (r || r')
               (Elem (Usage.Positional n r)) -> Just $ OptionArgument n o' /\ (r || r')
               _ -> Nothing
+          (Elem (Usage.Command    n r)) -> Just $ OptionArgument n false /\ r
+          (Elem (Usage.Positional n r)) -> Just $ OptionArgument n false /\ r
           _ -> Nothing
 
         opt <- case x of

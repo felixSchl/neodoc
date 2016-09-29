@@ -24,22 +24,6 @@ type Scan = {
 , originalUsage :: String
 }
 
-section :: String -> Regex
-section name = unsafePartial $ fromRight $
-  regex ("^([^\n]*" <> name <> "[^\n]*:(?:.*$)\n?(?:(?:[ \t].*)?(?:\n|$))*)")
-        (Regex.parseFlags "gmi")
-
-fixSection :: String -> String
-fixSection = fixHeaders <<< removeEscapes
-  where
-    removeEscapes = to (Just ' ') AnsiRegex.regex
-    fixHeaders    = to (Just ' ') $ unsafePartial
-                                  $ fromRight
-                                  $ regex "(^[^:]+:)" Regex.noFlags
-    to c = flip Regex.replace' $ \m _ ->
-              maybe "" (String.replicate (String.length m)) c
-
-
 scan :: String -> Either ScanError Scan
 scan text = lmap ScanError do
   u <- case sections "usage" of
@@ -58,3 +42,20 @@ scan text = lmap ScanError do
     sections n = maybe Nil
                        (catMaybes <<< fromFoldable)
                        (Regex.match (section n) text)
+
+section :: String -> Regex
+section name = unsafePartial $ fromRight $
+  regex ("^([^\n]*" <> name <> "[^\n]*:(?:.*$)\n?(?:(?:[ \t].*)?(?:\n|$))*)")
+        (Regex.parseFlags "gmi")
+
+fixSection :: String -> String
+fixSection = fixHeaders <<< removeEscapes
+  where
+    removeEscapes = to (Just ' ') AnsiRegex.regex
+    fixHeaders    = to (Just ' ') $ unsafePartial
+                                  $ fromRight
+                                  $ regex "(^[^:]+:)" Regex.noFlags
+    to c = flip Regex.replace' $ \m _ ->
+              maybe "" (String.replicate (String.length m)) c
+
+
