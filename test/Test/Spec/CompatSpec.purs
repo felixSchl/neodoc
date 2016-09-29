@@ -34,6 +34,7 @@ import Neodoc.Spec (Spec(..))
 import Neodoc.Spec.Parser as Spec
 import Neodoc.Spec.Lexer as Lexer
 import Neodoc.Scanner as Scanner
+import Neodoc.Solve as Solver
 import Neodoc.Solve.Error (SolveError(..))
 import Neodoc.Solve.ExpandOptions (expandOptions, ExpandedOptionsLayout(..)
 , ExpandedOptionsLayoutArg(..))
@@ -95,17 +96,11 @@ compatSpec tests =
 
                     -- pre-solve the input spec
                     -- (TODO: hide and remove this step)
-                    Spec spec' <- Error.capture do
-                      expandOptions $ Spec { program, layouts, descriptions }
-
-                    -- fake "solve" the spec
-                    -- (TODO: remove this step)
-                    spec'' <- pure $ unsafePartial $ Spec $ spec' {
-                      layouts = ((fakeSolve <$> _) <$> _) <$> spec'.layouts
-                    }
+                    spec' <- Error.capture do
+                      Solver.solve (Spec { program, layouts, descriptions })
 
                     ArgParseResult mBranch vs <- Error.capture do
-                      ArgParser.run spec'' opts env argv
+                      ArgParser.run spec' opts env argv
 
                     pure $ Evaluate.reduce env descriptions mBranch vs
 
@@ -138,12 +133,3 @@ compatSpec tests =
                             <> pretty actual
                         else pure unit)
                     out
-
-    where
-    fakeSolve
-      :: Partial
-      => ExpandedOptionsLayout
-      -> SolvedLayout
-    fakeSolve x = x <#> case _ of
-                              SolvedArg x -> x
-                              ReferenceArg _ -> (Solved.Command "foo" false {- ... just fake one ... -})

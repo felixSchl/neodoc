@@ -3,7 +3,7 @@ module Neodoc.Data.SolvedLayout where
 import Prelude
 import Data.Pretty (class Pretty, pretty)
 import Data.Maybe (Maybe, maybe)
-import Data.Foldable (intercalate)
+import Data.Foldable (intercalate, all)
 import Data.String as String
 import Data.List (List)
 import Data.String (singleton) as String
@@ -81,3 +81,9 @@ isOptional _ = false
 isGroup :: SolvedLayout -> Boolean
 isGroup (Group _ _ _) = true
 isGroup _ = false
+
+-- Is this layout considered "free"?
+isFreeLayout :: SolvedLayout -> Boolean
+isFreeLayout (Elem (Option _ _ _)) = true
+isFreeLayout (Elem _) = false
+isFreeLayout (Group _ _ xs) = all (all isFreeLayout) xs

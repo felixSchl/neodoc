@@ -68,104 +68,120 @@ solveSpec = \_ ->
   describe "The solver" do
     for_ (fromFoldable [
 
-      -- should not affect positionals and commands:
-      TestSuite "prog foo"       [ pass "" "prog foo" ]
-    , TestSuite "prog <prog>..." [ pass "" "prog <prog>..." ]
-
-      -- options:
-    , TestSuite "prog -io"
-        [ pass "" "prog -i -o" ]
-
-    , TestSuite "prog -io [-q]..."
-        [ pass "" "prog -i -o [-q]..." ]
-
-    , TestSuite "prog --foo..."
-        [ fail "-f --foo=bar [default: qux]"
-            "Option-Argument specified in options-section missing --foo" ]
-
-    , TestSuite "prog --foo... BAR"
-        [ fail "-f --foo=BAR [default: qux]"
-            "Option-Argument specified in options-section missing --foo" ]
-
-    , TestSuite "prog -f... BAR"
-        [ fail "-f --foo=BAR [default: qux]"
-            "Option-Argument specified in options-section missing -f" ]
-
-    , TestSuite "prog --foo BAR..."
-        [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR..."
-        , pass "-f --foo" "prog --foo BAR..." ]
-
-    , TestSuite "prog --foo BAR"
-        [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR"
-        , pass "-f --foo" "prog --foo BAR" ]
-
-    , TestSuite "prog --foo... BAR..."
-        [ fail "-f --foo=BAR [default: qux]"
-            "Option-Argument specified in options-section missing --foo" ]
-
-    , TestSuite "prog -f... BAR..."
-        [ fail "-f --foo=BAR [default: qux]"
-            "Option-Argument specified in options-section missing -f" ]
-
-    , TestSuite "prog -xvzfFILE..."
-        [ pass "-f --file=FILE [default: foo]"
-            "prog -x... -v... -z... -f=FILE..." ]
-
-    , TestSuite "prog -xvzf=FILE..."
-        [ pass "-f --file=FILE [default: foo]"
-            "prog -x... -v... -z... -f=FILE..." ]
-
-    , TestSuite "prog -xvzf FILE..."
-        [ pass "-f --file=FILE  [default: foo]"
-            "prog -x... -v... -z... -f=FILE..." ]
-
-    , TestSuite "prog --file FILE..."
-        [ fail
-            """
-            -f --file=FILE  [default: foo]
-            -f --file=FILE  [default: foo]
-            """
-            "Multiple option descriptions for option --file" ]
-
-    , TestSuite "prog -f FILE..."
-        [ fail
-            """
-            -f --file=FILE  [default: foo]
-            -f --file=FILE  [default: foo]
-            """
-            "Multiple option descriptions for option -f" ]
-
-    , TestSuite "prog --file FILE..."
-        [ fail
-            """
-            -f --file=FILE  [default: foo]
-            -f --file=FILE  [default: foo]
-            """
-            "Multiple option descriptions for option --file" ]
-
-    , TestSuite "prog -fx..."
-        [ fail
-            "-f --file=FILE  [default: foo]"
-            "Stacked option -f may not specify arguments" ]
-
-      -- Note: `f` should not adopt `file` as it's full name since it's in an
-      -- option stack and not in trailing position (therefore cannot inherit the
-      -- description's argument, rendering it an unfit candidate)
-    , TestSuite "prog -fvzx..."
-        [ fail
-            "-f --file=FILE  [default: foo]"
-            "Stacked option -f may not specify arguments" ]
-
-    , TestSuite "prog -xvzf FILE..."
+    --   -- should not affect positionals and commands:
+    --   TestSuite "prog foo"       [ pass "" "prog foo" ]
+    -- , TestSuite "prog <prog>..." [ pass "" "prog <prog>..." ]
+    --
+    --   -- options:
+    -- , TestSuite "prog -io"
+    --     [ pass "" "prog -i -o" ]
+    --
+    -- , TestSuite "prog -io [-q]..."
+    --     [ pass "" "prog -i -o [-q]..." ]
+    --
+    -- , TestSuite "prog --foo..."
+    --     [ fail "-f --foo=bar [default: qux]"
+    --         "Option-Argument specified in options-section missing --foo" ]
+    --
+    -- , TestSuite "prog --foo... BAR"
+    --     [ fail "-f --foo=BAR [default: qux]"
+    --         "Option-Argument specified in options-section missing --foo" ]
+    --
+    -- , TestSuite "prog -f... BAR"
+    --     [ fail "-f --foo=BAR [default: qux]"
+    --         "Option-Argument specified in options-section missing -f" ]
+    --
+    -- , TestSuite "prog --foo BAR..."
+    --     [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR..."
+    --     , pass "-f --foo" "prog --foo BAR..." ]
+    --
+    -- , TestSuite "prog --foo BAR"
+    --     [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR"
+    --     , pass "-f --foo" "prog --foo BAR" ]
+    --
+    -- , TestSuite "prog --foo... BAR..."
+    --     [ fail "-f --foo=BAR [default: qux]"
+    --         "Option-Argument specified in options-section missing --foo" ]
+    --
+    -- , TestSuite "prog -f... BAR..."
+    --     [ fail "-f --foo=BAR [default: qux]"
+    --         "Option-Argument specified in options-section missing -f" ]
+    --
+    -- , TestSuite "prog -xvzfFILE..."
+    --     [ pass "-f --file=FILE [default: foo]"
+    --         "prog -x... -v... -z... -f=FILE..." ]
+    --
+    -- , TestSuite "prog -xvzf=FILE..."
+    --     [ pass "-f --file=FILE [default: foo]"
+    --         "prog -x... -v... -z... -f=FILE..." ]
+    --
+    -- , TestSuite "prog -xvzf FILE..."
+    --     [ pass "-f --file=FILE  [default: foo]"
+    --         "prog -x... -v... -z... -f=FILE..." ]
+    --
+    -- , TestSuite "prog --file FILE..."
+    --     [ fail
+    --         """
+    --         -f --file=FILE  [default: foo]
+    --         -f --file=FILE  [default: foo]
+    --         """
+    --         "Multiple option descriptions for option --file" ]
+    --
+    -- , TestSuite "prog -f FILE..."
+    --     [ fail
+    --         """
+    --         -f --file=FILE  [default: foo]
+    --         -f --file=FILE  [default: foo]
+    --         """
+    --         "Multiple option descriptions for option -f" ]
+    --
+    -- , TestSuite "prog --file FILE..."
+    --     [ fail
+    --         """
+    --         -f --file=FILE  [default: foo]
+    --         -f --file=FILE  [default: foo]
+    --         """
+    --         "Multiple option descriptions for option --file" ]
+    --
+    -- , TestSuite "prog -fx..."
+    --     [ fail
+    --         "-f --file=FILE  [default: foo]"
+    --         "Stacked option -f may not specify arguments" ]
+    --
+    --   -- Note: `f` should not adopt `file` as it's full name since it's in an
+    --   -- option stack and not in trailing position (therefore cannot inherit the
+    --   -- description's argument, rendering it an unfit candidate)
+    -- , TestSuite "prog -fvzx..."
+    --     [ fail
+    --         "-f --file=FILE  [default: foo]"
+    --         "Stacked option -f may not specify arguments" ]
+    --
+    -- , TestSuite "prog -xvzf FILE..."
+    --     [ pass
+    --         "-f --file=FILE  [default: foo]"
+    --         "prog -x... -v... -z... -f=FILE..." ]
+    --
+    -- , TestSuite "prog -xvzf..."
+    --     [ fail
+    --         "-f --file=FILE  [default: foo]"
+    --         "Option-Argument specified in options-section missing -f" ]
+    --
+      -- [references]:
+      TestSuite "prog [options]"
         [ pass
-            "-f --file=FILE  [default: foo]"
-            "prog -x... -v... -z... -f=FILE..." ]
+            """
+            -i
+            -o
+            """
+            "prog [-i -o]" ]
 
-    , TestSuite "prog -xvzf..."
-        [ fail
-            "-f --file=FILE  [default: foo]"
-            "Option-Argument specified in options-section missing -f" ]
-
+    , TestSuite "prog [options]..."
+        [ pass
+            """
+            -i
+            -o
+            """
+            "prog [-i -o]..." ]
     ]) runTest
 
   where

@@ -42,6 +42,7 @@ import Neodoc.Spec (Spec(..))
 import Neodoc.Spec.Parser as Spec
 import Neodoc.Spec.Lexer as Lexer
 import Neodoc.Scanner as Scanner
+import Neodoc.Solve as Solver
 import Neodoc.Solve.Error (SolveError(..))
 import Neodoc.Solve.ExpandOptions (expandOptions, ExpandedOptionsLayout(..)
 , ExpandedOptionsLayoutArg(..))
@@ -996,25 +997,12 @@ argParserSpec = \_ -> describe "The parser generator" do
 
               -- pre-solve the input spec
               -- (TODO: hide and remove this step)
-              Spec spec' <- Error.capture do
-                expandOptions $ Spec { program, layouts, descriptions }
-
-              -- fake "solve" the spec
-              -- (TODO: remove this step)
-              pure $ unsafePartial $ Spec $ spec' {
-                layouts = ((fakeSolve <$> _) <$> _) <$> spec'.layouts
-              }
+              Error.capture do
+                Solver.solve $ Spec { program, layouts, descriptions }
 
             validate spec argv (Env.fromFoldable env) options expected
 
     where
-
-      fakeSolve
-        :: Partial
-        => ExpandedOptionsLayout
-        -> SolvedLayout
-      fakeSolve x = x <#> case _ of
-                               SolvedArg x -> x
 
       prettyPrintStrMap :: StrMap Value -> String
       prettyPrintStrMap m = intercalate "\n\t" $

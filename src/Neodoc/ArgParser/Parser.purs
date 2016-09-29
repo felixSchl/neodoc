@@ -88,6 +88,8 @@ import Neodoc.Data.Layout as Layout
 import Neodoc.Data.Description
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
+import Neodoc.Data.Chunk
+import Neodoc.Data.Indexed
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.ArgKey (ArgKey)
 import Neodoc.ArgKey.Class (toArgKey)
@@ -96,10 +98,8 @@ import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
 import Neodoc.ArgParser.Token as Token
 import Neodoc.ArgParser.Argument
-import Neodoc.ArgParser.Chunk
 import Neodoc.ArgParser.Lexer as L
 import Neodoc.ArgParser.Evaluate
-import Neodoc.ArgParser.Indexed
 import Neodoc.ArgParser.Required
 import Neodoc.ArgParser.Combinators
 import Neodoc.ArgParser.Fallback
@@ -107,7 +107,7 @@ import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.KeyValue
 
 _ENABLE_DEBUG_ :: Boolean
-_ENABLE_DEBUG_ = true
+_ENABLE_DEBUG_ = false
 
 initialState :: ParseState
 initialState = {
@@ -125,7 +125,7 @@ parse
   -> Env
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
-parse (Spec { layouts, descriptions }) options env tokens = traceShowA layouts *>
+parse (Spec { layouts, descriptions }) options env tokens =
   runParser { env, options, descriptions } initialState tokens $
     let parsers = concat (fromFoldable layouts) <#> \toplevel ->
           traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
@@ -337,7 +337,7 @@ parseChunk skippable isSkipping l chunk = do
       where
       recover layout err =
         let
-          isFixed = not <<< isFreeLayout
+          isFixed = not <<< Solved.isFreeLayout
           errs' = if isGroup layout || isFixed layout
                       then Map.alter (const (Just err)) layout errs
                       else errs
@@ -363,7 +363,7 @@ parseChunk skippable isSkipping l chunk = do
               else
                 let isFixed' = isFixed <<< getIndexedElem <<< unRequired
                     xs' =
-                      if isFreeLayout layout
+                      if Solved.isFreeLayout layout
                         then xs <> singleton x
                         -- XXX: Future work could include slicing off those
                         -- branches in the group that are 'free' and re-queueing
@@ -464,13 +464,7 @@ chunkBranch
   -> List SolvedLayout
   -> List (Chunk (List SolvedLayout))
 chunkBranch lax optsFirst = fromFoldable >>> chunk \x ->
-  (not (optsFirst && canTerm x)) && (lax || isFreeLayout x)
-
--- Is this layout considered "free"?
-isFreeLayout :: SolvedLayout -> Boolean
-isFreeLayout (Elem (Solved.Option _ _ _)) = true
-isFreeLayout (Elem _) = false
-isFreeLayout (Group _ _ xs) = all (all isFreeLayout) xs
+  (not (optsFirst && canTerm x)) && (lax || Solved.isFreeLayout x)
 
 isFrom :: Origin -> RichValue -> Boolean
 isFrom o rv = o == RichValue.getOrigin rv

@@ -1,6 +1,7 @@
 module Neodoc.Solve where
 
 import Prelude
+import Debug.Trace
 import Data.Either (Either(..), either)
 import Neodoc.Spec
 import Neodoc.Spec as Spec
@@ -17,4 +18,4 @@ solve
 solve x = pure x
   >>= smartOptions
   >>= expandOptions
-  >>= expandReferences
+  >>= expandReferences >>= (\x -> traceShowA x *> pure x)

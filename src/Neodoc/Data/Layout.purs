@@ -36,7 +36,7 @@ instance prettyLayout :: (Pretty a) => Pretty (Layout a) where
       <> (if r then "..." else "")
 
 instance showLayout :: (Show a) => Show (Layout a) where
-  show (Elem  x) = "Elem " <> show x
+  show (Elem  x)      = "Elem " <> show x
   show (Group o r xs) = "Group " <> show o <> " " <> show r <> " " <> show xs
 
 instance eqLayout :: (Eq a) => Eq (Layout a) where

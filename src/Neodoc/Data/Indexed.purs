@@ -1,4 +1,4 @@
-module Neodoc.ArgParser.Indexed where
+module Neodoc.Data.Indexed where
 
 import Prelude
 import Data.Function (on)
@@ -44,3 +44,5 @@ getIndexedElem (Indexed _ x) = x
 getIndex :: ∀ a. Indexed a -> Int
 getIndex (Indexed ix _) = ix
 
+toMap :: ∀ a. List (Indexed a) -> Map Int a
+toMap xs = Map.fromFoldable $ xs <#> \(Indexed ix x) -> ix /\ x

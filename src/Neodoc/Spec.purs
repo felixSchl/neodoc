@@ -35,7 +35,7 @@ instance prettySpec :: (Pretty a) => Pretty (Spec a) where
     <> (if null ts then "" else "\n")
     <> (intercalate "\n" $ ts <#> \t ->
         "   or: " <> program <> " " <> prettyTopLevel t)
-    <> (if null descriptions then "" else "\noptions:")
+    <> (if null descriptions then "" else "\noptions:\n")
     <> (intercalate "\n" $ pretty <$> descriptions)
     where prettyTopLevel t = intercalate " | " $ prettyBranch <$> t
           prettyBranch   b = intercalate " " $ pretty <$> b

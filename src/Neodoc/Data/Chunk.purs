@@ -1,4 +1,4 @@
-module Neodoc.ArgParser.Chunk where
+module Neodoc.Data.Chunk where
 
 import Prelude
 import Data.List (List(..), singleton, (:), reverse)
@@ -21,6 +21,10 @@ instance prettyClump :: (Pretty a) => Pretty (Chunk (List a)) where
 isFree :: ∀ a. Chunk a -> Boolean
 isFree (Free _) = true
 isFree _        = false
+
+getElem :: ∀ a. Chunk a -> a
+getElem (Free a) = a
+getElem (Fixed a) = a
 
 chunk
   :: ∀ a

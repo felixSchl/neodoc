@@ -33,6 +33,15 @@ getArg = fst
 getDescription :: ∀ a. WithDescription a -> Maybe Description
 getDescription = snd
 
+-- Annotate sth that can resolve an `ArgKey` with it's description
+annotate'
+  :: ∀ a
+   . (ToArgKey a)
+  => List Description
+  -> a
+  -> WithDescription a
+annotate' descriptions x = x /\ (findDescription descriptions (toArgKey x))
+
 -- Annotate a layout of arguments with it's description
 annotate
   :: List Description
@@ -42,9 +51,11 @@ annotate descriptions x = x /\ (findDescription descriptions x)
 
 -- Annotate a layout of arguments with it's description
 annotateLayout
-  :: List Description
-  -> SolvedLayout
-  -> AnnotatedLayout SolvedLayoutArg
+  :: ∀ a
+   . (ToArgKey a)
+  => List Description
+  -> Layout a
+  -> AnnotatedLayout a
 annotateLayout descriptions l = l <#> \x ->
   x /\ (findDescription descriptions $ toArgKey x)
 
@@ -61,6 +72,7 @@ findDescription descriptions (OptionKey alias)
     matchesAlias _ = false
 findDescription _ _ = Nothing
 
+-- Find the set of arg keys that describe the same option
 findArgKeys
   :: List Description
   -> ArgKey
