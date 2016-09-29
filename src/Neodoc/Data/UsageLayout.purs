@@ -2,15 +2,17 @@ module Neodoc.Data.UsageLayout where
 
 import Prelude
 import Data.Pretty (class Pretty, pretty)
-import Data.Maybe (Maybe, maybe)
+import Data.Array as Array
+import Data.Maybe (Maybe(..), maybe)
 import Data.Foldable (intercalate)
 import Data.List (List)
 import Data.String (singleton) as String
 import Data.Either (Either(..))
-import Data.NonEmpty (NonEmpty)
+import Data.NonEmpty (NonEmpty, (:|))
 import Data.Foreign as F
 import Data.Foreign.Class as F
 import Data.Foreign.Index as F
+import Data.Foreign.Index ((!))
 import Data.Foreign.Class
 import Neodoc.Data.Layout
 import Neodoc.Data.OptionArgument
@@ -29,24 +31,50 @@ data UsageLayoutArg
 instance isForeignUsageLayoutArg :: IsForeign UsageLayoutArg where
   read v = do
     typ :: String <- F.readProp "type" v
-    case typ of
-      "Command" ->
-        Command <$> F.readProp "name"       v
-                <*> F.readProp "repeatable" v
-      "Positional" ->
-        Positional  <$> F.readProp "name"       v
-                    <*> F.readProp "repeatable" v
-      "EOA"   -> pure EOA
-      "Stdin" -> pure Stdin
-      "Reference" ->
-        Reference <$> F.readProp "name" v
-      "Option" ->
-        Option <$> F.readProp "name"
-               <*> readOptionArgument v
-               <*> F.readProp 
 
-      -- "OptionStack" ->
+    case typ of
+      "EOA" -> pure EOA
+      "Stdin" -> pure Stdin
+      "Command" ->
+        Command
+          <$> F.readProp "name"       v
+          <*> F.readProp "repeatable" v
+      "Positional" ->
+        Positional
+          <$> F.readProp "name"       v
+          <*> F.readProp "repeatable" v
+      "Reference" ->
+        Reference
+          <$> F.readProp "name" v
+      "Option" ->
+        Option
+          <$> F.readProp "name" v
+          <*> readOptionArgument v
+          <*> F.readProp "repeatable" v
+      "OptionStack" ->
+        OptionStack
+          <$> readOptionStack v
+          <*> readOptionArgument v
+          <*> F.readProp "repeatable" v
       _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
+
+    where
+    readOptionArgument v = do
+      if F.hasOwnProperty "argument" v
+        then do
+          aV <- v ! "argument"
+          Just <$> do
+            OptionArgument
+              <$> F.readProp "name" aV
+              <*> F.readProp "repeatable" aV
+        else pure Nothing
+
+    readOptionStack v = do
+      chars :: Array Char <- F.readProp "chars" v
+      case Array.uncons chars of
+        Just { head, tail } -> pure $ head :| tail
+        _ -> Left $ F.errorAt "chars" (F.JSONError $ "missing chars")
+
 
 instance eqUsageLayoutArg :: Eq UsageLayoutArg where
   eq (Command n r) (Command n' r') = n == n' && r == r'
