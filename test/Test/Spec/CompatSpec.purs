@@ -81,8 +81,8 @@ compatSpec tests =
               let env = fromMaybe StrMap.empty opts.env
                   result = do
                     -- scan the input text
-                    { usage, options } <- Error.capture do
-                      Scanner.scan (dedent doc)
+                    { usage, options, originalUsage } <- Error.capture do
+                      Scanner.scan $ dedent doc
 
                     -- lex/parse the usage section
                     { program, layouts } <- do
@@ -94,18 +94,23 @@ compatSpec tests =
                       toks <- Error.capture $ Lexer.lexDescs description
                       Error.capture $ Spec.parseDescription toks
 
-                    -- pre-solve the input spec
-                    -- (TODO: hide and remove this step)
+                    -- solve the input spec
                     spec' <- Error.capture do
                       Solver.solve
                         { smartOptions: opts.smartOptions }
-                        (Spec { program, layouts, descriptions })
+                        (Spec { program
+                              , layouts
+                              , descriptions
+                              , helpText: doc
+                              , shortHelp: originalUsage
+                              })
 
+                    -- run the arg parser
                     ArgParseResult mBranch vs <- Error.capture do
                       ArgParser.run spec' opts env argv
 
+                    -- evaluate the results
                     pure $ Evaluate.reduce env descriptions mBranch vs
-
 
               vliftEff $ case result of
                 Left e ->

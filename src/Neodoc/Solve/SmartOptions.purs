@@ -44,9 +44,9 @@ import Data.NonEmpty.Extra (concat)
 smartOptions
   :: Spec UsageLayout
   -> Either SolveError (Spec UsageLayout)
-smartOptions (Spec { program, layouts, descriptions }) = do
-  layouts <- for layouts (traverse (smartOptionsOnBranch descriptions))
-  pure (Spec { program, layouts, descriptions })
+smartOptions (Spec (spec@{ layouts, descriptions })) = do
+  layouts' <- for layouts (traverse (smartOptionsOnBranch descriptions))
+  pure (Spec $ spec { layouts = layouts' })
 
   where
   smartOptionsOnBranch

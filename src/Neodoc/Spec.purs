@@ -27,14 +27,18 @@ newtype Spec a = Spec {
   program :: String
 , layouts :: NonEmpty List (Toplevel a)
 , descriptions :: List Description
+, helpText :: String
+, shortHelp :: String
 }
 
 instance isForeignOptionAlias :: (IsForeign a) => IsForeign (Spec a) where
   read v = Spec <$> do
-    { program: _, layouts:_, descriptions:_ }
+    { program: _, layouts:_, descriptions:_, helpText:_, shortHelp:_ }
       <$> F.readProp "program" v
       <*> readLayouts v
       <*> readDescriptions v
+      <*> F.readProp "helpText" v
+      <*> F.readProp "shortHelp" v
     where
 
     readLayouts v = lmap (F.errorAt "layouts") do
@@ -59,6 +63,18 @@ instance isForeignOptionAlias :: (IsForeign a) => IsForeign (Spec a) where
     readDescriptions v = do
       xs :: Array Description <- F.readProp "descriptions" v
       pure $ fromFoldable xs
+
+instance asForeignOptionAlias :: (AsForeign a) => AsForeign (Spec a) where
+  write (Spec spec@{ layouts, descriptions }) =
+    let layouts' = Array.fromFoldable $ layouts <#> \toplevel ->
+                    Array.fromFoldable $ toplevel <#> \branch ->
+                      Array.fromFoldable $ F.write <$> branch
+        descriptions' = Array.fromFoldable $ F.write <$> descriptions
+     in F.toForeign $ spec {
+          layouts = layouts'
+        , descriptions = descriptions'
+        }
+
 
 instance eqSpec :: (Eq a) => Eq (Spec a) where
   eq (Spec { program, layouts, descriptions })

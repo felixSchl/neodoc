@@ -212,7 +212,7 @@ instance prettyArgParseError :: Pretty ArgParseError where
 
 -- XXX: this is a hacky instance for now
 instance toNeodocErrorArgParseError :: ToNeodocError ArgParseError where
-  toNeodocError x = Neodoc.GenericError (pretty x)
+  toNeodocError x = Neodoc.ArgParserError (pretty x)
 
 type ParseConfig r = {
   env :: Env

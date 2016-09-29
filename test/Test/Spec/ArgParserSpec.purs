@@ -982,7 +982,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         in it (premsg <> " -> " <> msg) $ vliftEff do
             spec <- runEitherEff do
               -- scan the input text
-              { usage, options } <- Error.capture do
+              { originalUsage, usage, options } <- Error.capture do
                 Scanner.scan help'
 
               -- lex/parse the usage section
@@ -998,7 +998,12 @@ argParserSpec = \_ -> describe "The parser generator" do
               Error.capture do
                 Solver.solve
                   { smartOptions: false }
-                  (Spec { program, layouts, descriptions })
+                  (Spec { program
+                        , layouts
+                        , descriptions
+                        , helpText: help'
+                        , shortHelp: originalUsage
+                        })
 
             validate spec argv (Env.fromFoldable env) options expected
 

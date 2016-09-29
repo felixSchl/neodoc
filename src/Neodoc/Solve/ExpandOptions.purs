@@ -73,9 +73,9 @@ instance prettyPreSolvedLayoutArg :: Pretty ExpandedOptionsLayoutArg where
 expandOptions
   :: Spec UsageLayout
   -> Either SolveError (Spec ExpandedOptionsLayout)
-expandOptions (Spec { program, layouts, descriptions }) = do
-  layouts <- for layouts (traverse preSolveBranch)
-  pure (Spec { program, layouts, descriptions })
+expandOptions (Spec (spec@{ layouts, descriptions })) = do
+  layouts' <- for layouts (traverse preSolveBranch)
+  pure (Spec $ spec { layouts = layouts' })
 
   where
   preSolveBranch

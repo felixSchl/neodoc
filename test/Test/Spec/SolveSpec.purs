@@ -240,6 +240,8 @@ solveSpec = \_ ->
                     Error.capture $ SpecParser.parseUsage toks
                   pure $ Spec {
                     program
+                  , helpText: ""
+                  , shortHelp: ""
                   , descriptions: Nil
                   , layouts: unsafePartial $
                                 ((usageToSolved <$> _) <$> _) <$> layouts
@@ -252,7 +254,13 @@ solveSpec = \_ ->
                     descriptions <- do
                       toks <- Error.capture $ Lexer.lexDescs description
                       Error.capture $ SpecParser.parseDescription toks
-                    pure (Spec { descriptions, program, layouts })
+                    pure (Spec {
+                        descriptions
+                      , program
+                      , layouts
+                      , helpText: ""
+                      , shortHelp: ""
+                    })
                   lmap pretty $ solve { smartOptions } spec
             case expected' /\ output' of
               Left expected /\ Left actual | expected /= actual  ->
