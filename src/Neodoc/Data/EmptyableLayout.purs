@@ -10,6 +10,12 @@ import Data.NonEmpty.Extra (concat)
 import Data.List (List(..), (:), fromFoldable, length, catMaybes)
 import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
+import Data.Foreign (F)
+import Data.Foreign as F
+import Data.Foreign.Class as F
+import Data.Foreign.Index as F
+import Data.Foreign.Index ((!))
+import Data.Foreign.Class
 import Neodoc.Data.Layout
 
 
@@ -32,6 +38,22 @@ instance functorEmptyableLayout :: Functor EmptyableLayout where
 instance showEmptyableLayout :: (Show a) => Show (EmptyableLayout a) where
   show (EmptyableElem  x)      = "EmptyableElem " <> show x
   show (EmptyableGroup o r xs) = "Group " <> show o <> " " <> show r <> " " <> show xs
+
+instance isForeignEmptyableLayout :: (IsForeign a) => IsForeign (EmptyableLayout a) where
+  read v = do
+    typ :: String <- F.readProp "type" v
+
+    case typ of
+      "Elem" -> EmptyableElem
+        <$> F.readProp "elem" v
+      "Group" -> EmptyableGroup
+        <$> F.readProp "optional" v
+        <*> F.readProp "repeatable" v
+        <*> do
+            fromFoldable <$> do
+              (fromFoldable <$> _) <$> do
+                F.readProp "branches" v :: F (Array (Array (EmptyableLayout a)))
+      _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
 toStrictLayout
   :: ∀ a
