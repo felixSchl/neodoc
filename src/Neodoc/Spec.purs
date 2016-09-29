@@ -1,11 +1,23 @@
 module Neodoc.Spec where
 
 import Prelude
-import Data.List (List, null)
+import Data.List (List(..), (:), null, fromFoldable, catMaybes)
+import Data.Bifunctor (lmap)
+import Data.Either (Either(..))
+import Data.Array as Array
+import Data.Array ((..))
 import Data.Maybe (Maybe(..))
 import Data.Foldable (intercalate)
+import Data.Traversable (sequence)
 import Data.Pretty (class Pretty, pretty)
 import Data.NonEmpty (NonEmpty, (:|))
+import Data.Foreign (Foreign)
+import Data.Foreign as F
+import Data.Foreign.Class as F
+import Data.Foreign.Index as F
+import Data.Foreign.Index ((!))
+import Data.Foreign.Class
+import Data.Foreign.Extra as F
 import Neodoc.Data.Layout
 import Neodoc.Data.Description
 
@@ -16,6 +28,35 @@ newtype Spec a = Spec {
 , layouts :: NonEmpty List (Toplevel a)
 , descriptions :: List Description
 }
+
+instance isForeignOptionAlias :: (IsForeign a) => IsForeign (Spec a) where
+  read v = Spec <$> do
+    { program: _, layouts:_, descriptions:_ }
+      <$> F.readProp "program" v
+      <*> readLayouts v
+      <*> readDescriptions v
+    where
+
+    readLayouts v = lmap (F.errorAt "layouts") do
+      xs :: Array Foreign <- F.readProp "layouts" v
+      xs' <- fromFoldable <$>
+        sequence (Array.zipWith readToplevel (zero .. (Array.length xs)) xs)
+      case xs' of
+        x:xs -> pure $ x :| xs
+        Nil  -> pure $ Nil :| Nil
+
+    readToplevel i v = lmap (F.ErrorAtIndex i) do
+      xs :: Array Foreign <- F.read v
+      catMaybes <<< fromFoldable <$>
+        sequence (Array.zipWith readBranch (zero .. (Array.length xs)) xs)
+
+    readBranch i v = lmap (F.ErrorAtIndex i) do
+      xs :: Array a <- F.read v
+      pure case fromFoldable xs of
+        x:xs -> Just $ x :| xs
+        Nil  -> Nothing
+
+    readDescriptions v = Left $ F.JSONError $ "not implemented"
 
 instance eqSpec :: (Eq a) => Eq (Spec a) where
   eq (Spec { program, layouts, descriptions })
