@@ -12,8 +12,14 @@ import Neodoc.Solve.SmartOptions as Solve
 import Neodoc.Solve.ExpandOptions as Solve
 import Neodoc.Solve.ExpandReferences as Solve
 
+type SolveOptions r = {
+  smartOptions :: Boolean
+  | r
+}
+
 solve
-  :: { smartOptions :: Boolean }
+  :: ∀ r
+   .  SolveOptions r
   -> Spec UsageLayout
   -> Either SolveError (Spec SolvedLayout)
 solve { smartOptions } spec = do

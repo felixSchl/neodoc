@@ -3,7 +3,7 @@
 
 // module Data.Foreign.Extra
 
-exports.isTruthy = function (value) {
+exports._isTruthy = function (value) {
   return !!value;
 };
 
