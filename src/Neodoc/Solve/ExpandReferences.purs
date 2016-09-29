@@ -79,6 +79,7 @@ import Neodoc.Data.EmptyableLayout
 import Neodoc.Data.Description
 import Neodoc.Data.Chunk
 import Neodoc.Data.Layout
+import Neodoc.Data.LayoutConversion
 import Neodoc.Data.Indexed
 import Neodoc.Data.Indexed as Indexed
 import Neodoc.ArgKey.Class

@@ -16,8 +16,6 @@ import Data.Foreign.Class as F
 import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
-import Neodoc.Data.Layout
-
 
 -- XXX: This type is required i.o to be able to have 0-length branches in case
 --      an expansion yields an empty result. Ideally, we would use the same
@@ -54,39 +52,3 @@ instance isForeignEmptyableLayout :: (IsForeign a) => IsForeign (EmptyableLayout
               (fromFoldable <$> _) <$> do
                 F.readProp "branches" v :: F (Array (Array (EmptyableLayout a)))
       _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
-
-toStrictLayout
-  :: ∀ a
-   . EmptyableLayout a
-  -> Maybe (Layout a)
-toStrictLayout (EmptyableElem x) = Just (Elem x)
-toStrictLayout (EmptyableGroup o r branches) =
-  let branches' = catMaybes $ toStrictBranch <$> branches
-   in case branches' of
-        x : xs -> Just (Group o r (x :| xs))
-        Nil    -> Nothing
-
-toStrictBranch
-  :: ∀ a
-   . EmptyableBranch a
-  -> Maybe (Branch a)
-toStrictBranch branch =
-  let elems = catMaybes $ toStrictLayout <$> branch
-  in case elems of
-        x : xs -> Just (x :| xs)
-        Nil    -> Nothing
-
-toEmptyableLayout
-  :: ∀ a
-   . Layout a
-  -> EmptyableLayout a
-toEmptyableLayout (Elem x) = EmptyableElem x
-toEmptyableLayout (Group o r xs)
-  = EmptyableGroup o r $ fromFoldable
-                       $ toEmptyableBranch <$> xs
-
-toEmptyableBranch
-  :: ∀ a
-   . Branch a
-  -> EmptyableBranch a
-toEmptyableBranch xs = fromFoldable $ toEmptyableLayout <$> xs

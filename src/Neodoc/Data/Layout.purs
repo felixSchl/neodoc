@@ -6,6 +6,13 @@ import Data.Function (on)
 import Data.Pretty (class Pretty, pretty)
 import Data.List (List())
 import Data.NonEmpty (NonEmpty())
+import Data.Foreign (F)
+import Data.Foreign as F
+import Data.Foreign.Class as F
+import Data.Foreign.Index as F
+import Data.Foreign.Index ((!))
+import Data.Foreign.Class
+import Neodoc.Data.EmptyableLayout
 
 {-
 the general structure of a comamnd line:
@@ -21,6 +28,11 @@ data Layout a
 
 getElem :: ∀ a. Partial => Layout a -> a
 getElem (Elem x) = x
+
+-- instance isForeignLayout :: (IsForeign a) => IsForeign (Layout a) where
+--   read v = do
+--     emptyableLayout :: EmptyableLayout a <- F.read v
+--     toStrictLayout
 
 instance functorLayout :: Functor Layout where
   map f (Group o r xs) = Group o r $ ((f <$> _) <$> _) <$> xs
