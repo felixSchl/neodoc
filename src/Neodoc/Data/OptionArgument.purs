@@ -25,6 +25,9 @@ instance isForeigntOptionArgument :: IsForeign OptionArgument where
     <$> F.readProp "name" v
     <*> F.readProp "repeatable" v
 
+instance asForeigntOptionArgument :: AsForeign OptionArgument where
+  write (OptionArgument name optional) = F.toForeign { name, optional }
+
 instance prettyOptionArgument :: Pretty OptionArgument where
   pretty (OptionArgument n o)
     = (if o then "[" else "") <> n <> (if o then "]" else "")

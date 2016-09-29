@@ -3,6 +3,7 @@ module Neodoc.Data.EmptyableLayout where
 
 import Prelude
 import Data.Either (Either(..))
+import Data.Array as Array
 import Data.String as String
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse, for)
@@ -53,3 +54,15 @@ instance isForeignEmptyableLayout :: (IsForeign a) => IsForeign (EmptyableLayout
               (fromFoldable <$> _) <$> do
                 F.readProp "branches" v :: F (Array (Array (EmptyableLayout a)))
       _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
+
+instance asForeignEmptyableLayout :: (AsForeign a) => AsForeign (EmptyableLayout a) where
+  write (EmptyableElem x) = F.toForeign {
+      type: "Elem"
+    , elem: F.write x
+    }
+  write (EmptyableGroup o r xs) = F.toForeign {
+      type: "Group"
+    , optional: F.write o
+    , repeatable: F.write r
+    , branches: Array.fromFoldable $ (Array.fromFoldable <<< ((F.write <$> _) <$> _)) <$> xs
+    }

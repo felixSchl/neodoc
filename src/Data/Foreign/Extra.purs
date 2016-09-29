@@ -34,3 +34,7 @@ readNonemptyList v = do
   case fromFoldable xs of
     head : tail -> pure $ head :| tail
     _ -> Left $ JSONError $ "list is empty"
+
+foreign import undefined :: ∀ a. a
+foreign import toString  :: ∀ a. a -> String
+foreign import isTruthy :: Foreign -> Boolean

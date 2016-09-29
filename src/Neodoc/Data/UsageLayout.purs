@@ -31,30 +31,60 @@ data UsageLayoutArg
   | Stdin
   | Reference String
 
+instance asForeignUsageLayoutArg :: AsForeign UsageLayoutArg where
+  write (Command n r) = F.toForeign {
+      type: "Command"
+    , name: F.write n
+    , repeatable: F.write r
+    }
+  write (Positional n r) = F.toForeign {
+      type: "Positional"
+    , name: F.write n
+    , repeatable: F.write r
+    }
+  write (Option n mArg r) = F.toForeign {
+      type: "Option"
+    , name: F.write n
+    , argument: maybe F.undefined F.write mArg
+    , repeatable: F.write r
+    }
+  write (OptionStack cs mArg r) = F.toForeign {
+      type: "OptionStack"
+    , chars: F.write $ Array.fromFoldable cs
+    , argument: maybe F.undefined F.write mArg
+    , repeatable: F.write r
+    }
+  write (Reference n) = F.toForeign {
+      type: "Reference"
+    , name: F.write n
+    }
+  write Stdin = F.toForeign { type: "Stdin" }
+  write EOA = F.toForeign { type: "EOA" }
+
 instance isForeignUsageLayoutArg :: IsForeign UsageLayoutArg where
   read v = do
     typ :: String <- String.toUpper <$> F.readProp "type" v
 
     case typ of
       "EOA" -> pure EOA
-      "Stdin" -> pure Stdin
-      "Command" ->
+      "STDIN" -> pure Stdin
+      "COMMAND" ->
         Command
           <$> F.readProp "name"       v
           <*> F.readProp "repeatable" v
-      "Positional" ->
+      "POSITIONAL" ->
         Positional
           <$> F.readProp "name"       v
           <*> F.readProp "repeatable" v
-      "Reference" ->
+      "REFERENCE" ->
         Reference
           <$> F.readProp "name" v
-      "Option" ->
+      "OPTION" ->
         Option
           <$> F.readProp "name" v
           <*> F.readPropMaybe "argument" v
           <*> F.readProp "repeatable" v
-      "OptionStack" ->
+      "OPTIONSTACK" ->
         OptionStack
           <$> readOptionStack v
           <*> F.readPropMaybe "argument" v

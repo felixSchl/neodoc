@@ -4,6 +4,7 @@ module Neodoc.Data.Description (
 
 import Prelude
 import Data.Maybe
+import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (intercalate)
@@ -39,7 +40,7 @@ instance isForeignDescription :: IsForeign Description where
         <$> readAliases v
         <*> F.readProp "repeatable" v
         <*> F.readPropMaybe "argument" v
-        <*> readValue v
+        <*> F.readPropMaybe "default" v
         <*> F.readPropMaybe "env" v
       _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
@@ -47,7 +48,18 @@ instance isForeignDescription :: IsForeign Description where
     readAliases v =
       lmap (F.errorAt "aliases") do
         F.readNonemptyList =<< v ! "aliases"
-    readValue v = Left $ F.JSONError $ "not implemented"
+
+instance asForeignDescription :: AsForeign Description where
+  write CommandDescription = F.toForeign { type: "COMMAND"  }
+  write (OptionDescription aliases r mArg mDef mEnv) =
+    F.toForeign {
+      type: "COMMAND"
+    , aliases: Array.fromFoldable $ F.write <$> aliases
+    , repeatable: F.write r
+    , argument: maybe F.undefined F.write mArg
+    , default: maybe F.undefined F.write mDef
+    , env: maybe F.undefined F.write mEnv
+    }
 
 instance eqDescription :: Eq Description where
   eq CommandDescription CommandDescription = true

@@ -11,10 +11,11 @@ module Neodoc.Value (
 
 import Prelude
 import Data.Generic (class Generic)
-import Data.Either (Either(), either)
+import Data.Either (Either(..), either)
 import Data.Maybe (fromJust)
 import Data.List (List(..), toUnfoldable, many, some, (:))
 import Data.Foldable (foldMap)
+import Data.Traversable (for)
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
 import Text.Parsing.Parser (ParseError, runParser) as P
@@ -25,6 +26,13 @@ import Data.Int (toNumber, fromString) as Int
 import Data.String (singleton) as String
 import Partial.Unsafe (unsafePartial)
 import Data.Pretty (class Pretty, pretty)
+import Data.Foreign (F)
+import Data.Foreign as F
+import Data.Foreign.Class as F
+import Data.Foreign.Index as F
+import Data.Foreign.Index ((!))
+import Data.Foreign.Class
+import Data.Foreign.Extra as F
 import Global (readFloat)
 import Neodoc.Spec.Parser.Base (digit)
 
@@ -36,6 +44,22 @@ data Value
   | FloatValue  Number
 
 derive instance genericValue :: Generic Value
+
+instance isForeignValue :: IsForeign Value where
+  read v = do
+        (BoolValue   <$> F.readBoolean v)
+    <|> (IntValue    <$> F.readInt     v)
+    <|> (FloatValue  <$> F.readNumber  v)
+    <|> (StringValue <$> F.readString  v)
+    <|> (ArrayValue  <$> (F.readArray v >>= \vs -> for vs F.read))
+    <|> (Left $ F.JSONError "Invalid value")
+
+instance asForeignValue :: AsForeign Value where
+  write (BoolValue    v) = F.toForeign v
+  write (IntValue     v) = F.toForeign v
+  write (FloatValue   v) = F.toForeign v
+  write (StringValue  v) = F.toForeign v
+  write (ArrayValue  vs) = F.toForeign $ F.write <$> vs
 
 instance showValue :: Show Value where
   show (StringValue s) = "StringValue " <> s

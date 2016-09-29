@@ -56,7 +56,9 @@ instance isForeignOptionAlias :: (IsForeign a) => IsForeign (Spec a) where
         x:xs -> Just $ x :| xs
         Nil  -> Nothing
 
-    readDescriptions v = Left $ F.JSONError $ "not implemented"
+    readDescriptions v = do
+      xs :: Array Description <- F.readProp "descriptions" v
+      pure $ fromFoldable xs
 
 instance eqSpec :: (Eq a) => Eq (Spec a) where
   eq (Spec { program, layouts, descriptions })
