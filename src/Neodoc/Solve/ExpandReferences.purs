@@ -18,17 +18,39 @@
 -- | help text:
 -- |
 -- |    usage: prog foo -a [-b (-d -e)] [options] [-f] bar
+-- |       or: prog foo bar --qux
 -- |    options:
 -- |      -d
+-- |      -z
 -- |
--- | We divide it as follows:
+-- | We proceed as follows (for each top-level):
 -- |
--- | <! foo !> <* -a [-b (-d -e)] [options] *> <! bar !>
+-- | 1. flatten the entire top-level and annotate each element w/ it's index:
 -- |
--- | This division is *NOT* recursively applied in one go, however groups are
--- | traversed to check if they are "free", which is true if and only if all
--- | it's elements are "free". Expansion occurs "bottom up", meaning, the most
--- | deeply nested `[...-options]` are expanded first.
+-- |        prog foo -a [-b (-d -e)] [options] [-f] bar
+-- |
+-- |    becomes:
+-- |
+-- |        prog (1:foo) (2:-a) (3:-b) (4:-d) (5:-e) (6:[options]) (7:-f) (8:bar)
+-- |
+-- | 2. we chunk the output, such that "free" elements appear next to one
+-- |    another:
+-- |
+-- |        prog <!(1:foo)!> <*(2:-a) (3:-b) (4:-d) (5:-e) (6:[options])
+-- |             (7:-f)*> <!(8:bar)!>
+-- |
+-- | 3. we then expand any `[options]` elements into it's surrounding. We must
+-- |    make sure not to expand an option into it's surrounding that is already
+-- |    present. since the options section defined an `-d` (see above), but it
+-- |    is already present in the surrounding area, we only expand `-z`
+-- |
+-- |        prog <!(1:foo)!> <*(2:-a) (3:-b) (4:-d) (5:-e) (6:[options: -z])
+-- |             (7:-f)*> <!(8:bar)!>
+-- |
+-- | 4. finally, we apply expansion to the actual tree, using the indices as
+-- |    lookups into the tree structure:
+-- |
+-- |        prog foo -a [-b (-d -e)] ([-z]) [-f] bar
 
 module Neodoc.Solve.ExpandReferences where
 
