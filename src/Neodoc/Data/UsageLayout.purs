@@ -1,6 +1,8 @@
 module Neodoc.Data.UsageLayout where
 
 import Prelude
+import Data.String as String
+import Data.Bifunctor (lmap)
 import Data.Pretty (class Pretty, pretty)
 import Data.Array as Array
 import Data.Maybe (Maybe(..), maybe)
@@ -14,6 +16,7 @@ import Data.Foreign.Class as F
 import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
+import Data.Foreign.Extra as F
 import Neodoc.Data.Layout
 import Neodoc.Data.OptionArgument
 
@@ -30,7 +33,7 @@ data UsageLayoutArg
 
 instance isForeignUsageLayoutArg :: IsForeign UsageLayoutArg where
   read v = do
-    typ :: String <- F.readProp "type" v
+    typ :: String <- String.toUpper <$> F.readProp "type" v
 
     case typ of
       "EOA" -> pure EOA
@@ -49,32 +52,19 @@ instance isForeignUsageLayoutArg :: IsForeign UsageLayoutArg where
       "Option" ->
         Option
           <$> F.readProp "name" v
-          <*> readOptionArgument v
+          <*> F.readPropMaybe "argument" v
           <*> F.readProp "repeatable" v
       "OptionStack" ->
         OptionStack
           <$> readOptionStack v
-          <*> readOptionArgument v
+          <*> F.readPropMaybe "argument" v
           <*> F.readProp "repeatable" v
       _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
     where
-    readOptionArgument v = do
-      if F.hasOwnProperty "argument" v
-        then do
-          aV <- v ! "argument"
-          Just <$> do
-            OptionArgument
-              <$> F.readProp "name" aV
-              <*> F.readProp "repeatable" aV
-        else pure Nothing
-
     readOptionStack v = do
-      chars :: Array Char <- F.readProp "chars" v
-      case Array.uncons chars of
-        Just { head, tail } -> pure $ head :| tail
-        _ -> Left $ F.errorAt "chars" (F.JSONError $ "missing chars")
-
+      lmap (F.errorAt "chars") do
+        F.readNonemptyArray =<< v ! "chars"
 
 instance eqUsageLayoutArg :: Eq UsageLayoutArg where
   eq (Command n r) (Command n' r') = n == n' && r == r'

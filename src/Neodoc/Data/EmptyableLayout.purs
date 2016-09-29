@@ -3,6 +3,7 @@ module Neodoc.Data.EmptyableLayout where
 
 import Prelude
 import Data.Either (Either(..))
+import Data.String as String
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse, for)
 import Data.NonEmpty (NonEmpty, (:|))
@@ -39,12 +40,12 @@ instance showEmptyableLayout :: (Show a) => Show (EmptyableLayout a) where
 
 instance isForeignEmptyableLayout :: (IsForeign a) => IsForeign (EmptyableLayout a) where
   read v = do
-    typ :: String <- F.readProp "type" v
+    typ :: String <- String.toUpper <$> F.readProp "type" v
 
     case typ of
-      "Elem" -> EmptyableElem
+      "ELEM" -> EmptyableElem
         <$> F.readProp "elem" v
-      "Group" -> EmptyableGroup
+      "GROUP" -> EmptyableGroup
         <$> F.readProp "optional" v
         <*> F.readProp "repeatable" v
         <*> do

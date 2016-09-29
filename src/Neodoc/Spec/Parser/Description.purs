@@ -7,14 +7,13 @@ import Data.NonEmpty ((:|))
 import Data.Functor (($>))
 import Data.Function (on)
 import Data.Foldable (intercalate, foldl, elem)
-import Data.String as Str
 import Control.Lazy (defer)
 import Control.Bind ((>=>))
 import Control.Monad (when)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.MonadPlus (guard)
-import Data.String (singleton) as String
+import Data.String as String
 import Data.List (
   List(..), (:), many, some, head, length, filter, catMaybes, reverse,
   singleton)
@@ -270,7 +269,7 @@ getEnvKey _       = Nothing
 -- XXX: This is duplicated from Solver.purs.
 --      Where should this live???
 posArgsEq :: String -> String -> Boolean
-posArgsEq = eq `on` (Str.toUpper <<< stripAngles)
+posArgsEq = eq `on` (String.toUpper <<< stripAngles)
 infixl 9 posArgsEq as ^=^
 
 notPosArgsEq :: String -> String -> Boolean
@@ -280,5 +279,5 @@ infixl 9 notPosArgsEq as ^/=^
 stripAngles :: String -> String
 stripAngles = stripPrefix <<< stripSuffix
   where
-  stripPrefix s = fromMaybe s (Str.stripPrefix "<" s)
-  stripSuffix s = fromMaybe s (Str.stripSuffix ">" s)
+  stripPrefix s = fromMaybe s (String.stripPrefix "<" s)
+  stripSuffix s = fromMaybe s (String.stripSuffix ">" s)
