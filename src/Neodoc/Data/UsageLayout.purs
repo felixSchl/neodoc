@@ -6,7 +6,12 @@ import Data.Maybe (Maybe, maybe)
 import Data.Foldable (intercalate)
 import Data.List (List)
 import Data.String (singleton) as String
+import Data.Either (Either(..))
 import Data.NonEmpty (NonEmpty)
+import Data.Foreign as F
+import Data.Foreign.Class as F
+import Data.Foreign.Index as F
+import Data.Foreign.Class
 import Neodoc.Data.Layout
 import Neodoc.Data.OptionArgument
 
@@ -20,6 +25,28 @@ data UsageLayoutArg
   | EOA
   | Stdin
   | Reference String
+
+instance isForeignUsageLayoutArg :: IsForeign UsageLayoutArg where
+  read v = do
+    typ :: String <- F.readProp "type" v
+    case typ of
+      "Command" ->
+        Command <$> F.readProp "name"       v
+                <*> F.readProp "repeatable" v
+      "Positional" ->
+        Positional  <$> F.readProp "name"       v
+                    <*> F.readProp "repeatable" v
+      "EOA"   -> pure EOA
+      "Stdin" -> pure Stdin
+      "Reference" ->
+        Reference <$> F.readProp "name" v
+      "Option" ->
+        Option <$> F.readProp "name"
+               <*> readOptionArgument v
+               <*> F.readProp 
+
+      -- "OptionStack" ->
+      _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
 instance eqUsageLayoutArg :: Eq UsageLayoutArg where
   eq (Command n r) (Command n' r') = n == n' && r == r'
