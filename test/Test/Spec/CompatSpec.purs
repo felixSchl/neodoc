@@ -55,7 +55,7 @@ compatSpec tests =
   describe "Docopt compatibility" do
     for_ tests \(Test { doc, kases }) -> do
       describe (doc <> "\n") do
-        for_ kases \(Kase { options: opts, out }) -> do
+        for_ kases \(Kase { options: (NeodocOptions opts), out }) -> do
           let argv = unsafePartial $ fromJust opts.argv
               env  = unsafePartial $ fromJust opts.env
               flagsDesc = renderFlags { optionsFirst: opts.optionsFirst

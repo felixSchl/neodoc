@@ -7,12 +7,8 @@ import Data.Map as Map
 import Data.Map (Map())
 import Data.List (List())
 import Data.Tuple (Tuple())
-import Language.Docopt.Env (Env())
 import Text.Parsing.Parser (ParserT())
 import Control.Monad.Transformerless.RWS (RWS())
-import Language.Docopt.RichValue (RichValue())
-import Language.Docopt.ArgParser.Token (PositionedToken(..))
-import Language.Docopt.Argument (Argument(..)) as D
 import Text.Parsing.Parser (PState(), Result()) as P
 import Data.Pretty (class Pretty, pretty)
 import Data.Foldable (intercalate)
