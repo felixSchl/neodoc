@@ -36,9 +36,9 @@ main = launchAff do
   tests <- _liftEff $ readTests "testcases.docopt"
   liftEff $ run [consoleReporter] do
     scannerSpec     unit
-    usageParserSpec unit
+    -- usageParserSpec unit
     descParserSpec  unit
-    solveSpec       unit
-    argParserSpec   unit
-    foreignSpec     tests
-    compatSpec      tests
+    -- solveSpec       unit
+    -- argParserSpec   unit
+    -- foreignSpec     tests
+    -- compatSpec      tests

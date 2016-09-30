@@ -1,155 +1,188 @@
 module Test.Spec.DescParserSpec (descParserSpec) where
 
 import Prelude
-import Language.Docopt.SpecParser.Desc as Desc
-import Language.Docopt.SpecParser.Lexer as Lexer
-import Text.Parsing.Parser as P
+import Data.Either (Either(..), either)
+import Data.Foldable (intercalate, for_)
+import Data.Bifunctor (lmap)
+import Data.List (toUnfoldable, List(Nil), (:))
+import Data.Pretty (pretty)
+import Data.NonEmpty (NonEmpty, (:|))
+import Data.Maybe (Maybe(..))
 import Control.Bind ((=<<))
 import Control.Monad.Eff.Exception (error, throwException)
 import Control.Monad.State.Trans (StateT(StateT))
-import Data.Either (Either(..), either)
-import Data.Foldable (intercalate, for_)
-import Data.List (toUnfoldable, List(Nil), (:))
-import Data.Maybe (Maybe(..))
-import Language.Docopt.Value (Value(..))
-import Language.Docopt.OptionAlias ((:|))
-import Language.Docopt.OptionAlias (OptionAlias(..)) as Alias
+import Text.Wrap (dedent)
+import Text.Parsing.Parser as P
 import Test.Spec (describe, it)
 import Test.Support (vliftEff)
-import Text.Wrap (dedent)
 import Test.Support.Desc as Desc
 
-newtype TestCase = TestCase { input :: String
-                            , output :: Either String (Array Desc.Desc) }
+import Neodoc.Value
+import Neodoc.Error.Class as Error
+import Neodoc.Data.Description
+import Neodoc.Data.Description as Description
+import Neodoc.Data.OptionArgument
+import Neodoc.Spec.Parser.Description as Description
+import Neodoc.Spec.Lexer as Lexer
+import Neodoc.Spec.Parser as Spec
+import Neodoc.OptionAlias
+import Neodoc.OptionAlias as OptionAlias
 
-pass :: String -> Array Desc.Desc -> TestCase
+newtype TestCase = TestCase {
+  input :: String
+, output :: Either String (Array Description)
+}
+
+pass :: String -> Array Description -> TestCase
 pass input output = TestCase { input: input, output: Right output }
 
 fail :: String -> String -> TestCase
 fail input msg = TestCase { input: input, output: Left msg }
 
-o = Desc.OptionDesc
+o :: {
+  aliases    :: NonEmpty List OptionAlias
+, arg        :: Maybe OptionArgument
+, env        :: Maybe String
+, default    :: Maybe Value
+, repeatable :: Boolean
+} -> Description
+o x = OptionDescription x.aliases x.repeatable x.arg x.default x.env
 
 str = StringValue
 int = IntValue
-arg_    n   = Desc.argument n false Nothing
-arg     n v = Desc.argument n false (Just v)
-optarg  n v = Desc.argument n true (Just v)
-optarg_ n   = Desc.argument n true Nothing
+arg     n = Desc.argument n false
+optarg  n = Desc.argument n true
 
 descParserSpec = \_ ->
   describe "The description parser" do
     for_ [
           pass ("-f enable the --foo flag")
-            [ o { aliases:    Alias.Short 'f' :| Nil
+            [ o { aliases:    OptionAlias.Short 'f' :| Nil
                 , arg:        Nothing
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: false
                 } ]
         , pass ("-f ENABLE the --foo flag")
-            [ o { aliases:    Alias.Short 'f' :| Nil
-                , arg:        Just $ arg_ "ENABLE"
+            [ o { aliases:    OptionAlias.Short 'f' :| Nil
+                , arg:        Just $ arg "ENABLE"
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: false
                 } ]
         , pass ("-f[=ENABLE] the --foo flag")
-            [ o { aliases:    Alias.Short 'f' :| Nil
-                , arg:        Just $ optarg_ "ENABLE"
+            [ o { aliases:    OptionAlias.Short 'f' :| Nil
+                , arg:        Just $ optarg "ENABLE"
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: false
                 } ]
         , pass ("--foo enable the --foo flag")
-            [ o { aliases:    Alias.Long "foo" :| Nil
+            [ o { aliases:    OptionAlias.Long "foo" :| Nil
                 , arg:        Nothing
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: false
                 } ]
         , pass ("--foo ENABLE the --foo flag")
-            [ o { aliases:    Alias.Long "foo" :| Nil
-                , arg:        Just $ arg_ "ENABLE"
+            [ o { aliases:    OptionAlias.Long "foo" :| Nil
+                , arg:        Just $ arg "ENABLE"
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: false
                 } ]
         , pass ("--foo[=ENABLE] the --foo flag")
-            [ o { aliases:    Alias.Long "foo" :| Nil
-                , arg:        Just $ optarg_ "ENABLE"
+            [ o { aliases:    OptionAlias.Long "foo" :| Nil
+                , arg:        Just $ optarg "ENABLE"
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: false
                 } ]
         , pass ("-f, --foo...")
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
                 , arg:        Nothing
+                , default:    Nothing
                 , env:        Nothing
                 , repeatable: true
                 } ]
         , pass ("-f=BAZ, --foo=BAZ...")
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg_ "BAZ"
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: true
                 }
             ]
           -- XXX: Indecisive here: Should this throw an error instead?
         , pass ("-f=BAZ, --foo[=BAZ]")
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ optarg_ "BAZ"
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ optarg "BAZ"
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: false
                 }
             ]
         , pass ("-f=BAZ, --foo=BAZ [default: 100]")
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
                 , env:        Nothing
+                , default:    Just (int 100)
                 , repeatable: false
                 }
             ]
         , pass ("-f=BAZ, --foo [default: 100]")
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 100)
                 , env:        Nothing
                 , repeatable: false
                 }
             ]
         , pass ("--foo=BAZ, -f [default: 100]")
-            [ o { aliases:    Alias.Long "foo" :| Alias.Short 'f' :  Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Long "foo" :| OptionAlias.Short 'f' :  Nil
+                , arg:        Just $ arg "BAZ"
                 , env:        Nothing
+                , default:    Just (int 100)
                 , repeatable: false
                 }
             ]
         , pass ("--foo=BAZ, -f=BAZ [default: 100]")
-            [ o { aliases:    Alias.Long "foo" :| Alias.Short 'f' :  Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Long "foo" :| OptionAlias.Short 'f' :  Nil
+                , arg:        Just $ arg "BAZ"
                 , env:        Nothing
+                , default:    Just (int 100)
                 , repeatable: false
                 }
             ]
         , pass ("--foo=BAZ  -f=BAZ [default: 100]")
-            [ o { aliases:    Alias.Long "foo" :| Alias.Short 'f' :  Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Long "foo" :| OptionAlias.Short 'f' :  Nil
+                , arg:        Just $ arg "BAZ"
                 , env:        Nothing
+                , default:    Just (int 100)
                 , repeatable: false
                 }
             ]
         , pass ("--foo  -f=BAZ [default: 100]")
-            [ o { aliases:    Alias.Long "foo" :| Alias.Short 'f' :  Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Long "foo" :| OptionAlias.Short 'f' :  Nil
+                , arg:        Just $ arg "BAZ"
                 , env:        Nothing
+                , default:    Just (int 100)
                 , repeatable: false
                 }
             ]
         , pass ("--foo=BAZ  -f [default: 100]")
-            [ o { aliases:    Alias.Long "foo" :| Alias.Short 'f' :  Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Long "foo" :| OptionAlias.Short 'f' :  Nil
+                , arg:        Just $ arg "BAZ"
                 , env:        Nothing
+                , default:    Just (int 100)
                 , repeatable: false
                 }
             ]
 
         , pass ("-f, --foo=BAZ [default: 100]")
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 100)
                 , env:        Nothing
                 , repeatable: false
                 }
@@ -159,13 +192,15 @@ descParserSpec = \_ ->
             -f=BAZ, --foo=BAZ [default: 100]
             -q=BAZ, --qux=BAZ [default: 200]
             """)
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 100)
                 , env:        Nothing
                 , repeatable: false
                 }
-            , o { aliases:    Alias.Short 'q' :| Alias.Long "qux" : Nil
-                , arg:        Just $ arg "BAZ" (int 200)
+            , o { aliases:    OptionAlias.Short 'q' :| OptionAlias.Long "qux" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 200)
                 , env:        Nothing
                 , repeatable: false
                 }
@@ -179,13 +214,15 @@ descParserSpec = \_ ->
             -q=QIZ, --qux=QIZ this is also more
               text [default: 200]
             """)
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 200)
                 , env:        Nothing
                 , repeatable: false
                 }
-            , o { aliases:    Alias.Short 'q' :| Alias.Long "qux" : Nil
-                , arg:        Just $ arg "QIZ" (int 200)
+            , o { aliases:    OptionAlias.Short 'q' :| OptionAlias.Long "qux" : Nil
+                , arg:        Just $ arg "QIZ"
+                , default:    Just (int 200)
                 , env:        Nothing
                 , repeatable: false
                 }
@@ -208,13 +245,15 @@ descParserSpec = \_ ->
           -f=BAZ, --foo=BAZ [default: 100]
           -q=BAZ, --qux=BAZ [default: 200]
           """
-          ) [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+          ) [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 200)
                 , env:        Nothing
                 , repeatable: false
                 }
-            , o { aliases:    Alias.Short 'q' :| Alias.Long "qux" : Nil
-                , arg:        Just $ arg "BAZ" (int 200)
+            , o { aliases:    OptionAlias.Short 'q' :| OptionAlias.Long "qux" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 200)
                 , env:        Nothing
                 , repeatable: false
                 }
@@ -227,13 +266,15 @@ descParserSpec = \_ ->
           foo bar
           -q=BAZ, --qux=BAZ [default: 200]
           """
-          ) [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+          ) [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 100)
                 , env:        Nothing
                 , repeatable: false
                 }
-            , o { aliases:    Alias.Short 'q' :| Alias.Long "qux" : Nil
-                , arg:        Just $ arg "BAZ" (int 200)
+            , o { aliases:    OptionAlias.Short 'q' :| OptionAlias.Long "qux" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 200)
                 , env:        Nothing
                 , repeatable: false
                 }
@@ -248,13 +289,15 @@ descParserSpec = \_ ->
           -q=BAZ, --qux=BAZ [default: 200]
           foo bar
           """
-          ) [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+          ) [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 100)
                 , env:        Nothing
                 , repeatable: false
                 }
-            , o { aliases:    Alias.Short 'q' :| Alias.Long "qux" : Nil
-                , arg:        Just $ arg "BAZ" (int 200)
+            , o { aliases:    OptionAlias.Short 'q' :| OptionAlias.Long "qux" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 200)
                 , env:        Nothing
                 , repeatable: false
                 }
@@ -269,8 +312,9 @@ descParserSpec = \_ ->
                                 -q=QIZ, --qux=QIZ this option is over-indented and won't
                                                   be parsed.
             """)
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 100)
                 , env:        Just "QARK"
                 , repeatable: false
                 }
@@ -282,13 +326,15 @@ descParserSpec = \_ ->
                           -q=QIZ, --qux=QIZ this option is over-indented and won't
                                             be parsed.
             """)
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg "BAZ" (int 100)
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ"
+                , default:    Just (int 100)
                 , env:        Just "QARK"
                 , repeatable: false
                 }
-            , o { aliases:    Alias.Short 'q' :| Alias.Long "qux" : Nil
-                , arg:        Just $ arg_ "QIZ"
+            , o { aliases:    OptionAlias.Short 'q' :| OptionAlias.Long "qux" : Nil
+                , arg:        Just $ arg "QIZ"
+                , default:    Nothing
                 , env:        Nothing
                 , repeatable: false
                 }
@@ -315,18 +361,20 @@ descParserSpec = \_ ->
             "Option-arguments mismatch: \"BAZ\" and \"BAX\""
 
         , pass  "-f=BAZ, --foo=<baz>" -- BAZ be considered equal to <baz>
-            [ o { aliases:    Alias.Short 'f' :| Alias.Long "foo" : Nil
-                , arg:        Just $ arg_ "BAZ" -- uses the first occurence
+            [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
+                , arg:        Just $ arg "BAZ" -- uses the first occurence
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: false
                 }
             ]
 
           -- more than two aliases:
         , pass  "-q, -?, --help"
-            [ o { aliases:    Alias.Short 'q' :| Alias.Short '?' : Alias.Long "help" : Nil
+            [ o { aliases:    OptionAlias.Short 'q' :| OptionAlias.Short '?' : OptionAlias.Long "help" : Nil
                 , arg:        Nothing
                 , env:        Nothing
+                , default:    Nothing
                 , repeatable: false
                 }
             ]
@@ -337,11 +385,14 @@ descParserSpec = \_ ->
       it (input <> " " <>
         (either (\msg -> "should fail with \"" <> msg <> "\"")
                 (\out -> "should succeed with:\n" <>
-                  (intercalate "\n" $ Desc.prettyPrintDesc <$> out))
+                  (intercalate "\n" $ pretty <$> out))
                 output)) do
-        vliftEff $ evaltest (Desc.parse =<< Lexer.lexDescs input) output
+        vliftEff $ evaltest (lmap pretty do
+            toks <- Error.capture $ Lexer.lexDescs input
+            Error.capture $ Spec.parseDescription toks
+            ) output
 
-    evaltest (Left (P.ParseError msg _ _)) (Left msg')
+    evaltest (Left msg) (Left msg')
       = if msg == msg'
            then pure unit
            else throwException $ error $ "Unexpected error:\n" <> msg
@@ -351,7 +402,7 @@ descParserSpec = \_ ->
     evaltest (Right out) (Left _)
       = throwException $ error $
           "Missing exception! Got:\n"
-            <> (intercalate "\n" $ Desc.prettyPrintDesc <$> out)
+            <> (intercalate "\n" $ pretty <$> out)
 
     evaltest (Right out) (Right expected)
       = let out' = toUnfoldable out
@@ -359,4 +410,4 @@ descParserSpec = \_ ->
               then pure unit
               else throwException $ error $
                     "Unexpected output:\n"
-                      <> (intercalate "\n" $ Desc.prettyPrintDesc <$> out')
+                      <> (intercalate "\n" $ pretty <$> out')

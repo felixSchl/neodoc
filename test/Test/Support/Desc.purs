@@ -4,20 +4,17 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Data.List (List(Nil), (:))
 
-import Language.Docopt.Value
-import Language.Docopt.SpecParser.Desc
-import Language.Docopt.OptionAlias
-import Language.Docopt.OptionAlias (OptionAlias(..)) as OptionAlias
+import Neodoc.Value
+import Neodoc.OptionAlias
+import Neodoc.OptionAlias as OptionAlias
+import Neodoc.Data.Description
+import Neodoc.Data.OptionArgument
 
-arg :: String -> Boolean -> Maybe Value -> OptionArgumentObj
+arg :: String -> Boolean -> OptionArgument
 arg = argument
 
-opt :: Aliases -> Maybe OptionArgumentObj -> Desc
-opt as a = OptionDesc { aliases:    as
-                      , arg:        a
-                      , env:        Nothing
-                      , repeatable: false
-                      }
+opt :: Aliases -> Maybe OptionArgument -> Maybe Value -> Description
+opt as mArg mDef = OptionDescription as false mArg mDef Nothing
 
 lname :: String -> Aliases
 lname n = OptionAlias.Long n :| Nil
@@ -28,5 +25,5 @@ sname f = OptionAlias.Short f :| Nil
 fname :: Char -> String -> Aliases
 fname f n = OptionAlias.Short f :| OptionAlias.Long n : Nil
 
-argument :: String -> Boolean -> Maybe Value -> OptionArgumentObj
-argument n o d = { name: n, default: d, optional: o }
+argument :: String -> Boolean -> OptionArgument
+argument = OptionArgument

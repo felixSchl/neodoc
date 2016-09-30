@@ -8,6 +8,7 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
 import Data.Bifunctor (lmap)
 import Data.List (List(..), length, (!!), take)
+import Data.Pretty (pretty)
 import Data.TemplateString.Unsafe ((<~>))
 import Data.Either (Either(..), isRight, isLeft, either, fromRight)
 import Data.Either (fromRight)
@@ -21,8 +22,7 @@ import Data.String.Regex (regex, Regex())
 import Data.String as String
 import Partial.Unsafe (unsafePartial)
 
-import Language.Docopt
-import Language.Docopt.Scanner as Scanner
+import Neodoc.Scanner as Scanner
 import Text.Wrap (dedent)
 
 import Test.Assert (assert)
@@ -107,7 +107,7 @@ scannerSpec = \_ ->
       vliftEff do
         scan "" `shouldFailWith` "No usage section found!"
 
-scan = lmap getMessage <<< Scanner.scan <<< dedent
+scan = lmap pretty <<< Scanner.scan <<< dedent
 
 getMessage :: ParseError -> String
 getMessage (ParseError m _ _) = m
