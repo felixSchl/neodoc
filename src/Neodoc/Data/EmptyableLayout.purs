@@ -41,7 +41,7 @@ instance functorEmptyableLayout :: Functor EmptyableLayout where
 
 instance showEmptyableLayout :: (Show a) => Show (EmptyableLayout a) where
   show (EmptyableElem  x)      = "EmptyableElem " <> show x
-  show (EmptyableGroup o r xs) = "Group " <> show o <> " " <> show r <> " " <> show xs
+  show (EmptyableGroup o r xs) = "EmptyableGroup " <> show o <> " " <> show r <> " " <> show xs
 
 instance isForeignEmptyableLayout :: (IsForeign a) => IsForeign (EmptyableLayout a) where
   read v = do
@@ -68,5 +68,5 @@ instance asForeignEmptyableLayout :: (AsForeign a) => AsForeign (EmptyableLayout
       type: "Group"
     , optional: F.write o
     , repeatable: F.write r
-    , branches: Array.fromFoldable $ (Array.fromFoldable <<< ((F.write <$> _) <$> _)) <$> xs
+    , branches: Array.fromFoldable $ (Array.fromFoldable <<< (F.write <$> _)) <$> xs
     }

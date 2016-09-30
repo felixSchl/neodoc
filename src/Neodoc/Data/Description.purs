@@ -53,7 +53,7 @@ instance asForeignDescription :: AsForeign Description where
   write CommandDescription = F.toForeign { type: "COMMAND"  }
   write (OptionDescription aliases r mArg mDef mEnv) =
     F.toForeign {
-      type: "COMMAND"
+      type: "OPTION"
     , aliases: Array.fromFoldable $ F.write <$> aliases
     , repeatable: F.write r
     , argument: maybe F.undefined F.write mArg

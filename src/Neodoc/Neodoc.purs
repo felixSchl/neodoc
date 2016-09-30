@@ -100,19 +100,13 @@ readSpec input = do
   -- hold on to your hats, it's going to get nasty:
   -- we have to prune any branches that came in empty.
   let spec' = flip lmap spec \(Spec spec@{ layouts }) ->
-      let layouts' = catMaybes $ fromFoldable $ layouts <#> \branches ->
-            let branches' = catMaybes $ fromFoldable $ branches <#> \branch ->
-                let branch' = catMaybes $ fromFoldable $ branch <#> \layout -> toStrictLayout layout
-                  in case branch' of
-                    Nil  -> Nothing
-                    x:xs -> Just $ x:|xs
-            in case branches' of
-                  Nil -> Nothing
-                  xs  -> Just xs
-          layouts'' = case layouts' of
-                        Nil    -> Nil :| Nil
-                        x : xs -> x :| xs
-       in Spec (spec { layouts = layouts'' })
+      let layouts' = layouts <#> \branches ->
+            catMaybes $ fromFoldable $ branches <#> \branch ->
+              let branch' = catMaybes $ fromFoldable $ branch <#> \layout -> toStrictLayout layout
+                in case branch' of
+                  Nil  -> Nothing
+                  x:xs -> Just $ x:|xs
+       in Spec (spec { layouts = layouts' })
   pure spec'
 
 run

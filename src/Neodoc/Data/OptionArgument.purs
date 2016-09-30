@@ -23,7 +23,7 @@ data OptionArgument
 instance isForeigntOptionArgument :: IsForeign OptionArgument where
   read v = OptionArgument
     <$> F.readProp "name" v
-    <*> F.readProp "repeatable" v
+    <*> F.readProp "optional" v
 
 instance asForeigntOptionArgument :: AsForeign OptionArgument where
   write (OptionArgument name optional) = F.toForeign { name, optional }

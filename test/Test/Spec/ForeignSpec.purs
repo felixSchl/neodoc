@@ -82,9 +82,11 @@ foreignSpec tests = describe "Crossing JS/purescript" do
                   -- XXX: Would be cool to get some sort of diffing in here.
                   then throwException $ error $
                     "input and output mismatches:\n"
-                      <> "Expected:\n"
+                      <> "Expected:"
+                      <> "\n\n"
                       <> pretty expected
-                      <> "\n"
-                      <> "Received:\n"
+                      <> "\n\n"
+                      <> "Received:"
+                      <> "\n\n"
                       <> pretty output
                   else pure unit

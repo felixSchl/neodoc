@@ -37,8 +37,8 @@ instance isForeignOptionAlias :: IsForeign OptionAlias where
       _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
 instance asForeignOptionAlias :: AsForeign OptionAlias where
-  write (Short c) = F.toForeign { type: "SHORT", char: c }
-  write (Long  n) = F.toForeign { type: "SHORT", name: n }
+  write (Short c) = F.toForeign { type: "Short", char: c }
+  write (Long  n) = F.toForeign { type: "Long", name: n }
 
 instance prettyOptionAlias :: Pretty OptionAlias where
   pretty (Short c) = "-"  <> (String.singleton c)
