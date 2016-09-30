@@ -2762,7 +2762,7 @@ $ prog/s -c 200
 
 r"""
 Usage: foo [-a FOO] [-b BAR] [-c QUX]
-options: -a BAR [default: 100]
+options: -a FOO [default: 100]
 """
 
 $ prog/s

@@ -12,7 +12,6 @@ import Test.Spec.ArgParserSpec (argParserSpec)
 import Test.Spec.ForeignSpec (foreignSpec)
 import Test.Spec.SolveSpec (solveSpec)
 import Test.Spec.CompatSpec (compatSpec)
-import Test.Spec.DocoptSpec (docoptSpec)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff (Eff())
 import Node.FS (FS())
@@ -36,11 +35,10 @@ main :: Eff ( err     :: EXCEPTION
 main = launchAff do
   tests <- _liftEff $ readTests "testcases.docopt"
   liftEff $ run [consoleReporter] do
-    -- scannerSpec     unit
-    -- usageParserSpec unit
-    -- descParserSpec  unit
-    -- solveSpec       unit
-    -- argParserSpec   unit
-    -- docoptSpec      unit
-    -- foreignSpec     tests
+    scannerSpec     unit
+    usageParserSpec unit
+    descParserSpec  unit
+    solveSpec       unit
+    argParserSpec   unit
+    foreignSpec     tests
     compatSpec      tests

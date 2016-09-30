@@ -17,6 +17,7 @@ module Neodoc.Solve.SmartOptions where
 
 import Prelude
 
+import Debug.Trace
 import Data.List (List(..), (:), length, filter)
 import Data.Array as Array
 import Data.Tuple (Tuple)

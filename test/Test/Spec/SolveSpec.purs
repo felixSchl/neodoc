@@ -70,128 +70,133 @@ fail description err      = TestCase description (Left  err)
 solveSpec = \_ ->
   describe "The solver" do
     for_ (fromFoldable [
-    --
-    --   -- should not affect positionals and commands:
-    --   test "prog foo"       [ pass "" "prog foo" ]
-    -- , test "prog <prog>..." [ pass "" "prog <prog>..." ]
-    --
-    --   -- options:
-    -- , test "prog -io"
-    --     [ pass "" "prog -i -o" ]
-    --
-    -- , test "prog -io [-q]..."
-    --     [ pass "" "prog -i -o [-q]..." ]
-    --
-    -- , test "prog --foo..."
-    --     [ fail "-f --foo=bar [default: qux]"
-    --         "Option-Argument specified in options-section missing --foo" ]
-    --
-    -- , test "prog --foo... BAR"
-    --     [ fail "-f --foo=BAR [default: qux]"
-    --         "Option-Argument specified in options-section missing --foo" ]
-    --
-    -- , test "prog -f... BAR"
-    --     [ fail "-f --foo=BAR [default: qux]"
-    --         "Option-Argument specified in options-section missing -f" ]
-    --
-    -- , test "prog --foo BAR..."
-    --     [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR..."
-    --     , pass "-f --foo" "prog --foo BAR..." ]
-    --
-    -- , test "prog --foo BAR"
-    --     [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR"
-    --     , pass "-f --foo" "prog --foo BAR" ]
-    --
-    -- , test "prog --foo... BAR..."
-    --     [ fail "-f --foo=BAR [default: qux]"
-    --         "Option-Argument specified in options-section missing --foo" ]
-    --
-    -- , test "prog -f... BAR..."
-    --     [ fail "-f --foo=BAR [default: qux]"
-    --         "Option-Argument specified in options-section missing -f" ]
-    --
-    -- , test "prog -xvzfFILE..."
-    --     [ pass "-f --file=FILE [default: foo]"
-    --         "prog -x... -v... -z... -f=FILE..." ]
-    --
-    -- , test "prog -xvzf=FILE..."
-    --     [ pass "-f --file=FILE [default: foo]"
-    --         "prog -x... -v... -z... -f=FILE..." ]
-    --
-    -- , test "prog -xvzf FILE..."
-    --     [ pass "-f --file=FILE  [default: foo]"
-    --         "prog -x... -v... -z... -f=FILE..." ]
-    --
-    -- , test "prog --file FILE..."
-    --     [ fail
-    --         """
-    --         -f --file=FILE  [default: foo]
-    --         -f --file=FILE  [default: foo]
-    --         """
-    --         "Multiple option descriptions for option --file" ]
-    --
-    -- , test "prog -f FILE..."
-    --     [ fail
-    --         """
-    --         -f --file=FILE  [default: foo]
-    --         -f --file=FILE  [default: foo]
-    --         """
-    --         "Multiple option descriptions for option -f" ]
-    --
-    -- , test "prog --file FILE..."
-    --     [ fail
-    --         """
-    --         -f --file=FILE  [default: foo]
-    --         -f --file=FILE  [default: foo]
-    --         """
-    --         "Multiple option descriptions for option --file" ]
-    --
-    -- , test "prog -fx..."
-    --     [ fail
-    --         "-f --file=FILE  [default: foo]"
-    --         "Stacked option -f may not specify arguments" ]
-    --
-    --   -- Note: `f` should not adopt `file` as it's full name since it's in an
-    --   -- option stack and not in trailing position (therefore cannot inherit the
-    --   -- description's argument, rendering it an unfit candidate)
-    -- , test "prog -fvzx..."
-    --     [ fail
-    --         "-f --file=FILE  [default: foo]"
-    --         "Stacked option -f may not specify arguments" ]
-    --
-    -- , test "prog -xvzf FILE..."
-    --     [ pass
-    --         "-f --file=FILE  [default: foo]"
-    --         "prog -x... -v... -z... -f=FILE..." ]
-    --
-    -- , test "prog -xvzf..."
-    --     [ fail
-    --         "-f --file=FILE  [default: foo]"
-    --         "Option-Argument specified in options-section missing -f" ]
-    --
-    --   -- smart options
-    -- , testSmartOpts "prog [-f FILE]"
-    --     [ pass ""   "prog [-f=FILE]"
-    --     , pass "-f" "prog [-f FILE]"
-    --     ]
-    --
-    -- , testSmartOpts "prog (-f FILE)"
-    --     [ pass ""   "prog (-f=FILE)"
-    --     , pass "-f" "prog (-f FILE)"
-    --     ]
-    --
-    -- , testSmartOpts "prog (-x <foo> | -f FILE)"
-    --     [ pass ""                  "prog (-x=<foo> | -f=FILE)"
-    --     , pass "-x"                "prog (-x <foo> | -f=FILE)"
-    --     , pass "-f"                "prog (-x=<foo> | -f FILE)"
-    --     , pass "-f\n-x"            "prog (-x <foo> | -f FILE)"
-    --     , pass "-x=<foo>"          "prog (-x=<foo> | -f=FILE)"
-    --     , pass "-f=FILE"           "prog (-x=<foo> | -f=FILE)"
-    --     , pass "-f=FILE\n-x=<foo>" "prog (-x=<foo> | -f=FILE)"
-    --     ]
+
+      -- should not affect positionals and commands:
+      test "prog foo"       [ pass "" "prog foo" ]
+    , test "prog <prog>..." [ pass "" "prog <prog>..." ]
+
+      -- options:
+    , test "prog -io"
+        [ pass "" "prog -i -o" ]
+
+    , test "prog -io [-q]..."
+        [ pass "" "prog -i -o [-q]..." ]
+
+    , test "prog --foo..."
+        [ fail "-f --foo=bar [default: qux]"
+            "Option-Argument specified in options-section missing --foo" ]
+
+    , test "prog --foo... BAR"
+        [ fail "-f --foo=BAR [default: qux]"
+            "Option-Argument specified in options-section missing --foo" ]
+
+    , test "prog -f... BAR"
+        [ fail "-f --foo=BAR [default: qux]"
+            "Option-Argument specified in options-section missing -f" ]
+
+    , test "prog --foo BAR..."
+        [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR..."
+        , pass "-f --foo" "prog --foo BAR..." ]
+
+    , test "prog --foo BAR"
+        [ pass "-f --foo=BAR [default: qux]" "prog --foo=BAR"
+        , pass "-f --foo" "prog --foo BAR" ]
+
+    , test "prog --foo... BAR..."
+        [ fail "-f --foo=BAR [default: qux]"
+            "Option-Argument specified in options-section missing --foo" ]
+
+    , test "prog -f... BAR..."
+        [ fail "-f --foo=BAR [default: qux]"
+            "Option-Argument specified in options-section missing -f" ]
+
+    , test "prog -xvzfFILE..."
+        [ pass "-f --file=FILE [default: foo]"
+            "prog -x... -v... -z... -f=FILE..." ]
+
+    , test "prog -xvzf=FILE..."
+        [ pass "-f --file=FILE [default: foo]"
+            "prog -x... -v... -z... -f=FILE..." ]
+
+    , test "prog -xvzf FILE..."
+        [ pass "-f --file=FILE  [default: foo]"
+            "prog -x... -v... -z... -f=FILE..." ]
+
+    , test "prog --file FILE..."
+        [ fail
+            """
+            -f --file=FILE  [default: foo]
+            -f --file=FILE  [default: foo]
+            """
+            "Multiple option descriptions for option --file" ]
+
+    , test "prog -f FILE..."
+        [ fail
+            """
+            -f --file=FILE  [default: foo]
+            -f --file=FILE  [default: foo]
+            """
+            "Multiple option descriptions for option -f" ]
+
+    , test "prog --file FILE..."
+        [ fail
+            """
+            -f --file=FILE  [default: foo]
+            -f --file=FILE  [default: foo]
+            """
+            "Multiple option descriptions for option --file" ]
+
+    , test "prog -fx..."
+        [ fail
+            "-f --file=FILE  [default: foo]"
+            "Stacked option -f may not specify arguments" ]
+
+      -- Note: `f` should not adopt `file` as it's full name since it's in an
+      -- option stack and not in trailing position (therefore cannot inherit the
+      -- description's argument, rendering it an unfit candidate)
+    , test "prog -fvzx..."
+        [ fail
+            "-f --file=FILE  [default: foo]"
+            "Stacked option -f may not specify arguments" ]
+
+    , test "prog -xvzf FILE..."
+        [ pass
+            "-f --file=FILE  [default: foo]"
+            "prog -x... -v... -z... -f=FILE..." ]
+
+    , test "prog -xvzf..."
+        [ fail
+            "-f --file=FILE  [default: foo]"
+            "Option-Argument specified in options-section missing -f" ]
+
+      -- smart options
+    , testSmartOpts "prog [-f FILE]"
+        [ pass ""   "prog [-f=FILE]"
+        , pass "-f" "prog [-f FILE]"
+        ]
+
+    , testSmartOpts "prog (-f FILE)"
+        [ pass ""   "prog (-f=FILE)"
+        , pass "-f" "prog (-f FILE)"
+        ]
+
+    , testSmartOpts     "prog [-a FOO] [-b BAR] [-c QUX]"
+        [ pass ""       "prog [-a=FOO] [-b=BAR] [-c=QUX]"
+        , fail "-a BAR" "Arguments mismatch for option -a: \"FOO\" and \"BAR\""
+        ]
+
+    , testSmartOpts "prog (-x <foo> | -f FILE)"
+        [ pass ""                  "prog (-x=<foo> | -f=FILE)"
+        , pass "-x"                "prog (-x <foo> | -f=FILE)"
+        , pass "-f"                "prog (-x=<foo> | -f FILE)"
+        , pass "-f\n-x"            "prog (-x <foo> | -f FILE)"
+        , pass "-x=<foo>"          "prog (-x=<foo> | -f=FILE)"
+        , pass "-f=FILE"           "prog (-x=<foo> | -f=FILE)"
+        , pass "-f=FILE\n-x=<foo>" "prog (-x=<foo> | -f=FILE)"
+        ]
 
       -- [references]:
-      test "prog [options]"
+    , test "prog [options]"
         [ pass
             """
             -a        Add
