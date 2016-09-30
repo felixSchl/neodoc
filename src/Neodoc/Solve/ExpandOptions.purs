@@ -126,12 +126,12 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
 
         Nothing -> do
           case mDescription of
-            Just (_ /\ (Just (OptionArgument aN' aO'))) -> do
+            Just (_ /\ (descArg@(Just (OptionArgument aN' aO')))) -> do
               maybe
                 (if not aO'
                   then fail $ "Option-Argument specified in options-section missing"
                               <> " --" <> n
-                  else solved $ Solved.Option (OptionAlias.Long n) Nothing r
+                  else solved $ Solved.Option (OptionAlias.Long n) descArg r
                 )
                 (\(adjR /\ adjN /\ adjO) -> do
                   guardArgNames adjN aN'
@@ -269,7 +269,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
           -- repeatability later.
           pure $ \r' -> Solved.Option (OptionAlias.Short t) Nothing (r || r')
         case mDesc of
-          Just (_ /\ (Just (OptionArgument aN' aO'))) -> do
+          Just (_ /\ (descArg@(Just (OptionArgument aN' aO')))) -> do
             maybe'
               (\_->
                 if not aO' then
@@ -277,7 +277,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                         <> " -" <> S.singleton h
                 else
                   let leading' = (_ $ false) <$> leading
-                      opt = Solved.Option (OptionAlias.Short h) Nothing r
+                      opt = Solved.Option (OptionAlias.Short h) descArg r
                   in solved case leading' of
                         x : xs -> x :| xs <> singleton opt
                         Nil    -> opt :| Nil

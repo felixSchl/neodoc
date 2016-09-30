@@ -169,6 +169,13 @@ solveSpec = \_ ->
             "-f --file=FILE  [default: foo]"
             "Option-Argument specified in options-section missing -f" ]
 
+      -- optional arguments
+    , test "prog -f"
+        [ pass "-f[=ARG]" "prog -f[=ARG]" ]
+
+    , test "prog --file"
+        [ pass "--file[=ARG]" "prog --file[=ARG]" ]
+
       -- smart options
     , testSmartOpts "prog [-f FILE]"
         [ pass ""   "prog [-f=FILE]"
@@ -220,7 +227,7 @@ solveSpec = \_ ->
     , test "prog -i [options] -o"
         [ pass (intercalate "\n" [ "-i", "-o" ]) "prog -i -o"
         , pass (intercalate "\n" [ "-i", "-o" ]) "prog -i -o"
-        , pass (intercalate "\n" [ "-i[=FOO]", "-o" ]) "prog -i -o"
+        , pass (intercalate "\n" [ "-i[=FOO]", "-o" ]) "prog -i[=FOO] -o"
         ]
     ]) runTest
 
@@ -277,8 +284,8 @@ solveSpec = \_ ->
               Right (Spec expected) /\ Right (Spec actual)
                 | expected.layouts /= actual.layouts ->
                     throwException $ error $
-                      "Unexpected output! expected:\n" <> pretty (Spec expected)
-                      <> "\n\nbut got:\n" <> pretty (Spec actual)
+                      "Unexpected output! expected:\n\n" <> pretty (Spec expected)
+                      <> "\n\nbut got:\n\n" <> pretty (Spec actual)
               Right _ /\ Left err ->
                 throwException $ error $ "Failure!\n" <> err
               _ -> pure unit

@@ -2791,7 +2791,7 @@ $ prog/s -c 400
 {"-a": 100, "-b": 200, "-c": 400}
 
 r"""
-Usage: foo [-a FOO] | [[-a FOO] [-b FOO]]
+Usage: foo [-a FOO] | [[-a FOO] [-b BAR]]
 options: -a FOO [default: 100]
          -b BAR [default: 200]
 """
@@ -2806,7 +2806,7 @@ $ prog/s -a 1000 -b 2000
 {"-a": 1000, "-b": 2000}
 
 r"""
-Usage: foo [[-a FOO] | [[-a FOO] [-b FOO]]]
+Usage: foo [[-a FOO] | [[-a FOO] [-b BAR]]]
 options: -a FOO [default: 100]
          -b BAR [default: 200]
 """
@@ -2821,7 +2821,7 @@ $ prog/s -a 1000 -b 2000
 {"-a": 1000, "-b": 2000}
 
 r"""
-Usage: foo [[-a FOO] | [[-a FOO] [-b FOO]]]...
+Usage: foo [[-a FOO] | [[-a FOO] [-b BAR]]]...
 options: -a FOO [default: 100]
          -b BAR [default: 200]
 """
