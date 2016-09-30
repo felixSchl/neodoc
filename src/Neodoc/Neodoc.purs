@@ -2,22 +2,26 @@ module Neodoc where
 
 import Prelude
 import Data.Array as A
+import Data.Bifunctor (lmap)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Either (Either (..), either)
 import Data.StrMap (StrMap)
 import Data.String as String
 import Data.Char as Char
 import Data.StrMap as StrMap
-import Data.List (List(..), (:), many, toUnfoldable, concat, fromFoldable, catMaybes)
+import Data.List (
+  List(..), (:), many, toUnfoldable, concat, fromFoldable, catMaybes, filter
+, length)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.Traversable (for)
 import Data.Pretty (class Pretty, pretty)
-import Data.Foreign (Foreign)
+import Data.Foreign (F, Foreign)
 import Data.Foreign.Class as F
 import Data.Foreign as F
 import Data.Foldable (any, intercalate)
 import Data.String.Yarn (lines, unlines)
-import Control.Monad.Eff.Exception (Error, throwException, EXCEPTION)
+import Control.Alt ((<|>))
+import Control.Monad.Eff.Exception (Error, throwException, error, EXCEPTION)
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Console as Console
 import Control.Monad.Eff.Class (liftEff)
@@ -32,6 +36,7 @@ import Neodoc.Options
 import Neodoc.Data.UsageLayout
 import Neodoc.Data.LayoutConversion
 import Neodoc.Data.EmptyableLayout
+import Neodoc.Data.EmptyableLayout as Layout
 import Neodoc.Error.Class (capture) as Error
 import Neodoc.Error as Error
 import Neodoc.Error (NeodocError)
@@ -66,11 +71,34 @@ data Output
 
 runJS
   :: ∀ eff
-   . Either (Spec UsageLayout) String
+   . Foreign
   -> NeodocOptions
   -> Eff (NeodocEff eff) Foreign
 runJS input opts = do
-  x <- run input opts
+  input' :: Either (Spec (EmptyableLayout UsageLayoutArg)) String <- do
+    either (throwException <<< error <<< show) pure do
+          (Right <$> F.read input) <|>
+          (Left  <$> F.read input)
+
+  -- hold on to your hats, it's going to get nasty,
+  -- we have to prune any branches that came in empty.
+
+  let input'' = flip lmap input'  \(Spec spec@{ layouts }) ->
+      let layouts' = catMaybes $ fromFoldable $ layouts <#> \branches ->
+            let branches' = catMaybes $ fromFoldable $ branches <#> \branch ->
+                let branch' = catMaybes $ fromFoldable $ branch <#> \layout -> toStrictLayout layout
+                  in case branch' of
+                    Nil  -> Nothing
+                    x:xs -> Just $ x:|xs
+            in case branches' of
+                  Nil -> Nothing
+                  xs  -> Just xs
+          layouts'' = case layouts' of
+                        Nil    -> Nil :| Nil
+                        x : xs -> x :| xs
+       in Spec (spec { layouts = layouts'' })
+
+  x <- run input'' opts
   pure case x of
     (ParseOutput   x) -> F.toForeign x
     (HelpOutput    x) -> F.toForeign x
@@ -154,25 +182,8 @@ parseHelptextJS help = do
       let msg = renderNeodocError Nothing e
        in throwException $ jsError msg {}
     Right (Spec spec) ->
-
-      -- make the layout emptyable, since there are no guarantees in JS.
-      -- when we run from an existing spec, we must convert back no non-
-      -- emptyable using `Neodoc.Data.LayoutConversion`
-      -- XXX: Move this into layout conversion!!!
-      let layouts = do
-            catMaybes $ fromFoldable $ spec.layouts <#> \toplevel ->
-              let branches' = catMaybes $ toplevel <#> \branch ->
-                    case toEmptyableBranch branch of
-                      Nil  -> Nothing
-                      x : xs -> Just $ x:| xs
-                in case branches' of
-                    Nil -> Nothing
-                    xs  -> Just xs
-          layouts' = case layouts of
-                      Nil    -> Nil :| Nil
-                      x : xs ->   x :| xs
-       in pure $ F.write $ Spec $ spec { layouts = layouts' }
-
+      let layouts = ((toEmptyableLayout <$> _) <$> _) <$> spec.layouts
+       in pure $ F.write $ Spec $ spec { layouts = layouts }
 
 parseHelptext
   :: String

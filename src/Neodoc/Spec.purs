@@ -75,7 +75,6 @@ instance asForeignOptionAlias :: (AsForeign a) => AsForeign (Spec a) where
         , descriptions = descriptions'
         }
 
-
 instance eqSpec :: (Eq a) => Eq (Spec a) where
   eq (Spec { program, layouts, descriptions })
      (Spec { program: program', layouts: layouts', descriptions: descriptions' })

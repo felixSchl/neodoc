@@ -31,6 +31,10 @@ data EmptyableLayout a
       (List (EmptyableBranch a))
   | EmptyableElem a
 
+isEmpty :: ∀ a. EmptyableLayout a -> Boolean
+isEmpty (EmptyableGroup _ _ Nil) = true
+isEmpty _ = false
+
 instance functorEmptyableLayout :: Functor EmptyableLayout where
   map f (EmptyableGroup o r xs) = EmptyableGroup o r $ ((f <$> _) <$> _) <$> xs
   map f (EmptyableElem x)       = EmptyableElem (f x)
