@@ -70,7 +70,7 @@ foreignSpec tests = describe "Crossing JS/purescript" do
             -- albeit slower - gives more confidence that everything's
             -- alright.
             input <- unsafeInterleaveEff do
-              runFn1 Neodoc.parseHelptextJS helpText
+              runFn1 Neodoc.parseHelpTextJS helpText
 
             let result = unsafePartial $ fromLeft <$> do
                   Neodoc.readSpec (toForeign input)

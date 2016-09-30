@@ -1,10 +1,23 @@
-module Neodoc where
+module Neodoc (
+  run
+, run'
+, runJS
+, runPure
+, runPure'
+, readSpec
+, parseHelpText
+, parseHelpTextJS
+, Output (..)
+, module Reexports
+) where
 
 import Prelude
 import Data.Array as A
 import Data.Bifunctor (lmap)
+import Data.Tuple (Tuple(..))
+import Data.Tuple.Nested ((/\))
 import Data.Function.Uncurried
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Data.Either (Either (..), either)
 import Data.StrMap (StrMap)
 import Data.String as String
@@ -52,6 +65,8 @@ import Neodoc.ArgParser (ArgParseResult(..))
 import Neodoc.Evaluate as Evaluate
 import Neodoc.Data.SolvedLayout
 
+import Neodoc.Options as Reexports
+
 _DEVELOPER_ERROR_MESSAGE :: String
 _DEVELOPER_ERROR_MESSAGE = dedent """
   This is an error with the program itself and not your fault.
@@ -68,24 +83,31 @@ type NeodocEff e = (
 
 data Output
   = VersionOutput String
-  | ParseOutput (StrMap Value)
+  | Output (StrMap Value)
   | HelpOutput String
+
+instance prettyOutput :: Pretty Output where
+  pretty (VersionOutput s) = s
+  pretty (HelpOutput    s) = s
+  pretty (Output        s) = show s -- TODO: make pretty
 
 runJS
   :: ∀ eff
    . Fn2
         Foreign
-        NeodocOptions
+        Foreign
         (Eff (NeodocEff eff) Foreign)
 runJS = mkFn2 go
   where
-    go input opts = do
-      spec <- either (throwException <<< error <<< F.prettyForeignError)
+    go fSpec fOpts = do
+      spec /\ opts <- either (throwException <<< error <<< F.prettyForeignError)
                       pure
-                      (readSpec input)
-      x <- run spec opts
+                      do
+                        Tuple <$> (readSpec fSpec)
+                              <*> (F.read fOpts)
+      x <- _run spec opts
       pure case x of
-        (ParseOutput   x) -> F.toForeign x
+        (Output        x) -> F.toForeign x
         (HelpOutput    x) -> F.toForeign x
         (VersionOutput x) -> F.toForeign x
 
@@ -111,10 +133,24 @@ readSpec input = do
 
 run
   :: ∀ eff
+   . String
+  -> NeodocOptions
+  -> Eff (NeodocEff eff) Output
+run help = _run (Right help)
+
+run'
+  :: ∀ eff
+   . Spec UsageLayout
+  -> NeodocOptions
+  -> Eff (NeodocEff eff) Output
+run' spec = _run (Left spec)
+
+_run
+  :: ∀ eff
    . Either (Spec UsageLayout) String
   -> NeodocOptions
   -> Eff (NeodocEff eff) Output
-run input (NeodocOptions opts) = do
+_run input (NeodocOptions opts) = do
   argv <- maybe (A.drop 2 <$> Process.argv) pure opts.argv
   env  <- maybe Process.getEnv              pure opts.env
 
@@ -148,9 +184,10 @@ run input (NeodocOptions opts) = do
                 then pure (VersionOutput ver)
                 else Console.log ver *> Process.exit 0
           Nothing -> runNeodocError (Just program) (Left Error.VersionMissingError)
-    else pure (ParseOutput output)
+    else pure (Output output)
 
   where
+
   runNeodocError
     :: ∀ eff a
      . Maybe String
@@ -167,22 +204,64 @@ run input (NeodocOptions opts) = do
                             else msg
               in Console.error msg' *> Process.exit 1
     Right x -> pure x
-
-  has x = any \s ->
-              maybe false (case _ of
-                            IntValue  0     -> false
-                            BoolValue false -> false
-                            ArrayValue []   -> false
-                            _               -> true
-                            ) (StrMap.lookup s x)
   readPkgVersion = readPkgVersionImpl Just Nothing
 
-parseHelptextJS
+
+runPure
+  :: String
+  -> NeodocOptions
+  -> Maybe String
+  -> Either NeodocError Output
+runPure help = _runPure (Right help)
+
+runPure'
+  :: Spec UsageLayout
+  -> NeodocOptions
+  -> Maybe String
+  -> Either NeodocError Output
+runPure' spec = _runPure (Left spec)
+
+_runPure
+  :: Either (Spec UsageLayout) String
+  -> NeodocOptions
+  -> Maybe String
+  -> Either NeodocError Output
+_runPure input (NeodocOptions opts) mVer = do
+  let argv = fromMaybe [] opts.argv
+      env  = fromMaybe StrMap.empty opts.env
+
+  -- 1. obtain a spec, either by using the provided spec or by parsing a fresh
+  --    one.
+  inputSpec@(Spec { program, helpText }) <- do
+    either pure parseHelpText input
+
+  -- 2. solve the spec
+  spec@(Spec { descriptions }) <- do
+    Error.capture do
+      Solver.solve opts inputSpec
+
+  -- 3. run the arg parser agains the spec and user input
+  ArgParseResult mBranch vs <- do
+    Error.capture do
+      ArgParser.run spec opts env argv
+
+  let output = Evaluate.reduce env descriptions mBranch vs
+
+  if output `has` opts.helpFlags
+    then pure (HelpOutput helpText)
+    else
+      if output `has` opts.versionFlags then do
+        case mVer of
+          Just ver -> pure (VersionOutput ver)
+          Nothing ->  Left Error.VersionMissingError
+      else pure (Output output)
+
+parseHelpTextJS
   :: ∀ eff
    . Fn1
         String
         (Eff (NeodocEff eff) Foreign)
-parseHelptextJS = mkFn1 go
+parseHelpTextJS = mkFn1 go
   where
   go help =
     case parseHelpText help of
@@ -239,6 +318,14 @@ formatHelpText program helpFlags shortHelp errmsg = errmsg
       else "\n" <> "See "
                     <> program <> " " <> (intercalate "/" helpFlags)
                     <> " for more information"
+
+has x = any \s ->
+  maybe false (case _ of
+                IntValue  0     -> false
+                BoolValue false -> false
+                ArrayValue []   -> false
+                _               -> true
+                ) (StrMap.lookup s x)
 
 foreign import jsError :: ∀ a. String -> a -> Error
 foreign import readPkgVersionImpl

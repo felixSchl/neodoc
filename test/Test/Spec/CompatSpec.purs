@@ -25,6 +25,8 @@ import Partial.Unsafe (unsafePartial)
 import Control.Apply ((*>), (<*))
 import Node.FS (FS)
 
+import Neodoc as Neodoc
+import Neodoc (NeodocOptions(..))
 import Neodoc.Value
 import Neodoc.Env (Env)
 import Neodoc.Env as Env
@@ -79,38 +81,40 @@ compatSpec tests =
               later (pure unit)
 
               let env = fromMaybe StrMap.empty opts.env
-                  result = do
-                    -- scan the input text
-                    { usage, options, originalUsage } <- Error.capture do
-                      Scanner.scan $ dedent doc
+                  result = Neodoc.runPure (dedent doc) (NeodocOptions opts) Nothing
 
-                    -- lex/parse the usage section
-                    { program, layouts } <- do
-                      toks <- Error.capture $ Lexer.lexUsage usage
-                      Error.capture $ Spec.parseUsage toks
 
-                    -- lex/parse the description section(s)
-                    descriptions <- concat <$> for options \description -> do
-                      toks <- Error.capture $ Lexer.lexDescs description
-                      Error.capture $ Spec.parseDescription toks
-
-                    -- solve the input spec
-                    spec' <- Error.capture do
-                      Solver.solve
-                        { smartOptions: opts.smartOptions }
-                        (Spec { program
-                              , layouts
-                              , descriptions
-                              , helpText: doc
-                              , shortHelp: originalUsage
-                              })
-
-                    -- run the arg parser
-                    ArgParseResult mBranch vs <- Error.capture do
-                      ArgParser.run spec' opts env argv
-
-                    -- evaluate the results
-                    pure $ Evaluate.reduce env descriptions mBranch vs
+              --       -- scan the input text
+              --       { usage, options, originalUsage } <- Error.capture do
+              --         Scanner.scan $ dedent doc
+              --
+              --       -- lex/parse the usage section
+              --       { program, layouts } <- do
+              --         toks <- Error.capture $ Lexer.lexUsage usage
+              --         Error.capture $ Spec.parseUsage toks
+              --
+              --       -- lex/parse the description section(s)
+              --       descriptions <- concat <$> for options \description -> do
+              --         toks <- Error.capture $ Lexer.lexDescs description
+              --         Error.capture $ Spec.parseDescription toks
+              --
+              --       -- solve the input spec
+              --       spec' <- Error.capture do
+              --         Solver.solve
+              --           { smartOptions: opts.smartOptions }
+              --           (Spec { program
+              --                 , layouts
+              --                 , descriptions
+              --                 , helpText: doc
+              --                 , shortHelp: originalUsage
+              --                 })
+              --
+              --       -- run the arg parser
+              --       ArgParseResult mBranch vs <- Error.capture do
+              --         ArgParser.run spec' opts env argv
+              --
+              --       -- evaluate the results
+              --       pure $ Evaluate.reduce env descriptions mBranch vs
 
               vliftEff $ case result of
                 Left e ->
@@ -125,7 +129,7 @@ compatSpec tests =
                     )
                     (const $ throwException $ error $ pretty e)
                     out
-                Right output -> do
+                Right (Neodoc.Output output) -> do
                   either
                     (\_ -> do
                       throwException $ error $
@@ -140,3 +144,6 @@ compatSpec tests =
                             <> pretty actual
                         else pure unit)
                     out
+                Right x -> throwException $ error $
+                              "Unexpected output:\n"
+                                <> pretty x

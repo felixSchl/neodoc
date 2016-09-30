@@ -20,6 +20,7 @@ module Neodoc.ArgParser.Type (
 , catch
 , catch'
 , extractError
+, mapError
 
 -- `ArgParser`
 , Input
@@ -44,6 +45,7 @@ module Neodoc.ArgParser.Type (
 import Prelude
 import Data.List (List(..))
 import Data.Either (Either(..), either)
+import Data.Bifunctor (rmap)
 import Control.Lazy (class Lazy)
 import Control.MonadPlus (class MonadPlus, class MonadZero, class Alternative)
 import Control.Plus (class Plus, class Alt)
@@ -69,6 +71,8 @@ import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
 import Neodoc.Data.Description (Description(..))
 
 data ParseError e = ParseError Boolean (Either String e)
+
+mapError f (ParseError b e) = ParseError b (rmap  f e)
 
 instance showParseError :: (Show e) => Show (ParseError e) where
   show (ParseError b e) = "ParseError " <> show b <> " "<> show e

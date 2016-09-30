@@ -128,8 +128,11 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
           case mDescription of
             Just (_ /\ (Just (OptionArgument aN' aO'))) -> do
               maybe
-                (fail $ "Option-Argument specified in options-section missing"
-                        <> " --" <> n)
+                (if not aO'
+                  then fail $ "Option-Argument specified in options-section missing"
+                              <> " --" <> n
+                  else solved $ Solved.Option (OptionAlias.Long n) Nothing r
+                )
                 (\(adjR /\ adjN /\ adjO) -> do
                   guardArgNames adjN aN'
                   slurped $ Solved.Option

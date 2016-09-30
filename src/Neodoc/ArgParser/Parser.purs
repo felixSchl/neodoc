@@ -57,6 +57,7 @@ import Data.List (
 , null, concat, mapWithIndex, length, take, drop, toUnfoldable)
 import Data.Array as Array
 import Data.List.Partial as LU
+import Data.Bifunctor (lmap)
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Data.Function (on)
 import Data.Tuple (Tuple(..), snd)
@@ -125,7 +126,7 @@ parse
   -> Env
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
-parse (Spec { layouts, descriptions }) options env tokens =
+parse (Spec { layouts, descriptions }) options env tokens = lmap fixError $
   runParser { env, options, descriptions } initialState tokens $
     let parsers = concat (fromFoldable layouts) <#> \toplevel ->
           traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
@@ -146,6 +147,12 @@ parse (Spec { layouts, descriptions }) options env tokens =
     case input of
       Nil -> pure unit
       xs  -> fail' $ UnexpectedInputError xs Nil
+
+  fixError :: ParseError ArgParseError -> ParseError ArgParseError
+  fixError = mapError go
+    where
+    go (UnexpectedInputError toks layouts) = (UnexpectedInputError toks layouts)
+    go x = x
 
 parseLayout
   :: ∀ r
