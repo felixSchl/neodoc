@@ -3,6 +3,7 @@ module Neodoc where
 import Prelude
 import Data.Array as A
 import Data.Bifunctor (lmap)
+import Data.Function.Uncurried
 import Data.Maybe (Maybe(..), maybe)
 import Data.Either (Either (..), either)
 import Data.StrMap (StrMap)
@@ -17,6 +18,7 @@ import Data.Traversable (for)
 import Data.Pretty (class Pretty, pretty)
 import Data.Foreign (F, Foreign)
 import Data.Foreign.Class as F
+import Data.Foreign.Extra as F
 import Data.Foreign as F
 import Data.Foldable (any, intercalate)
 import Data.String.Yarn (lines, unlines)
@@ -71,19 +73,33 @@ data Output
 
 runJS
   :: ∀ eff
-   . Foreign
-  -> NeodocOptions
-  -> Eff (NeodocEff eff) Foreign
-runJS input opts = do
-  input' :: Either (Spec (EmptyableLayout UsageLayoutArg)) String <- do
-    either (throwException <<< error <<< show) pure do
-          (Right <$> F.read input) <|>
-          (Left  <$> F.read input)
+   . Fn2
+        Foreign
+        NeodocOptions
+        (Eff (NeodocEff eff) Foreign)
+runJS = mkFn2 go
+  where
+    go input opts = do
+      spec <- either (throwException <<< error <<< F.prettyForeignError)
+                      pure
+                      (readSpec input)
+      x <- run spec opts
+      pure case x of
+        (ParseOutput   x) -> F.toForeign x
+        (HelpOutput    x) -> F.toForeign x
+        (VersionOutput x) -> F.toForeign x
 
-  -- hold on to your hats, it's going to get nasty,
+readSpec
+  :: Foreign
+  -> F (Either (Spec UsageLayout) String)
+readSpec input = do
+  spec :: Either (Spec (EmptyableLayout UsageLayoutArg)) String <- do
+    (Right <$> F.read input) <|>
+    (Left  <$> F.read input)
+
+  -- hold on to your hats, it's going to get nasty:
   -- we have to prune any branches that came in empty.
-
-  let input'' = flip lmap input'  \(Spec spec@{ layouts }) ->
+  let spec' = flip lmap spec \(Spec spec@{ layouts }) ->
       let layouts' = catMaybes $ fromFoldable $ layouts <#> \branches ->
             let branches' = catMaybes $ fromFoldable $ branches <#> \branch ->
                 let branch' = catMaybes $ fromFoldable $ branch <#> \layout -> toStrictLayout layout
@@ -97,12 +113,7 @@ runJS input opts = do
                         Nil    -> Nil :| Nil
                         x : xs -> x :| xs
        in Spec (spec { layouts = layouts'' })
-
-  x <- run input'' opts
-  pure case x of
-    (ParseOutput   x) -> F.toForeign x
-    (HelpOutput    x) -> F.toForeign x
-    (VersionOutput x) -> F.toForeign x
+  pure spec'
 
 run
   :: ∀ eff
@@ -116,7 +127,7 @@ run input (NeodocOptions opts) = do
   -- 1. obtain a spec, either by using the provided spec or by parsing a fresh
   --    one.
   inputSpec@(Spec { program, helpText }) <- runNeodocError Nothing do
-    either pure parseHelptext input
+    either pure parseHelpText input
 
   -- 2. solve the spec
   spec@(Spec { descriptions }) <- runNeodocError Nothing do
@@ -174,21 +185,24 @@ run input (NeodocOptions opts) = do
 
 parseHelptextJS
   :: ∀ eff
-   . String
-  -> Eff (NeodocEff eff) Foreign
-parseHelptextJS help = do
-  case parseHelptext help of
-    Left e ->
-      let msg = renderNeodocError Nothing e
-       in throwException $ jsError msg {}
-    Right (Spec spec) ->
-      let layouts = ((toEmptyableLayout <$> _) <$> _) <$> spec.layouts
-       in pure $ F.write $ Spec $ spec { layouts = layouts }
+   . Fn1
+        String
+        (Eff (NeodocEff eff) Foreign)
+parseHelptextJS = mkFn1 go
+  where
+  go help =
+    case parseHelpText help of
+      Left e ->
+        let msg = renderNeodocError Nothing e
+        in throwException $ jsError msg {}
+      Right (Spec spec) ->
+        let layouts = ((toEmptyableLayout <$> _) <$> _) <$> spec.layouts
+        in pure $ F.write $ Spec $ spec { layouts = layouts }
 
-parseHelptext
+parseHelpText
   :: String
   -> Either NeodocError (Spec UsageLayout)
-parseHelptext help = do
+parseHelpText help = do
   -- scan the input text
   { originalUsage, usage, options } <- Error.capture do
     Scanner.scan $ dedent help

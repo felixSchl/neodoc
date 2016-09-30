@@ -15,6 +15,16 @@ import Data.Foreign.NullOrUndefined
 import Data.Foreign.Index
 import Data.Foreign.Class
 
+prettyForeignError :: ForeignError -> String
+prettyForeignError = go
+  where
+  go (ErrorAtIndex ix e) = "Error at [" <> show ix <> "]" <> nested e
+  go (ErrorAtProperty prop e) = "Error at [" <> show prop <> "]" <> nested e
+  go e = show e
+  nested (ErrorAtIndex ix e) = "[" <> show ix <> "]" <> nested e
+  nested (ErrorAtProperty prop e) = "[" <> show prop <> "]" <> nested e
+  nested e = ": " <> show e
+
 readPropMaybe :: forall a i. (IsForeign a, Index i) => i -> Foreign -> F (Maybe a)
 readPropMaybe k v = do
   if hasOwnProperty k v
