@@ -25,19 +25,20 @@ import Neodoc.Data.OptionArgument
 import Neodoc.Spec.Parser.Description as Description
 import Neodoc.Spec.Lexer as Lexer
 import Neodoc.Spec.Parser as Spec
+import Neodoc.Spec.Error
 import Neodoc.OptionAlias
 import Neodoc.OptionAlias as OptionAlias
 
 newtype TestCase = TestCase {
   input :: String
-, output :: Either String (Array Description)
+, output :: Either SpecParseError (Array Description)
 }
 
 pass :: String -> Array Description -> TestCase
 pass input output = TestCase { input: input, output: Right output }
 
 fail :: String -> String -> TestCase
-fail input msg = TestCase { input: input, output: Left msg }
+fail input msg = TestCase { input: input, output: Left (SpecParseError msg) }
 
 o :: {
   aliases    :: NonEmpty List OptionAlias
@@ -216,7 +217,7 @@ descParserSpec = \_ ->
             """)
             [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
                 , arg:        Just $ arg "BAZ"
-                , default:    Just (int 200)
+                , default:    Just (int 100)
                 , env:        Nothing
                 , repeatable: false
                 }
@@ -247,7 +248,7 @@ descParserSpec = \_ ->
           """
           ) [ o { aliases:    OptionAlias.Short 'f' :| OptionAlias.Long "foo" : Nil
                 , arg:        Just $ arg "BAZ"
-                , default:    Just (int 200)
+                , default:    Just (int 100)
                 , env:        Nothing
                 , repeatable: false
                 }
@@ -383,19 +384,18 @@ descParserSpec = \_ ->
   where
     runtest (TestCase { input, output }) = do
       it (input <> " " <>
-        (either (\msg -> "should fail with \"" <> msg <> "\"")
+        (either (\err -> "should fail with \"" <> pretty err <> "\"")
                 (\out -> "should succeed with:\n" <>
                   (intercalate "\n" $ pretty <$> out))
                 output)) do
-        vliftEff $ evaltest (lmap pretty do
-            toks <- Error.capture $ Lexer.lexDescs input
-            Error.capture $ Spec.parseDescription toks
-            ) output
+        vliftEff $ flip evaltest output do
+            toks <- Lexer.lexDescs input
+            Spec.parseDescription toks
 
-    evaltest (Left msg) (Left msg')
-      = if msg == msg'
+    evaltest (Left err) (Left err')
+      = if err == err'
            then pure unit
-           else throwException $ error $ "Unexpected error:\n" <> msg
+           else throwException $ error $ "Unexpected error:\n" <> pretty err
 
     evaltest (Left e) _ = throwException $ error $ show e
 

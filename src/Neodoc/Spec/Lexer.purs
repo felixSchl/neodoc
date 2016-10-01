@@ -23,14 +23,14 @@ import Data.String.Regex (Regex(), regex)
 import Data.String.Regex (test, parseFlags, replace) as Regex
 import Partial.Unsafe (unsafePartial)
 import Data.String.Ext ((^=), (~~))
-import Neodoc.Spec.Error (SpecLexError(..))
+import Neodoc.Spec.Error (SpecParseError(..))
 import Neodoc.Spec.Parser.Base (
   lowerAlphaNum, alphaNum, alpha, space, lowerAlpha, upperAlpha, string'
 , getPosition, getInput, spaces, eol)
 import Neodoc.Spec.ParserState (ParserState(..))
 import Neodoc.Spec.ParserState as ParserState
 import Text.Parsing.Parser (
-  ParseError, Parser, PState(..), ParserT(..), Result(..)
+  ParseError(..), Parser, PState(..), ParserT(..), Result(..)
 , runParserT, parseFailed, fail, runParser, unParserT) as P
 import Text.Parsing.Parser.Combinators ((<??>))
 import Text.Parsing.Parser.Combinators (
@@ -76,8 +76,8 @@ instance showMode :: Show Mode where
   show (Usage)        = "Usage"
   show (Descriptions) = "Descriptions"
 
-lex :: Mode -> String -> Either SpecLexError (List PositionedToken)
-lex m input = lmap SpecLexError $
+lex :: Mode -> String -> Either SpecParseError (List PositionedToken)
+lex m input = lmap (SpecParseError <<< getParseErrorMessage) $
   -- perform a simple transformation to avoid 'manyTill' and safe some millis
   -- lexing. Hopefully this won't be necessary when purescript-parsing improves
   -- performance, a faster parsing library shows up or the purescript compiler
@@ -87,10 +87,10 @@ lex m input = lmap SpecLexError $
                 Descriptions -> input
    in P.runParser input' (parseTokens m)
 
-lexDescs :: String -> Either SpecLexError (List PositionedToken)
+lexDescs :: String -> Either SpecParseError (List PositionedToken)
 lexDescs = lex Descriptions
 
-lexUsage :: String -> Either SpecLexError (List PositionedToken)
+lexUsage :: String -> Either SpecParseError (List PositionedToken)
 lexUsage = lex Usage
 
 type OptionArgument = {
@@ -572,3 +572,6 @@ runTokenParser
 runTokenParser s =
   flip evalState ParserState.initialState
     <<< P.runParserT (P.PState s P.initialPos)
+
+getParseErrorMessage :: P.ParseError -> String
+getParseErrorMessage (P.ParseError m _ _) = m
