@@ -131,572 +131,572 @@ argParserSpec = \_ -> describe "The parser generator" do
   -- Some options that will be used for these tests
   let
     testCases = ([
-    --   test
-    --     "usage: prog <qux>..."
-    --     [ pass Nothing
-    --         [ "a", "b", "c" ]
-    --         [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
-    --         ]
-    --     , fail
-    --         Nothing
-    --         [ "--foo", "baz" ]
-    --         "Expected <qux>..., but got --foo"
-    --     , fail
-    --         Nothing
-    --         [ "a", "--foo", "-f=10" ]
-    --         "Unknown option --foo"
-    --     ]
-    --
-    -- , test
-    --     "usage: prog <qux>... --"
-    --     [ pass Nothing
-    --         [ "a", "b", "c", "--" ]
-    --         [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
-    --         , "--"    :> V.array []
-    --         ]
-    --     , pass Nothing
-    --         [ "a", "b", "c", "--", "--", "--" ]
-    --         [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
-    --         , "--"    :> V.array [ V.str "--" , V.str "--" ]
-    --         ]
-    --     ]
-
-    -- , test
-    --     """
-    --     usage: prog [options]
-    --     options:
-    --       -h, --host <host[:port]> [default: "http://localhost:3000"]
-    --     """
-    --     [ pass
-    --         Nothing
-    --         [ "-hhttp://localhost:5000" ]
-    --         [ "-h"     :> V.str "http://localhost:5000"
-    --         , "--host" :> V.str "http://localhost:5000"
-    --         ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog [options]
-    --     options:
-    --       -h, --host FOO [default: BAR] [env: HOST]
-    --     """
-    --     [ pass'
-    --         Nothing
-    --         []
-    --         [ "HOST" :> "HOME" ]
-    --         [ "-h"     :> V.str "HOME"
-    --         , "--host" :> V.str "HOME"
-    --         ]
-    --     ]
-
-      -- test
-      --   """
-      --   usage: prog -iFILE
-      --   options:
-      --     -i, --input FILE
-      --   """
-      --   [ --fail Nothing [] "Missing -i/--input=FILE"
-      --     pass Nothing
-      --       [ "-i", "bar" ]
-      --       [ "-i"      :> V.str "bar"
-      --       , "--input" :> V.str "bar" ]
-      --   ]
-
-      -- test
-      --   """
-      --   usage: prog -i FILE
-      --   options:
-      --     -i, --input FILE
-      --   """
-      --   [ --fail Nothing [] "Missing -i/--input=FILE"
-      --     pass Nothing
-      --       [ "-i", "bar" ]
-      --       [ "-i"      :> V.str "bar"
-      --       , "--input" :> V.str "bar" ]
-      --   ]
-
-      -- test
-      --   """
-      --   usage: prog (-iFILE)
-      --   options:
-      --     -i, --input FILE
-      --   """
-      --   [ --fail Nothing [] "Missing -i/--input=FILE"
-      --     pass Nothing
-      --       [ "-i", "bar" ]
-      --       [ "-i"      :> V.str "bar"
-      --       , "--input" :> V.str "bar" ]
-      --   ]
-
-      -- test
-      --   """
-      --   usage: prog (-iFILE) -oFILE
-      --   options:
-      --     -i, --input FILE
-      --     -o, --output FILE
-      --   """
-      --   [ fail Nothing []
-      --     $ "Missing -i/--input=FILE, -o/--output=FILE"
-      --
-      --   , fail Nothing [ "-i", "bar" ]
-      --     $ "Missing -o/--output=FILE"
-      --
-      --   , pass Nothing
-      --       [ "-i", "bar", "-o", "bar" ]
-      --       [ "--input"  :> V.str "bar"
-      --       , "-i"       :> V.str "bar"
-      --       , "--output" :> V.str "bar"
-      --       , "-o"       :> V.str "bar" ]
-      --
-      --     -- group should be interchangable if it's only of options:
-      --   , pass Nothing
-      --       [ "-o", "bar", "-i", "bar" ]
-      --       [ "--input"  :> V.str "bar"
-      --       , "-i"       :> V.str "bar"
-      --       , "--output" :> V.str "bar"
-      --       , "-o"       :> V.str "bar" ]
-      --   ]
-
-      -- test
-      --   """
-      --   usage: prog ((-iFILE) -rFILE) -oFILE
-      --   options:
-      --     -i, --input FILE
-      --     -o, --output FILE
-      --     -r, --redirect FILE [env: QUX]
-      --   """
-      --   [ fail Nothing []
-      --     $ "Missing -i/--input=FILE, -r/--redirect=FILE"
-      --
-      --   , fail Nothing [ "-i", "bar", "-r", "bar" ]
-      --       "Missing -o/--output=FILE"
-      --
-      --   , pass Nothing
-      --       [ "-i", "bar", "-r", "bar", "-o", "bar" ]
-      --       [ "--input"    :> V.str "bar"
-      --       , "-i"         :> V.str "bar"
-      --       , "--redirect" :> V.str "bar"
-      --       , "-r"         :> V.str "bar"
-      --       , "--output"   :> V.str "bar"
-      --       , "-o"         :> V.str "bar" ]
-      --
-      --     -- group should be interchangable if it's only of options:
-      --   , pass Nothing
-      --       [ "-o", "bar", "-r", "bar", "-i", "bar" ]
-      --       [ "--input"    :> V.str "bar"
-      --       , "-i"         :> V.str "bar"
-      --       , "--redirect" :> V.str "bar"
-      --       , "-r"         :> V.str "bar"
-      --       , "--output"   :> V.str "bar"
-      --       , "-o"         :> V.str "bar" ]
-      --
-      --   , pass' Nothing
-      --       [ "-o", "bar", "-i", "bar" ]
-      --       [ "QUX" :> "BAR" ]
-      --       [ "--input"    :> V.str "bar"
-      --       , "-i"         :> V.str "bar"
-      --       , "--redirect" :> V.str "BAR"
-      --       , "-r"         :> V.str "BAR"
-      --       , "--output"   :> V.str "bar"
-      --       , "-o"         :> V.str "bar" ]
-      --   ]
-
-    --   test
-    --     """
-    --     usage: prog ((-i FILE) <env>) -oFILE
-    --     options:
-    --       -i, --input FILE
-    --       -o, --output FILE
-    --       -r, --redirect FILE
-    --     """
-    --     [ fail Nothing [] "Missing -i/--input=FILE"
-    --       -- XXX: Would be cool to show the reason the group did not parse!
-    --     , fail Nothing [ "-i", "bar" ] "Expected <env>"
-    --     , pass Nothing
-    --         [ "-i", "bar", "x", "-o", "bar" ]
-    --         [ "--input"  :> V.str "bar"
-    --         , "-i"       :> V.str "bar"
-    --         , "<env>"    :> V.str "x"
-    --         , "--output" :> V.str "bar"
-    --         , "-o"       :> V.str "bar" ]
-    --       -- group should NOT be interchangable if it contains non-options:
-    --     , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-    --         "Unexpected option -o. Expected -i/--input=FILE"
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog [options]
-    --     options:
-    --       -o, --out FOO [env: FOO]
-    --     """
-    --     [ pass' Nothing
-    --         []
-    --         [ "FOO"    :> "BAR" ]
-    --         [  "--out" :> V.str "BAR"
-    --         ,  "-o"    :> V.str "BAR" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog [options]
-    --     options:
-    --       -o, --out FOO [default: "ADLER"] [env: FOO]
-    --     """
-    --     [ pass' Nothing
-    --         []
-    --         [ "FOO" :> "BAR" ]
-    --         [  "--out" :> V.str "BAR"
-    --         ,  "-o"    :> V.str "BAR" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog -a
-    --        or: prog -b
-    --     """
-    --     [ pass Nothing
-    --         [ "-a" ]
-    --         [ "-a" :> V.bool true ]
-    --     , pass Nothing
-    --         [ "-b" ]
-    --         [ "-b" :> V.bool true ]
-    --     , pass Nothing
-    --         []
-    --         []
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog a
-    --        or: prog b
-    --     """
-    --     [ pass Nothing
-    --         [ "a" ]
-    --         [ "a" :> V.bool true ]
-    --     , pass Nothing
-    --         [ "b" ]
-    --         [ "b" :> V.bool true ]
-    --     , fail Nothing
-    --         [ "a", "b" ]
-    --         "Unexpected command b"
-    --     , fail Nothing
-    --         [ "b", "a" ]
-    --         "Unexpected command a"
-    --     , fail Nothing [] ""
-    --     ]
-    --
-    --   test
-    --     """
-    --     usage: prog foo -io [-q]... -b=BAZ (-f FOZ)... baz
-    --     options:
-    --       -i, --input
-    --       -o, --out
-    --       -q, --qux...
-    --       -b, --baz BAZ [default: "ax"]
-    --       -f, --foo FOZ...
-    --     """
-    --     [ pass Nothing
-    --         [ "foo", "--out", "--input", "--qux", "--foo=ox", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "--qux"   :> V.int 1
-    --         , "-q"      :> V.int 1
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         , "baz"     :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         ]
-    --
-    --     , pass Nothing
-    --         [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--qux"   :> V.int 3
-    --         , "-q"      :> V.int 3
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "baz"     :> V.bool true
-    --         ]
-    --
-    --     , pass Nothing
-    --         [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--qux"   :> V.int 2
-    --         , "-q"      :> V.int 2
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         , "baz"     :> V.bool true
-    --         ]
-    --
-    --     , pass Nothing
-    --         [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "baz"     :> V.bool true
-    --         ]
-    --
-    --     , pass Nothing
-    --         [ "foo", "-o", "-i", "-bax", "-f=ox", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "baz"     :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         ]
-    --
-    --     , fail Nothing
-    --         [ "foo" ]
-    --         "Missing -f/--foo=FOZ"
-    --     , fail Nothing
-    --         [ "foo", "-o", "-i", "-bax" ]
-    --         "Missing -f/--foo=FOZ"
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog [foo]
-    --     """
-    --     [ fail Nothing [ "goo" ] "Unknown command goo" ]
-    --
-    -- , test
-    --     """
-    --     usage: prog (foo)
-    --     """
-    --     [ fail Nothing [ "goo" ] "Expected foo, but got goo" ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "true", "false" ]
-    --         [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n...
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "true", "false" ]
-    --         [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n[=FOO]
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "true", "false" ]
-    --         [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n[=FOO]...
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "true", "false" ]
-    --         [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n, --noop
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
-    --         , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "--noop" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
-    --         , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n", "--noop" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
-    --         , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n ARC
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-
-    --   test
-    --     """
-    --     Usage: prog ((((foo|bar)|qux)|wux)|-n ARC) ARGS...
-    --     options:
-    --       -n ARC
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [-n ARG]
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt       = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 , smartOptions = false
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog ((((foo|bar)|-n ARC)|wux))
-    --     options:
-    --       -n ARC
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [-i] [-q]...
-    --     """
-    --     [ pass
-    --         Nothing
-    --         [ "-q", "-i", "-q" ]
-    --         [ "-i" :> V.bool true
-    --         , "-q" :> V.int 2 ]
-    --     , pass
-    --         Nothing
-    --         [ "-i", "-q", "-q" ]
-    --         [ "-i" :> V.bool true
-    --         , "-q" :> V.int 2 ]
-    --     , pass
-    --         Nothing
-    --         [ "-q", "-q", "-i" ]
-    --         [ "-i" :> V.bool true
-    --         , "-q" :> V.int 2 ]
-    --     ]
-    --
       test
+        "usage: prog <qux>..."
+        [ pass Nothing
+            [ "a", "b", "c" ]
+            [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+            ]
+        , fail
+            Nothing
+            [ "--foo", "baz" ]
+            "Expected <qux>..., but got --foo"
+        , fail
+            Nothing
+            [ "a", "--foo", "-f=10" ]
+            "unknown option --foo"
+        ]
+
+    , test
+        "usage: prog <qux>... --"
+        [ pass Nothing
+            [ "a", "b", "c", "--" ]
+            [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+            , "--"    :> V.array []
+            ]
+        , pass Nothing
+            [ "a", "b", "c", "--", "--", "--" ]
+            [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+            , "--"    :> V.array [ V.str "--" , V.str "--" ]
+            ]
+        ]
+
+    , test
+        """
+        usage: prog [options]
+        options:
+          -h, --host <host[:port]> [default: "http://localhost:3000"]
+        """
+        [ pass
+            Nothing
+            [ "-hhttp://localhost:5000" ]
+            [ "-h"     :> V.str "http://localhost:5000"
+            , "--host" :> V.str "http://localhost:5000"
+            ]
+        ]
+
+    , test
+        """
+        usage: prog [options]
+        options:
+          -h, --host FOO [default: BAR] [env: HOST]
+        """
+        [ pass'
+            Nothing
+            []
+            [ "HOST" :> "HOME" ]
+            [ "-h"     :> V.str "HOME"
+            , "--host" :> V.str "HOME"
+            ]
+        ]
+
+    , test
+        """
+        usage: prog -iFILE
+        options:
+          -i, --input FILE
+        """
+        [ --fail Nothing [] "Missing -i/--input=FILE"
+          pass Nothing
+            [ "-i", "bar" ]
+            [ "-i"      :> V.str "bar"
+            , "--input" :> V.str "bar" ]
+        ]
+
+    , test
+        """
+        usage: prog -i FILE
+        options:
+          -i, --input FILE
+        """
+        [ --fail Nothing [] "Missing -i/--input=FILE"
+          pass Nothing
+            [ "-i", "bar" ]
+            [ "-i"      :> V.str "bar"
+            , "--input" :> V.str "bar" ]
+        ]
+
+    , test
+        """
+        usage: prog (-iFILE)
+        options:
+          -i, --input FILE
+        """
+        [ --fail Nothing [] "Missing -i/--input=FILE"
+          pass Nothing
+            [ "-i", "bar" ]
+            [ "-i"      :> V.str "bar"
+            , "--input" :> V.str "bar" ]
+        ]
+
+    , test
+        """
+        usage: prog (-iFILE) -oFILE
+        options:
+          -i, --input FILE
+          -o, --output FILE
+        """
+        [ fail Nothing []
+          $ "Missing -i/--input=FILE, -o/--output=FILE"
+
+        , fail Nothing [ "-i", "bar" ]
+          $ "Missing -o/--output=FILE"
+
+        , pass Nothing
+            [ "-i", "bar", "-o", "bar" ]
+            [ "--input"  :> V.str "bar"
+            , "-i"       :> V.str "bar"
+            , "--output" :> V.str "bar"
+            , "-o"       :> V.str "bar" ]
+
+          -- group should be interchangable if it's only of options:
+        , pass Nothing
+            [ "-o", "bar", "-i", "bar" ]
+            [ "--input"  :> V.str "bar"
+            , "-i"       :> V.str "bar"
+            , "--output" :> V.str "bar"
+            , "-o"       :> V.str "bar" ]
+        ]
+
+    , test
+        """
+        usage: prog ((-iFILE) -rFILE) -oFILE
+        options:
+          -i, --input FILE
+          -o, --output FILE
+          -r, --redirect FILE [env: QUX]
+        """
+        [ fail Nothing []
+          $ "Missing -i/--input=FILE, -r/--redirect=FILE"
+
+        , fail Nothing [ "-i", "bar", "-r", "bar" ]
+            "Missing -o/--output=FILE"
+
+        , pass Nothing
+            [ "-i", "bar", "-r", "bar", "-o", "bar" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "bar"
+            , "-r"         :> V.str "bar"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
+
+          -- group should be interchangable if it's only of options:
+        , pass Nothing
+            [ "-o", "bar", "-r", "bar", "-i", "bar" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "bar"
+            , "-r"         :> V.str "bar"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
+
+        , pass' Nothing
+            [ "-o", "bar", "-i", "bar" ]
+            [ "QUX" :> "BAR" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "BAR"
+            , "-r"         :> V.str "BAR"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
+        ]
+
+    , test
+        """
+        usage: prog ((-i FILE) <env>) -oFILE
+        options:
+          -i, --input FILE
+          -o, --output FILE
+          -r, --redirect FILE
+        """
+        [ fail Nothing [] "Missing -i/--input=FILE"
+          -- XXX: Would be cool to show the reason the group did not parse!
+        , fail Nothing [ "-i", "bar" ] "Expected <env>"
+        , pass Nothing
+            [ "-i", "bar", "x", "-o", "bar" ]
+            [ "--input"  :> V.str "bar"
+            , "-i"       :> V.str "bar"
+            , "<env>"    :> V.str "x"
+            , "--output" :> V.str "bar"
+            , "-o"       :> V.str "bar" ]
+          -- group should NOT be interchangable if it contains non-options:
+        , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
+            "unexpected option -o. Expected -i/--input=FILE"
+        ]
+
+    , test
+        """
+        usage: prog [options]
+        options:
+          -o, --out FOO [env: FOO]
+        """
+        [ pass' Nothing
+            []
+            [ "FOO"    :> "BAR" ]
+            [  "--out" :> V.str "BAR"
+            ,  "-o"    :> V.str "BAR" ]
+        ]
+
+    , test
+        """
+        usage: prog [options]
+        options:
+          -o, --out FOO [default: "ADLER"] [env: FOO]
+        """
+        [ pass' Nothing
+            []
+            [ "FOO" :> "BAR" ]
+            [  "--out" :> V.str "BAR"
+            ,  "-o"    :> V.str "BAR" ]
+        ]
+
+    , test
+        """
+        usage: prog -a
+           or: prog -b
+        """
+        [ pass Nothing
+            [ "-a" ]
+            [ "-a" :> V.bool true ]
+        , pass Nothing
+            [ "-b" ]
+            [ "-b" :> V.bool true ]
+        , pass Nothing
+            []
+            []
+        ]
+
+    , test
+        """
+        usage: prog a
+           or: prog b
+        """
+        [ pass Nothing
+            [ "a" ]
+            [ "a" :> V.bool true ]
+        , pass Nothing
+            [ "b" ]
+            [ "b" :> V.bool true ]
+        , fail Nothing
+            [ "a", "b" ]
+            "unexpected command b"
+        , fail Nothing
+            [ "b", "a" ]
+            "unexpected command a"
+        , fail Nothing [] ""
+        ]
+
+    , test
+        """
+        usage: prog foo -io [-q]... -b=BAZ (-f FOZ)... baz
+        options:
+          -i, --input
+          -o, --out
+          -q, --qux...
+          -b, --baz BAZ [default: "ax"]
+          -f, --foo FOZ...
+        """
+        [ pass Nothing
+            [ "foo", "--out", "--input", "--qux", "--foo=ox", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "--qux"   :> V.int 1
+            , "-q"      :> V.int 1
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "baz"     :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            ]
+
+        , pass Nothing
+            [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--qux"   :> V.int 3
+            , "-q"      :> V.int 3
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "baz"     :> V.bool true
+            ]
+
+        , pass Nothing
+            [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--qux"   :> V.int 2
+            , "-q"      :> V.int 2
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "baz"     :> V.bool true
+            ]
+
+        , pass Nothing
+            [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "baz"     :> V.bool true
+            ]
+
+        , pass Nothing
+            [ "foo", "-o", "-i", "-bax", "-f=ox", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "baz"     :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            ]
+
+        , fail Nothing
+            [ "foo" ]
+            "Missing -f/--foo=FOZ"
+        , fail Nothing
+            [ "foo", "-o", "-i", "-bax" ]
+            "Missing -f/--foo=FOZ"
+        ]
+
+    , test
+        """
+        usage: prog [foo]
+        """
+        [ fail Nothing [ "goo" ] "unknown command goo" ]
+
+    , test
+        """
+        usage: prog (foo)
+        """
+        [ fail Nothing [ "goo" ] "Expected foo, but got goo" ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "true", "false" ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n...
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "true", "false" ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n[=FOO]
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "true", "false" ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n[=FOO]...
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "true", "false" ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n, --noop
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
+            , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "--noop" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
+            , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n", "--noop" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
+            , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n ARC
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+
+    , test
+        """
+        Usage: prog ((((foo|bar)|qux)|wux)|-n ARC) ARGS...
+        options:
+          -n ARC
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [-n ARG]
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt       = [ "-n" ]
+                    , optionsFirst = true
+                    , smartOptions = false
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog ((((foo|bar)|-n ARC)|wux))
+        options:
+          -n ARC
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [-i] [-q]...
+        """
+        [ pass
+            Nothing
+            [ "-q", "-i", "-q" ]
+            [ "-i" :> V.bool true
+            , "-q" :> V.int 2 ]
+        , pass
+            Nothing
+            [ "-i", "-q", "-q" ]
+            [ "-i" :> V.bool true
+            , "-q" :> V.int 2 ]
+        , pass
+            Nothing
+            [ "-q", "-q", "-i" ]
+            [ "-i" :> V.bool true
+            , "-q" :> V.int 2 ]
+        ]
+
+    , test
         """
         usage: prog (-a | -b)... (-d | -e)...
         """
@@ -837,27 +837,27 @@ argParserSpec = \_ -> describe "The parser generator" do
               [ fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-x=foo", "-i" ]
-                  "Option takes no argument: -x"
+                  "option takes no argument: -x"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-ifx=foo", "-i" ]
-                  "Option takes no argument: -x"
+                  "option takes no argument: -x"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-ifxy=foo", "-i" ]
-                  "Unknown option -y=foo"
+                  "unknown option -y=foo"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-xoz" ]
-                  "Unknown option -z"
+                  "unknown option -z"
 
               , fail
                   (Just (defaultOptions { stopAt = [ "-x" ] }))
                   [ "-i", "-f", "-oxzfoo", "-i" ]
-                 "Unknown option -zfoo"
+                 "unknown option -zfoo"
               ]
             otherwise ->
               [ pass
@@ -928,11 +928,11 @@ argParserSpec = \_ -> describe "The parser generator" do
               [ fail
                   (Just (defaultOptions { stopAt = [ "--foo" ] }))
                   [ "--foo=BAR", "-f"]
-                  "Option takes no argument: --foo"
+                  "option takes no argument: --foo"
               , fail
                   (Just (defaultOptions { stopAt = [ "--foo" ] }))
                   [ "--fooBAR", "-f"]
-                  "Unknown option --fooBAR"
+                  "unknown option --fooBAR"
               ]
             otherwise ->
               [ pass

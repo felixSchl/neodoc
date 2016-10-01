@@ -100,7 +100,7 @@ type IndexedLayoutArg a = Indexed a
 expandReferences
   :: Spec ExpandedOptionsLayout
   -> Either SolveError (Spec SolvedLayout)
-expandReferences (Spec (spec@{ layouts, descriptions })) = do
+expandReferences (Spec (spec@{ layouts, descriptions })) =
   let -- expand the references per top-level branch, then remove any branches
       -- that yieleded `Nothing`.
       layouts' = (catMaybes <$> _)
@@ -109,8 +109,7 @@ expandReferences (Spec (spec@{ layouts, descriptions })) = do
       layouts'' = case layouts' of
                     Nil    -> Nil :| Nil -- create empty top-level branch
                     x : xs ->   x :| xs
-
-  pure (Spec $ spec { layouts = layouts'' })
+   in pure (Spec $ spec { layouts = layouts'' })
 
   where
   expandReferencesInBranch

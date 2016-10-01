@@ -4,7 +4,7 @@ import Prelude
 import Debug.Trace
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
-, null, length)
+, null, length, reverse)
 import Data.Function (on)
 import Data.Either (Either(..))
 import Data.NonEmpty (NonEmpty(..), (:|))
@@ -94,7 +94,7 @@ evalParsers p parsers = do
   let
     results = mrights collected
     errors = filter isErrorEvaluation results
-    successes = filter isSuccessEvaluation results
+    successes = reverse $ filter isSuccessEvaluation results
     eqByDepth = eq `on` getEvaluationDepth
     cmpByDepth = compare `on` getEvaluationDepth
     deepestErrors = last $ groupBy eqByDepth $ sortBy cmpByDepth errors

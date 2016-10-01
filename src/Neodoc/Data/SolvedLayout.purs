@@ -2,7 +2,7 @@ module Neodoc.Data.SolvedLayout where
 
 import Prelude
 import Data.Pretty (class Pretty, pretty)
-import Data.Maybe (Maybe, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Foldable (intercalate, all)
 import Data.String as String
 import Data.List (List)
@@ -74,9 +74,32 @@ setRepeatable r (Elem (Positional  n _)) = Elem (Positional n r)
 setRepeatable r (Elem (Option   a mA _)) = Elem (Option a mA r)
 setRepeatable _ x = x
 
+setRepeatableOr :: Boolean -> SolvedLayout -> SolvedLayout
+setRepeatableOr r (Group           o r' xs) = Group o (r || r') xs
+setRepeatableOr r (Elem (Command     n r')) = Elem (Command n (r || r'))
+setRepeatableOr r (Elem (Positional  n r')) = Elem (Positional n (r || r'))
+setRepeatableOr r (Elem (Option   a mA r')) = Elem (Option a mA (r || r'))
+setRepeatableOr _ x = x
+
 isOptional :: SolvedLayout -> Boolean
 isOptional (Group o _ _) = o
 isOptional _ = false
+
+isPositional :: SolvedLayoutArg -> Boolean
+isPositional (Positional _ _) = true
+isPositional _ = false
+
+isCommand :: SolvedLayoutArg -> Boolean
+isCommand (Command _ _) = true
+isCommand _ = false
+
+isOption :: SolvedLayoutArg -> Boolean
+isOption (Option _ _ _) = true
+isOption _ = false
+
+isFlag :: SolvedLayoutArg -> Boolean
+isFlag (Option _ Nothing _) = true
+isFlag _ = false
 
 isGroup :: SolvedLayout -> Boolean
 isGroup (Group _ _ _) = true

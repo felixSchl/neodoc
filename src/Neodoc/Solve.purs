@@ -11,6 +11,7 @@ import Neodoc.Solve.Error
 import Neodoc.Solve.SmartOptions as Solve
 import Neodoc.Solve.ExpandOptions as Solve
 import Neodoc.Solve.ExpandReferences as Solve
+import Neodoc.Solve.Canonicalise as Solve
 
 type SolveOptions r = {
   smartOptions :: Boolean
@@ -26,3 +27,4 @@ solve { smartOptions } spec = pure spec
     >>= (if smartOptions then Solve.smartOptions else pure)
     >>= Solve.expandOptions
     >>= Solve.expandReferences
+    >>= Solve.canonicalise

@@ -40,7 +40,7 @@ instance eqToken :: Eq Token where
 instance prettyToken :: Pretty Token where
   pretty (Stdin) = "-"
   pretty (EOA xs) = "-- " <> intercalate " " (pretty <$> xs)
-  pretty (Lit s) = show s
+  pretty (Lit s) = s
   pretty (LOpt n a) = "--" <> n <> arg
     where arg = maybe "" ("=" <> _) a
   pretty (SOpt n s a) = "-"  <> (fromCharArray (A.cons n s)) <> arg

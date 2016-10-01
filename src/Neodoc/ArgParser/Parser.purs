@@ -108,7 +108,7 @@ import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.KeyValue
 
 _ENABLE_DEBUG_ :: Boolean
-_ENABLE_DEBUG_ = false
+_ENABLE_DEBUG_ = true
 
 initialState :: ParseState
 initialState = {
@@ -572,7 +572,7 @@ traceBracket
   -> ArgParser r a
 traceBracket l label p = do
   input <- getInput
-  trace l \_ -> "parsing " <> label <> "... (input: " <> pretty input <> ")"
+  trace l \_ -> "parsing " <> label <> " (input: " <> pretty input <> ")"
   output <- traceError l ("failed to parse " <> label) p
   input <- getInput
   trace l \_ ->

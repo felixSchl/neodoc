@@ -90,7 +90,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
   preSolveAdjacent layout mAdjLayout =
     let _return xs = pure (xs /\ mAdjLayout)
         _slurp  xs = pure (xs /\ Nothing)
-        mAdjArg   = mAdjLayout >>= case _ of
+        mAdjArg    = mAdjLayout >>= case _ of
                       Group _ _ _ -> Nothing
                       Elem  x     -> Just x
      in case layout of

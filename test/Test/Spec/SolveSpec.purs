@@ -169,6 +169,10 @@ solveSpec = \_ ->
             "-f --file=FILE  [default: foo]"
             "Option-Argument specified in options-section missing -f" ]
 
+      -- same adjacent arg
+    , test "prog -0 ARG ARG..."
+        [ pass "-0, --foo ARG [default: 100]" "prog -0=ARG ARG..." ]
+
       -- optional arguments
     , test "prog -f"
         [ pass "-f[=ARG]" "prog -f[=ARG]" ]

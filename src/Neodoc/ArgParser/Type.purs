@@ -254,7 +254,7 @@ unexpectedInputError expected toks
   where
   render Nil Nil = "" -- XXX: this shouldn't happen. can we encode this at type level?
   render Nil ((Known tok):_) = "unexpected " <> tokLabel tok
-  render Nil ((Unknown tok):_) = "unknown " <> tokLabel tok
+  render xs ((Unknown tok):_) = "unknown " <> tokLabel tok
   render (x:_) toks = "expected " <> pretty x <> butGot toks
   butGot Nil = ""
   butGot xs = ", but got " <> intercalate " " (pretty <$> xs)
