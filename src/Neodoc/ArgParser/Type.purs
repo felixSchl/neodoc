@@ -25,7 +25,7 @@ module Neodoc.ArgParser.Type (
 -- `ArgParser`
 , Input
 , ArgParser
-, ArgParseError
+, ArgParseError(..)
 , unexpectedInputError
 , missingArgumentsError
 , optionTakesNoArgumentError
@@ -33,6 +33,12 @@ module Neodoc.ArgParser.Type (
 , malformedInputError
 , genericError
 , internalError
+, IsKnown
+, known
+, unknown
+, isKnown
+, isUnknown
+, unIsKnown
 , ParseConfig
 , ParseState
 , findDescription
@@ -192,11 +198,30 @@ extractError _ (ParseError _ (Right e)) = e
 
 type Input = List PositionedToken
 
+data IsKnown a = Known a | Unknown a
+
+instance showIsKnown :: (Show a) => Show (IsKnown a) where
+  show (Known x) = "Known " <> show x
+  show (Unknown x) = "Unknown " <> show x
+
+instance prettyIsKnown :: (Pretty a) => Pretty (IsKnown a) where
+  pretty (Known x) = pretty x
+  pretty (Unknown x) = pretty x
+
+known = Known
+unknown = Unknown
+isKnown (Known _) = true
+isKnown (Unknown _) = false
+isUnknown (Unknown _) = true
+isUnknown (Known _) = false
+unIsKnown (Unknown a) = a
+unIsKnown (Known a) = a
+
 data ArgParseError
   = OptionTakesNoArgumentError OptionAlias (Lazy String)
   | OptionRequiresArgumentError OptionAlias (Lazy String)
   | MissingArgumentsError (NonEmpty List SolvedLayout) (Lazy String)
-  | UnexpectedInputError  (List SolvedLayout) (List PositionedToken) (Lazy String)
+  | UnexpectedInputError  (List SolvedLayout) (List (IsKnown PositionedToken)) (Lazy String)
   | MalformedInputError String (Lazy String)
   | GenericError String
   | InternalError String (Lazy String)
@@ -228,10 +253,11 @@ unexpectedInputError expected toks
   = UnexpectedInputError expected toks $ defer \_ -> render expected toks
   where
   render Nil Nil = "" -- XXX: this shouldn't happen. can we encode this at type level?
-  render Nil (tok:_) = "unexpected " <> tokLabel tok
+  render Nil ((Known tok):_) = "unexpected " <> tokLabel tok
+  render Nil ((Unknown tok):_) = "unknown " <> tokLabel tok
   render (x:_) toks = "expected " <> pretty x <> butGot toks
   butGot Nil = ""
-  butGot xs = ", but got: " <> intercalate " " (pretty <$> xs)
+  butGot xs = ", but got " <> intercalate " " (pretty <$> xs)
 
 missingArgumentsError layouts
   = MissingArgumentsError layouts $ defer \_ ->

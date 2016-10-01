@@ -131,7 +131,7 @@ parse
   -> Env
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
-parse (Spec { layouts, descriptions }) options env tokens = lmap fixError $
+parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError $
   runParser { env, options, descriptions } initialState tokens $
     let toplevelBranches = concat (fromFoldable layouts)
         hasEmpty = any ((_ == 0) <<< length) layouts
@@ -157,13 +157,55 @@ parse (Spec { layouts, descriptions }) options env tokens = lmap fixError $
     input <- getInput
     case input of
       Nil  -> pure unit
-      toks -> fail' $ unexpectedInputError Nil toks
+      toks -> fail' $ unexpectedInputError Nil (known <$> toks)
 
   fixError :: ParseError ArgParseError -> ParseError ArgParseError
   fixError = mapError go
     where
-    -- go (UnexpectedInputError toks layouts _) = (UnexpectedInputError toks layouts _)
+    go (UnexpectedInputError xs toks _) =
+      let toks' = f <<< unIsKnown <$> toks
+       in unexpectedInputError xs toks'
+      where
+      f tok | isKnownToken spec tok = known tok
+      f tok = unknown tok
     go x = x
+
+-- Determine if a given option is "known".
+-- An option is considered to be known if either
+--      (a) appears anywhere in a layout
+--      (b) is mentioned anywhere in a description
+--
+-- note: this is a fairly expensive operation as currently lookups are not
+--       cached. there are at least 2 ways to resolve this:
+--          1. create an authorative map all options (but could lead into the
+--             need of options solving and will conflict with #57)
+--          2. memoize / cache the lookups
+
+isKnownToken
+  :: Spec SolvedLayout
+  -> PositionedToken
+  -> Boolean
+isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInLayouts
+  where
+  occuresInDescs = any (matchesDesc tok) descriptions
+    where
+    matchesDesc (PositionedToken { token }) (OptionDescription as _ _ _ _) = test token
+      where
+      test (Token.LOpt n _)   = elem (OptionAlias.Long n) as
+      test (Token.SOpt s _ _) = elem (OptionAlias.Short s) as
+      test _ = false
+    matchesDesc _ _ = false
+  occuresInLayouts = any (any (any (matchesLayout tok))) layouts
+    where
+    matchesLayout tok (Group _ _ xs) = any (any (matchesLayout tok)) xs
+    matchesLayout (PositionedToken { token }) (Elem x) = test token x
+      where
+      test (Token.LOpt n _)   (Solved.Option a _ _) = OptionAlias.Long n == a
+      test (Token.SOpt s _ _) (Solved.Option a _ _) = OptionAlias.Short s == a
+      test (Token.Lit n)      (Solved.Command n' _) = n == n'
+      test (Token.EOA _)      (Solved.EOA)          = true
+      test (Token.Stdin)      (Solved.Stdin)        = true
+      test _ _ = false
 
 parseLayout
   :: ∀ r
@@ -217,7 +259,7 @@ parseLayout skippable isSkipping l layout = do
      in nTimes do
           Tuple (toArgKey x) <<< (RichValue.from Origin.Argv) <$> go' x
             <* modifyDepth (_ + 1)
-    ) <|> fail' (unexpectedInputError (e:Nil) i)
+    ) <|> fail' (unexpectedInputError (e:Nil) (known <$> i))
 
     where
     go' (Solved.Positional n _) = positional (pretty x) n
@@ -452,7 +494,7 @@ parseChunk skippable isSkipping l chunk = do
           let e = case Map.lookup x errs of
                     _ -> case input of
                       Nil  -> missingArgumentsError (x:|xs)
-                      toks -> unexpectedInputError xss toks
+                      toks -> unexpectedInputError xss (known <$> toks)
            in fail' e
 
     draw _ _ _ = pure Nil
