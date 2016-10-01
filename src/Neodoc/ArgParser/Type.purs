@@ -25,7 +25,14 @@ module Neodoc.ArgParser.Type (
 -- `ArgParser`
 , Input
 , ArgParser
-, ArgParseError (..)
+, ArgParseError
+, unexpectedInputError
+, missingArgumentsError
+, optionTakesNoArgumentError
+, optionRequiresArgumentError
+, malformedInputError
+, genericError
+, internalError
 , ParseConfig
 , ParseState
 , findDescription
@@ -59,13 +66,15 @@ import Neodoc.OptionAlias (OptionAlias)
 
 -- `ArgParser`
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.List (head, filter)
+import Data.List (head, filter, (:))
 import Data.Pretty (pretty, class Pretty)
 import Data.Foldable (any, intercalate)
-import Data.NonEmpty ((:|))
+import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty (singleton) as NonEmpty
 import Control.Alt ((<|>))
+import Data.Lazy (Lazy, defer, force)
 import Neodoc.Env
+import Neodoc.ArgParser.Token as Token
 import Neodoc.Error (NeodocError(..)) as Neodoc
 import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
 import Neodoc.Data.Description (Description(..))
@@ -184,35 +193,67 @@ extractError _ (ParseError _ (Right e)) = e
 type Input = List PositionedToken
 
 data ArgParseError
-  = OptionTakesNoArgumentError OptionAlias
-  | OptionRequiresArgumentError OptionAlias
-  | MissingArgumentsError (List SolvedLayout)
-  | UnexpectedInputError (List PositionedToken) (List SolvedLayout)
-  | MalformedInputError String
+  = OptionTakesNoArgumentError OptionAlias (Lazy String)
+  | OptionRequiresArgumentError OptionAlias (Lazy String)
+  | MissingArgumentsError (NonEmpty List SolvedLayout) (Lazy String)
+  | UnexpectedInputError  (List SolvedLayout) (List PositionedToken) (Lazy String)
+  | MalformedInputError String (Lazy String)
   | GenericError String
-  | InternalError String
+  | InternalError String (Lazy String)
+
+tokLabel :: PositionedToken -> String
+tokLabel (PositionedToken { token, source }) = go token
+  where
+  go (Token.LOpt _ _)   = "option " <> source
+  go (Token.SOpt _ _ _) = "option " <> source
+  go (Token.EOA _)      = "option --"
+  go Token.Stdin        = "option -"
+  go (Token.Lit _)      = "command " <> source
+
+optionTakesNoArgumentError a = OptionTakesNoArgumentError a $ defer \_ ->
+  "option takes no argument: " <> pretty a
+
+optionRequiresArgumentError a = OptionRequiresArgumentError a $ defer \_->
+  "option requires argument: " <> pretty a
+
+malformedInputError i = MalformedInputError i $ defer \_->
+  "malformed input: " <> i
+
+genericError msg = GenericError msg
+
+internalError msg = InternalError msg $ defer \_->
+  "internal error: " <> msg
+
+unexpectedInputError expected toks
+  = UnexpectedInputError expected toks $ defer \_ -> render expected toks
+  where
+  render Nil Nil = "" -- XXX: this shouldn't happen. can we encode this at type level?
+  render Nil (tok:_) = "unexpected " <> tokLabel tok
+  render (x:_) toks = "expected " <> pretty x <> butGot toks
+  butGot Nil = ""
+  butGot xs = ", but got: " <> intercalate " " (pretty <$> xs)
+
+missingArgumentsError layouts
+  = MissingArgumentsError layouts $ defer \_ ->
+      "missing " <> intercalate ", " (pretty <$> layouts)
 
 instance showArgParseError :: Show ArgParseError where
-  show (OptionTakesNoArgumentError a) = "OptionTakesNoArgumentError " <> show a
-  show (OptionRequiresArgumentError a) = "OptionRequiresArgumentError " <> show a
-  show (MissingArgumentsError xs) = "MissingArgumentsError " <> show xs
-  show (UnexpectedInputError xs ys) = "UnexpectedInputError " <> show xs <> " " <> show ys
-  show (MalformedInputError s) = "MalformedInputError " <> show s
+  show (OptionTakesNoArgumentError a msg) = "OptionTakesNoArgumentError " <> show a <> " " <> show msg
+  show (OptionRequiresArgumentError a msg) = "OptionRequiresArgumentError " <> show a <> " " <> show msg
+  show (MissingArgumentsError xs msg) = "MissingArgumentsError " <> show xs <> " " <> show msg
+  show (UnexpectedInputError xs ys msg) = "UnexpectedInputError " <> show xs <> " " <> show ys <> " " <> show msg
+  show (MalformedInputError s msg) = "MalformedInputError " <> show s <> " " <> show msg
   show (GenericError s) = "GenericError " <> show s
-  show (InternalError s) = "InternalError " <> show s
+  show (InternalError s msg) = "InternalError " <> show s <> " " <> show msg
 
 instance prettyArgParseError :: Pretty ArgParseError where
-  pretty (OptionTakesNoArgumentError a) = "Option takes no argument: " <> pretty a
-  pretty (OptionRequiresArgumentError a) = "Option requires argument: " <> pretty a
-  pretty (MissingArgumentsError xs) = "Missing arguments: " <> (intercalate ", " $ pretty <$> xs)
-  pretty (UnexpectedInputError xs ys)
-    = "Unexpected Input: " <> (intercalate " " $ pretty <$> xs)
-     <> expected ys
-    where expected Nil = ""
-          expected ys = ". Expected: " <> (intercalate " " $ pretty <$> ys)
-  pretty (MalformedInputError s) = "Malformed Input: " <> show s
+  pretty (OptionTakesNoArgumentError _ msg) = force msg
+  pretty (OptionRequiresArgumentError _ msg) = force msg
+  pretty (MissingArgumentsError _ msg) = force msg
+  pretty (UnexpectedInputError _ _ msg) = force msg
+  pretty (MalformedInputError _ msg) = force msg
   pretty (GenericError s) = s
-  pretty (InternalError s) = "Internal error: " <> s
+  pretty (InternalError _ msg) = force msg
 
 -- XXX: this is a hacky instance for now
 instance toNeodocErrorArgParseError :: ToNeodocError ArgParseError where

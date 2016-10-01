@@ -73,7 +73,7 @@ parse = flip L.runTokenParser do
       layouts <#> case _ of
         Just (Group _ _ xs) -> fromFoldable $ xs
         Just (x@(Elem _))   -> singleton $ x :| Nil
-        _                   -> Nil
+        Nothing             -> Nil
   }
 
   where

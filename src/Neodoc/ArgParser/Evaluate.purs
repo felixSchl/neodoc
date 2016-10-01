@@ -64,7 +64,7 @@ evalParsers
   -> List (ArgParser r a)
   -> ArgParser r a
 evalParsers _ parsers | length parsers == 0
-  = fail' $ InternalError "no parsers to evaluate"
+  = fail' $ internalError "no parsers to evaluate"
 
 evalParsers p parsers = do
 

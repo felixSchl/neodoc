@@ -11,7 +11,9 @@ import Neodoc.Env (Env)
 import Neodoc.Spec (Spec)
 import Neodoc.Data.SolvedLayout (SolvedLayout)
 import Neodoc.ArgParser.Options (Options)
-import Neodoc.ArgParser.Type (ParseError, ArgParser, ArgParseError(..), extractError)
+import Neodoc.ArgParser.Type (
+  ParseError, ArgParser, ArgParseError, extractError, malformedInputError
+, genericError)
 import Neodoc.ArgParser.Parser (parse)
 import Neodoc.ArgParser.Result (ArgParseResult(..))
 import Neodoc.ArgParser.Lexer as Lexer
@@ -32,8 +34,8 @@ run spec opts env input = do
   runParser $ parse spec opts env toks
 
   where
-  runLexer = lmap (MalformedInputError <<< getParseErrorMessage)
-  runParser = lmap (extractError GenericError)
+  runLexer = lmap (malformedInputError <<< getParseErrorMessage)
+  runParser = lmap (extractError genericError)
 
 getParseErrorMessage :: P.ParseError -> String
 getParseErrorMessage (P.ParseError s _ _) = s

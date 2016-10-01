@@ -119,6 +119,11 @@ initialState = {
 
 type ChunkedLayout a = Layout (Chunk a)
 
+-- a: A B | C D
+-- b:
+-- AB | CD |
+
+
 parse
   :: ∀ r
    . Spec SolvedLayout
@@ -128,30 +133,36 @@ parse
   -> Either (ParseError ArgParseError) ArgParseResult
 parse (Spec { layouts, descriptions }) options env tokens = lmap fixError $
   runParser { env, options, descriptions } initialState tokens $
-    let parsers = concat (fromFoldable layouts) <#> \toplevel ->
+    let toplevelBranches = concat (fromFoldable layouts)
+        hasEmpty = any ((_ == 0) <<< length) layouts
+        parsers = toplevelBranches <#> \toplevel ->
           traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
             unsetFailed
             vs <- {-withLocalCache-} do
               parseExhaustively true false 0 (fromFoldable toplevel)
             eof
             pure $ ArgParseResult (Just toplevel) vs
-     in
-      if length parsers == 0
+        parsers' =
+            if hasEmpty
+              then parsers <> singleton do
+                    eof $> ArgParseResult Nothing Nil
+              else parsers
+      in if length parsers' == 0
         then eof $> ArgParseResult Nothing Nil
-        else flip evalParsers parsers \(ArgParseResult _ vs) ->
+        else flip evalParsers parsers' \(ArgParseResult _ vs) ->
                 sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
   where
   eof :: ∀ r. ArgParser r Unit
   eof = do
     input <- getInput
     case input of
-      Nil -> pure unit
-      xs  -> fail' $ UnexpectedInputError xs Nil
+      Nil  -> pure unit
+      toks -> fail' $ unexpectedInputError Nil toks
 
   fixError :: ParseError ArgParseError -> ParseError ArgParseError
   fixError = mapError go
     where
-    go (UnexpectedInputError toks layouts) = (UnexpectedInputError toks layouts)
+    -- go (UnexpectedInputError toks layouts _) = (UnexpectedInputError toks layouts _)
     go x = x
 
 parseLayout
@@ -201,11 +212,12 @@ parseLayout skippable isSkipping l layout = do
           then loop $ acc <> vs
           else pure acc
 
-  go _ e@(Elem x) =
+  go _ e@(Elem x) = getInput >>= \i -> (
     let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
      in nTimes do
           Tuple (toArgKey x) <<< (RichValue.from Origin.Argv) <$> go' x
             <* modifyDepth (_ + 1)
+    ) <|> fail' (unexpectedInputError (e:Nil) i)
 
     where
     go' (Solved.Positional n _) = positional (pretty x) n
@@ -227,7 +239,7 @@ parseLayout skippable isSkipping l layout = do
               case description of
                 (OptionDescription aliases _ _ def env) ->
                   pure $ aliases /\ def /\ env
-                _ -> fail' $ InternalError "invalid option description"
+                _ -> fail' $ internalError "invalid option description"
             let
               ns = fromFoldable $ aliases <#> case _ of
                     OptionAlias.Short f -> Left  f
@@ -419,7 +431,7 @@ parseChunk skippable isSkipping l chunk = do
       if isSkipping && length missing > 0
         then do
           setFailed
-          throwExpectedError missing input
+          unsafePartial $ throwExpectedError missing input
         else
           if skippable || null input
             then
@@ -427,20 +439,20 @@ parseChunk skippable isSkipping l chunk = do
                 then {- XXX: withLocalCache do -}
                   parseExhaustively true true l layouts
                 else pure fallbacks
-            else throwExpectedError layouts input
+            else unsafePartial $ throwExpectedError layouts input
 
       where
         throwExpectedError
           :: ∀ r
-           . List SolvedLayout
+           . Partial
+          => List SolvedLayout
           -> List PositionedToken
           -> ArgParser r _
-        throwExpectedError xs input =
-          let x = unsafePartial (LU.head xs)
-              e = case Map.lookup x errs of
-                _ -> case input of
-                  Nil  -> MissingArgumentsError xs
-                  toks -> UnexpectedInputError toks xs
+        throwExpectedError xss@(x:xs) input =
+          let e = case Map.lookup x errs of
+                    _ -> case input of
+                      Nil  -> missingArgumentsError (x:|xs)
+                      toks -> unexpectedInputError xss toks
            in fail' e
 
     draw _ _ _ = pure Nil

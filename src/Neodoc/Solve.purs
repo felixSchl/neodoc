@@ -22,7 +22,7 @@ solve
    .  SolveOptions r
   -> Spec UsageLayout
   -> Either SolveError (Spec SolvedLayout)
-solve { smartOptions } spec = do
-  (if smartOptions then Solve.smartOptions spec else pure spec)
+solve { smartOptions } spec = pure spec
+    >>= (if smartOptions then Solve.smartOptions else pure)
     >>= Solve.expandOptions
     >>= Solve.expandReferences

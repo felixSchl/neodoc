@@ -66,7 +66,8 @@ import Data.Map as Map
 import Data.List (List(..), (:), fromFoldable, length, catMaybes, concat, filter)
 import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
-import Data.Foldable (any)
+import Data.Foldable (any, intercalate)
+import Data.Pretty
 import Control.Monad.State
 import Control.Monad.State as State
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
@@ -104,6 +105,7 @@ expandReferences (Spec (spec@{ layouts, descriptions })) = do
       layouts'' = case layouts' of
                     Nil    -> Nil :| Nil -- create empty top-level branch
                     x : xs ->   x :| xs
+
   pure (Spec $ spec { layouts = layouts'' })
 
   where
