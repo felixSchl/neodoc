@@ -1,9 +1,8 @@
-module Test.Support.Docopt where
+module Test.Support.Value where
 
 import Prelude
 import Data.Maybe (Maybe(..))
-import Language.Docopt.Value
-import Language.Docopt.Argument
+import Neodoc.Value
 
 -- short hand for values
 array = ArrayValue

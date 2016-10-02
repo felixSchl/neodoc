@@ -37,9 +37,10 @@ import Text.Parsing.Parser.Combinators (manyTill, optional, between, sepBy,
 import Text.Parsing.Parser.String (eof, string, anyChar, skipSpaces,
                                   char, noneOf) as P
 
-import Docopt as Docopt
-import Language.Docopt.Value (Value(..), prettyPrintValue) as D
-import Language.Docopt.SpecParser.Base (space, digit, alpha, upperAlpha, getInput)
+import Neodoc as Neodoc
+import Neodoc.Options
+import Neodoc.Value (Value(..), prettyPrintValue) as D
+import Neodoc.Spec.Parser.Base (space, digit, alpha, upperAlpha, getInput)
 
 import Test.Support (runEitherEff)
 
@@ -50,7 +51,7 @@ newtype Test = Test {
 
 newtype Kase = Kase {
   out     :: Either String (List (Tuple String D.Value))
-, options :: Docopt.Options {}
+, options :: NeodocOptions
 }
 
 type Flags = {
@@ -139,7 +140,7 @@ readTests filepath = do
         ]
       P.skipSpaces *> skipComments *>  P.skipSpaces
       pure $ Kase { out: output
-                    , options: {
+                    , options: NeodocOptions {
                         argv:         pure input
                       , optionsFirst: flags.optionsFirst
                       , env:          pure env

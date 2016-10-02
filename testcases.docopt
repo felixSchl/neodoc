@@ -2243,7 +2243,7 @@ $ prog/s -i 123
 {"-i": 123}
 
 $ prog/s -i
-"foo: option requires argument: -i"
+"option requires argument: -i"
 
 r"""
 Usage: foo [-oi ARG]...
@@ -2405,7 +2405,7 @@ Usage: foo -
 """
 
 $ prog
-"foo: expected -"
+"expected -"
 
 $ prog -
 {"-": true}
@@ -2462,7 +2462,7 @@ Options: -f, --foo ARG
 # Missing option-arguments are fatal errors, no pardon:
 
 $ prog -f
-"foo: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 Usage: foo [-f ARG]
@@ -2470,7 +2470,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"foo: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 Usage: foo [[-f ARG]]
@@ -2478,7 +2478,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"foo: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 Usage: foo [[-bf=ARG]]
@@ -2486,7 +2486,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"foo: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 Usage: foo (-bf=ARG)
@@ -2494,7 +2494,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"foo: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 usage: git (([-f ARG]))
@@ -2502,7 +2502,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"git: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 usage: git (([-f ARG]))
@@ -2511,7 +2511,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"git: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 usage: git (([-f ARG | -b]))
@@ -2519,7 +2519,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"git: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 usage: git (([-b | -f ARG]))
@@ -2527,7 +2527,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"git: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 usage: git (([-bf ARG]))
@@ -2535,7 +2535,7 @@ Options: -f, --foo ARG
 """
 
 $ prog -f
-"git: option requires argument: -f"
+"option requires argument: -f"
 
 r"""
 usage: git (([-b ARG | -f ARG]))
@@ -2543,7 +2543,7 @@ Options: -f, --foo ARG
 """
 
 $ prog --foo
-"git: option requires argument: --foo"
+"option requires argument: --foo"
 
 r"""
 usage: git (([-b | -f ARG]))
@@ -2571,17 +2571,17 @@ options: -b, --boo
 """
 
 $ prog -b=FOO
-"git: option takes no argument: -b"
+"option takes no argument: -b"
 
 $ prog --boo=FOO
-"git: option takes no argument: --boo"
+"option takes no argument: --boo"
 
 r"""
 usage: git -f <foo>
 """
 
 $ prog/s -fb
-"git: expected <foo>, but got -b"
+"unknown option -b"
 
 #
 # Command and positional errors:
@@ -2589,15 +2589,15 @@ $ prog/s -fb
 
 r"""Usage: git <command> -f"""
 $ prog
-"git: expected <command>"
+"expected <command>"
 
 r"""Usage: git COMMAND -f"""
 $ prog
-"git: expected COMMAND"
+"expected COMMAND"
 
 r"""Usage: git pull -f"""
 $ prog
-"git: expected pull"
+"expected pull"
 
 r"""
 Usage: git <command> -f
@@ -2613,7 +2613,7 @@ Usage: foo remote
 """
 
 $ prog --fooo
-"foo: expected remote, but got --fooo"
+"unknown option --fooo"
 
 r"""
 Usage: foo
@@ -2621,7 +2621,7 @@ Usage: foo
 """
 
 $ prog --fooo
-"foo: unknown option --fooo"
+"unknown option --fooo"
 
 #
 # This usage section parse must fail until #23 comes to fruition.
@@ -2674,10 +2674,10 @@ $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"foo: unknown command QUX"
+"unknown command QUX"
 
 $ prog --foo=bar QUX
-"foo: unknown command QUX"
+"unknown command QUX"
 
 r"""
 Usage: foo [-f[=FOO]] [-b=BAR]
@@ -2691,10 +2691,10 @@ $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"foo: unknown command QUX"
+"unknown command QUX"
 
 $ prog --foo=bar QUX
-"foo: unknown command QUX"
+"unknown command QUX"
 
 #
 # Proper value parsing
@@ -2762,7 +2762,7 @@ $ prog/s -c 200
 
 r"""
 Usage: foo [-a FOO] [-b BAR] [-c QUX]
-options: -a BAR [default: 100]
+options: -a FOO [default: 100]
 """
 
 $ prog/s
@@ -2791,7 +2791,7 @@ $ prog/s -c 400
 {"-a": 100, "-b": 200, "-c": 400}
 
 r"""
-Usage: foo [-a FOO] | [[-a FOO] [-b FOO]]
+Usage: foo [-a FOO] | [[-a FOO] [-b BAR]]
 options: -a FOO [default: 100]
          -b BAR [default: 200]
 """
@@ -2806,7 +2806,7 @@ $ prog/s -a 1000 -b 2000
 {"-a": 1000, "-b": 2000}
 
 r"""
-Usage: foo [[-a FOO] | [[-a FOO] [-b FOO]]]
+Usage: foo [[-a FOO] | [[-a FOO] [-b BAR]]]
 options: -a FOO [default: 100]
          -b BAR [default: 200]
 """
@@ -2821,7 +2821,7 @@ $ prog/s -a 1000 -b 2000
 {"-a": 1000, "-b": 2000}
 
 r"""
-Usage: foo [[-a FOO] | [[-a FOO] [-b FOO]]]...
+Usage: foo [[-a FOO] | [[-a FOO] [-b BAR]]]...
 options: -a FOO [default: 100]
          -b BAR [default: 200]
 """
@@ -3045,7 +3045,7 @@ usage: foo [--foo BAR]...
 """
 
 $ prog/s --foo 1 2 3
-"foo: unknown command 2"
+"unknown command 2"
 
 r"""
 usage: foo [--foo BAR]...
@@ -3078,7 +3078,7 @@ $ prog --foo foo
 {"--foo": "foo"}
 
 $ prog --foo
-"prog: option requires argument: --foo"
+"option requires argument: --foo"
 
 r"""
 usage: prog --foo [BAR]...
@@ -3175,14 +3175,14 @@ usage: prog --foo
 """
 
 $ prog/r
-"prog: missing --foo"
+"expected --foo"
 
 r"""
 usage: prog --foo --bar
 """
 
 $ prog/r
-"prog: missing --foo, --bar"
+"expected --foo"
 
 r"""
 usage: prog (--foo --bar) --qux
@@ -3190,10 +3190,10 @@ usage: prog (--foo --bar) --qux
 
 # only reports error of first group
 $ prog/r
-"prog: missing --foo, --bar"
+"expected --foo"
 
 $ prog/r --yikes
-"prog: unknown option --yikes. Expected --foo, --bar"
+"unknown option --yikes"
 
 #
 # Free positionals
@@ -3224,7 +3224,7 @@ usage: prog go foo
 """
 
 $ prog/l foo go
-"prog: expected go, but got foo"
+"expected go, but got foo"
 
 r"""
 usage: prog [foo] bar [qux]
@@ -3238,7 +3238,7 @@ usage: prog (a) b
 """
 
 $ prog/l b a
-"prog: expected a, but got b"
+"expected a, but got b"
 
 $ prog/l a b
 {"a": true, "b": true}
@@ -3248,7 +3248,7 @@ usage: prog go... foo
 """
 
 $ prog/l foo go
-"prog: expected go..., but got foo"
+"expected go..., but got foo"
 
 r"""
 usage: prog [foo...]... bar... [qux]
@@ -3262,7 +3262,7 @@ usage: prog (a...)... b...
 """
 
 $ prog/l b a
-"prog: expected a..., but got b"
+"expected a..., but got b"
 
 $ prog/l a b
 {"a": 1, "b": 1}
@@ -3272,7 +3272,7 @@ usage: prog move --speed=<kn>...
 """
 
 $ prog/l --speed 100
-"prog: expected move"
+"expected move"
 
 r"""
 usage: prog move [--speed=<kn>...]...
@@ -3315,28 +3315,28 @@ usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar foo -a
-"prog: unexpected command foo"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar -a foo
-"prog: unexpected command foo"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar foo
-"prog: unexpected command foo"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l -a bar foo
-"prog: unexpected command foo"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]

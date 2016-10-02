@@ -3,26 +3,34 @@ module Test.Spec.UsageParserSpec (usageParserSpec) where
 import Prelude
 import Debug.Trace
 import Control.Monad (when)
+import Data.NonEmpty (NonEmpty, (:|))
+import Data.Pretty (class Pretty)
+import Data.Bifunctor (lmap)
 import Control.Monad.Aff (liftEff')
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION(), error, throwException)
 import Control.Monad.Error.Class (throwError)
-import Data.List (List(..), length, (!!), take, fromFoldable, singleton)
+import Data.List (List(..), length, (!!), take, fromFoldable, singleton, (:))
 import Data.Either (Either(..), isRight, isLeft, either)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Foldable (intercalate, foldMap, traverse_, for_)
 import Data.Array ((..))
+import Data.Pretty (pretty)
+import Partial.Unsafe (unsafePartial)
 
-import Language.Docopt
-import Test.Support.Usage                        as U
-import Language.Docopt.SpecParser.Usage          as U
-import Language.Docopt.SpecParser.Usage.Argument as U
-import Language.Docopt.SpecParser.Lexer          as Lexer
-import Language.Docopt.Scanner                   as Scanner
-import Language.Docopt.SpecParser.Base (debug)
+import Test.Support.Usage as U
+
+import Neodoc.Error.Class (capture) as Error
+import Neodoc.Spec.Lexer as Lexer
+import Neodoc.Spec.Parser as Spec
+import Neodoc.Spec.Parser.Base (debug)
+import Neodoc.Spec.Parser.Usage as U
+import Neodoc.Data.UsageLayout as U
+import Neodoc.Data.OptionArgument
+import Neodoc.Data.Layout
+
 import Text.Wrap (dedent)
-
 import Test.Assert (assert)
 import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
@@ -37,12 +45,10 @@ lopt_ f      r = (if r then U.loptR_ else U.lopt_) f
 lopt  f    a r = (if r then U.loptR else U.lopt) f a
 po    n      r = (if r then U.poR else U.po) n
 co    n      r = (if r then U.coR else U.co) n
-arg'  n o      = { name: n, optional: o }
-arg_  n        = arg' n true
-arg   n        = arg' n false
+arg_  n        = OptionArgument n true
+arg   n        = OptionArgument n false
 
-usageParserSpec = \_ ->
-  describe "The usage parser" do
+usageParserSpec = \_ -> do
 
     -- Test positionals in various formats.
     -- Each entry is run for both singular and repeated version.
@@ -68,7 +74,7 @@ usageParserSpec = \_ ->
       runSingleArgumentTests
         [ pass "--bar"         $ lopt_ "bar"
         , fail "--bar = foo"
-        , pass "--bar=<foo>"   $ lopt  "bar" (arg "foo")
+        , pass "--bar=<foo>"   $ lopt  "bar" (arg "<foo>")
         , pass "--bar=FOO"     $ lopt  "bar" (arg "FOO")
         , fail "--bar = FOO"
         , pass "--bar=fOo"     $ lopt  "bar" (arg "fOo")
@@ -77,13 +83,13 @@ usageParserSpec = \_ ->
         , pass "--barFOO"      $ lopt_ "barFOO"
 
         , fail "--bar[ = foo]"
-        , pass "--bar[=<foo>]"  $ lopt  "bar" (arg "foo")
-        , pass "--bar[=FOO]"    $ lopt  "bar" (arg "FOO")
+        , pass "--bar[=<foo>]"  $ lopt  "bar" (arg_ "<foo>")
+        , pass "--bar[=FOO]"    $ lopt  "bar" (arg_ "FOO")
         , fail "--bar[ = FOO]"
-        , pass "--bar[=fOo]"    $ lopt  "bar" (arg "fOo")
+        , pass "--bar[=fOo]"    $ lopt  "bar" (arg_ "fOo")
         , fail "--bar[ = fOo]"
         , fail "--bar[ = <foo>]"
-        , pass "--bar[FOO]"     $ lopt  "bar" (arg "FOO")
+        , pass "--bar[FOO]"     $ lopt  "bar" (arg_ "FOO")
 
         -- disallow space
         , fail "--bar [ = foo]"
@@ -107,29 +113,30 @@ usageParserSpec = \_ ->
           -- disallow immediate following by '-'
         , fail "--bar[=FOO]-"
         , fail "--BAR-"
-        ]
+         ]
 
     -- Test stacked options in various formats.
     -- Each entry is run for both singular and repeated version.
     describe "stacked options" do
       runSingleArgumentTests
         [ pass "-b"         $ sopt_ 'b' []
+        , pass "-io"        $ sopt_ 'i' ['o']
         , pass "-?"         $ sopt_ '?' [] -- special chars
         , pass "-bFOO"      $ sopt_ 'b' ['F', 'O', 'O']
         , pass "-bFoo"      $ sopt_ 'b' ['F', 'o', 'o']
-        , pass "-b<foo>"    $ sopt  'b' [] (arg "foo")
-        , pass "-b<foo>"    $ sopt  'b' [] (arg "foo")
+        , pass "-b<foo>"    $ sopt  'b' [] (arg "<foo>")
+        , pass "-b<foo>"    $ sopt  'b' [] (arg "<foo>")
         , pass "-b=foo"     $ sopt  'b' [] (arg "foo")
         , pass "-b=FOO"     $ sopt  'b' [] (arg "FOO")
-        , pass "-b=<foo>"   $ sopt  'b' [] (arg "foo")
+        , pass "-b=<foo>"   $ sopt  'b' [] (arg "<foo>")
 
-        , pass "-b[FOO]"    $ sopt  'b' [] (arg "FOO")
-        , pass "-b[Foo]"    $ sopt  'b' [] (arg "Foo")
-        , pass "-b[<foo>]"  $ sopt  'b' [] (arg "foo")
-        , pass "-b[<foo>]"  $ sopt  'b' [] (arg "foo")
-        , pass "-b[=foo]"   $ sopt  'b' [] (arg "foo")
-        , pass "-b[=FOO]"   $ sopt  'b' [] (arg "FOO")
-        , pass "-b[=<foo>]" $ sopt  'b' [] (arg "foo")
+        , pass "-b[FOO]"    $ sopt  'b' [] (arg_ "FOO")
+        , pass "-b[Foo]"    $ sopt  'b' [] (arg_ "Foo")
+        , pass "-b[<foo>]"  $ sopt  'b' [] (arg_ "<foo>")
+        , pass "-b[<foo>]"  $ sopt  'b' [] (arg_ "<foo>")
+        , pass "-b[=foo]"   $ sopt  'b' [] (arg_ "foo")
+        , pass "-b[=FOO]"   $ sopt  'b' [] (arg_ "FOO")
+        , pass "-b[=<foo>]" $ sopt  'b' [] (arg_ "<foo>")
 
         -- disallow space
         , fail "-b [=foo]"
@@ -138,20 +145,20 @@ usageParserSpec = \_ ->
 
         , pass "-bar"       $ sopt_ 'b' ['a', 'r']
         , pass "-barFOO"    $ sopt_ 'b' ['a', 'r', 'F', 'O', 'O']
-        , pass "-bar<foo>"  $ sopt  'b' ['a', 'r'] (arg "foo")
+        , pass "-bar<foo>"  $ sopt  'b' ['a', 'r'] (arg "<foo>")
         , pass "-barFoo"    $ sopt_ 'b' ['a', 'r', 'F', 'o', 'o']
         , pass "-bar=foo"   $ sopt  'b' ['a', 'r'] (arg "foo")
         , pass "-bar=FOO"   $ sopt  'b' ['a', 'r'] (arg "FOO")
-        , pass "-bar=<foo>" $ sopt  'b' ['a', 'r'] (arg "foo")
+        , pass "-bar=<foo>" $ sopt  'b' ['a', 'r'] (arg "<foo>")
         , pass "-bAR"       $ sopt_ 'b' ['A', 'R']
         , pass "-bARfoo"    $ sopt_ 'b' ['A', 'R', 'f', 'o', 'o']
 
         , pass "-bar[FOO]"    $ sopt 'b' ['a', 'r'] (arg_ "FOO")
-        , pass "-bar[<foo>]"  $ sopt 'b' ['a', 'r'] (arg_ "foo")
+        , pass "-bar[<foo>]"  $ sopt 'b' ['a', 'r'] (arg_ "<foo>")
         , pass "-bar[Foo]"    $ sopt 'b' ['a', 'r'] (arg_ "Foo")
         , pass "-bar[=foo]"   $ sopt 'b' ['a', 'r'] (arg_ "foo")
         , pass "-bar[=FOO]"   $ sopt 'b' ['a', 'r'] (arg_ "FOO")
-        , pass "-bar[=<foo>]" $ sopt 'b' ['a', 'r'] (arg_ "foo")
+        , pass "-bar[=<foo>]" $ sopt 'b' ['a', 'r'] (arg_ "<foo>")
         , pass "-bAR[foo]"    $ sopt 'b' ['A', 'R'] (arg_ "foo")
 
           -- disallow immediate following by '-'
@@ -210,7 +217,7 @@ usageParserSpec = \_ ->
         ]
 
     -- Test the "[options...]", "[options]", etc. syntax
-    describe "stdin" do
+    describe "references" do
       runTests
         [ pass "[options...]"     [[[ U.ref ""    ]]]
         , pass "[options]"        [[[ U.ref ""    ]]]
@@ -219,82 +226,87 @@ usageParserSpec = \_ ->
         ]
 
   where
+  kase :: ∀ a. String -> Expected a -> { i :: String, o :: Expected a }
+  kase i o = { i, o }
 
-    kase :: ∀ a. String -> Expected a -> { i :: String, o :: Expected a }
-    kase i o = { i, o }
+  pass :: ∀ a. String -> a -> { i :: String, o :: Expected a }
+  pass i o = kase i (P o)
 
-    pass :: ∀ a. String -> a -> { i :: String, o :: Expected a }
-    pass i o = kase i (P o)
+  fail :: ∀ a. String -> { i :: String, o :: Expected a }
+  fail i = kase i F
 
-    fail :: ∀ a. String -> { i :: String, o :: Expected a }
-    fail i = kase i F
+  prettyTopLevel
+    :: forall a
+      . (Pretty a)
+    => NonEmpty List (NonEmpty List a)
+    -> String
+  prettyTopLevel xs = intercalate "|" $ xs <#> \x ->
+                        intercalate " " $ pretty <$> x
 
-    runTests :: _
-    runTests xs =
-      for_ xs \{ i, o } -> do
-        let input = "prog " <> i
-        case o of
-          P expectedUsages -> do
-            -- deeply convert array to list
-            -- (array is used for readability above)
-            let
-              expected'
-                = ((fromFoldable <$> _)  <$> _) fromFoldable
-                                         <$>    fromFoldable
-                                         <$>    fromFoldable expectedUsages
-            it (input
-                <> " -> "
-                <> intercalate "\n" (U.prettyPrintUsage <$> expected'))  do
-              vliftEff do
-                { program, usages } <- runEitherEff do
-                  Lexer.lexUsage input >>= U.parse false
-                assertEqual "prog" program
-                assertEqual (U.prettyPrintUsage <$> expected')
-                            (U.prettyPrintUsage <$> usages)
-          otherwise -> do
-            it (input <> " should fail") do
+  runTests :: _
+  runTests xs =
+    for_ xs \{ i, o } -> do
+      let input = "prog " <> i
+      case o of
+        P expectedLayouts -> do
+          -- deeply convert array to list
+          -- (array is used for readability above)
+          let
+            expected'
+              = ((fromFoldable <$> _)  <$> _) fromFoldable
+                                        <$>    fromFoldable
+                                        <$>    fromFoldable expectedLayouts
+            expected = expected' <#> \ex ->
+              unsafePartial $ U.listToNonEmpty $ U.listToNonEmpty <$> ex
+
+          it (input
+              <> " -> "
+              <> intercalate "\n" (prettyTopLevel <$> expected))  do
             vliftEff do
-              assertThrows (const true) do
-                runEitherEff do
-                  toks       <- Lexer.lexUsage input
-                  { usages } <- U.parse false toks
-                  debug usages
+              { program, layouts } <- runEitherEff do
+                toks <- Error.capture $ Lexer.lexUsage input
+                Error.capture $ Spec.parseUsage toks
+              assertEqual "prog" program
+              assertEqual expected' (fromFoldable $ (fromFoldable <$> _) <$> layouts)
+        otherwise -> do
+          it (input <> " should fail") do
+          vliftEff do
+            assertThrows (const true) do
+              runEitherEff do
+                toks <- Error.capture $ Lexer.lexUsage input
+                { layouts } <- Error.capture $ Spec.parseUsage toks
+                debug layouts
 
-    runSingleArgumentTests :: _
-    runSingleArgumentTests xs =
-      for_ xs \{ i, o } -> do
-        for_ [ false, true ] \isRepeated -> do -- Append "..." ?
-          let ys = if isRepeated then (1 .. 2) else (1 .. 1)
-          for_ ys \q -> do -- "..." vs " ..." (note the space)
-            let input = "prog " <> i <> (if isRepeated
-                                      then (if q == 1 then "..." else " ...")
-                                      else "")
-            case o of
-              P v -> do
-                let expected = v isRepeated
-                it (input <> " -> " <> U.prettyPrintArg expected)  do
-                  vliftEff do
-                    { program, usages } <- runEitherEff do
-                      Lexer.lexUsage input >>= U.parse false
-                                                    -- ^ Disable "smart-options"
-
-                    assertEqual "prog" program
-                    -- There should only be one top-level mutex group
-                    (length usages) `shouldEqual` 1
-                    u <- runMaybeEff $ usages !! 0
-                    g <- runMaybeEff $ u !! 0
-                    let result = take 1 g
-
-                    -- Assert output matches expected
-                    when (result /= (singleton expected)) do
+  runSingleArgumentTests :: _
+  runSingleArgumentTests xs =
+    for_ xs \{ i, o } -> do
+      for_ [ false, true ] \isRepeated -> do -- Append "..." ?
+        let ys = if isRepeated then (1 .. 2) else (1 .. 1)
+        for_ ys \q -> -- "..." vs " ..." (note the space)
+          let input = "prog " <> i
+                              <> (if isRepeated
+                                    then (if q == 1 then "..." else " ...")
+                                    else "")
+           in case o of
+            P v ->
+              let expected = v isRepeated
+               in it (input <> " -> " <> pretty expected) $ vliftEff do
+                  { program, layouts } <- runEitherEff do
+                    toks <- Error.capture $ Lexer.lexUsage input
+                    Error.capture $ Spec.parseUsage toks
+                  assertEqual "prog" program
+                  case layouts of
+                    ((x :| Nil) : Nil) :| Nil -> do
+                      when (x /= expected) do
+                        throwException $ error $
+                          "Unexpected output:\n" <> pretty x
+                    _ -> do
                       throwException $ error $
-                        "Unexpected output:\n"
-                          <> (U.prettyPrintUsage $ singleton result)
-              otherwise -> do
-                it (input <> " should fail") do
-                vliftEff do
-                  assertThrows (const true) do
-                    runEitherEff do
-                      toks  <- Lexer.lexUsage input
-                      { usages } <- U.parse false toks
-                      debug usages
+                        "Unexpected output:\n" <> show layouts
+            _ -> do
+              it (input <> " should fail") $ vliftEff do
+                assertThrows (const true) do
+                  runEitherEff do
+                    toks <- Error.capture $ Lexer.lexUsage input
+                    { layouts } <- Error.capture $ Spec.parseUsage toks
+                    debug layouts

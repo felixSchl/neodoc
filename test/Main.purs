@@ -8,11 +8,10 @@ import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.ScannerSpec (scannerSpec)
 import Test.Spec.UsageParserSpec (usageParserSpec)
 import Test.Spec.DescParserSpec (descParserSpec)
-import Test.Spec.ArgParserSpec (parserGenSpec)
+import Test.Spec.ArgParserSpec (argParserSpec)
 import Test.Spec.ForeignSpec (foreignSpec)
-import Test.Spec.SolverSpec (solverSpec)
+import Test.Spec.SolveSpec (solveSpec)
 import Test.Spec.CompatSpec (compatSpec)
-import Test.Spec.DocoptSpec (docoptSpec)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff (Eff())
 import Node.FS (FS())
@@ -39,8 +38,7 @@ main = launchAff do
     scannerSpec     unit
     usageParserSpec unit
     descParserSpec  unit
-    solverSpec      unit
-    parserGenSpec   unit
-    docoptSpec      unit
+    solveSpec       unit
+    argParserSpec   unit
     foreignSpec     tests
     compatSpec      tests
