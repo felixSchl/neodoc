@@ -32,27 +32,27 @@ type ChunkedLayout a = Layout (Chunk a)
 
 data ParserCont c s i = ParserCont c s i
 data Evaluation c s i e a
-  = ErrorEvaluation   (ParserCont c s i) Int (ParseError e)
-  | SuccessEvaluation (ParserCont c s i) Int a
+  = ErrorEvaluation   (ParserCont c s i) (ParseError e)
+  | SuccessEvaluation (ParserCont c s i) a
 
 instance showParserCont :: (Show c, Show s, Show i) => Show (ParserCont c s i) where
   show (ParserCont c s i) = "ParserCont " <> show c <> " " <> show s <> " " <> show i
 
 instance showEvaluation :: (Show c, Show s, Show i, Show e, Show a) => Show (Evaluation c s i e a) where
-  show (ErrorEvaluation   c i e) = "ErrorEvaluation " <> show c <> " " <> show i <> " " <> show e
-  show (SuccessEvaluation c i a) = "SuccessEvaluation " <> show c <> " " <> show i <> " " <> show a
+  show (ErrorEvaluation   c e) = "ErrorEvaluation " <> show c <> " " <> show e
+  show (SuccessEvaluation c a) = "SuccessEvaluation " <> show c <> " " <> show a
 
 isErrorEvaluation :: ∀ c s i e a. Evaluation c s i e a -> Boolean
-isErrorEvaluation (ErrorEvaluation _ _ _) = true
+isErrorEvaluation (ErrorEvaluation _ _) = true
 isErrorEvaluation _ = false
 
 isSuccessEvaluation :: ∀ c s i e a. Evaluation c s i e a -> Boolean
-isSuccessEvaluation (SuccessEvaluation _ _ _) = true
+isSuccessEvaluation (SuccessEvaluation _ _) = true
 isSuccessEvaluation _ = false
 
-getEvaluationDepth :: ∀ c s i e a. Evaluation c s i e a -> Int
-getEvaluationDepth (ErrorEvaluation _ i _) = i
-getEvaluationDepth (SuccessEvaluation _ i _) = i
+getEvaluationDepth :: ∀ c s i e a. Evaluation c ParseState i e a -> Int
+getEvaluationDepth (ErrorEvaluation (ParserCont _ s _) _) = s.depth
+getEvaluationDepth (SuccessEvaluation (ParserCont _ s _) _) = s.depth
 
 -- Evaluate multiple parsers, producing a new parser that chooses the best
 -- succeeding match or fails otherwise. If any of the parsers yields a fatal
@@ -80,8 +80,8 @@ evalParsers p parsers = do
               let cont = ParserCont c' s' i'
                in Step b' c' s' i' case result of
                   Left  (err@(ParseError true _)) -> Left err
-                  Left  err -> Right $ ErrorEvaluation   cont s.depth err
-                  Right val -> Right $ SuccessEvaluation cont s.depth val
+                  Left  err -> Right $ ErrorEvaluation   cont err
+                  Right val -> Right $ SuccessEvaluation cont val
 
   -- Now, check to see if we have any fatal errors, winnders or soft errors.
   -- We know we must have either, but this is not encoded at the type-level,
@@ -101,17 +101,27 @@ evalParsers p parsers = do
     bestSuccess = do
       deepest <- last $ groupBy eqByDepth $ sortBy cmpByDepth successes
       unsafePartial $ flip maximumBy deepest $ compare `on` case _ of
-        SuccessEvaluation _ _ v -> p v
+        SuccessEvaluation _ v -> p v
 
   -- Ok, now that we have a potentially "best error" and a potentially "best
   -- match", take a pick.
   case bestSuccess of
-    Just (SuccessEvaluation (ParserCont c s i) _ val) ->
-      Parser \_ _ _ -> Step true c (state { done = s.done }) i (Right val)
+    Just (SuccessEvaluation (ParserCont c s i) val) ->
+      Parser \_ _ _ ->
+        Step true c (state {
+          done = s.done
+        , failed = s.failed
+        , depth = s.depth + state.depth
+        }) i (Right val)
     _ -> case deepestErrors of
       Just errors -> case errors of
-        (ErrorEvaluation (ParserCont c s i) _ e):es | null es || not (null input) ->
-          Parser \_ _ _ -> Step false c s i (Left e)
+        (ErrorEvaluation (ParserCont c s i) e):es | null es || not (null input) ->
+          Parser \_ _ _ ->
+            Step false c (state {
+              done = s.done
+            , failed = s.failed
+            , depth = s.depth + state.depth
+            }) i (Left e)
         _ -> fail "" -- XXX: explain this
       _ -> do
         fail "The impossible happened. Failure without error"

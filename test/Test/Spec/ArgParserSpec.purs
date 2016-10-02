@@ -140,7 +140,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         , fail
             Nothing
             [ "--foo", "baz" ]
-            "Expected <qux>..., but got --foo"
+            "unknown option --foo"
         , fail
             Nothing
             [ "a", "--foo", "-f=10" ]
@@ -196,7 +196,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         options:
           -i, --input FILE
         """
-        [ --fail Nothing [] "Missing -i/--input=FILE"
+        [ --fail Nothing [] "Missing -iFILE"
           pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> V.str "bar"
@@ -209,7 +209,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         options:
           -i, --input FILE
         """
-        [ --fail Nothing [] "Missing -i/--input=FILE"
+        [ --fail Nothing [] "Missing -iFILE"
           pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> V.str "bar"
@@ -222,7 +222,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         options:
           -i, --input FILE
         """
-        [ --fail Nothing [] "Missing -i/--input=FILE"
+        [ --fail Nothing [] "Missing -iFILE"
           pass Nothing
             [ "-i", "bar" ]
             [ "-i"      :> V.str "bar"
@@ -237,10 +237,10 @@ argParserSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
         """
         [ fail Nothing []
-          $ "Missing -i/--input=FILE, -o/--output=FILE"
+          $ "Missing -iFILE, -oFILE"
 
         , fail Nothing [ "-i", "bar" ]
-          $ "Missing -o/--output=FILE"
+          $ "Missing -oFILE"
 
         , pass Nothing
             [ "-i", "bar", "-o", "bar" ]
@@ -267,10 +267,10 @@ argParserSpec = \_ -> describe "The parser generator" do
           -r, --redirect FILE [env: QUX]
         """
         [ fail Nothing []
-          $ "Missing -i/--input=FILE, -r/--redirect=FILE"
+          $ "Missing -iFILE, -rFILE"
 
         , fail Nothing [ "-i", "bar", "-r", "bar" ]
-            "Missing -o/--output=FILE"
+            "Missing -oFILE"
 
         , pass Nothing
             [ "-i", "bar", "-r", "bar", "-o", "bar" ]
@@ -310,9 +310,9 @@ argParserSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE
         """
-        [ fail Nothing [] "Missing -i/--input=FILE"
+        [ fail Nothing [] "Missing -iFILE"
           -- XXX: Would be cool to show the reason the group did not parse!
-        , fail Nothing [ "-i", "bar" ] "Expected <env>"
+        , fail Nothing [ "-i", "bar" ] "expected <env>"
         , pass Nothing
             [ "-i", "bar", "x", "-o", "bar" ]
             [ "--input"  :> V.str "bar"
@@ -322,7 +322,7 @@ argParserSpec = \_ -> describe "The parser generator" do
             , "-o"       :> V.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-            "unexpected option -o. Expected -i/--input=FILE"
+            "unexpected option -o. Expected -iFILE"
         ]
 
     , test
@@ -477,10 +477,10 @@ argParserSpec = \_ -> describe "The parser generator" do
 
         , fail Nothing
             [ "foo" ]
-            "Missing -f/--foo=FOZ"
+            "Missing -fFOZ"
         , fail Nothing
             [ "foo", "-o", "-i", "-bax" ]
-            "Missing -f/--foo=FOZ"
+            "Missing -fFOZ"
         ]
 
     , test
@@ -493,7 +493,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         """
         usage: prog (foo)
         """
-        [ fail Nothing [ "goo" ] "Expected foo, but got goo" ]
+        [ fail Nothing [ "goo" ] "expected foo, but got goo" ]
 
     , test
         """

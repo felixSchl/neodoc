@@ -328,7 +328,7 @@ parseExhaustively
   -> List SolvedLayout
   -> ArgParser r (List KeyValue)
 parseExhaustively _ _ _ Nil = pure Nil
-parseExhaustively skippable isSkipping l xs = do
+parseExhaustively skippable isSkipping l xs = skipIf isDone Nil do
   { options } <- getConfig
   let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
   concat <$> traverse (parseChunk skippable isSkipping (l + 2)) chunks
@@ -340,7 +340,7 @@ parseChunk
   -> Int      -- ^ recursive level
   -> Chunk (List SolvedLayout)
   -> ArgParser r (List KeyValue)
-parseChunk skippable isSkipping l chunk = do
+parseChunk skippable isSkipping l chunk = skipIf isDone Nil do
   traceBracket l ("chunk (" <> pretty chunk <> ")") do
     go chunk
 
@@ -572,11 +572,21 @@ traceBracket
   -> ArgParser r a
 traceBracket l label p = do
   input <- getInput
-  trace l \_ -> "parsing " <> label <> " (input: " <> pretty input <> ")"
-  output <- traceError l ("failed to parse " <> label) p
-  input <- getInput
+  state <- getState
   trace l \_ ->
-    "successfully parsed " <> label <> "!"
+    stateLabel state <> " parsing " <> label <> " (input: " <> pretty input <> ")"
+  output <- traceError l (stateLabel state <> " failed to parse " <> label) p
+  input <- getInput
+  state <- getState
+  trace l \_ ->
+    stateLabel state <> " successfully parsed " <> label <> "!"
       <> " (output: " <> pretty output <> ")"
       <> " (new input: " <> pretty input <> ")"
   pure output
+  where
+  stateLabel { failed, done, depth } = 
+    (if done then "✓" else "·")
+    <> (if failed then "✘" else "·")
+    <> "(" <> show depth <> ")"
+
+
