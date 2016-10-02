@@ -11,13 +11,16 @@ const { runFakeProc, exec } = require('./support');
 
 describe('neodoc', () => {
   describe('examples - git', () => {
-    const git = (args) => JSON.parse(exec(GIT_EXAMPLE, args));
+    const git = (args) => {
+      const output = exec(GIT_EXAMPLE, args)
+      return JSON.parse(output);
+    }
 
     it('git branch -u origin master', () => {
       expect(git('branch -u origin master'))
         .to.deep.equal({
           branch: true
-        , '<branchname>': [ 'master' ]
+        , '<branchname>': ['master']
         , '-u': 'origin'
         , '--set-upstream-to': 'origin'
         });
@@ -52,122 +55,12 @@ describe('neodoc', () => {
     });
   });
 
-  describe('specification parsing', () => {
-    it ('should return the spec in regular JS', () => {
-      const help = `
-        Usage: foo <command> [options]
-        Options:
-          -f, --foo=BAR...
-        `;
-
-      expect(neodoc.parse(help)).to.deep.equal({
-        program: 'foo'
-      , help: help
-      , shortHelp: 'Usage: foo <command> [options]'
-      , specification:
-          [
-            [
-              [
-                {
-                  "type": "Positional",
-                  "value": {
-                    "name": "<command>",
-                    "repeatable": false
-                  }
-                },
-                // each expanded [options] option gets it's own group i.o.t.
-                // indiciate that it's optional. Repeatability is indiciated on
-                // the group itself, rather than on the 'Option' node.
-                {
-                  "type": "Group",
-                  "value": {
-                    "optional": true,
-                    "repeatable": true,
-                    "branches":
-                      [
-                        [
-                          { "type": "Option",
-                            "value": {
-                              "aliases": [ "-f", "--foo" ],
-                              "repeatable": false,
-                              "env": undefined,
-                              "arg": {
-                                  "name": "BAR",
-                                  "default": undefined,
-                                  "optional": false
-                              }
-                            }
-                          }
-                        ]
-                      ]
-                  }
-                }
-              ]
-            ]
-          ]
-      });
-    })
-  });
-
-  describe('specification loading', () => {
-    it ('should parse argv using a JS spec', () => {
-      const spec = {
-        program: 'foo'
-      , help: '...' /* does not matter */
-      , shortHelp: 'Usage: foo <command> [options]'
-      , specification:
-          [
-            [
-              [
-                {
-                  "type": "Positional",
-                  "value": {
-                    "name": "<command>",
-                    "repeatable": true
-                  }
-                },
-                // each expanded [options] option gets it's own group i.o.t.
-                // indiciate that it's optional. Repeatability is indiciated on
-                // the group itself, rather than on the 'Option' node.
-                {
-                  "type": "Group",
-                  "value": {
-                    "optional": true,
-                    "repeatable": false,
-                    "branches":
-                      [
-                        [
-                          { "type": "Option",
-                            "value": {
-                              "aliases": [ "-f", "--foo" ],
-                              "repeatable": false,
-                              "arg": {}
-                            }
-                          }
-                        ]
-                      ]
-                  }
-                }
-              ]
-            ]
-          ]
-      };
-
-      expect(neodoc.run(spec, { argv: [ 'bar', '--foo', 'test' ] }))
-        .to.deep.equal({
-          '<command>': ['bar']
-        , '--foo': 'test'
-        , '-f': 'test'
-        });
-    })
-  });
-
   describe('special arguments', () => {
     describe('option.helpFlags', () => {
       it('should print help', () => {
         for (let flag of ['-h', '--help', '-?']) {
           const result = runFakeProc(() => {
-            console.log(JSON.stringify(neodoc.run(`
+            console.log(JSON.stringify(neodoc.run(`\
               usage: prog -h
               options:
                 -?, -h, --help
@@ -190,7 +83,7 @@ describe('neodoc', () => {
       it('should print help', () => {
         for (let flag of ['-v', '--version']) {
           const result = runFakeProc(() => {
-            console.log(JSON.stringify(neodoc.run(`
+            console.log(JSON.stringify(neodoc.run(`\
               usage: prog -v
               options:
                 -v, --version
@@ -245,7 +138,7 @@ describe('neodoc', () => {
     describe('#71 - remove left & right trimming', () => {
       it('should not trim the help text', () => {
         const result = runFakeProc(() => {
-          neodoc.run(`
+          neodoc.run(`\
             ${chalk.inverse(' THIMBLE ')} A scaffolding system that grows with you.
             ${chalk.blue('I. Usage:')}
               thimble <command> [<args>...]

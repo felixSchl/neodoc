@@ -1,1 +1,1 @@
-module.exports = require('./dist/docopt.js');
+module.exports = require('./dist/neodoc.js');

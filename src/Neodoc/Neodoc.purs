@@ -18,7 +18,7 @@ import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Data.Function.Uncurried
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
-import Data.Either (Either (..), either)
+import Data.Either (Either (..), either, fromRight)
 import Data.StrMap (StrMap)
 import Data.String as String
 import Data.Char as Char
@@ -29,6 +29,8 @@ import Data.List (
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.Traversable (for)
 import Data.Pretty (class Pretty, pretty)
+import Data.String.Regex as Regex
+import Data.String.Regex (regex, Regex())
 import Data.Foreign (F, Foreign)
 import Data.Foreign.Class as F
 import Data.Foreign.Extra as F
@@ -45,6 +47,8 @@ import Node.Process (PROCESS)
 import Node.Process as Process
 import Node.FS (FS)
 import Text.Wrap (dedent)
+import Unsafe.Coerce (unsafeCoerce)
+import Partial.Unsafe (unsafePartial)
 
 import Neodoc.Spec
 import Neodoc.Options
@@ -99,17 +103,25 @@ runJS
         (Eff (NeodocEff eff) Foreign)
 runJS = mkFn2 go
   where
-    go fSpec fOpts = do
-      spec /\ opts <- either (throwException <<< error <<< F.prettyForeignError)
-                      pure
-                      do
-                        Tuple <$> (readSpec fSpec)
-                              <*> (F.read fOpts)
-      x <- _run spec opts
-      pure case x of
-        (Output        x) -> F.toForeign x
-        (HelpOutput    x) -> F.toForeign x
-        (VersionOutput x) -> F.toForeign x
+  go fSpec fOpts = do
+    spec /\ opts <- either (throwException <<< error <<< F.prettyForeignError)
+                    pure
+                    do
+                      Tuple <$> (readSpec fSpec)
+                            <*> (F.read fOpts)
+    x <- _run spec opts
+    pure case x of
+      (Output        x) -> F.toForeign (rawValue <$> x)
+      (HelpOutput    x) -> F.toForeign x
+      (VersionOutput x) -> F.toForeign x
+
+  -- | Convert a Value into a JS-native value.
+  rawValue :: Value -> Unit
+  rawValue (BoolValue   b) = unsafeCoerce b
+  rawValue (IntValue    i) = unsafeCoerce i
+  rawValue (FloatValue  x) = unsafeCoerce x
+  rawValue (StringValue s) = unsafeCoerce s
+  rawValue (ArrayValue xs) = unsafeCoerce $ rawValue <$> xs
 
 readSpec
   :: Foreign
@@ -172,9 +184,10 @@ _run input (NeodocOptions opts) = do
     pure $ Evaluate.reduce env descriptions mBranch vs
 
   if output `has` opts.helpFlags then
-    if opts.dontExit
-        then pure (HelpOutput helpText)
-        else Console.log helpText *> Process.exit 0
+    let helpText' = trimHelp helpText
+     in if opts.dontExit
+          then pure (HelpOutput helpText')
+          else Console.log helpText' *> Process.exit 0
     else
       if output `has` opts.versionFlags then do
         mVer <- maybe readPkgVersion (pure <<< pure) opts.version
@@ -248,7 +261,7 @@ _runPure input (NeodocOptions opts) mVer = do
   let output = Evaluate.reduce env descriptions mBranch vs
 
   if output `has` opts.helpFlags
-    then pure (HelpOutput helpText)
+    then pure (HelpOutput (trimHelp helpText))
     else
       if output `has` opts.versionFlags then do
         case mVer of
@@ -326,6 +339,9 @@ has x = any \s ->
                 ArrayValue []   -> false
                 _               -> true
                 ) (StrMap.lookup s x)
+
+trimHelp = Regex.replace (regex' "(^\\s*(\r\n|\n|\r))|((\r\n|\n|\r)\\s*$)" "g") ""
+  where regex' a b = unsafePartial $ fromRight $ regex a (Regex.parseFlags b)
 
 foreign import jsError :: ∀ a. String -> a -> Error
 foreign import readPkgVersionImpl
