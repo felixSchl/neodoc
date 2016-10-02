@@ -112,7 +112,7 @@ evalParsers p parsers = do
         Step true c (state {
           hasTerminated = s.hasTerminated
         , hasFailed = s.hasFailed
-        , depth = s.depth + state.depth
+        , depth = s.depth
         }) i (Right val)
     _ -> case deepestErrors of
       Just errors -> case errors of
@@ -121,7 +121,7 @@ evalParsers p parsers = do
             Step false c (state {
               hasTerminated = s.hasTerminated
             , hasFailed = s.hasFailed
-            , depth = s.depth + state.depth
+            , depth = s.depth
             }) i (Left e)
         _ -> fail "" -- XXX: explain this
       _ -> do
