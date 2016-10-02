@@ -61,11 +61,11 @@ advantages are numerous:
 
 This implementation features **error reporting**, both for users and developers,
 reading values from **environment variables**, type coercion and much more. For
-an (in-)comprehensive comparison to the original, click
-[here](#deviations-from-the-original). To take neodoc for a ride, click
-[here][playground].
+an (in-)comprehensive comparison to the original, [click
+here](#deviations-from-the-original). To take neodoc for a ride, [click
+here][playground].
 
-**_A note to potential adopters and contributors:_** Neodoc is divided into two
+> **_A note to potential adopters and contributors:_** Neodoc is divided into two
 distinct parts &mdash; parsing the specification and parsing the argv, given the
 specificiation. Theoretically, the origin of the specification does not matter
 and the argv parser could be used standalone as it offers a more "correct" parse
@@ -241,47 +241,11 @@ options:
 ### 1. Arguments
 
 At the heart of the language are command line arguments. There are three
-fundamental types of arguments: options, positional arguments and commands.
-Options are arguments that start with either a single or a double dash ('-'),
-commands are literal matches of a certain string and positionals constitute
-everything else.  Read on below for more detail on each argument type.
-
-The internal data structure for arguments looks as follows:
-
-```haskell
-type Specification = List Usage
-type Usage         = List Branch
-type Branch        = List Argument
-data OptionAlias   = Short Char | Long String
-
-data Argument
-  = Command     { name       :: String
-                , repeatable :: Boolean
-                }
-  | Positional  { name       :: String
-                , repeatable :: Boolean
-                }
-  | Option      { aliases    :: NonEmpty OptionAlias
-                , arg        :: Maybe { name     :: String
-                                      , default  :: Maybe Value
-                                      , optional :: Boolean
-                                      }
-                , env        :: Maybe String
-                , repeatable :: Boolean
-                }
-  | Group       { optional   :: Boolean
-                , branches   :: List Branch
-                , repeatable :: Boolean
-                }
-  | EOA
-  | Stdin
-```
-
-As you can see, this is a recursive data structure as a `Group` may contain
-multiple `Branch`es, each of which may contain multiple `Argument`s.
-
-First, we dive into describing each argument type in more detail, then focus on
-arranging arguments using groups and branches.
+fundamental types of arguments: `options`, `positional` arguments and
+`commands`. Options are arguments that start with either a single or a double
+dash ('-'), commands are literal matches of a certain string and positionals
+constitute everything else.  Read on below for more detail on each argument
+type.
 
 #### 1.1. Options
 
