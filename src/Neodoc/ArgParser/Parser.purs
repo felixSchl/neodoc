@@ -112,9 +112,9 @@ _ENABLE_DEBUG_ = true
 
 initialState :: ParseState
 initialState = {
-  depth:  0
-, done:   false
-, failed: false
+  depth: 0
+, hasTerminated:   false
+, hasFailed: false
 }
 
 type ChunkedLayout a = Layout (Chunk a)
@@ -328,7 +328,7 @@ parseExhaustively
   -> List SolvedLayout
   -> ArgParser r (List KeyValue)
 parseExhaustively _ _ _ Nil = pure Nil
-parseExhaustively skippable isSkipping l xs = skipIf isDone Nil do
+parseExhaustively skippable isSkipping l xs = skipIf hasTerminated Nil do
   { options } <- getConfig
   let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
   concat <$> traverse (parseChunk skippable isSkipping (l + 2)) chunks
@@ -340,7 +340,7 @@ parseChunk
   -> Int      -- ^ recursive level
   -> Chunk (List SolvedLayout)
   -> ArgParser r (List KeyValue)
-parseChunk skippable isSkipping l chunk = skipIf isDone Nil do
+parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
   traceBracket l ("chunk (" <> pretty chunk <> ")") do
     go chunk
 
@@ -354,6 +354,9 @@ parseChunk skippable isSkipping l chunk = skipIf isDone Nil do
 
   go (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
   go (Free  xs) =
+    -- We decorate all arguments with an index from left to right, as well as
+    -- marking them "Required". The "Required" wrapper is used to make
+    -- repetition work, while ensuring the parser terminates.
     let indexedLayouts = flip mapWithIndex xs \x ix -> Required (Indexed ix x)
      in draw Map.empty (length xs) indexedLayouts
 
@@ -365,29 +368,30 @@ parseChunk skippable isSkipping l chunk = skipIf isDone Nil do
       -> ArgParser r (List KeyValue)
 
     -- Try "drawing" from the input list
+    -- We've got `n` tries left to make this work.
     draw errs n xss@(x:xs) | n >= 0 =
+
       let layout = getIndexedElem (unRequired x)
        in catch' (recover layout) $
-          let
-            mod = if isRequired x then id else option Nil
-            p = parseLayout
-                  isSkipping  -- propagate the 'isSkipping' property
-                  false       -- reset 'isSkipping' to false
-                  (l + 1)     -- increase the recursive level
-                  if not isSkipping
-                      then setLayoutRequired true layout
-                      else layout
+          let mod = if isRequired x then id else option Nil
            in do
             traceDraw n xss ""
 
-            -- Try parsing the argument 'x'. If 'x' fails, enqueue it for a later
-            -- try.  Should 'x' fail and should 'x' be skippable (i.e. it defines
-            -- a default value or is backed by an environment variable),
-            -- substitute x. For groups, temporarily set the required flag to
-            -- "true", such that it will fail and we have a chance to retry as
-            -- part of the exhaustive parsing mechanism. The 'cached' call
-            -- ensures that we only parse a (arg, input) combo once per group.
-            vs <- cached x $ try $ mod p
+            -- parse the next layout. This could be a group, in which case we
+            -- recursive down each of the groups branches to try and make a
+            -- match. Based on wether or not `isSkipping` is set to true, allow
+            -- the layout to substitute values from fallback sources.
+            vs <- cached x $ try $ mod do
+              parseLayout
+                isSkipping  -- propagate the 'isSkipping' property
+                false       -- reset 'skipable' to false
+                (l + 1)     -- increase the recursive level
+                if not isSkipping
+                    then setLayoutRequired true layout
+                    else layout
+
+            -- if the layout is marked as repeatable, try repeating the parse
+            -- recursively, but mark successive matches as "optional".
             vss <- try do
               if (Solved.isRepeatable layout &&
                   length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
@@ -417,9 +421,12 @@ parseChunk skippable isSkipping l chunk = skipIf isDone Nil do
             -- to parse.
             else if n == 0 || length xs == 0
               then
+                -- note: ensure that layouts do not change their relative
+                -- positioning, hence return the original input list, rather
+                -- than pushing it onto the back.
                 let xs' = if isFixed layout then xss else (xs <> singleton x)
                  in do
-                    traceDraw n xss $ "! Skipping (shortcut)"
+                    traceDraw n xs' $ "! Skipping (shortcut)"
                     draw errs' (-1) xs'
               else
                 let isFixed' = isFixed <<< getIndexedElem <<< unRequired
@@ -440,15 +447,18 @@ parseChunk skippable isSkipping l chunk = skipIf isDone Nil do
     -- All arguments have been matched (or have failed to be matched) at least
     -- once by now. See where we're at - is there any required argument that was
     -- not matched at all?
-    draw errs n xss@(x:xs) | n < 0 = skipIf isDone Nil do
+    draw errs n xss@(x:xs) | n < 0 = skipIf hasTerminated Nil do
       input <- getInput
       { options, env, descriptions } <- getConfig
 
       traceDraw n xss $ ""
 
       let
+        -- re-align the input using the originally assigned indices
         xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss
         layouts = getIndexedElem <<< unRequired <$> xss'
+
+        -- substitute any missing values using the various fallback methods
         vs = layouts <#> case _ of
           layout@(Group _ _ _) -> Left layout
           layout@(Elem arg) -> maybe (Left layout) (Right <<< Tuple (toArgKey arg)) do
@@ -461,6 +471,9 @@ parseChunk skippable isSkipping l chunk = skipIf isDone Nil do
                   then ArrayValue $ Value.intoArray v.value
                   else v.value
             }
+
+        -- find those layouts that did not yield any value, not even a fallback
+        -- value, but are required for a successful match.
         missing = mlefts vs `flip filter` \layout ->
           isRequired x &&
           -- This may look very counter-intuitive, yet getting fallback
@@ -468,13 +481,18 @@ parseChunk skippable isSkipping l chunk = skipIf isDone Nil do
           -- If a group that is allowed to be omitted fails, there won't
           -- be any values to fall back onto.
           not (isGroup layout && isOptional layout)
+
         fallbacks = mrights vs
 
       if isSkipping && length missing > 0
         then do
+          -- set the parser state to "failed".
+          -- setting this will cause no more recoveries during succesive draws.
           setFailed
           unsafePartial $ throwExpectedError missing input
         else
+          -- special case: when the input is empty, we choose to enable skipping
+          -- "on the spot" as it's unlikely enough we'll find anything better.
           if skippable || null input
             then
               if not isSkipping
@@ -491,11 +509,11 @@ parseChunk skippable isSkipping l chunk = skipIf isDone Nil do
           -> List PositionedToken
           -> ArgParser r _
         throwExpectedError xss@(x:xs) input =
-          let e = case Map.lookup x errs of
-                    _ -> case input of
-                      Nil  -> missingArgumentsError (x:|xs)
-                      toks -> unexpectedInputError xss (known <$> toks)
-           in fail' e
+          case Map.lookup x errs of
+            Just e -> throw e
+            Nothing ->  case input of
+              Nil  -> fail' $ missingArgumentsError (x:|xs)
+              toks -> fail' $ unexpectedInputError xss (known <$> toks)
 
     draw _ _ _ = pure Nil
 
@@ -584,9 +602,9 @@ traceBracket l label p = do
       <> " (new input: " <> pretty input <> ")"
   pure output
   where
-  stateLabel { failed, done, depth } = 
-    (if done then "✓" else "·")
-    <> (if failed then "✘" else "·")
+  stateLabel { hasFailed, hasTerminated, depth } = 
+    (if hasTerminated then "✓" else "·")
+    <> (if hasFailed then "✘" else "·")
     <> "(" <> show depth <> ")"
 
 

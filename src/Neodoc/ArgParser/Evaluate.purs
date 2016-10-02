@@ -74,7 +74,7 @@ evalParsers p parsers = do
 
   -- Run all parsers and collect their results for further evaluation
   let collected = fromFoldable $ parsers <#> \parser ->
-        runParser config (state { depth = 0 }) input $ Parser \c s i ->
+        runParser config state input $ Parser \c s i ->
           case unParser parser c s i of
             Step b' c' s' i' result ->
               let cont = ParserCont c' s' i'
@@ -109,8 +109,8 @@ evalParsers p parsers = do
     Just (SuccessEvaluation (ParserCont c s i) val) ->
       Parser \_ _ _ ->
         Step true c (state {
-          done = s.done
-        , failed = s.failed
+          hasTerminated = s.hasTerminated
+        , hasFailed = s.hasFailed
         , depth = s.depth + state.depth
         }) i (Right val)
     _ -> case deepestErrors of
@@ -118,8 +118,8 @@ evalParsers p parsers = do
         (ErrorEvaluation (ParserCont c s i) e):es | null es || not (null input) ->
           Parser \_ _ _ ->
             Step false c (state {
-              done = s.done
-            , failed = s.failed
+              hasTerminated = s.hasTerminated
+            , hasFailed = s.hasFailed
             , depth = s.depth + state.depth
             }) i (Left e)
         _ -> fail "" -- XXX: explain this

@@ -47,7 +47,7 @@ module Neodoc.ArgParser.Type (
 , setFailed
 , unsetFailed
 , hasFailed
-, isDone
+, hasTerminated
 , setDone
 , unsetDone
 , skipIf
@@ -293,8 +293,8 @@ type ParseConfig r = {
 
 type ParseState = {
   depth :: Int
-, done :: Boolean
-, failed :: Boolean
+, hasTerminated :: Boolean
+, hasFailed :: Boolean
 }
 
 type ArgParser r a = Parser ArgParseError (ParseConfig r) ParseState Input a
@@ -316,22 +316,22 @@ lookupDescription' a = fromMaybe default <$> lookupDescription a
   where default = OptionDescription (NonEmpty.singleton a) false Nothing Nothing Nothing
 
 unsetFailed :: ∀ r. ArgParser r Unit
-unsetFailed = modifyState \s -> s { failed = false }
+unsetFailed = modifyState \s -> s { hasFailed = false }
 
 setFailed :: ∀ r. ArgParser r Unit
-setFailed = modifyState \s -> s { failed = true }
+setFailed = modifyState \s -> s { hasFailed = true }
 
 hasFailed :: ∀ r. ArgParser r Boolean
-hasFailed = _.failed <$> getState
+hasFailed = _.hasFailed <$> getState
 
-isDone :: ∀ r. ArgParser r Boolean
-isDone = _.done <$> getState
+hasTerminated :: ∀ r. ArgParser r Boolean
+hasTerminated = _.hasTerminated <$> getState
 
 unsetDone :: ∀ r. ArgParser r Unit
-unsetDone = modifyState \s -> s { done = false }
+unsetDone = modifyState \s -> s { hasTerminated = false }
 
 setDone :: ∀ r. ArgParser r Unit
-setDone = modifyState \s -> s { done = true }
+setDone = modifyState \s -> s { hasTerminated = true }
 
 skipIf :: ∀ r a. ArgParser r Boolean -> a -> ArgParser r a -> ArgParser r a
 skipIf a b c = a >>= if _ then pure b else c
