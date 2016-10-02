@@ -2,6 +2,7 @@ module Neodoc.Data.OptionArgument where
 
 import Prelude
 import Data.Pretty (class Pretty, pretty)
+import Data.Tuple.Nested ((/\))
 import Data.Maybe (Maybe, maybe)
 import Data.Foldable (intercalate)
 import Data.List (List)
@@ -37,6 +38,9 @@ instance showOptionArgument :: Show OptionArgument where
 
 instance eqOptionArgument :: Eq OptionArgument where
   eq (OptionArgument n o) (OptionArgument n' o') = n == n' && o == o'
+
+instance ordOptionArgument :: Ord OptionArgument where
+  compare (OptionArgument n o) (OptionArgument n' o') = compare (n /\ o) (n' /\ o')
 
 isOptionArgumentOptional :: OptionArgument -> Boolean
 isOptionArgumentOptional (OptionArgument _ o) = o

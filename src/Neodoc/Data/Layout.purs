@@ -3,6 +3,7 @@ module Neodoc.Data.Layout where
 import Prelude
 import Data.Foldable (intercalate)
 import Data.Function (on)
+import Data.Tuple.Nested ((/\))
 import Data.Pretty (class Pretty, pretty)
 import Data.List (List())
 import Data.NonEmpty (NonEmpty())
@@ -56,6 +57,8 @@ instance eqLayout :: (Eq a) => Eq (Layout a) where
   eq (Group o r xs) (Group o' r' xs') = o == o' && r == r' && xs == xs'
   eq _ _ = false
 
--- XXX: implement this properly
-instance ordLayout :: (Show a, Eq a) => Ord (Layout a) where
-  compare = compare `on` show
+instance ordLayout :: (Show a, Ord a) => Ord (Layout a) where
+  compare (Elem x) (Elem x') = compare x x'
+  compare (Group o r xs) (Group o' r' xs') = compare (o /\ r /\ xs) (o' /\ r' /\ xs')
+  compare (Group _ _ _) (Elem _) = GT
+  compare (Elem _) (Group _ _ _) = LT

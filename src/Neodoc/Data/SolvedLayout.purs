@@ -3,6 +3,7 @@ module Neodoc.Data.SolvedLayout where
 import Prelude
 import Data.Pretty (class Pretty, pretty)
 import Data.Maybe (Maybe(..), maybe)
+import Data.Tuple.Nested ((/\))
 import Data.Foldable (intercalate, all)
 import Data.String as String
 import Data.List (List)
@@ -46,9 +47,39 @@ instance showSolvedLayoutArg :: Show SolvedLayoutArg where
   show Stdin = "Stdin"
   show (Option n mA r) = "Option " <> show n <> " " <> show mA <> " " <> show r
 
--- XXX: implement this properly
 instance ordSolvedLayoutArg :: Ord SolvedLayoutArg where
-  compare = compare `on` show
+  compare (Command n r) (Command n' r') = compare (n /\ r) (n' /\ r')
+  compare (Positional n r) (Positional n' r') = compare (n /\ r) (n' /\ r')
+  compare (Option n mA r) (Option n' mA' r') = compare (n /\ mA /\ r) (n' /\ mA' /\ r')
+  compare EOA EOA = EQ
+  compare Stdin Stdin = EQ
+
+  -- the following table must be carefully updated:
+
+  -- by Command
+  compare (Command _ _) (Positional _ _) = GT
+  compare (Command _ _) (Option _ _ _)   = GT
+  compare (Command _ _) EOA              = GT
+  compare (Command _ _) Stdin            = GT
+  compare (Positional _ _) (Command _ _) = LT
+  compare (Option _ _ _)   (Command _ _) = LT
+  compare EOA              (Command _ _) = LT
+  compare Stdin            (Command _ _) = LT
+
+  compare (Positional _ _) (Option _ _ _) = GT
+  compare (Positional _ _) EOA            = GT
+  compare (Positional _ _) Stdin          = GT
+  compare (Option _ _ _) (Positional _ _) = LT
+  compare EOA            (Positional _ _) = LT
+  compare Stdin          (Positional _ _) = LT
+
+  compare (Option _ _ _) EOA   = GT
+  compare (Option _ _ _) Stdin = GT
+  compare EOA   (Option _ _ _) = LT
+  compare Stdin (Option _ _ _) = LT
+
+  compare EOA Stdin = GT
+  compare Stdin EOA = LT
 
 instance prettySolvedLayoutArg :: Pretty SolvedLayoutArg where
   pretty = go
