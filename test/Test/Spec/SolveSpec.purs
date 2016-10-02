@@ -187,7 +187,7 @@ solveSpec = \_ ->
         ]
 
     , testSmartOpts "prog (-f FILE)"
-        [ pass ""   "prog (-f=FILE)"
+        [ pass ""   "prog -f=FILE"
         , pass "-f" "prog (-f FILE)"
         ]
 
@@ -224,8 +224,8 @@ solveSpec = \_ ->
         ]
 
     , test "prog [options] -o"
-        [ pass (intercalate "\n" [ "-i", "-o" ]) "prog ([-i]) -o"
-        , pass (intercalate "\n" [ "-i=FOO", "-o" ]) "prog ([-i=FOO]) -o"
+        [ pass (intercalate "\n" [ "-i", "-o" ]) "prog [-i] -o"
+        , pass (intercalate "\n" [ "-i=FOO", "-o" ]) "prog [-i=FOO] -o"
         ]
 
     , test "prog -i [options] -o"

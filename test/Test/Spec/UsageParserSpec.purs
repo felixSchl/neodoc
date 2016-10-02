@@ -23,7 +23,7 @@ import Test.Support.Usage as U
 
 import Neodoc.Error.Class (capture) as Error
 import Neodoc.Spec.Lexer as Lexer
-import Neodoc.Spec.Parser as SpecParser
+import Neodoc.Spec.Parser as Spec
 import Neodoc.Spec.Parser.Base (debug)
 import Neodoc.Spec.Parser.Usage as U
 import Neodoc.Data.UsageLayout as U
@@ -263,22 +263,19 @@ usageParserSpec = \_ -> do
               <> " -> "
               <> intercalate "\n" (prettyTopLevel <$> expected))  do
             vliftEff do
-              pure unit
-
-              -- { program, layouts } <- runEitherEff do
-              --   Lexer.lexUsage input >>= U.parse
-              -- assertEqual "prog" program
-              -- assertEqual (U.prettyPrintUsage <$> expected')
-              --             (U.prettyPrintUsage <$> usages)
+              { program, layouts } <- runEitherEff do
+                toks <- Error.capture $ Lexer.lexUsage input
+                Error.capture $ Spec.parseUsage toks
+              assertEqual "prog" program
+              assertEqual expected' (fromFoldable $ (fromFoldable <$> _) <$> layouts)
         otherwise -> do
-          pure unit
-          -- it (input <> " should fail") do
-          -- vliftEff do
-          --   assertThrows (const true) do
-          --     runEitherEff do
-          --       toks       <- Lexer.lexUsage input
-          --       { usages } <- U.parse false toks
-          --       debug usages
+          it (input <> " should fail") do
+          vliftEff do
+            assertThrows (const true) do
+              runEitherEff do
+                toks <- Error.capture $ Lexer.lexUsage input
+                { layouts } <- Error.capture $ Spec.parseUsage toks
+                debug layouts
 
   runSingleArgumentTests :: _
   runSingleArgumentTests xs =
@@ -296,7 +293,7 @@ usageParserSpec = \_ -> do
                in it (input <> " -> " <> pretty expected) $ vliftEff do
                   { program, layouts } <- runEitherEff do
                     toks <- Error.capture $ Lexer.lexUsage input
-                    Error.capture $ SpecParser.parseUsage toks
+                    Error.capture $ Spec.parseUsage toks
                   assertEqual "prog" program
                   case layouts of
                     ((x :| Nil) : Nil) :| Nil -> do
@@ -311,5 +308,5 @@ usageParserSpec = \_ -> do
                 assertThrows (const true) do
                   runEitherEff do
                     toks <- Error.capture $ Lexer.lexUsage input
-                    { layouts } <- Error.capture $ SpecParser.parseUsage toks
+                    { layouts } <- Error.capture $ Spec.parseUsage toks
                     debug layouts

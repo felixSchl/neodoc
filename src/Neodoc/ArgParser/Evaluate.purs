@@ -104,9 +104,6 @@ evalParsers p parsers = do
       unsafePartial $ flip maximumBy deepest $ compare `on` case _ of
         SuccessEvaluation _ v -> p v
 
-  -- unsafePartial $ traceShowA $ errors <#> \(ErrorEvaluation _ e) ->
-    -- pretty e
-
   -- Ok, now that we have a potentially "best error" and a potentially "best
   -- match", take a pick.
   case bestSuccess of

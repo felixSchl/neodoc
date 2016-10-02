@@ -84,6 +84,7 @@ import Neodoc.ArgParser.Token as Token
 import Neodoc.Error (NeodocError(..)) as Neodoc
 import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
 import Neodoc.Data.Description (Description(..))
+import Neodoc.Data.LayoutConversion
 
 data ParseError e = ParseError Boolean (Either String e)
 
@@ -257,11 +258,12 @@ unexpectedInputError expected toks
   render xs ((Unknown tok):_) = "unknown " <> tokLabel tok
   render (x:_) toks = "expected " <> pretty x <> butGot toks
   butGot Nil = ""
-  butGot xs = ", but got " <> intercalate " " (pretty <$> xs)
+  butGot (x:_) = ", but got " <> pretty x
 
 missingArgumentsError layouts
   = MissingArgumentsError layouts $ defer \_ ->
-      "missing " <> intercalate ", " (pretty <$> layouts)
+      let flat = flattenBranch layouts
+       in "missing " <> intercalate ", " (pretty <$> flat)
 
 instance showArgParseError :: Show ArgParseError where
   show (OptionTakesNoArgumentError a msg) = "OptionTakesNoArgumentError " <> show a <> " " <> show msg

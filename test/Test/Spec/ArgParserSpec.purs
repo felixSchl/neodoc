@@ -237,10 +237,10 @@ argParserSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
         """
         [ fail Nothing []
-          $ "missing -iFILE, -oFILE"
+          $ "expected -iFILE"
 
         , fail Nothing [ "-i", "bar" ]
-          $ "missing -oFILE"
+          $ "expected -oFILE"
 
         , pass Nothing
             [ "-i", "bar", "-o", "bar" ]
@@ -267,10 +267,10 @@ argParserSpec = \_ -> describe "The parser generator" do
           -r, --redirect FILE [env: QUX]
         """
         [ fail Nothing []
-          $ "missing -iFILE, -rFILE"
+          $ "expected -iFILE"
 
         , fail Nothing [ "-i", "bar", "-r", "bar" ]
-            "missing -oFILE"
+            "expected -oFILE"
 
         , pass Nothing
             [ "-i", "bar", "-r", "bar", "-o", "bar" ]
@@ -310,7 +310,7 @@ argParserSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE
         """
-        [ fail Nothing [] "missing -iFILE"
+        [ fail Nothing [] "expected -iFILE"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail Nothing [ "-i", "bar" ] "expected <env>"
         , pass Nothing
@@ -322,7 +322,7 @@ argParserSpec = \_ -> describe "The parser generator" do
             , "-o"       :> V.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-            "unexpected option -o. Expected -iFILE"
+            "expected -iFILE, but got -o"
         ]
 
     , test
@@ -477,10 +477,10 @@ argParserSpec = \_ -> describe "The parser generator" do
 
         , fail Nothing
             [ "foo" ]
-            "missing -fFOZ"
+            "expected -i"
         , fail Nothing
             [ "foo", "-o", "-i", "-bax" ]
-            "missing -fFOZ"
+            "expected -fFOZ"
         ]
 
     , test
@@ -493,7 +493,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         """
         usage: prog (foo)
         """
-        [ fail Nothing [ "goo" ] "expected foo, but got goo" ]
+        [ fail Nothing [ "goo" ] "unknown command goo" ]
 
     , test
         """

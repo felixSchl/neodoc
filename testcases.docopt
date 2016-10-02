@@ -2581,7 +2581,7 @@ usage: git -f <foo>
 """
 
 $ prog/s -fb
-"expected <foo>, but got -b"
+"unknown option -b"
 
 #
 # Command and positional errors:
@@ -2613,7 +2613,7 @@ Usage: foo remote
 """
 
 $ prog --fooo
-"expected remote, but got --fooo"
+"unknown option --fooo"
 
 r"""
 Usage: foo
@@ -3175,14 +3175,14 @@ usage: prog --foo
 """
 
 $ prog/r
-"missing --foo"
+"expected --foo"
 
 r"""
 usage: prog --foo --bar
 """
 
 $ prog/r
-"missing --foo, --bar"
+"expected --foo"
 
 r"""
 usage: prog (--foo --bar) --qux
@@ -3190,10 +3190,10 @@ usage: prog (--foo --bar) --qux
 
 # only reports error of first group
 $ prog/r
-"missing --foo, --bar"
+"expected --foo"
 
 $ prog/r --yikes
-"unknown option --yikes. Expected --foo, --bar"
+"unknown option --yikes"
 
 #
 # Free positionals

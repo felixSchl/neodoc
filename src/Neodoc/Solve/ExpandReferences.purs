@@ -217,22 +217,3 @@ indexBranch branch = flip evalState 0 $ for branch indexLayout
     i <- State.get
     State.put (i + 1)
     pure (Elem (Indexed i x))
-
--- Flatten a branch into a single list of elements, i.e.:
---
---      -a (-b | -c)
---
--- would become:
---
---      -a -b -c
---
-flattenBranch
-  :: ∀ a
-   . NonEmpty List (Layout a)
-  -> NonEmpty List a
-flattenBranch branch = NonEmpty.concat $ flattenLayout <$> branch
-  where
-  flattenLayout (Elem x) = x :| Nil
-  flattenLayout (Group _ _ branches)
-    = NonEmpty.concat $ NonEmpty.concat $ (flattenLayout <$> _) <$> branches
-

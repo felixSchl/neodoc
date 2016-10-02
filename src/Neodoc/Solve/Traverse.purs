@@ -30,7 +30,6 @@ zipTraverseM f = go
           pure (a :| as <> (b : bs)) -- note: `as` won't be run again
 
     go (x :| y : xss) = do
-      traceA $ show x <> " / " <> show y <> " {" <> show xss <> "}"
       (a :| as) /\ ma <- f x (Just y)
 
       case ma of

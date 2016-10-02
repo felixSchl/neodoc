@@ -108,7 +108,7 @@ import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.KeyValue
 
 _ENABLE_DEBUG_ :: Boolean
-_ENABLE_DEBUG_ = true
+_ENABLE_DEBUG_ = false
 
 initialState :: ParseState
 initialState = {
@@ -118,11 +118,6 @@ initialState = {
 }
 
 type ChunkedLayout a = Layout (Chunk a)
-
--- a: A B | C D
--- b:
--- AB | CD |
-
 
 parse
   :: ∀ r
@@ -404,28 +399,9 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
         let
           isFixed = not <<< Solved.isFreeLayout
           errs' = case errs of
-                    Just (d /\ _) | depth >= d -> Just (depth /\ err)
+                    Just (d /\ _) | depth > d -> Just (depth /\ err)
                     Nothing -> Just (depth /\ err)
                     x -> x
-          -- errs' = if isGroup layout || isFixed layout
-          --             then Map.alter (case _ of
-          --                            Just (depth' /\ err') ->
-          --                             if depth > depth'
-          --                                then do
-          --                                   traceShowA $ indent l <> "REPLACING ERROR "
-          --                                     <> "(EXISITNG: (" <> show depth' <> "): " <> pretty err' <> ")"
-          --                                     <> "(INCOMING: (" <> show depth <> "): " <> pretty err <> ")"
-          --                                     <> "(FOR: " <> pretty layout <> ")"
-          --                                   Just $ depth /\ err
-          --                                else do
-          --                                   traceShowA $ indent l <>  "**NOT** REPLACING ERROR "
-          --                                     <> "(EXISITNG: (" <> show depth' <> "): " <> pretty err' <> ")"
-          --                                     <> "(INCOMING: (" <> show depth <> "): " <> pretty err <> ")"
-          --                                     <> "(FOR: " <> pretty layout <> ")"
-          --                                   Just $ depth' /\ err'
-          --                            Nothing -> Just $ depth /\ err
-          --                            ) layout errs
-          --             else errs
          in do
           -- Check if we're done trying to recover.
           -- See the `draw -1` case below (`markFailed`).
@@ -535,18 +511,10 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
           -> ArgParser r _
         throwExpectedError depth xss@(x:xs) input =
           case errs of
-            Just (d /\ e) | d > depth -> throw e
+            Just (d /\ e) | d >= depth -> throw e
             _ -> case input of
               Nil  -> fail' $ missingArgumentsError (x:|xs)
               toks -> fail' $ unexpectedInputError xss (known <$> toks)
-          -- case Map.lookup x errs of
-          --   Just (d /\ e) -> do
-          --     trace l \_-> "THROWING EXISTING: (" <> show d <> "): "  <> pretty e
-          --     throw e
-          --   _ -> do
-          --     trace l \_-> "THROWING **NON** EXISTING" <> show x
-          --     trace l \_-> intercalate "\n" $ Map.toList errs <#> \(k /\ (d /\ e)) ->
-          --       show k <> " => " <> "(" <> show d <> ") " <> pretty e
 
     draw _ _ _ = pure Nil
 

@@ -2,6 +2,7 @@ module Neodoc.Data.LayoutConversion where
 
 import Prelude
 import Data.NonEmpty (NonEmpty, (:|))
+import Data.NonEmpty.Extra (concat) as NonEmpty
 import Data.List (List(..), catMaybes, fromFoldable, (:))
 import Data.Maybe (Maybe(..))
 import Neodoc.Data.Layout
@@ -42,3 +43,21 @@ toEmptyableBranch
    . Branch a
   -> EmptyableBranch a
 toEmptyableBranch xs = fromFoldable $ toEmptyableLayout <$> xs
+
+-- Flatten a branch into a single list of elements, i.e.:
+--
+--      -a (-b | -c)
+--
+-- would become:
+--
+--      -a -b -c
+--
+flattenBranch
+  :: ∀ a
+   . NonEmpty List (Layout a)
+  -> NonEmpty List a
+flattenBranch branch = NonEmpty.concat $ flattenLayout <$> branch
+  where
+  flattenLayout (Elem x) = x :| Nil
+  flattenLayout (Group _ _ branches)
+    = NonEmpty.concat $ NonEmpty.concat $ (flattenLayout <$> _) <$> branches
