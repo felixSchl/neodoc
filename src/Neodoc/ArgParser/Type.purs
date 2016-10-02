@@ -130,22 +130,22 @@ instance bindParser :: Bind (Parser e c s i) where
 
 instance monadParser :: Monad (Parser e c s i)
 
-catch :: ∀ e c s i a. Parser e c s i a -> (ParseError e -> Parser e c s i a) -> Parser e c s i a
+catch :: ∀ e c s i a. Parser e c s i a -> (s -> ParseError e -> Parser e c s i a) -> Parser e c s i a
 catch p f = Parser \c s i ->
   let step = unParser p c s i
    in case step of
-      Step consumed _ _ _ (Left (e@(ParseError fatal _)))
-        | not (fatal || consumed) -> unParser (f e) c s i
+      Step consumed _ s' _ (Left (e@(ParseError fatal _)))
+        | not (fatal || consumed) -> unParser (f s' e) c s i
       _ -> step
 
-catch' :: ∀ e c s i a. (ParseError e -> Parser e c s i a) -> Parser e c s i a -> Parser e c s i a
+catch' :: ∀ e c s i a. (s -> ParseError e -> Parser e c s i a) -> Parser e c s i a -> Parser e c s i a
 catch' = flip catch
 
 throw :: ∀ e c s i a. ParseError e -> Parser e c s i a
 throw e = Parser \c s i -> Step false c s i (Left e)
 
 instance altParser :: Alt (Parser e c s i) where
-  alt p1 p2 = catch p1 (const p2)
+  alt p1 p2 = catch p1 (\_ _ -> p2)
 
 instance plusParser :: Plus (Parser e c s i) where
   empty = fail "No alternative"

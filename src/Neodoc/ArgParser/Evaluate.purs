@@ -2,6 +2,7 @@ module Neodoc.ArgParser.Evaluate where
 
 import Prelude
 import Debug.Trace
+import Data.Pretty
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
 , null, length, reverse)
@@ -102,6 +103,9 @@ evalParsers p parsers = do
       deepest <- last $ groupBy eqByDepth $ sortBy cmpByDepth successes
       unsafePartial $ flip maximumBy deepest $ compare `on` case _ of
         SuccessEvaluation _ v -> p v
+
+  -- unsafePartial $ traceShowA $ errors <#> \(ErrorEvaluation _ e) ->
+    -- pretty e
 
   -- Ok, now that we have a potentially "best error" and a potentially "best
   -- match", take a pick.

@@ -233,7 +233,7 @@ parseLayout skippable isSkipping l layout = do
         parsers = flip mapWithIndex branches' \branch ix ->
           traceBracket (l + 1) ("EVALUTATION " <> show (ix + 1) <> "/" <> show nEvaluations) do
           {-withLocalCache do-}
-            parseExhaustively skippable isSkipping l (fromFoldable branch)
+            parseExhaustively skippable isSkipping (l + 1) (fromFoldable branch)
     in do
         vs <- (if o then option Nil else id) do
           if length parsers == 0 then pure Nil else
@@ -358,11 +358,11 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
     -- marking them "Required". The "Required" wrapper is used to make
     -- repetition work, while ensuring the parser terminates.
     let indexedLayouts = flip mapWithIndex xs \x ix -> Required (Indexed ix x)
-     in draw Map.empty (length xs) indexedLayouts
+     in draw Nothing (length xs) indexedLayouts
 
     where
     draw
-      :: Map SolvedLayout (ParseError ArgParseError)
+      :: Maybe (Tuple Int (ParseError ArgParseError))
       -> Int
       -> List (Required (Indexed SolvedLayout))
       -> ArgParser r (List KeyValue)
@@ -400,18 +400,40 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
             pure $ vs <> vss
 
       where
-      recover layout err =
+      recover layout { depth } err =
         let
           isFixed = not <<< Solved.isFreeLayout
-          errs' = if isGroup layout || isFixed layout
-                      then Map.alter (const (Just err)) layout errs
-                      else errs
+          errs' = case errs of
+                    Just (d /\ _) | depth >= d -> Just (depth /\ err)
+                    Nothing -> Just (depth /\ err)
+                    x -> x
+          -- errs' = if isGroup layout || isFixed layout
+          --             then Map.alter (case _ of
+          --                            Just (depth' /\ err') ->
+          --                             if depth > depth'
+          --                                then do
+          --                                   traceShowA $ indent l <> "REPLACING ERROR "
+          --                                     <> "(EXISITNG: (" <> show depth' <> "): " <> pretty err' <> ")"
+          --                                     <> "(INCOMING: (" <> show depth <> "): " <> pretty err <> ")"
+          --                                     <> "(FOR: " <> pretty layout <> ")"
+          --                                   Just $ depth /\ err
+          --                                else do
+          --                                   traceShowA $ indent l <>  "**NOT** REPLACING ERROR "
+          --                                     <> "(EXISITNG: (" <> show depth' <> "): " <> pretty err' <> ")"
+          --                                     <> "(INCOMING: (" <> show depth <> "): " <> pretty err <> ")"
+          --                                     <> "(FOR: " <> pretty layout <> ")"
+          --                                   Just $ depth' /\ err'
+          --                            Nothing -> Just $ depth /\ err
+          --                            ) layout errs
+          --             else errs
          in do
           -- Check if we're done trying to recover.
           -- See the `draw -1` case below (`markFailed`).
           failed <- hasFailed
           traceDraw n xss $ "! ERROR - (state.failed = " <> show failed
-                            <> ", error = " <> pretty err <> ")"
+                            <> ", error = " <> pretty err
+                            <> ", layout = " <> pretty layout
+                            <> ")"
           if failed
             then do
               traceDraw n xss $ "! ABORTING (failed)"
@@ -419,7 +441,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
 
             -- shortcut: there's no point trying again if there's nothing left
             -- to parse.
-            else if n == 0 || length xs == 0
+            else if false --  n == 0 || length xs == 0
               then
                 -- note: ensure that layouts do not change their relative
                 -- positioning, hence return the original input list, rather
@@ -484,36 +506,47 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
 
         fallbacks = mrights vs
 
+      { depth } <- getState
       if isSkipping && length missing > 0
         then do
           -- set the parser state to "failed".
           -- setting this will cause no more recoveries during succesive draws.
           setFailed
-          unsafePartial $ throwExpectedError missing input
+          unsafePartial $ throwExpectedError depth missing input
         else
           -- special case: when the input is empty, we choose to enable skipping
           -- "on the spot" as it's unlikely enough we'll find anything better.
           if skippable || null input
             then
               if not isSkipping
-                then {- XXX: withLocalCache do -}
-                  parseExhaustively true true l layouts
+                then do {- XXX: withLocalCache do -}
+                  traceDraw n xss "final ditch attempt"
+                  parseExhaustively true true (l + 1) layouts
                 else pure fallbacks
-            else unsafePartial $ throwExpectedError layouts input
+            else unsafePartial $ throwExpectedError depth layouts input
 
       where
         throwExpectedError
           :: ∀ r
            . Partial
-          => List SolvedLayout
+          => Int
+          -> List SolvedLayout
           -> List PositionedToken
           -> ArgParser r _
-        throwExpectedError xss@(x:xs) input =
-          case Map.lookup x errs of
-            Just e -> throw e
-            Nothing ->  case input of
+        throwExpectedError depth xss@(x:xs) input =
+          case errs of
+            Just (d /\ e) | d > depth -> throw e
+            _ -> case input of
               Nil  -> fail' $ missingArgumentsError (x:|xs)
               toks -> fail' $ unexpectedInputError xss (known <$> toks)
+          -- case Map.lookup x errs of
+          --   Just (d /\ e) -> do
+          --     trace l \_-> "THROWING EXISTING: (" <> show d <> "): "  <> pretty e
+          --     throw e
+          --   _ -> do
+          --     trace l \_-> "THROWING **NON** EXISTING" <> show x
+          --     trace l \_-> intercalate "\n" $ Map.toList errs <#> \(k /\ (d /\ e)) ->
+          --       show k <> " => " <> "(" <> show d <> ") " <> pretty e
 
     draw _ _ _ = pure Nil
 
@@ -567,13 +600,19 @@ terminate arg = do
 trace :: ∀ r. Int -> (List PositionedToken -> String) -> ArgParser r Unit
 trace l f = if _ENABLE_DEBUG_
               then do
+                state <- getState
                 input <- getInput
-                traceA $ indent l <> (f input)
+                traceA $ indent l <> stateLabel state <> (f input)
               else pure unit
+  where
+  stateLabel { hasFailed, hasTerminated, depth } = 
+    (if hasTerminated then "✓" else "·")
+    <> (if hasFailed then "✘" else "·")
+    <> "(" <> show depth <> ")"
 
 traceError :: ∀ r a. Int -> String -> ArgParser r a  -> ArgParser r a
 traceError l s
-  = catch' (\e -> trace l (\_ -> "! " <> s <> ": " <> pretty e) *> throw e)
+  = catch' (\_ e -> trace l (\_ -> "! " <> s <> ": " <> pretty e) *> throw e)
 
 traceInput :: ∀ r. ArgParser r Unit
 traceInput = traceA =<< pretty <$> getInput
