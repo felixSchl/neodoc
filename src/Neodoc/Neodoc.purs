@@ -167,9 +167,9 @@ _run input (NeodocOptions opts) = do
   spec@(Spec { descriptions }) <- runNeodocError Nothing do
     let fromJSCallback
           :: ∀ a
-           . (Spec a -> Eff _ (Spec a))
-          -> Spec a
-          -> Either _ (Spec a)
+           . (Pretty a)
+          => (Spec a -> Eff _ (Spec a))
+          -> (Spec a -> Either _ (Spec a))
         fromJSCallback cb = \spec ->
           let result = unsafePerformEff (cb spec)
            in Right result

@@ -157,7 +157,7 @@ describe('neodoc', () => {
           }
         });
 
-        expect({ i, k }).to.equal({ i: 1, k: 1 });
+        expect({ i, k }).to.deep.equal({ i: 1, k: 1 });
         expect(args).to.deep.equal({
           '-a': true
         , '-b': true
@@ -171,10 +171,9 @@ describe('neodoc', () => {
         `, {
           dontExit: true
         , argv: []
-        , transform: {
+        , transforms: {
             presolve: [
               spec => {
-                console.log(spec);
                 spec.layouts = [];
                 return spec;
               }

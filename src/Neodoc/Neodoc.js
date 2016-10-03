@@ -56,3 +56,15 @@ exports.readPkgVersionImpl = function (Just) {
     }
   }
 };
+
+exports.runUnsafeJSCallbackOnce = function(cb) {
+  var hasRun = false;
+  var lastResult = null;
+  return function (arg) {
+    if (hasRun) { return lastResult; }
+    hasRun = true;
+    lastResult = cb(arg)();
+    console.log(hasRun, lastResult);
+    return lastResult
+  };
+}

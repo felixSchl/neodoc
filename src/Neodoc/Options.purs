@@ -125,7 +125,7 @@ instance isForeign :: IsForeign NeodocOptions where
                   Right s -> pure s
       readPostsolveTransforms v = do
         -- note: we trust these are functions for now.
-        callbacks :: Array Foreign <- F.defaultIfUndefined "presolve" [] v
+        callbacks :: Array Foreign <- F.defaultIfUndefined "postsolve" [] v
         pure $ Left $ callbacks <#> \fn ->
           \(spec :: Spec SolvedLayout) ->
             let spec' = (unsafeCoerce fn) (F.write $ toEmptyableSpec spec)
