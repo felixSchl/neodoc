@@ -133,7 +133,7 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError
         parsers = toplevelBranches <#> \toplevel ->
           traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
             unsetFailed
-            vs <- {-withLocalCache-} do
+            vs <- do
               parseExhaustively true false 0 (fromFoldable toplevel)
             eof
             pure $ ArgParseResult (Just toplevel) vs
@@ -227,7 +227,6 @@ parseLayout skippable isSkipping l layout = do
         nEvaluations = length branches'
         parsers = flip mapWithIndex branches' \branch ix ->
           traceBracket (l + 1) ("EVALUTATION " <> show (ix + 1) <> "/" <> show nEvaluations) do
-          {-withLocalCache do-}
             parseExhaustively skippable isSkipping (l + 1) (fromFoldable branch)
     in do
         vs <- (if o then option Nil else id) do
@@ -376,7 +375,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
             -- recursive down each of the groups branches to try and make a
             -- match. Based on wether or not `isSkipping` is set to true, allow
             -- the layout to substitute values from fallback sources.
-            vs <- cached x $ try $ mod do
+            vs <- try $ mod do
               parseLayout
                 isSkipping  -- propagate the 'isSkipping' property
                 false       -- reset 'skipable' to false
@@ -495,7 +494,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
           if skippable || null input
             then
               if not isSkipping
-                then do {- XXX: withLocalCache do -}
+                then do
                   traceDraw n xss "final ditch attempt"
                   parseExhaustively true true (l + 1) layouts
                 else pure fallbacks
@@ -532,9 +531,6 @@ termAs _ = Nothing
 -- Is this layout capable of acting as a terminator for options-first?
 canTerm :: SolvedLayout -> Boolean
 canTerm = isJust <<< termAs
-
--- TODO: implement
-cached _ = id
 
 -- Chunk a branch
 --   E(foo) G(-a -b -c) E(-x) => [Fixed([E(foo)]), Free([G(-a -b -c), E(-x)])]
