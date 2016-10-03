@@ -148,6 +148,17 @@ Options:
   `opts.versionFlags` is non-empty and `opts.version` is not set.
 * `opts.helpFlags` - An array of flags that trigger the special help
   behavior: Print the full program help text and exit with code 0.
+* `opts.transforms.presolve` - an array of functions to be called prior to
+  "solving" the input. This function takes the spec as it's only parameter.
+  At this point, the spec is mostly untouched by neodoc with the exception of
+  smart-options which runs as a fixed transform prior to user-provided callbacks
+  if `smart-options` is true. Transforms that need to be aware of option stacks
+  and `[...-options]` references should run here as this information is lost
+  during the solving transforms.
+* `opts.transforms.postsolve` - an array of functions to be called after
+  "solving" the input, just prior to passing the spec to the arg-parser. This
+  function takes the spec as it's only parameter. At this point, the spec has
+  been fully solved, expanded and canonicalised.
 
 For example:
 
