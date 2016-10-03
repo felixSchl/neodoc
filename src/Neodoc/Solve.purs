@@ -3,6 +3,10 @@ module Neodoc.Solve where
 import Prelude
 import Debug.Trace
 import Data.Either (Either(..), either)
+import Data.List (List(..))
+import Data.List as List
+import Data.Foldable (class Foldable)
+import Data.Traversable (for)
 import Neodoc.Spec
 import Neodoc.Spec as Spec
 import Neodoc.Data.UsageLayout
@@ -18,13 +22,24 @@ type SolveOptions r = {
   | r
 }
 
-solve
+solve'
   :: ∀ r
-   .  SolveOptions r
+   . SolveOptions r
+  -> List (Spec UsageLayout  -> Either SolveError (Spec UsageLayout))
+  -> List (Spec SolvedLayout -> Either SolveError (Spec SolvedLayout))
   -> Spec UsageLayout
   -> Either SolveError (Spec SolvedLayout)
-solve { smartOptions } spec = pure spec
-    >>= (if smartOptions then Solve.smartOptions else pure)
-    >>= Solve.expandOptions
-    >>= Solve.expandReferences
-    >>= Solve.canonicalise
+solve' { smartOptions } usageTs solvedTs =
+      (if smartOptions then Solve.smartOptions else pure)
+  >=> flip (List.foldM (#)) usageTs
+  >=> Solve.expandOptions
+  >=> Solve.expandReferences
+  >=> Solve.canonicalise
+  >=> flip (List.foldM (#)) solvedTs
+
+solve
+  :: ∀ r
+   . SolveOptions r
+  -> Spec UsageLayout
+  -> Either SolveError (Spec SolvedLayout)
+solve opts = solve' opts Nil Nil
