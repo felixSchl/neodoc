@@ -182,6 +182,54 @@ describe('neodoc', () => {
         });
       });
     });
+
+    describe('postsolve hooks', () => {
+      it('should get called once per run', () => {
+        let i = 0, k = 0;
+        const args = neodoc.run(`\
+          usage: prog -a -b -c
+        `, {
+          dontExit: true
+        , argv: ['-a', '-b', '-c']
+        , transforms: {
+            presolve: [
+              spec => {
+                i += 1;
+                return spec;
+              }
+            , spec => {
+                k += 1;
+                return spec;
+              }
+            ]
+          }
+        });
+
+        expect({ i, k }).to.deep.equal({ i: 1, k: 1 });
+        expect(args).to.deep.equal({
+          '-a': true
+        , '-b': true
+        , '-c': true
+        });
+      });
+
+      it('should be able to change the spec', () => {
+        const args = neodoc.run(`\
+          usage: prog foo
+        `, {
+          dontExit: true
+        , argv: []
+        , transforms: {
+            presolve: [
+              spec => {
+                spec.layouts = [];
+                return spec;
+              }
+            ]
+          }
+        });
+      });
+    });
   });
 
   describe('issues', () => {
