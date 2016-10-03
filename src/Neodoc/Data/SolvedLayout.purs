@@ -1,14 +1,22 @@
 module Neodoc.Data.SolvedLayout where
 
 import Prelude
+import Data.Either (Either(..))
 import Data.Pretty (class Pretty, pretty)
 import Data.Maybe (Maybe(..), maybe)
+import Data.Bifunctor (lmap)
 import Data.Tuple.Nested ((/\))
 import Data.Foldable (intercalate, all)
 import Data.String as String
 import Data.List (List)
 import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty)
+import Data.Foreign as F
+import Data.Foreign.Class as F
+import Data.Foreign.Index as F
+import Data.Foreign.Index ((!))
+import Data.Foreign.Class
+import Data.Foreign.Extra as F
 import Neodoc.Data.Layout
 import Neodoc.OptionAlias
 import Neodoc.ArgKey (ArgKey(..))
@@ -90,6 +98,48 @@ instance prettySolvedLayoutArg :: Pretty SolvedLayoutArg where
     go Stdin = "-"
     go (Option n mA r) = pretty n <> maybe "" pretty mA <> rep r
     rep r = if r then "..." else ""
+
+instance asForeignSolvedLayoutArg :: AsForeign SolvedLayoutArg where
+  write (Command n r) = F.toForeign {
+      type: "Command"
+    , name: F.write n
+    , repeatable: F.write r
+    }
+  write (Positional n r) = F.toForeign {
+      type: "Positional"
+    , name: F.write n
+    , repeatable: F.write r
+    }
+  write (Option n mArg r) = F.toForeign {
+      type: "Option"
+    , name: F.write n
+    , argument: maybe F.undefined F.write mArg
+    , repeatable: F.write r
+    }
+  write Stdin = F.toForeign { type: "Stdin" }
+  write EOA = F.toForeign { type: "EOA" }
+
+instance isForeignSolvedLayoutArg :: IsForeign SolvedLayoutArg where
+  read v = do
+    typ :: String <- String.toUpper <$> F.readProp "type" v
+
+    case typ of
+      "EOA" -> pure EOA
+      "STDIN" -> pure Stdin
+      "COMMAND" ->
+        Command
+          <$> F.readProp "name"       v
+          <*> F.readProp "repeatable" v
+      "POSITIONAL" ->
+        Positional
+          <$> F.readProp "name"       v
+          <*> F.readProp "repeatable" v
+      "OPTION" ->
+        Option
+          <$> F.readProp "name" v
+          <*> F.readPropMaybe "argument" v
+          <*> F.readProp "repeatable" v
+      _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
 isRepeatable :: SolvedLayout -> Boolean
 isRepeatable (Group           _ r _) = r
