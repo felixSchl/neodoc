@@ -18,6 +18,8 @@ import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
 import Data.Foreign.Extra as F
+import Data.Foreign (F)
+import Control.Alt ((<|>))
 import Neodoc.Data.Layout
 import Neodoc.Data.Description
 

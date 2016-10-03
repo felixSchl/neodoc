@@ -1,8 +1,8 @@
 module Neodoc.Options where
 
 import Prelude
-import Data.Maybe (Maybe(..), maybe)
-import Data.Either (Either(..))
+import Data.Maybe (Maybe(..), maybe, fromMaybe)
+import Data.Either (Either(..), fromRight)
 import Data.Foreign (F, Foreign)
 import Data.Foreign as F
 import Data.Foreign.Class as F
@@ -10,9 +10,22 @@ import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
 import Data.Foreign.Extra as F
+import Control.Monad.Eff.Exception (Error, throwException, error, EXCEPTION)
+import Control.Monad.Eff
+import Neodoc.Spec
+import Neodoc.Data.EmptyableLayout
+import Neodoc.Data.UsageLayout
+import Neodoc.Data.SolvedLayout
+import Neodoc.Solve.Error
 import Neodoc.Solve (SolveOptions)
 import Neodoc.ArgParser.Options as ArgParser
 import Neodoc.Env (Env(), unwrapEnv)
+import Neodoc.SpecConversions (fromEmptyableSpec, toEmptyableSpec)
+import Unsafe.Coerce
+
+foreign import data JSCALLBACK :: !
+
+type JsCallbackEff = (jsCallback :: JSCALLBACK, err :: EXCEPTION)
 
 type Argv = Array String
 newtype NeodocOptions = NeodocOptions {
@@ -27,6 +40,14 @@ newtype NeodocOptions = NeodocOptions {
 , version      :: Maybe String -- ^ the version string to display
 , versionFlags :: Array String -- ^ list of flags that trigger 'version'
 , helpFlags    :: Array String -- ^ list of flags that trigger 'help'
+, transforms   :: {
+    presolve :: ∀ eff. Either
+      (Array (Spec UsageLayout -> Eff JsCallbackEff (Spec UsageLayout)))
+      (Array (Spec UsageLayout -> Either SolveError (Spec UsageLayout)))
+  , postsolve :: ∀ eff. Either
+      (Array (Spec SolvedLayout -> Eff JsCallbackEff (Spec SolvedLayout)))
+      (Array (Spec SolvedLayout -> Either SolveError (Spec SolvedLayout)))
+  }
 }
 
 defaultOptions :: NeodocOptions
@@ -44,6 +65,7 @@ _defaults = {
 , version:      Nothing
 , versionFlags: [ "--version" ]
 , helpFlags:    [ "--help"    ]
+, transforms:   { presolve: Right [], postsolve: Right [] }
 }
 
 instance isForeign :: IsForeign NeodocOptions where
@@ -59,6 +81,7 @@ instance isForeign :: IsForeign NeodocOptions where
     , version:      _
     , versionFlags: _
     , helpFlags:    _
+    , transforms:   _
     }
       <$> readArgv         v
       <*> readEnv          v
@@ -71,6 +94,7 @@ instance isForeign :: IsForeign NeodocOptions where
       <*> readVersion      v
       <*> readVersionFlags v
       <*> readHelpFlags    v
+      <*> readTransforms   v
 
     where
     readArgv         = _maybe "argv"
@@ -84,6 +108,30 @@ instance isForeign :: IsForeign NeodocOptions where
     readStopAt       = _default  "stopAt"       _defaults.stopAt
     readVersionFlags = _default  "versionFlags" _defaults.versionFlags
     readHelpFlags    = _default  "helpFlags"    _defaults.helpFlags
-    _maybe          = F.readPropMaybe
-    _default        = F.defaultIfUndefined
-    _readBool k d v = F.isTruthy <$> _default k (F.truthy d) v
+    readTransforms v = do
+      transforms :: Foreign <- F.defaultIfUndefined "transforms" (F.toForeign {}) v
+      { presolve: _, postsolve: _ }
+        <$> readPresolveTransforms transforms
+        <*> readPostsolveTransforms transforms
+      where
+      readPresolveTransforms v = do
+        -- note: we trust these are functions for now.
+        callbacks :: Array Foreign <- F.defaultIfUndefined "presolve" [] v
+        pure $ Left $ callbacks <#> \fn ->
+          \(spec :: Spec UsageLayout) ->
+            let spec' = (unsafeCoerce fn) (F.write $ toEmptyableSpec spec)
+             in case fromEmptyableSpec <$> (F.read spec' :: Either _ (Spec (EmptyableLayout UsageLayoutArg))) of
+                  Left e  -> throwException $ error $ show e
+                  Right s -> pure s
+      readPostsolveTransforms v = do
+        -- note: we trust these are functions for now.
+        callbacks :: Array Foreign <- F.defaultIfUndefined "presolve" [] v
+        pure $ Left $ callbacks <#> \fn ->
+          \(spec :: Spec SolvedLayout) ->
+            let spec' = (unsafeCoerce fn) (F.write $ toEmptyableSpec spec)
+             in case fromEmptyableSpec <$> (F.read spec' :: Either _ (Spec (EmptyableLayout SolvedLayoutArg))) of
+                  Left e  -> throwException $ error $ show e
+                  Right s -> pure s
+    _maybe           = F.readPropMaybe
+    _default         = F.defaultIfUndefined
+    _readBool k d v  = F.isTruthy <$> _default k (F.truthy d) v

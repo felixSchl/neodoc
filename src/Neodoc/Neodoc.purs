@@ -4,9 +4,9 @@ module Neodoc (
 , runJS
 , runPure
 , runPure'
-, readSpec
 , parseHelpText
 , parseHelpTextJS
+, readSpec
 , Output (..)
 , module Reexports
 ) where
@@ -43,6 +43,7 @@ import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Console as Console
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Unsafe
 import Node.Process (PROCESS)
 import Node.Process as Process
 import Node.FS (FS)
@@ -52,6 +53,7 @@ import Partial.Unsafe (unsafePartial)
 
 import Neodoc.Spec
 import Neodoc.Options
+import Neodoc.Data.Layout
 import Neodoc.Data.UsageLayout
 import Neodoc.Data.LayoutConversion
 import Neodoc.Data.EmptyableLayout
@@ -60,6 +62,7 @@ import Neodoc.Error.Class (capture) as Error
 import Neodoc.Error as Error
 import Neodoc.Error (NeodocError)
 import Neodoc.Scanner as Scanner
+import Neodoc.SpecConversions as Spec
 import Neodoc.Spec.Parser as Spec
 import Neodoc.Spec.Lexer as Lexer
 import Neodoc.Solve as Solver
@@ -130,18 +133,7 @@ readSpec input = do
   spec :: Either (Spec (EmptyableLayout UsageLayoutArg)) String <- do
     (Right <$> F.read input) <|>
     (Left  <$> F.read input)
-
-  -- hold on to your hats, it's going to get nasty:
-  -- we have to prune any branches that came in empty.
-  let spec' = flip lmap spec \(Spec spec@{ layouts }) ->
-      let layouts' = layouts <#> \branches ->
-            catMaybes $ fromFoldable $ branches <#> \branch ->
-              let branch' = catMaybes $ fromFoldable $ branch <#> \layout -> toStrictLayout layout
-                in case branch' of
-                  Nil  -> Nothing
-                  x:xs -> Just $ x:|xs
-       in Spec (spec { layouts = layouts' })
-  pure spec'
+  pure $ lmap Spec.fromEmptyableSpec spec
 
 run
   :: ∀ eff
@@ -173,8 +165,20 @@ _run input (NeodocOptions opts) = do
 
   -- 2. solve the spec
   spec@(Spec { descriptions }) <- runNeodocError Nothing do
+    let fromJSCallback
+          :: ∀ a
+           . (Spec a -> Eff _ (Spec a))
+          -> Spec a
+          -> Either _ (Spec a)
+        fromJSCallback cb = \spec ->
+          let result = unsafePerformEff (cb spec)
+           in Right result
     Error.capture do
-      Solver.solve opts inputSpec
+      Solver.solve'
+        opts
+        (fromFoldable $ either (fromJSCallback <$> _) id opts.transforms.presolve)
+        (fromFoldable $ either (fromJSCallback <$> _) id opts.transforms.postsolve)
+        inputSpec
 
   -- 3. run the arg parser agains the spec and user input
   output <- runNeodocError (Just program) do
@@ -280,10 +284,9 @@ parseHelpTextJS = mkFn1 go
     case parseHelpText help of
       Left e ->
         let msg = renderNeodocError Nothing e
-        in throwException $ jsError msg {}
-      Right (Spec spec) ->
-        let layouts = ((toEmptyableLayout <$> _) <$> _) <$> spec.layouts
-        in pure $ F.write $ Spec $ spec { layouts = layouts }
+         in throwException $ jsError msg {}
+      Right spec ->
+        pure $ F.write $ Spec.toEmptyableSpec spec
 
 parseHelpText
   :: String

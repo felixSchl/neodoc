@@ -152,6 +152,10 @@ readTests filepath = do
                       , version:      Nothing
                       , versionFlags: []
                       , helpFlags:    []
+                      , transforms: {
+                          presolve: Right []
+                        , postsolve: Right []
+                        }
                       }
                     }
 

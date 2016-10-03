@@ -30,11 +30,6 @@ data Layout a
 getElem :: ∀ a. Partial => Layout a -> a
 getElem (Elem x) = x
 
--- instance isForeignLayout :: (IsForeign a) => IsForeign (Layout a) where
---   read v = do
---     emptyableLayout :: EmptyableLayout a <- F.read v
---     toStrictLayout
-
 instance functorLayout :: Functor Layout where
   map f (Group o r xs) = Group o r $ ((f <$> _) <$> _) <$> xs
   map f (Elem x)       = Elem (f x)

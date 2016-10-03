@@ -27,11 +27,13 @@ import Unsafe.Coerce (unsafeCoerce)
 import Control.Apply ((*>), (<*))
 import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
 import Data.Array as A
+import Data.Foreign.Class as F
 import Data.Array.Partial as AU
 import Node.FS (FS)
 import Partial.Unsafe
 
 import Neodoc as Neodoc
+import Neodoc.SpecConversions (fromEmptyableSpec)
 import Neodoc.Data.UsageLayout
 
 import Test.Support.CompatParser
@@ -72,8 +74,7 @@ foreignSpec tests = describe "Crossing JS/purescript" do
             input <- unsafeInterleaveEff do
               runFn1 Neodoc.parseHelpTextJS helpText
 
-            let result = unsafePartial $ fromLeft <$> do
-                  Neodoc.readSpec (toForeign input)
+            let result = fromEmptyableSpec <$> F.read input
 
             case result of
               Left e -> throwException $ error $ F.prettyForeignError e
