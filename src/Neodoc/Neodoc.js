@@ -6,13 +6,19 @@
 var fs = require('fs');
 var path = require('path');
 
+function NeodocError(message, payload) {
+  this.message = message;
+  this.payload = payload;
+  Error.call(this);
+}
+
+NeodocError.prototype.name = 'NeodocError';
+NeodocError.prototype = Object.create(Error);
+
 exports.jsError = function(msg) {
   return function(payload) {
-    return new Error({
-      message: msg,
-      payload: payload
-    })
-  }
+    return new NeodocError(msg, payload);
+  };
 };
 
 exports.undefined = undefined;
