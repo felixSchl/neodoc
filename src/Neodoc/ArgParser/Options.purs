@@ -4,10 +4,11 @@ module Neodoc.ArgParser.Options (
 
 -- | The options for generating a parser
 type Options r = {
-  optionsFirst :: Boolean
-, stopAt       :: Array String
-, requireFlags :: Boolean
-, laxPlacement :: Boolean
+  optionsFirst      :: Boolean
+, stopAt            :: Array String
+, requireFlags      :: Boolean
+, laxPlacement      :: Boolean
+, repeatableOptions :: Boolean
   | r
 }
 

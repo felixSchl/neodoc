@@ -40,6 +40,7 @@ newtype NeodocOptions = NeodocOptions {
 , version      :: Maybe String -- ^ the version string to display
 , versionFlags :: Array String -- ^ list of flags that trigger 'version'
 , helpFlags    :: Array String -- ^ list of flags that trigger 'help'
+, repeatableOptions :: Boolean -- ^ options are always allowed to repeat
 , transforms   :: {
     presolve :: ∀ eff. Either
       (Array (Spec UsageLayout -> Eff JsCallbackEff (Spec UsageLayout)))
@@ -66,6 +67,7 @@ _defaults = {
 , versionFlags: [ "--version" ]
 , helpFlags:    [ "--help"    ]
 , transforms:   { presolve: Right [], postsolve: Right [] }
+, repeatableOptions: false
 }
 
 instance isForeign :: IsForeign NeodocOptions where
@@ -82,6 +84,7 @@ instance isForeign :: IsForeign NeodocOptions where
     , versionFlags: _
     , helpFlags:    _
     , transforms:   _
+    , repeatableOptions: _
     }
       <$> readArgv         v
       <*> readEnv          v
@@ -95,19 +98,21 @@ instance isForeign :: IsForeign NeodocOptions where
       <*> readVersionFlags v
       <*> readHelpFlags    v
       <*> readTransforms   v
+      <*> readRepeatOptions v
 
     where
-    readArgv         = _maybe "argv"
-    readEnv v        = (unwrapEnv <$> _) <$> F.readPropMaybe "env" v
-    readOptionsFirst = _readBool "optionsFirst" _defaults.optionsFirst
-    readDontExit     = _readBool "dontExit"     _defaults.dontExit
-    readSmartOptions = _readBool "smartOptions" _defaults.smartOptions
-    readRequireFlags = _readBool "requireFlags" _defaults.requireFlags
-    readLaxPlacement = _readBool "laxPlacement" _defaults.laxPlacement
-    readVersion      = _maybe    "version"
-    readStopAt       = _default  "stopAt"       _defaults.stopAt
-    readVersionFlags = _default  "versionFlags" _defaults.versionFlags
-    readHelpFlags    = _default  "helpFlags"    _defaults.helpFlags
+    readArgv          = _maybe "argv"
+    readEnv v         = (unwrapEnv <$> _) <$> F.readPropMaybe "env" v
+    readOptionsFirst  = _readBool "optionsFirst"      _defaults.optionsFirst
+    readDontExit      = _readBool "dontExit"          _defaults.dontExit
+    readSmartOptions  = _readBool "smartOptions"      _defaults.smartOptions
+    readRequireFlags  = _readBool "requireFlags"      _defaults.requireFlags
+    readLaxPlacement  = _readBool "laxPlacement"      _defaults.laxPlacement
+    readRepeatOptions = _readBool "repeatableOptions" _defaults.laxPlacement
+    readVersion       = _maybe    "version"
+    readStopAt        = _default  "stopAt"            _defaults.stopAt
+    readVersionFlags  = _default  "versionFlags"      _defaults.versionFlags
+    readHelpFlags     = _default  "helpFlags"         _defaults.helpFlags
     readTransforms v = do
       transforms :: Foreign <- F.defaultIfUndefined "transforms" (F.toForeign {}) v
       { presolve: _, postsolve: _ }

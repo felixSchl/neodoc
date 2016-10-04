@@ -55,11 +55,12 @@ import Neodoc.Evaluate as Evaluate
 isolate :: Boolean
 isolate = false
 
-type Options =  { stopAt       :: Array String
-                , optionsFirst :: Boolean
-                , smartOptions :: Boolean
-                , requireFlags :: Boolean
-                , laxPlacement :: Boolean
+type Options =  { stopAt            :: Array String
+                , optionsFirst      :: Boolean
+                , smartOptions      :: Boolean
+                , requireFlags      :: Boolean
+                , laxPlacement      :: Boolean
+                , repeatableOptions :: Boolean
                 }
 
 defaultOptions :: Options
@@ -69,6 +70,7 @@ defaultOptions = {
 , smartOptions: true
 , requireFlags: false
 , laxPlacement: false
+, repeatableOptions: false
 }
 
 type Test = { help  :: String

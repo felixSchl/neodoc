@@ -342,8 +342,11 @@ parseChunk
   -> Chunk (List SolvedLayout)
   -> ArgParser r (List KeyValue)
 parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
+  { options } <- getConfig
   traceBracket l ("chunk (" <> pretty chunk <> ")") do
-    go chunk
+    vs <- go options chunk
+    vs' <- consumeRest
+    pure $ vs <> vs'
 
   where
   traceDraw :: ∀ a. (Pretty a) => Int -> (List a) -> String -> ArgParser r Unit
@@ -353,8 +356,12 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
       <> " (elems: " <> pretty xss <> ")"
       <> " (input: " <> pretty input <> ")"
 
-  go (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
-  go (Free  xs) =
+  consumeRest :: ∀ r. ArgParser r (List KeyValue)
+  consumeRest = do
+    pure Nil
+
+  go _ (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
+  go opts (Free  xs) =
     -- We decorate all arguments with an index from left to right, as well as
     -- marking them "Required". The "Required" wrapper is used to make
     -- repetition work, while ensuring the parser terminates.
@@ -395,6 +402,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
             -- recursively, but mark successive matches as "optional".
             vss <- try do
               if (Solved.isRepeatable layout &&
+                  (opts.repeatableOptions && Solved.isOptionElem layout) &&
                   any (snd >>> isFrom Origin.Argv) vs)
                   then draw errs (length xss) (xs <> pure (toOptional x))
                   else draw errs (length xs) xs

@@ -3396,3 +3396,28 @@ $ prog configure --clientid 123 --foo
 
 $ prog configure --clientid 123 --clientsecret
 "option requires argument: --clientsecret"
+
+#
+# repeatable options (#32)
+#
+
+r"""
+usage: prog (-c | -d) foo -e
+"""
+
+$ prog/R -c -c -c foo -e -e
+{"-c": 3, "foo": true, "-e": 2}
+
+r"""
+usage: prog -a -b -c
+"""
+
+$ prog/R -a -b -c -b
+{"-c": 3, "foo": true, "-e": 2}
+
+r"""
+usage: prog [-c FOO]
+"""
+
+$ prog/Rs -c foo -c bar -c qux
+{"-c": ["foo", "bar", "qux"]}

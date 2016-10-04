@@ -138,6 +138,10 @@ isCommand :: SolvedLayoutArg -> Boolean
 isCommand (Command _ _) = true
 isCommand _ = false
 
+isOptionElem :: SolvedLayout -> Boolean
+isOptionElem (Elem x) = isOption x
+isOptionElem _ = false
+
 isOption :: SolvedLayoutArg -> Boolean
 isOption (Option _ _ _) = true
 isOption _ = false
