@@ -520,8 +520,8 @@ Here, `--foo` won't be expanded again and hence remain required.
 > when it comes down to it. The universal docopt test suite has been adjusted
 > accordingly.
 
-* **Better Error reporting.** Let the user of your utility know why his input
-  was rejected.
+* **Better Error reporting.** Let the user of your utility know why input was
+  rejected and how to fix it
 * **Optional arguments.** Neodoc understands `--foo[=BAR]` (or `-f[=<bar>]`) as
   an option that can be provided either with or without an argument.
 * **Alias matches.** If `--verbose` yields a value, so will `-v` <sub>(given
@@ -548,8 +548,6 @@ Here, `--foo` won't be expanded again and hence remain required.
   ```sh
   Usage: prog [[<name>] [<type>]]
   ```
-  Also refer to issue #44 which will introduce a slight change in behaviour once
-  completed.
 * **No abbreviations:**
   `--ver` does not match `--verbose`.
   <sub>[(mis-feature in the original implementation)](https://github.com/docopt/docopt/issues/104)</sub>
@@ -562,7 +560,81 @@ Here, `--foo` won't be expanded again and hence remain required.
     1. User input (per `process.argv`)
     1. Environment variables (per `[env: ...]` tag)
     1. Option defaults (per `[default: ...]` tag)
+* **Stricter document layout**. Neodoc imposes more restrictions on the format
+  of the help text in order to achieve certain goals, such as:
+  * Neodoc allows associating option aliases over newlines:
 
+    ```
+    options:
+     -f,
+     --foo this is foo
+    ```
+
+  * Neodoc does **not** require 2 spaces between option and argument. Instead,
+    only those arguments that visually "look like" arguments are considered for
+    binding (i.e. all-caps: `ARG` and in-angles: `<arg>`):
+
+    ```
+    options:
+     -f,
+     --foo ARG
+    ```
+
+    Should there be any ambiguity, the option can also be explicitly bound:
+
+    ```
+    options:
+     -f,
+     --foo=ARG
+    ```
+
+    The same is true for optional arguments:
+
+    ```
+    options:
+     -f,
+     --foo [ARG]
+     -b,
+     --bar[=ARG]
+    ```
+
+  * Neodoc is more conservative on learning about options in order to prevent
+    subtly introducing options:
+
+    ```
+    usage: prog [options]
+
+    options:
+
+    --foo this is foo, and it is similar to some-command's
+            --bar in that it does qux.
+    ```
+
+    Here, the author is talking about `--bar` in another context, so it should
+    not be considered an option to the program. Neodoc figures this out based on
+    indentation of the previous description start.
+  * Neodoc allows interspersing spaces in between usage layouts:
+
+    ```
+    usage:
+      prog foo bar
+
+      prog qux woo
+    ```
+
+    it is important to not that in this format (above), identation of the layout
+    **is required**.
+    or:
+
+    ```
+    usage: prog foo bar
+
+       or: prog qux woo
+    ```
+
+   * Neodoc requires an `Options:` section title in order to parse any options
+     (see [#76][issue-76] for discussion). **note: I am interested in a proposal
+     on how to lift this requirement**.
 
 ## License ##
 
@@ -577,3 +649,4 @@ See file `LICENSE` for a more detailed description of its terms.
 [issue-55]: https://github.com/felixSchl/neodoc/issues/55
 [issue-24]: https://github.com/felixSchl/neodoc/issues/24
 [issue-57]: https://github.com/felixSchl/neodoc/issues/57
+[issue-76]: https://github.com/felixSchl/neodoc/issues/76
