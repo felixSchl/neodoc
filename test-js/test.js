@@ -134,6 +134,57 @@ describe('neodoc', () => {
     });
   });
 
+  describe('transform hooks', () => {
+    describe('presolve hooks', () => {
+      it('should get called once per run', () => {
+        let i = 0, k = 0;
+        const args = neodoc.run(`\
+          usage: prog -a -b -c
+        `, {
+          dontExit: true
+        , argv: ['-a', '-b', '-c']
+        , transforms: {
+            presolve: [
+              spec => {
+                i += 1;
+                return spec;
+              }
+            , spec => {
+                k += 1;
+                return spec;
+              }
+            ]
+          }
+        });
+
+        expect({ i, k }).to.equal({ i: 1, k: 1 });
+        expect(args).to.deep.equal({
+          '-a': true
+        , '-b': true
+        , '-c': true
+        });
+      });
+
+      it('should be able to change the spec', () => {
+        const args = neodoc.run(`\
+          usage: prog foo
+        `, {
+          dontExit: true
+        , argv: []
+        , transform: {
+            presolve: [
+              spec => {
+                console.log(spec);
+                spec.layouts = [];
+                return spec;
+              }
+            ]
+          }
+        });
+      });
+    });
+  });
+
   describe('issues', () => {
     describe('#71 - remove left & right trimming', () => {
       it('should not trim the help text', () => {
