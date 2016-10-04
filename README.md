@@ -124,6 +124,8 @@ canonical form of the option and its alias, if available.
 
 Options:
 
+* `opts.dontExit` - Do not exit upon error or when parsing `--help` or
+    `--version`. Instead throw and error / return the value.
 * `opts.env` - Override `process.env`
 * `opts.argv` - Override `process.argv`
 * `opts.optionsFirst` - Parse until the first `command` or `<positional>`
