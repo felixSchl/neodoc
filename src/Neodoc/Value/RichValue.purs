@@ -10,6 +10,7 @@ module Neodoc.Value.RichValue (
 ) where
 
 import Prelude
+import Data.Generic
 import Data.Pretty (class Pretty, pretty)
 import Neodoc.Value (Value, prettyPrintValue)
 import Neodoc.Value.Origin (Origin)
@@ -20,7 +21,20 @@ type RichValueObj = {
 , origin :: Origin
 }
 
-newtype RichValue = RichValue RichValueObj
+newtype RichValue = RichValue {
+  value  :: Value
+, origin :: Origin
+}
+
+derive instance eqRichValue :: Eq RichValue
+derive instance genericRichValue :: Generic RichValue
+
+instance showRichValue :: Show RichValue where
+  show = gShow
+
+instance prettyRichValue :: Pretty RichValue where
+  pretty (RichValue v) = pretty v.value <> " " <> "(" <> show v.origin <> ")"
+
 
 unRichValue :: RichValue -> RichValueObj
 unRichValue (RichValue o) = o
@@ -37,18 +51,5 @@ getValue (RichValue v) = v.value
 getOrigin :: RichValue -> Origin
 getOrigin (RichValue v) = v.origin
 
-instance showRichValue :: Show RichValue where
-  show (RichValue v) = "(RichValue { origin: " <> show v.origin
-                               <> ", value: "  <> show v.value
-                               <> "})"
-
-instance eqRichValue :: Eq RichValue where
-  eq (RichValue v) (RichValue v') = v.origin == v'.origin
-                                 && v.value  == v'.value
-
 from :: Origin -> Value -> RichValue
 from o v = RichValue $ { value: v, origin: o }
-
-instance prettyRichValue :: Pretty RichValue where
-  pretty (RichValue v) = pretty v.value <> " " <> "(" <> show v.origin <> ")"
-

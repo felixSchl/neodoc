@@ -1,6 +1,7 @@
 module Neodoc.Data.SolvedLayout where
 
 import Prelude
+import Data.Generic
 import Data.Either (Either(..))
 import Data.Pretty (class Pretty, pretty)
 import Data.Maybe (Maybe(..), maybe)
@@ -35,6 +36,10 @@ data SolvedLayoutArg
 
 derive instance eqSolvedLayoutArg :: Eq SolvedLayoutArg
 derive instance ordSolvedLayoutArg :: Ord SolvedLayoutArg
+derive instance genericSolvedLayoutArg :: Generic SolvedLayoutArg
+
+instance showSolvedLayoutArg :: Show SolvedLayoutArg where
+  show = gShow
 
 instance toArgKeySolvedLayoutArg :: ToArgKey SolvedLayoutArg where
   toArgKey (Command     n   _) = CommandKey n
@@ -42,13 +47,6 @@ instance toArgKeySolvedLayoutArg :: ToArgKey SolvedLayoutArg where
   toArgKey (Option      a _ _) = OptionKey a
   toArgKey (EOA              ) = EOAKey
   toArgKey (Stdin            ) = StdinKey
-
-instance showSolvedLayoutArg :: Show SolvedLayoutArg where
-  show (Command n r) = "Command " <> show n <> " " <> show r
-  show (Positional n r) = "Positional " <> show n <> " " <> show r
-  show EOA = "EOA"
-  show Stdin = "Stdin"
-  show (Option n mA r) = "Option " <> show n <> " " <> show mA <> " " <> show r
 
 instance prettySolvedLayoutArg :: Pretty SolvedLayoutArg where
   pretty = go

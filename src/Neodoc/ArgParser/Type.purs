@@ -71,6 +71,7 @@ import Neodoc.ArgParser.Lexer as L
 import Neodoc.OptionAlias (OptionAlias)
 
 -- `ArgParser`
+import Data.Generic
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.List (head, filter, (:))
 import Data.Pretty (pretty, class Pretty)

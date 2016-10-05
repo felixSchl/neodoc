@@ -10,7 +10,7 @@ module Neodoc.Value (
   ) where
 
 import Prelude
-import Data.Generic (class Generic)
+import Data.Generic
 import Data.Either (Either(..), either)
 import Data.Maybe (fromJust)
 import Data.List (List(..), toUnfoldable, many, some, (:))
@@ -43,7 +43,12 @@ data Value
   | IntValue    Int
   | FloatValue  Number
 
+derive instance eqValue :: Eq Value
+derive instance ordValue :: Ord Value
 derive instance genericValue :: Generic Value
+
+instance showValue :: Show Value where
+  show = gShow
 
 instance isForeignValue :: IsForeign Value where
   read v = do
@@ -61,31 +66,8 @@ instance asForeignValue :: AsForeign Value where
   write (StringValue  v) = F.toForeign v
   write (ArrayValue  vs) = F.toForeign $ F.write <$> vs
 
-instance showValue :: Show Value where
-  show (StringValue s) = "StringValue " <> s
-  show (BoolValue   b) = "BoolValue "   <> show b
-  show (ArrayValue xs) = "ArrayValue "  <> show (show <$> xs)
-  show (IntValue    x) = "IntValue "    <> show x
-  show (FloatValue  x) = "FloatValue "  <> show x
-
 instance prettyValue :: Pretty Value where
   pretty = prettyPrintValue
-
-instance eqValue :: Eq Value where
-  eq (StringValue s) (StringValue s') = s  == s'
-  eq (BoolValue   b) (BoolValue   b') = b  == b'
-  eq (ArrayValue xs) (ArrayValue xs') = xs == xs'
-  eq (FloatValue  x) (FloatValue  x') = x  == x'
-  eq (IntValue    x) (IntValue    x') = x  == x'
-  eq _               _                = false
-
-instance ordValue :: Ord Value where
-  compare (StringValue s) (StringValue s') = s  `compare` s'
-  compare (BoolValue   b) (BoolValue   b') = b  `compare` b'
-  compare (ArrayValue xs) (ArrayValue xs') = xs `compare` xs'
-  compare (FloatValue  x) (FloatValue  x') = x  `compare` x'
-  compare (IntValue    x) (IntValue    x') = x  `compare` x'
-  compare _               _                = LT
 
 isSameValueType :: Value -> Value -> Boolean
 isSameValueType (StringValue _) (StringValue _) = true

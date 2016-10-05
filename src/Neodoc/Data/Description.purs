@@ -4,6 +4,7 @@ module Neodoc.Data.Description (
 
 import Prelude
 import Data.Maybe
+import Data.Generic
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
@@ -31,6 +32,11 @@ data Description
   | CommandDescription
 
 derive instance eqDescription :: Eq Description
+derive instance ordDescription :: Ord Description
+derive instance genericDescription :: Generic Description
+
+instance showDescription :: Show Description where
+  show = gShow
 
 instance isForeignDescription :: IsForeign Description where
   read v = do
@@ -62,11 +68,6 @@ instance asForeignDescription :: AsForeign Description where
     , default: maybe F.undefined F.write mDef
     , env: maybe F.undefined F.write mEnv
     }
-
-instance showDescription :: Show Description where
-  show CommandDescription = "CommandDescription"
-  show (OptionDescription as r mA mDef mEnv) = "OptionDescription " <> show as
-    <> " " <> show r <> " " <> show mA <> " " <> show mDef <> " " <> show mEnv
 
 instance prettyDescription :: Pretty Description where
   pretty CommandDescription = "<CommandDescription>" -- note: placeholder

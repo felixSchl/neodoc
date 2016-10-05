@@ -1,6 +1,7 @@
 module Neodoc.Data.UsageLayout where
 
 import Prelude
+import Data.Generic
 import Data.String as String
 import Data.Bifunctor (lmap)
 import Data.Pretty (class Pretty, pretty)
@@ -32,6 +33,12 @@ data UsageLayoutArg
   | Reference String
 
 derive instance eqUsageLayoutArg :: Eq UsageLayoutArg
+derive instance ordUsageLayoutArg :: Ord UsageLayoutArg
+derive instance genericUsageLayoutArg :: Generic UsageLayoutArg
+
+instance showUsageLayoutArg :: Show UsageLayoutArg where
+  show = gShow
+
 
 instance asForeignUsageLayoutArg :: AsForeign UsageLayoutArg where
   write (Command n r) = F.toForeign {
@@ -97,15 +104,6 @@ instance isForeignUsageLayoutArg :: IsForeign UsageLayoutArg where
     readOptionStack v = do
       lmap (F.errorAt "chars") do
         F.readNonemptyArray =<< v ! "chars"
-
-instance showUsageLayoutArg :: Show UsageLayoutArg where
-  show (Command n r) = "Command " <> show n <> " " <> show r
-  show (Positional n r) = "Positional " <> show n <> " " <> show r
-  show (Option n a r) = "Option " <> show n <> " " <> show a <> " " <> show r
-  show (OptionStack cs a r) = "OptionStack " <> show cs <> " " <> show a <> " " <> show r
-  show EOA = "EOA"
-  show Stdin = "Stdin"
-  show (Reference s) = "Reference " <> show s
 
 instance prettyUsageLayoutArg :: Pretty UsageLayoutArg where
   pretty = go

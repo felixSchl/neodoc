@@ -31,6 +31,9 @@ derive instance eqOptionAlias :: Eq OptionAlias
 derive instance ordOptionAlias :: Ord OptionAlias
 derive instance genericOptionAlias :: Generic OptionAlias
 
+instance showOptionAlias :: Show OptionAlias where
+  show = gShow
+
 instance isForeignOptionAlias :: IsForeign OptionAlias where
   read v = do
     typ :: String <- String.toUpper <$> F.readProp "type" v
@@ -47,10 +50,6 @@ instance asForeignOptionAlias :: AsForeign OptionAlias where
 instance prettyOptionAlias :: Pretty OptionAlias where
   pretty (Short c) = "-"  <> (String.singleton c)
   pretty (Long  n) = "--" <> n
-
-instance showOptionAlias :: Show OptionAlias where
-  show (Short c) = "Short " <> show c
-  show (Long  s) = "Long "  <> show s
 
 isLong :: OptionAlias -> Boolean
 isLong (Long _) = true

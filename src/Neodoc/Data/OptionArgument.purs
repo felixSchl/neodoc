@@ -1,6 +1,7 @@
 module Neodoc.Data.OptionArgument where
 
 import Prelude
+import Data.Generic
 import Data.Pretty (class Pretty, pretty)
 import Data.Tuple.Nested ((/\))
 import Data.Maybe (Maybe, maybe)
@@ -23,6 +24,10 @@ data OptionArgument
 
 derive instance eqOptionArgument :: Eq OptionArgument
 derive instance ordOptionArgument :: Ord OptionArgument
+derive instance genericOptionArgument :: Generic OptionArgument
+
+instance showOptionArgument :: Show OptionArgument where
+  show = gShow
 
 instance isForeigntOptionArgument :: IsForeign OptionArgument where
   read v = OptionArgument
@@ -35,9 +40,6 @@ instance asForeigntOptionArgument :: AsForeign OptionArgument where
 instance prettyOptionArgument :: Pretty OptionArgument where
   pretty (OptionArgument n o)
     = (if o then "[" else "") <> n <> (if o then "]" else "")
-
-instance showOptionArgument :: Show OptionArgument where
-  show (OptionArgument n o) = "OptionArgument " <> show n <> " " <> show o
 
 isOptionArgumentOptional :: OptionArgument -> Boolean
 isOptionArgumentOptional (OptionArgument _ o) = o

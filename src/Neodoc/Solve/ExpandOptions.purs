@@ -18,6 +18,7 @@ import Data.List (
 import Control.Alt ((<|>))
 import Control.Bind (join)
 import Control.Plus (empty)
+import Data.Generic
 import Data.Array as Array
 import Data.Pretty (class Pretty, pretty)
 import Data.Function (on)
@@ -58,10 +59,10 @@ data ExpandedOptionsLayoutArg
   | ReferenceArg String
 
 derive instance eqPreSolvedLayoutArg :: Eq ExpandedOptionsLayoutArg
+derive instance genericPreSolvedLayoutArg :: Generic ExpandedOptionsLayoutArg
 
 instance showPreSolvedLayoutArg :: Show ExpandedOptionsLayoutArg where
-  show (SolvedArg a) = "SolvedArg " <> show a
-  show (ReferenceArg n) = "ReferenceArg " <> show n
+  show = gShow
 
 instance prettyPreSolvedLayoutArg :: Pretty ExpandedOptionsLayoutArg where
   pretty (SolvedArg a) = pretty a
