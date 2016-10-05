@@ -17,8 +17,8 @@ import Data.Foldable (intercalate)
 -- | order of arguments.
 data Indexed a = Indexed Int a
 
-instance eqIndexed :: (Eq a) => Eq (Indexed a) where
-  eq (Indexed n a) (Indexed n' a') = n == n' && a == a'
+derive instance eqIndexed :: (Eq a) => Eq (Indexed a)
+derive instance ordIndexed :: (Ord a) => Ord (Indexed a)
 
 instance showIndexed :: (Show a) => Show (Indexed a) where
   show (Indexed n a) = "Indexed " <> show n <> " " <> show a
@@ -28,11 +28,6 @@ instance prettyIndexed :: (Pretty a) => Pretty (Indexed a) where
 
 instance prettyIndexed' :: (Show a) => Pretty (Indexed a) where
   pretty (Indexed n a) = "#" <> show n <> ": " <> show a
-
--- | Note: use the tuple semantics for comparisons.
--- | Refer to the Ord instance of tuples for an explanation.
-instance ordIndexed :: (Ord a) => Ord (Indexed a) where
-  compare = compare `on` \(Indexed n a) -> n /\ a
 
 getIndexedElem :: ∀ a. Indexed a -> a
 getIndexedElem (Indexed _ x) = x

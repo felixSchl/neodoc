@@ -12,6 +12,8 @@ data ArgKey
   | EOAKey
   | StdinKey
 
+derive instance ordArgKey :: Ord ArgKey
+
 instance eqArgKey :: Eq ArgKey where
   -- XXX: we have to call `String.toUpper` over and over again. Can we cache this?
   eq (PositionalKey n) (PositionalKey n') = eq (String.toUpper n) (String.toUpper n')
@@ -20,43 +22,6 @@ instance eqArgKey :: Eq ArgKey where
   eq EOAKey EOAKey = true
   eq StdinKey StdinKey = true
   eq _ _ = false
-
-instance ordArgKey :: Ord ArgKey where
-  compare (PositionalKey n) (PositionalKey n') = compare n n'
-  compare (CommandKey n) (CommandKey n') = compare n n'
-  compare (OptionKey a) (OptionKey a') = compare a a'
-  compare EOAKey EOAKey = EQ
-  compare StdinKey StdinKey = EQ
-
-  -- note: this list must be carefully updated
-
-  -- By PositionalKey
-  compare (PositionalKey _) (CommandKey _) = GT
-  compare (PositionalKey _) (OptionKey  _) = GT
-  compare (PositionalKey _) EOAKey         = GT
-  compare (PositionalKey _) StdinKey       = GT
-  compare (CommandKey _) (PositionalKey _) = LT
-  compare (OptionKey _)  (PositionalKey _) = LT
-  compare EOAKey         (PositionalKey _) = LT
-  compare StdinKey       (PositionalKey _) = LT
-
-  -- By CommandKey
-  compare (CommandKey _) (OptionKey  _) = GT
-  compare (CommandKey _) EOAKey         = GT
-  compare (CommandKey _) StdinKey       = GT
-  compare (OptionKey _)  (CommandKey _) = LT
-  compare EOAKey         (CommandKey _) = LT
-  compare StdinKey       (CommandKey _) = LT
-
-  -- By OptionKey
-  compare (OptionKey _) EOAKey        = GT
-  compare (OptionKey _) StdinKey      = GT
-  compare EOAKey        (OptionKey _) = LT
-  compare StdinKey      (OptionKey _) = LT
-
-  -- By EOAKey
-  compare EOAKey   StdinKey = GT
-  compare StdinKey EOAKey   = LT
 
 instance showArgKey :: Show ArgKey where
   show (PositionalKey n) = "PositionalKey " <> show n

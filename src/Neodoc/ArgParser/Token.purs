@@ -24,18 +24,15 @@ data Token
   | Stdin
   | Lit String
 
+derive instance ordToken :: Ord Token
+derive instance eqToken :: Eq Token
+
 instance showToken :: Show Token where
   show (LOpt s a)    = "LOpt " <> show s <> " " <> show a
   show (SOpt c cs a) = "SOpt " <> show c <> " " <> show cs <> " " <> show a
   show (Lit  s)      = "Lit "  <> show s
   show (EOA  xs)     = "EOA "  <> show xs
   show (Stdin)       = "Stdin"
-
-instance ordToken :: Ord Token where
-  compare = compare `on` show -- XXX
-
-instance eqToken :: Eq Token where
-  eq = eq `on` show -- XXX
 
 instance prettyToken :: Pretty Token where
   pretty (Stdin) = "-"
@@ -52,19 +49,13 @@ data PositionedToken = PositionedToken
   , source    :: String
   }
 
+derive instance eqPositionedToken :: Eq PositionedToken
 instance ordPositionedToken :: Ord PositionedToken where
   compare = compare `on` \(PositionedToken {
     sourcePos: P.Position l r
   , token
   , source
   }) -> l /\ r /\ source /\ token
-
-instance eqPositionedToken :: Eq PositionedToken where
-  eq = eq `on` \(PositionedToken {
-    sourcePos
-  , token
-  , source
-  }) -> source /\ token /\ sourcePos
 
 unPositionedToken
   :: PositionedToken

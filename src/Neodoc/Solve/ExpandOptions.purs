@@ -57,10 +57,7 @@ data ExpandedOptionsLayoutArg
   = SolvedArg SolvedLayoutArg
   | ReferenceArg String
 
-instance eqPreSolvedLayoutArg :: Eq ExpandedOptionsLayoutArg where
-  eq (SolvedArg a) (SolvedArg a') = a == a'
-  eq (ReferenceArg n) (ReferenceArg n') = n == n'
-  eq _ _ = false
+derive instance eqPreSolvedLayoutArg :: Eq ExpandedOptionsLayoutArg
 
 instance showPreSolvedLayoutArg :: Show ExpandedOptionsLayoutArg where
   show (SolvedArg a) = "SolvedArg " <> show a

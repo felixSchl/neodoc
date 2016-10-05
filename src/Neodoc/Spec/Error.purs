@@ -8,8 +8,7 @@ import Text.Parsing.Parser as P
 
 newtype SpecParseError = SpecParseError String
 
-instance eqSpecParseError :: Eq SpecParseError where
-  eq (SpecParseError s) (SpecParseError s') = s == s'
+derive instance eqSpecParseError :: Eq SpecParseError
 
 instance showSpecParseError :: Show SpecParseError where
   show (SpecParseError s) = "SpecParseError " <> show s

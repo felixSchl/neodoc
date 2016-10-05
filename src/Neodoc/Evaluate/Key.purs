@@ -32,6 +32,9 @@ import Neodoc.Evaluate.Annotate
 -- to refer to it.
 newtype Key = Key (Set ArgKey)
 
+derive instance eqKey :: Eq Key
+derive instance ordKey :: Ord Key
+
 toKey :: WithDescription SolvedLayoutArg -> Key
 toKey (x /\ mDesc) = Key (Set.fromFoldable $ go x)
   where
@@ -48,12 +51,6 @@ instance showKey :: (Show a) => Show Key where
 
 instance prettyKey :: (Pretty a) => Pretty Key where
   pretty (Key keys) = pretty $ fromFoldable keys
-
-instance eqKey :: Eq Key where
-  eq (Key keys) (Key keys') = eq keys keys'
-
-instance ordKey :: Ord Key where
-  compare (Key keys) (Key keys') = compare keys keys'
 
 -- | Derive a strin based key
 toStrKeys :: Key -> List String

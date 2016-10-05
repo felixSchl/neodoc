@@ -31,6 +31,8 @@ data UsageLayoutArg
   | Stdin
   | Reference String
 
+derive instance eqUsageLayoutArg :: Eq UsageLayoutArg
+
 instance asForeignUsageLayoutArg :: AsForeign UsageLayoutArg where
   write (Command n r) = F.toForeign {
       type: "Command"
@@ -95,16 +97,6 @@ instance isForeignUsageLayoutArg :: IsForeign UsageLayoutArg where
     readOptionStack v = do
       lmap (F.errorAt "chars") do
         F.readNonemptyArray =<< v ! "chars"
-
-instance eqUsageLayoutArg :: Eq UsageLayoutArg where
-  eq (Command n r) (Command n' r') = n == n' && r == r'
-  eq (Positional n r) (Positional n' r') = n == n' && r == r'
-  eq (Option n a r) (Option n' a' r') = n == n' && a == a' && r == r'
-  eq (OptionStack cs a r) (OptionStack cs' a' r') = cs == cs' && a == a' && r == r'
-  eq EOA EOA = true
-  eq Stdin Stdin = true
-  eq (Reference s) (Reference s') = s == s'
-  eq _ _ = false
 
 instance showUsageLayoutArg :: Show UsageLayoutArg where
   show (Command n r) = "Command " <> show n <> " " <> show r

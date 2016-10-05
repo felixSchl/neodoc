@@ -27,6 +27,10 @@ import Data.Foreign.Extra as F
 type Aliases = NonEmpty List OptionAlias
 data OptionAlias = Short Char | Long String
 
+derive instance eqOptionAlias :: Eq OptionAlias
+derive instance ordOptionAlias :: Ord OptionAlias
+derive instance genericOptionAlias :: Generic OptionAlias
+
 instance isForeignOptionAlias :: IsForeign OptionAlias where
   read v = do
     typ :: String <- String.toUpper <$> F.readProp "type" v
@@ -47,19 +51,6 @@ instance prettyOptionAlias :: Pretty OptionAlias where
 instance showOptionAlias :: Show OptionAlias where
   show (Short c) = "Short " <> show c
   show (Long  s) = "Long "  <> show s
-
-instance eqOptionAlias :: Eq OptionAlias where
-  eq (Short c) (Short c') = c == c'
-  eq (Long  s) (Long  s') = s == s'
-  eq _         _          = false
-
-instance ordOptionAlias :: Ord OptionAlias where
-  compare (Short c) (Short c') = c `compare` c'
-  compare (Long  s) (Long  s') = s `compare` s'
-  compare (Long  _) _          = GT -- move long names to the back
-  compare (Short _) _          = LT -- move short names to the front
-
-derive instance genericOptionAlias :: Generic OptionAlias
 
 isLong :: OptionAlias -> Boolean
 isLong (Long _) = true

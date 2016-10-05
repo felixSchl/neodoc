@@ -30,6 +30,8 @@ data Description
       (Maybe String) -- env var backing
   | CommandDescription
 
+derive instance eqDescription :: Eq Description
+
 instance isForeignDescription :: IsForeign Description where
   read v = do
     typ :: String <- String.toUpper <$> F.readProp "type" v
@@ -60,13 +62,6 @@ instance asForeignDescription :: AsForeign Description where
     , default: maybe F.undefined F.write mDef
     , env: maybe F.undefined F.write mEnv
     }
-
-instance eqDescription :: Eq Description where
-  eq CommandDescription CommandDescription = true
-  eq (OptionDescription as  r  mA  mDef  mEnv)
-     (OptionDescription as' r' mA' mDef' mEnv')
-     = as == as' && r == r' && mA == mA' && mDef == mDef' && mEnv == mEnv'
-  eq _ _ = false
 
 instance showDescription :: Show Description where
   show CommandDescription = "CommandDescription"

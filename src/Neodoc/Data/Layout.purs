@@ -47,13 +47,5 @@ instance showLayout :: (Show a) => Show (Layout a) where
   show (Elem  x)      = "Elem " <> show x
   show (Group o r xs) = "Group " <> show o <> " " <> show r <> " " <> show xs
 
-instance eqLayout :: (Eq a) => Eq (Layout a) where
-  eq (Elem x) (Elem x') = x == x'
-  eq (Group o r xs) (Group o' r' xs') = o == o' && r == r' && xs == xs'
-  eq _ _ = false
-
-instance ordLayout :: (Show a, Ord a) => Ord (Layout a) where
-  compare (Elem x) (Elem x') = compare x x'
-  compare (Group o r xs) (Group o' r' xs') = compare (o /\ r /\ xs) (o' /\ r' /\ xs')
-  compare (Group _ _ _) (Elem _) = GT
-  compare (Elem _) (Group _ _ _) = LT
+derive instance eqLayout :: (Eq a) => Eq (Layout a)
+derive instance ordLayout :: (Ord a) => Ord (Layout a)

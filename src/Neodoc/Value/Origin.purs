@@ -24,12 +24,5 @@ instance showOrigin :: Show Origin where
   show Default     = "Default"
   show Empty       = "Empty"
 
-instance eqOrigin :: Eq Origin where
-  eq Argv        Argv        = true
-  eq Environment Environment = true
-  eq Default     Default     = true
-  eq Empty       Empty       = true
-  eq _           _           = false
-
-instance ordOrigin :: Ord Origin where
-  compare = compare `on` weight
+derive instance eqOrigin :: Eq Origin
+derive instance ordOrigin :: Ord Origin

@@ -21,6 +21,9 @@ data OptionArgument
       String  -- name
       Boolean -- optional
 
+derive instance eqOptionArgument :: Eq OptionArgument
+derive instance ordOptionArgument :: Ord OptionArgument
+
 instance isForeigntOptionArgument :: IsForeign OptionArgument where
   read v = OptionArgument
     <$> F.readProp "name" v
@@ -35,12 +38,6 @@ instance prettyOptionArgument :: Pretty OptionArgument where
 
 instance showOptionArgument :: Show OptionArgument where
   show (OptionArgument n o) = "OptionArgument " <> show n <> " " <> show o
-
-instance eqOptionArgument :: Eq OptionArgument where
-  eq (OptionArgument n o) (OptionArgument n' o') = n == n' && o == o'
-
-instance ordOptionArgument :: Ord OptionArgument where
-  compare (OptionArgument n o) (OptionArgument n' o') = compare (n /\ o) (n' /\ o')
 
 isOptionArgumentOptional :: OptionArgument -> Boolean
 isOptionArgumentOptional (OptionArgument _ o) = o
