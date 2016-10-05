@@ -1,11 +1,7 @@
-module Neodoc.ArgParser.Token (
-    Token (..)
-  , PositionedToken (..)
-  , getSource
-  , unPositionedToken
-  ) where
+module Neodoc.ArgParser.Token where
 
 import Prelude
+import Data.Generic
 import Data.Function (on)
 import Data.Pretty (class Pretty, pretty)
 import Data.Tuple.Nested ((/\))
@@ -26,13 +22,10 @@ data Token
 
 derive instance ordToken :: Ord Token
 derive instance eqToken :: Eq Token
+derive instance genericToken :: Generic Token
 
 instance showToken :: Show Token where
-  show (LOpt s a)    = "LOpt " <> show s <> " " <> show a
-  show (SOpt c cs a) = "SOpt " <> show c <> " " <> show cs <> " " <> show a
-  show (Lit  s)      = "Lit "  <> show s
-  show (EOA  xs)     = "EOA "  <> show xs
-  show (Stdin)       = "Stdin"
+  show = gShow
 
 instance prettyToken :: Pretty Token where
   pretty (Stdin) = "-"
@@ -43,38 +36,20 @@ instance prettyToken :: Pretty Token where
   pretty (SOpt n s a) = "-"  <> (fromCharArray (A.cons n s)) <> arg
     where arg = maybe "" ("=" <> _) a
 
-data PositionedToken = PositionedToken
-  { sourcePos :: P.Position
-  , token     :: Token
-  , source    :: String
-  }
+data PositionedToken = PositionedToken Token String Int
 
 derive instance eqPositionedToken :: Eq PositionedToken
-instance ordPositionedToken :: Ord PositionedToken where
-  compare = compare `on` \(PositionedToken {
-    sourcePos: P.Position l r
-  , token
-  , source
-  }) -> l /\ r /\ source /\ token
-
-unPositionedToken
-  :: PositionedToken
-  ->  { sourcePos :: P.Position
-      , token     :: Token
-      , source    :: String
-      }
-unPositionedToken (PositionedToken t) = t
-
-getSource :: PositionedToken -> String
-getSource = _.source <<< unPositionedToken
+derive instance ordPositionedToken :: Ord PositionedToken
+derive instance genericPositionedToken :: Generic PositionedToken
 
 instance showPositionedToken :: Show PositionedToken where
-  show (PositionedToken { sourcePos, token, source }) =
-    "PositionedToken { "
-      <> "sourcePos: " <> show sourcePos
-      <> ", token: " <> show token
-      <> ", source: " <> show source
-      <> " }"
+  show = gShow
 
 instance prettyPositionedToken :: Pretty PositionedToken where
-  pretty (PositionedToken { token }) = pretty token
+  pretty (PositionedToken tok _ _) = pretty tok
+
+getSource :: PositionedToken -> String
+getSource (PositionedToken _ s _) = s
+
+getToken :: PositionedToken -> Token
+getToken (PositionedToken t _ _) = t

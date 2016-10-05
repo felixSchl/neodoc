@@ -184,7 +184,7 @@ isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInL
   where
   occuresInDescs = any (matchesDesc tok) descriptions
     where
-    matchesDesc (PositionedToken { token }) (OptionDescription as _ _ _ _) = test token
+    matchesDesc (PositionedToken token _ _) (OptionDescription as _ _ _ _) = test token
       where
       test (Token.LOpt n _)   = elem (OptionAlias.Long n) as
       test (Token.SOpt s _ _) = elem (OptionAlias.Short s) as
@@ -193,7 +193,7 @@ isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInL
   occuresInLayouts = any (any (any (matchesLayout tok))) layouts
     where
     matchesLayout tok (Group _ _ xs) = any (any (matchesLayout tok)) xs
-    matchesLayout (PositionedToken { token }) (Elem x) = test token x
+    matchesLayout (PositionedToken token _ _) (Elem x) = test token x
       where
       test (Token.LOpt n _)   (Solved.Option a _ _) = OptionAlias.Long n == a
       test (Token.SOpt s _ _) (Solved.Option a _ _) = OptionAlias.Short s == a
@@ -264,7 +264,7 @@ parseLayout skippable isSkipping l layout = do
       input       <- getInput
       { options } <- getConfig
       case input of
-        (PositionedToken { token }) : _
+        (PositionedToken token _ _) : _
           | case token of
               LOpt _ _   -> true
               SOpt _ _ _ -> true

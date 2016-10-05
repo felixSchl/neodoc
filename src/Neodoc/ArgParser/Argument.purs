@@ -63,7 +63,7 @@ token name test = Parser \c s i ->
   let _return = Step true c s
       _fail m = Step false c s i (Left $ ParseError false (Left m))
    in case i of
-    (PositionedToken { token, source }) : ss ->
+    (PositionedToken token source _) : ss ->
       case test token of
         Nothing -> _fail $ "expected " <> name <> ", but got: " <> source
         Just a  -> _return ss (Right a)
@@ -82,8 +82,8 @@ longOption
 longOption term n mArg = do
   input <- getInput
   case input of
-    (ptok@PositionedToken { token, sourcePos, source }):xs ->
-      let nextToken = _.token <<< unPositionedToken <$> head xs
+    (PositionedToken token _ _):xs ->
+      let nextToken = getToken <$> head xs
        in do
         result <- go token nextToken
 
@@ -175,8 +175,8 @@ shortOption
 shortOption term f mArg = do
   input <- getInput
   case input of
-    (PositionedToken (ptok@{ token, sourcePos, source })):xs ->
-      let nextToken = _.token <<< unPositionedToken <$> head xs
+    (PositionedToken token source sourcePos):xs ->
+      let nextToken = getToken <$> head xs
        in do
         result <- go token nextToken
         if term && isNothing result.remainder
@@ -197,10 +197,7 @@ shortOption term f mArg = do
           else
             let newSource = "-" <> String.drop 2 source
                 pushed = maybe empty
-                          (singleton <<< PositionedToken <<< ptok {
-                            token = _
-                          , source = newSource
-                          })
+                          (\tok -> singleton $ PositionedToken tok newSource sourcePos)
                           result.remainder
                 rest = case xs of
                         _:xs' | result.hasConsumedArg -> xs'
@@ -210,11 +207,8 @@ shortOption term f mArg = do
                 -- completeness sake).
                 nPushed = length pushed
                 rest' = if nPushed > 0
-                          then rest <#> \(PositionedToken p) ->
-                                PositionedToken $ p {
-                                  sourcePos = case p.sourcePos of
-                                    P.Position n x -> P.Position (n + nPushed) x
-                                }
+                          then rest <#> \(PositionedToken tok source sourcePos) ->
+                                PositionedToken tok source (sourcePos + nPushed)
                           else rest
                 val = maybe (BoolValue true) (flip Value.read false) result.rawValue
                 newInput = pushed <> rest'

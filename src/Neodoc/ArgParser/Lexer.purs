@@ -97,11 +97,8 @@ lex xs options = go xs 1
   where
     go Nil _ = pure Nil
     go (x:xs) n = do
-      let toEOA l = pure $ singleton $ PositionedToken {
-            token:     EOA (StringValue <$> xs)
-          , sourcePos: P.Position 1 n
-          , source:    x
-          }
+      let toEOA l = pure $ singleton
+            $ PositionedToken (EOA (StringValue <$> xs)) x n
 
       tok <- P.runParser x parseToken
       case tok of
@@ -109,8 +106,4 @@ lex xs options = go xs 1
         otherwise -> do
           toks <- go xs (n + 1)
           pure
-            $ singleton (PositionedToken {
-                          token:     tok
-                        , sourcePos: P.Position 1 n
-                        , source:    x
-                        }) <> toks
+            $ singleton (PositionedToken tok x n) <> toks

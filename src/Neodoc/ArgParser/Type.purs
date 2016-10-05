@@ -228,7 +228,7 @@ data ArgParseError
   | InternalError String (Lazy String)
 
 tokLabel :: PositionedToken -> String
-tokLabel (PositionedToken { token, source }) = go token
+tokLabel (PositionedToken token source _) = go token
   where
   go (Token.LOpt _ _)   = "option " <> source
   go (Token.SOpt _ _ _) = "option " <> source
