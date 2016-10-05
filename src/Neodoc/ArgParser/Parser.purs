@@ -54,7 +54,7 @@ import Prelude
 import Debug.Trace
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
-, null, concat, mapWithIndex, length, take, drop, toUnfoldable)
+, null, concat, mapWithIndex, length, take, drop, toUnfoldable, catMaybes)
 import Data.Array as Array
 import Data.List.Partial as LU
 import Data.Bifunctor (lmap)
@@ -67,8 +67,9 @@ import Data.String as String
 import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.Maybe (Maybe(..), isJust, maybe, fromJust)
 import Data.Traversable (for, traverse)
+import Data.Foldable.Extra (findMap)
 import Data.Foldable (
-  class Foldable, maximumBy, all, intercalate, sum, any, elem)
+  class Foldable, maximumBy, all, intercalate, sum, any, elem, find)
 import Data.Map as Map
 import Data.Map (Map)
 import Data.Pretty (pretty, class Pretty)
@@ -345,7 +346,9 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
   { options } <- getConfig
   traceBracket l ("chunk (" <> pretty chunk <> ")") do
     vs <- go options chunk
-    vs' <- consumeRest
+    vs' <- if options.repeatableOptions
+              then (try $ consumeRest chunk vs) <|> pure Nil
+              else pure Nil
     pure $ vs <> vs'
 
   where
@@ -356,9 +359,24 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
       <> " (elems: " <> pretty xss <> ")"
       <> " (input: " <> pretty input <> ")"
 
-  consumeRest :: ∀ r. ArgParser r (List KeyValue)
-  consumeRest = do
-    pure Nil
+  -- The chunk has been parsed but there may be potentially trailing input.
+  -- Let's try to to parse the rest of the input by assembling a fake chunk
+  -- and handing that back to the parser.
+  consumeRest
+    :: ∀ r
+     . Chunk (List SolvedLayout)
+    -> List KeyValue
+    -> ArgParser r (List KeyValue)
+  consumeRest (Fixed _) _ = pure Nil
+  consumeRest (Free xs) vs = do
+    -- do a reverse look-up from arg-key to layout elem
+    let parsedArgs
+          = catMaybes $ vs <#> \(key /\ _) ->
+              findMap (findElem ((_ == key) <<< toArgKey)) xs
+    input <- getInput
+    if null input || null parsedArgs
+      then pure Nil
+      else parseChunk false false l (Free (Elem <$> parsedArgs))
 
   go _ (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
   go opts (Free  xs) =

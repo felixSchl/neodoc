@@ -3412,12 +3412,25 @@ r"""
 usage: prog -a -b -c
 """
 
-$ prog/R -a -b -c -b
-{"-c": 3, "foo": true, "-e": 2}
+$ prog/R -a -a -b -c -b -a -c -b -a -c -bbbb -aaa -c
+{"-a": 7, "-b": 7, "-c": 4}
 
 r"""
-usage: prog [-c FOO]
+usage: prog -e (-a | -b) -c
 """
 
-$ prog/Rs -c foo -c bar -c qux
-{"-c": ["foo", "bar", "qux"]}
+$ prog/R -a -a
+{"-a": 2}
+
+$ prog/R -c -c -a -a
+{"-a": 2, "-c": 2}
+
+$ prog/R -a -a -b
+"unexpected option -b"
+
+r"""
+usage: prog [-c FOO] -a
+"""
+
+$ prog/Rs -c foo -a -c bar -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true}

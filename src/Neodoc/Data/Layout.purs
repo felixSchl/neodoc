@@ -2,10 +2,15 @@ module Neodoc.Data.Layout where
 
 import Prelude
 import Data.Foldable (intercalate)
+import Data.NonEmpty (NonEmpty, (:|))
+import Data.NonEmpty.Extra as NonEmpty
+import Data.Maybe (Maybe(..))
 import Data.Function (on)
 import Data.Tuple.Nested ((/\))
 import Data.Pretty (class Pretty, pretty)
-import Data.List (List())
+import Data.List (List(..), (:))
+import Data.Foldable (find)
+import Data.Foldable.Extra (findMap)
 import Data.NonEmpty (NonEmpty())
 import Data.Foreign (F)
 import Data.Foreign as F
@@ -13,6 +18,8 @@ import Data.Foreign.Class as F
 import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
+import Control.Alt ((<|>))
+import Control.Lazy (defer)
 import Neodoc.Data.EmptyableLayout
 
 {-
@@ -29,6 +36,14 @@ data Layout a
 
 getElem :: ∀ a. Partial => Layout a -> a
 getElem (Elem x) = x
+
+findElem :: ∀ a. (a -> Boolean) -> Layout a -> Maybe a
+findElem f (Elem x) | f x = Just x
+findElem f (Group _ _ xs) = case NonEmpty.concat xs of x:|xs -> go (x:xs)
+  where
+  go Nil = Nothing
+  go (x:xs) = findElem f x <|> go xs
+findElem _ _ = Nothing
 
 instance functorLayout :: Functor Layout where
   map f (Group o r xs) = Group o r $ ((f <$> _) <$> _) <$> xs
