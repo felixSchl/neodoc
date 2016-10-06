@@ -116,7 +116,6 @@ initialState :: ParseState
 initialState = {
   depth: 0
 , hasTerminated: false
-, hasFailed: false
 }
 
 initialGlobalState :: GlobalParseState
@@ -139,7 +138,6 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError
         hasEmpty = any ((_ == 0) <<< length) layouts
         parsers = toplevelBranches <#> \toplevel ->
           traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
-            unsetFailed
             vs <- parseExhaustively true false 0 (NonEmpty.toList toplevel)
             eof
             pure $ ArgParseResult (Just toplevel) vs
@@ -439,42 +437,36 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
 
           -- Check if we're done trying to recover.
           -- See the `draw -1` case below (`markFailed`).
-          failed <- hasFailed
-          traceDraw n xss $ "! ERROR - (state.failed = " <> show failed
-                            <> ", error = " <> pretty err
+          traceDraw n xss $ "! ERROR - (error = " <> pretty err
                             <> ", layout = " <> pretty layout
                             <> ")"
-          if failed
-            then do
-              traceDraw n xss $ "! ABORTING (failed)"
-              throw err
 
-            -- shortcut: there's no point trying again if there's nothing left
-            -- to parse.
-            else if false --  n == 0 || length xs == 0
-              then
-                -- note: ensure that layouts do not change their relative
-                -- positioning, hence return the original input list, rather
-                -- than pushing it onto the back.
-                let xs' = if isFixed layout then xss else (xs <> singleton x)
-                 in do
-                    traceDraw n xs' $ "! Skipping (shortcut)"
-                    draw errs' (-1) xs'
-              else
-                let isFixed' = isFixed <<< getIndexedElem <<< unRequired
-                    xs' =
-                      if Solved.isFreeLayout layout
-                        then xs <> singleton x
-                        -- XXX: Future work could include slicing off those
-                        -- branches in the group that are 'free' and re-queueing
-                        -- those.
-                        else
-                            let fs = take n xss
-                                rs = drop n xss
-                            in sortBy (compare `on` isFixed') fs <> rs
-                 in do
-                    traceDraw n xss $ "...retrying"
-                    draw errs' (n - 1) xs'
+          -- shortcut: there's no point trying again if there's nothing left
+          -- to parse.
+          if n == 0 || length xs == 0
+            then
+              -- note: ensure that layouts do not change their relative
+              -- positioning, hence return the original input list, rather
+              -- than pushing it onto the back.
+              let xs' = if isFixed layout then xss else (xs <> singleton x)
+                in do
+                  traceDraw n xs' $ "! Skipping (shortcut)"
+                  draw errs' (-1) xs'
+            else
+              let isFixed' = isFixed <<< getIndexedElem <<< unRequired
+                  xs' =
+                    if Solved.isFreeLayout layout
+                      then xs <> singleton x
+                      -- XXX: Future work could include slicing off those
+                      -- branches in the group that are 'free' and re-queueing
+                      -- those.
+                      else
+                          let fs = take n xss
+                              rs = drop n xss
+                          in sortBy (compare `on` isFixed') fs <> rs
+                in do
+                  traceDraw n xss $ "...retrying"
+                  draw errs' (n - 1) xs'
 
     -- All arguments have been matched (or have failed to be matched) at least
     -- once by now. See where we're at - is there any required argument that was
@@ -521,7 +513,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
         then do
           -- set the parser state to "failed".
           -- setting this will cause no more recoveries during succesive draws.
-          setFailed
+          -- setFailed
           unsafePartial $ throwExpectedError depth missing input
         else
           -- special case: when the input is empty, we choose to enable skipping
@@ -614,6 +606,7 @@ trace l f = if _ENABLE_DEBUG_
                 globalState <- getGlobalState
                 traceA $ indent l <> stateLabel state globalState <> (f input)
               else pure unit
+
 traceError :: ∀ r a. Int -> String -> ArgParser r a  -> ArgParser r a
 traceError l s = catch' \st e ->
   trace l (\_ -> "! " <> s <> ": " <> pretty e)
@@ -650,9 +643,8 @@ traceBracket l label p = do
   pure output
 
 stateLabel :: ParseState -> GlobalParseState -> String
-stateLabel { hasFailed, hasTerminated, depth } { deepestError } =
+stateLabel { hasTerminated, depth } { deepestError } =
   (if hasTerminated then "✓" else "·")
-  <> (if hasFailed then "✘" else "·")
   <> "(" <> show depth <> ")"
   <> "(dE = " <> show (pretty <$> deepestError) <> ")"
 

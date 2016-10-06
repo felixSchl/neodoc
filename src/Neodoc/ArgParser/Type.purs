@@ -46,9 +46,6 @@ module Neodoc.ArgParser.Type (
 , findDescription
 , lookupDescription
 , lookupDescription'
-, setFailed
-, unsetFailed
-, hasFailed
 , hasTerminated
 , setDone
 , unsetDone
@@ -310,7 +307,6 @@ type ParseConfig r = {
 type ParseState = {
   depth :: Int
 , hasTerminated :: Boolean
-, hasFailed :: Boolean
 }
 
 type GlobalParseState = {
@@ -340,15 +336,6 @@ lookupDescription alias = do
 lookupDescription' :: ∀ r. OptionAlias -> ArgParser r Description
 lookupDescription' a = fromMaybe default <$> lookupDescription a
   where default = OptionDescription (NonEmpty.singleton a) false Nothing Nothing Nothing
-
-unsetFailed :: ∀ r. ArgParser r Unit
-unsetFailed = modifyState \s -> s { hasFailed = false }
-
-setFailed :: ∀ r. ArgParser r Unit
-setFailed = modifyState \s -> s { hasFailed = true }
-
-hasFailed :: ∀ r. ArgParser r Boolean
-hasFailed = _.hasFailed <$> getState
 
 hasTerminated :: ∀ r. ArgParser r Boolean
 hasTerminated = _.hasTerminated <$> getState
