@@ -368,15 +368,16 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
     -> List KeyValue
     -> ArgParser r (List KeyValue)
   consumeRest (Fixed _) _ = pure Nil
-  consumeRest (Free xs) vs = do
+  consumeRest (Free xs) vs = traceBracket l "consume-reset" do
     -- do a reverse look-up from arg-key to layout elem
     let parsedArgs
-          = catMaybes $ vs <#> \(key /\ _) ->
-              findMap (findElem ((_ == key) <<< toArgKey)) xs
+          = filter Solved.isFreeLayout $ Elem <$> do
+              catMaybes $ vs <#> \(key /\ _) ->
+                findMap (findElem ((_ == key) <<< toArgKey)) xs
     input <- getInput
     if null input || null parsedArgs
       then pure Nil
-      else parseChunk false false l (Free (Elem <$> parsedArgs))
+      else parseChunk false false l (Free parsedArgs)
 
   go _ (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
   go opts (Free  xs) =

@@ -3434,3 +3434,23 @@ usage: prog [-c FOO] -a
 
 $ prog/Rs -c foo -a -c bar -c qux
 {"-c": ["foo", "bar", "qux"], "-a": true}
+
+
+r"""
+usage: prog [-c FOO] run -a
+"""
+
+$ prog/lRs -c foo -a -c bar -c qux run
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+$ prog/lRs -c foo -a -c bar run -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+$ prog/lRs -c foo -a run -c bar -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+$ prog/lRs -c foo run -a -c bar -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+$ prog/lRs run -c foo -a -c bar -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
