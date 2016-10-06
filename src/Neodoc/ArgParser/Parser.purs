@@ -110,7 +110,7 @@ import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.KeyValue
 
 _ENABLE_DEBUG_ :: Boolean
-_ENABLE_DEBUG_ = false
+_ENABLE_DEBUG_ = true
 
 initialState :: ParseState
 initialState = {
@@ -386,6 +386,12 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
      in draw Nothing (length xs) indexedLayouts
 
     where
+
+    isFixed = not <<< Solved.isFreeLayout
+    isFixedX = isFixed <<< getIndexedElem <<< unRequired
+    isFreeX = Solved.isFreeLayout <<< getIndexedElem <<< unRequired
+    unwrap = getIndexedElem <<< unRequired
+
     draw
       :: Maybe (Tuple Int (ParseError ArgParseError))
       -> Int
@@ -428,7 +434,6 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
       where
       recover layout { depth } err =
         let
-          isFixed = not <<< Solved.isFreeLayout
           errs' = case errs of
                     Just (d /\ _) | depth > d -> Just (depth /\ err)
                     Nothing -> Just (depth /\ err)
@@ -453,20 +458,17 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
                   traceDraw n xs' $ "! Skipping (shortcut)"
                   draw errs' (-1) xs'
             else
-              let isFixed' = isFixed <<< getIndexedElem <<< unRequired
-                  xs' =
-                    if Solved.isFreeLayout layout
-                      then xs <> singleton x
-                      -- XXX: Future work could include slicing off those
-                      -- branches in the group that are 'free' and re-queueing
-                      -- those.
-                      else
-                          let fs = take n xss
-                              rs = drop n xss
-                          in sortBy (compare `on` isFixed') fs <> rs
-                in do
-                  traceDraw n xss $ "...retrying"
-                  draw errs' (n - 1) xs'
+              if Solved.isFreeLayout layout
+                then do
+                  traceDraw n xss $ "...retrying (free)"
+                  draw errs' (n - 1) (xs <> singleton x)
+                else do
+                  -- try to move the positional one to the right
+                  traceDraw n xss $ "...retrying (fixed)"
+                  draw errs' (n - 1) (shiftPositional Nil x xs)
+      shiftPositional ls x (r:rs) | isFreeX r
+        = shiftPositional (ls <> pure r) x rs
+      shiftPositional ls x rs = ls <> x : rs
 
     -- All arguments have been matched (or have failed to be matched) at least
     -- once by now. See where we're at - is there any required argument that was
@@ -511,9 +513,6 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
       { depth } <- getState
       if isSkipping && length missing > 0
         then do
-          -- set the parser state to "failed".
-          -- setting this will cause no more recoveries during succesive draws.
-          -- setFailed
           unsafePartial $ throwExpectedError depth missing input
         else
           -- special case: when the input is empty, we choose to enable skipping

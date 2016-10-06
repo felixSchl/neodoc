@@ -3454,3 +3454,19 @@ $ prog/lRs -c foo run -a -c bar -c qux
 
 $ prog/lRs run -c foo -a -c bar -c qux
 {"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+r"""
+usage: prog [-a] f -b
+"""
+
+$ prog/lR -b -a -a f
+{}
+
+$ prog/lR -a -b -a f
+{}
+
+$ prog/lR -a -b -a -a f
+{}
+
+$ prog/lR -b -a -b f
+{}
