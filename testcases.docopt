@@ -3357,3 +3357,22 @@ $ prog/l -a bar
 
 $ prog/l bar -a
 {"-a": true, "bar": true}
+
+#
+# Issue 77
+#
+
+r"""
+usage: fbit configure [<client-id> <client-secret>
+                      |--clientid=<client-id> --clientsecret=<client-secret>
+                      ]
+"""
+
+$ prog configure --clientid 123
+"missing --clientsecret=<client-secret>"
+
+$ prog configure --clientid 123 --foo
+"unknown option --foo. Expected --clientsecret=<client-secret>"
+
+$ prog configure --clientid 123 --clientsecret
+"option requires argument: --clientsecret"
