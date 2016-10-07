@@ -39,3 +39,6 @@ instance prettyEither :: (Pretty e, Pretty a) => Pretty (Either e a) where
 
 instance prettyString :: Pretty String where
   pretty s = s
+
+instance prettyInt :: Pretty Int where
+  pretty i = show i

@@ -2,6 +2,7 @@ module Neodoc.ArgParser.Evaluate where
 
 import Prelude
 import Debug.Trace
+import Data.Tuple.Nested ((/\))
 import Data.Pretty
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
@@ -31,29 +32,29 @@ import Neodoc.ArgParser.Lexer as L
 
 type ChunkedLayout a = Layout (Chunk a)
 
-data ParserCont c s i = ParserCont c s i
-data Evaluation c s i e a
-  = ErrorEvaluation   (ParserCont c s i) (ParseError e)
-  | SuccessEvaluation (ParserCont c s i) a
+data ParserCont c s g i = ParserCont c s g i
+data Evaluation c s g i e a
+  = ErrorEvaluation   (ParserCont c s g i) (ParseError e)
+  | SuccessEvaluation (ParserCont c s g i) a
 
-instance showParserCont :: (Show c, Show s, Show i) => Show (ParserCont c s i) where
-  show (ParserCont c s i) = "ParserCont " <> show c <> " " <> show s <> " " <> show i
+instance showParserCont :: (Show c, Show s, Show g, Show i) => Show (ParserCont c s g i) where
+  show (ParserCont c s g i) = "ParserCont " <> show c <> " " <> show s <> " " <> show g <> " " <> show i
 
-instance showEvaluation :: (Show c, Show s, Show i, Show e, Show a) => Show (Evaluation c s i e a) where
+instance showEvaluation :: (Show c, Show s, Show g, Show i, Show e, Show a) => Show (Evaluation c s g i e a) where
   show (ErrorEvaluation   c e) = "ErrorEvaluation " <> show c <> " " <> show e
   show (SuccessEvaluation c a) = "SuccessEvaluation " <> show c <> " " <> show a
 
-isErrorEvaluation :: ∀ c s i e a. Evaluation c s i e a -> Boolean
+isErrorEvaluation :: ∀ c s g i e a. Evaluation c s g i e a -> Boolean
 isErrorEvaluation (ErrorEvaluation _ _) = true
 isErrorEvaluation _ = false
 
-isSuccessEvaluation :: ∀ c s i e a. Evaluation c s i e a -> Boolean
+isSuccessEvaluation :: ∀ c s g i e a. Evaluation c s g i e a -> Boolean
 isSuccessEvaluation (SuccessEvaluation _ _) = true
 isSuccessEvaluation _ = false
 
-getEvaluationDepth :: ∀ c s i e a. Evaluation c ParseState i e a -> Int
-getEvaluationDepth (ErrorEvaluation (ParserCont _ s _) _) = s.depth
-getEvaluationDepth (SuccessEvaluation (ParserCont _ s _) _) = s.depth
+getEvaluationDepth :: ∀ c g i e a. Evaluation c ParseState g i e a -> Int
+getEvaluationDepth (ErrorEvaluation (ParserCont _ s _ _) _) = s.depth
+getEvaluationDepth (SuccessEvaluation (ParserCont _ s _ _) _) = s.depth
 
 -- Evaluate multiple parsers, producing a new parser that chooses the best
 -- succeeding match or fails otherwise. If any of the parsers yields a fatal
@@ -69,27 +70,28 @@ evalParsers _ parsers | length parsers == 0
 
 evalParsers p parsers = do
 
-  config <- getConfig
-  state  <- getState
-  input  <- getInput
+  config      <- getConfig
+  state       <- getState
+  globalState <- getGlobalState
+  input       <- getInput
 
   -- Run all parsers and collect their results for further evaluation
   let collected = fromFoldable $ parsers <#> \parser ->
-        runParser config state input $ Parser \c s i ->
-          case unParser parser c s i of
-            Step b' c' s' i' result ->
-              let cont = ParserCont c' s' i'
-               in Step b' c' s' i' case result of
+        runParser config state globalState input $ Parser \c s g i ->
+          case unParser parser c s g i of
+            Step b' c' s' g' i' result ->
+              let cont = ParserCont c' s' g' i'
+               in Step b' c' s' g' i' case result of
                   Left  (err@(ParseError true _)) -> Left err
                   Left  err -> Right $ ErrorEvaluation   cont err
                   Right val -> Right $ SuccessEvaluation cont val
 
-  -- Now, check to see if we have any fatal errors, winnders or soft errors.
+  -- Now, check to see if we have any fatal errors, winners or soft errors.
   -- We know we must have either, but this is not encoded at the type-level,
   -- we have to fail with an internal error message in the impossible case this
   -- is not true.
   case mlefts collected of
-    error:_ -> Parser \c s i -> Step false c s i (Left error)
+    error:_ -> Parser \c s g i -> Step false c s g i (Left error)
     _       -> pure unit
 
   let
@@ -107,22 +109,30 @@ evalParsers p parsers = do
   -- Ok, now that we have a potentially "best error" and a potentially "best
   -- match", take a pick.
   case bestSuccess of
-    Just (SuccessEvaluation (ParserCont c s i) val) ->
-      Parser \_ _ _ ->
-        Step true c (state {
-          hasTerminated = s.hasTerminated
-        , hasFailed = s.hasFailed
-        , depth = s.depth
-        }) i (Right val)
+    Just (SuccessEvaluation (ParserCont c s g i) val) -> do
+      applyResults results $ Parser \_ _ _ _ -> Step true c s g i (Right val)
     _ -> case deepestErrors of
       Just errors -> case errors of
-        (ErrorEvaluation (ParserCont c s i) e):es | null es || not (null input) ->
-          Parser \_ _ _ ->
-            Step false c (state {
-              hasTerminated = s.hasTerminated
-            , hasFailed = s.hasFailed
-            , depth = s.depth
-            }) i (Left e)
+        (ErrorEvaluation (ParserCont c s g i) e):es | null es || not (null input) -> do
+          applyResults results $ Parser \_ _ _ _ -> Step false c s g i (Right unit)
+          throw e
         _ -> fail "" -- XXX: explain this
-      _ -> do
-        fail "The impossible happened. Failure without error"
+      _ -> fail "The impossible happened. Failure without error"
+
+  where
+  applyResults :: ∀ r a. _ -> ArgParser r a -> ArgParser r a
+  applyResults results p = do
+    out <- p
+    -- transport adjacent error messages up, even on success. should we fail
+    -- at a later stage, we have access to this valuable information and
+    -- can present the best error message possible.
+    unsafePartial $ for results case _ of
+      ErrorEvaluation (ParserCont _ { depth } { deepestError } _) e -> do
+        case deepestError of
+          Just (d /\ e) -> setErrorAtDepth d e
+          _ -> setErrorAtDepth depth (extractError genericError e)
+      SuccessEvaluation (ParserCont _ { depth } { deepestError } _) _ -> do
+        case deepestError of
+          Just (d /\ e) -> setErrorAtDepth d e
+          _ -> pure unit
+    pure out

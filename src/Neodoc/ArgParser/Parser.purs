@@ -113,8 +113,13 @@ _ENABLE_DEBUG_ = false
 initialState :: ParseState
 initialState = {
   depth: 0
-, hasTerminated:   false
+, hasTerminated: false
 , hasFailed: false
+}
+
+initialGlobalState :: GlobalParseState
+initialGlobalState = {
+  deepestError: Nothing
 }
 
 type ChunkedLayout a = Layout (Chunk a)
@@ -127,14 +132,13 @@ parse
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
 parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError $
-  runParser { env, options, descriptions } initialState tokens $
+  runParser { env, options, descriptions } initialState initialGlobalState tokens $
     let toplevelBranches = concat (fromFoldable layouts)
         hasEmpty = any ((_ == 0) <<< length) layouts
         parsers = toplevelBranches <#> \toplevel ->
           traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
             unsetFailed
-            vs <- do
-              parseExhaustively true false 0 (fromFoldable toplevel)
+            vs <- parseExhaustively true false 0 (fromFoldable toplevel)
             eof
             pure $ ArgParseResult (Just toplevel) vs
         parsers' =
@@ -152,7 +156,11 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError
     input <- getInput
     case input of
       Nil  -> pure unit
-      toks -> fail' $ unexpectedInputError Nil (known <$> toks)
+      toks -> do
+        { deepestError } <- getGlobalState
+        case deepestError of
+          Just (_ /\ e) -> fail' e
+          Nothing -> fail' $ unexpectedInputError Nil (known <$> toks)
 
   fixError :: ParseError ArgParseError -> ParseError ArgParseError
   fixError = mapError go
@@ -286,7 +294,6 @@ parseLayout skippable isSkipping l layout = do
                         OptionAlias.Short s -> "-"  <> String.singleton s
                         OptionAlias.Long  n -> "--" <> n
 
-
             -- note: safe to be unsafe because of pattern match above
             OptRes v canTerm canRepeat <- unsafePartial case token of
               LOpt _ _ ->
@@ -402,6 +409,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
                     Nothing -> Just (depth /\ err)
                     x -> x
          in do
+
           -- Check if we're done trying to recover.
           -- See the `draw -1` case below (`markFailed`).
           failed <- hasFailed
@@ -508,12 +516,22 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
           -> List SolvedLayout
           -> List PositionedToken
           -> ArgParser r _
-        throwExpectedError depth xss@(x:xs) input =
+        throwExpectedError depth xss@(x:xs) input = do
           case errs of
-            Just (d /\ e) | d >= depth -> throw e
+            Just (d /\ e) | d > depth -> do
+              setErrorAtDepth d (extractError genericError e)
+              throw e
             _ -> case input of
-              Nil  -> fail' $ missingArgumentsError (x:|xs)
-              toks -> fail' $ unexpectedInputError xss (known <$> toks)
+              Nil ->
+                let e = missingArgumentsError (x:|xs)
+                 in do
+                  setErrorAtDepth depth e
+                  fail' e
+              toks ->
+                let e = unexpectedInputError xss (known <$> toks)
+                 in do
+                  setErrorAtDepth depth e
+                  fail' e
 
     draw _ _ _ = pure Nil
 
@@ -564,19 +582,16 @@ terminate arg = do
 trace :: ∀ r. Int -> (List PositionedToken -> String) -> ArgParser r Unit
 trace l f = if _ENABLE_DEBUG_
               then do
-                state <- getState
-                input <- getInput
-                traceA $ indent l <> stateLabel state <> (f input)
+                input       <- getInput
+                state       <- getState
+                globalState <- getGlobalState
+                traceA $ indent l <> stateLabel state globalState <> (f input)
               else pure unit
-  where
-  stateLabel { hasFailed, hasTerminated, depth } = 
-    (if hasTerminated then "✓" else "·")
-    <> (if hasFailed then "✘" else "·")
-    <> "(" <> show depth <> ")"
-
 traceError :: ∀ r a. Int -> String -> ArgParser r a  -> ArgParser r a
-traceError l s
-  = catch' (\_ e -> trace l (\_ -> "! " <> s <> ": " <> pretty e) *> throw e)
+traceError l s = catch' \st e ->
+  trace l (\_ -> "! " <> s <> ": " <> pretty e)
+    *> setState st
+    *> throw e
 
 traceInput :: ∀ r. ArgParser r Unit
 traceInput = traceA =<< pretty <$> getInput
@@ -592,22 +607,25 @@ traceBracket
   -> ArgParser r a
   -> ArgParser r a
 traceBracket l label p = do
-  input <- getInput
-  state <- getState
+  input       <- getInput
+  state       <- getState
+  globalState <- getGlobalState
   trace l \_ ->
-    stateLabel state <> " parsing " <> label <> " (input: " <> pretty input <> ")"
-  output <- traceError l (stateLabel state <> " failed to parse " <> label) p
-  input <- getInput
-  state <- getState
+    stateLabel state globalState <> " parsing " <> label <> " (input: " <> pretty input <> ")"
+  output <- traceError l (stateLabel state globalState <> " failed to parse " <> label) p
+  input       <- getInput
+  state       <- getState
+  globalState <- getGlobalState
   trace l \_ ->
-    stateLabel state <> " successfully parsed " <> label <> "!"
+    stateLabel state globalState <> " successfully parsed " <> label <> "!"
       <> " (output: " <> pretty output <> ")"
       <> " (new input: " <> pretty input <> ")"
   pure output
-  where
-  stateLabel { hasFailed, hasTerminated, depth } = 
-    (if hasTerminated then "✓" else "·")
-    <> (if hasFailed then "✘" else "·")
-    <> "(" <> show depth <> ")"
 
+stateLabel :: ParseState -> GlobalParseState -> String
+stateLabel { hasFailed, hasTerminated, depth } { deepestError } =
+  (if hasTerminated then "✓" else "·")
+  <> (if hasFailed then "✘" else "·")
+  <> "(" <> show depth <> ")"
+  <> "(dE = " <> show (pretty <$> deepestError) <> ")"
 
