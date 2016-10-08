@@ -14,7 +14,7 @@ try :: ∀ e c s g i a. Parser e c s g i a -> Parser e c s g i a
 try p = Parser \c s g i ->
   let step = unParser p c s g i
    in case step of
-        Step _ _ _ _ _ e@(Left _) -> Step false c s g i e
+        Step _ _ _ g' _ e@(Left _) -> Step false c s g' i e
         _                         -> step
 
 -- | Parse one of a set of alternatives.

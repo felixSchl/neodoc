@@ -115,7 +115,11 @@ evalParsers p parsers = do
       Just errors -> case errors of
         (ErrorEvaluation (ParserCont c s g i) e):es | null es || not (null input) -> do
           applyResults results $ Parser \_ _ _ _ -> Step false c s g i (Right unit)
-          throw e
+          { depth        } <- getState
+          { deepestError } <- getGlobalState
+          case deepestError of
+            Just (d /\ e) | d > depth -> fail' e
+            _ -> throw e
         _ -> fail "" -- XXX: explain this
       _ -> fail "The impossible happened. Failure without error"
 
@@ -130,7 +134,7 @@ evalParsers p parsers = do
       ErrorEvaluation (ParserCont _ { depth } { deepestError } _) e -> do
         case deepestError of
           Just (d /\ e) -> setErrorAtDepth d e
-          _ -> setErrorAtDepth depth (extractError genericError e)
+          _ -> pure unit
       SuccessEvaluation (ParserCont _ { depth } { deepestError } _) _ -> do
         case deepestError of
           Just (d /\ e) -> setErrorAtDepth d e

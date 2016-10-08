@@ -276,7 +276,8 @@ unexpectedInputError expected toks
 missingArgumentsError layouts
   = MissingArgumentsError layouts $ defer \_ ->
       let flat = flattenBranch layouts
-       in "missing " <> intercalate ", " (pretty <$> flat)
+       in case flat of
+        layout:|_ -> "missing " <> pretty layout
 
 instance showArgParseError :: Show ArgParseError where
   show (OptionTakesNoArgumentError a msg) = "OptionTakesNoArgumentError " <> show a <> " " <> show msg
@@ -371,8 +372,6 @@ setErrorAtDepth :: ∀ r. Int -> ArgParseError -> ArgParser r Unit
 setErrorAtDepth d e = do
   { deepestError } <- getGlobalState
   case deepestError of
-    Just (d' /\ _) | d > d' -> do
-      modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
-    Nothing -> do
-      modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
+    Just (d' /\ _) | d > d' -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
+    Nothing -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
     _ -> pure unit
