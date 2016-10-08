@@ -43,7 +43,7 @@ instance isForeignOptionAlias :: (IsForeign a) => IsForeign (Spec a) where
       <*> F.readProp "shortHelp" v
     where
 
-    readLayouts v = lmap (F.errorAt "layouts") do
+    readLayouts v = do
       xs :: Array Foreign <- F.readProp "layouts" v
       xs' <- fromFoldable <$>
         sequence (Array.zipWith readToplevel (zero .. (Array.length xs)) xs)
