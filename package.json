@@ -1,7 +1,7 @@
 {
   "name": "neodoc",
   "version": "1.0.0-rc.0",
-  "description": "Docopt implementation for node",
+  "description": "Beautiful, handcrafted command line interfaces",
   "main": "index.js",
   "directories": {
     "test": "test"
