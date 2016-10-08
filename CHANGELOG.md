@@ -3,25 +3,87 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
+## [1.0.0-rc.0] - 2016-10-09
+
+This is a pre-release of the up-coming
+
+### New features
+
+* Neodoc now sports a couple of hooks that allow devs to hook into the
+  transformation of the spec. See `opts.transforms` in the README for more
+  information.
+* `--version` will now simply return the version as a string if `opts.dontExit`
+  is true.
+* `--help` will now simply return the help as a string if `opts.dontExit` is
+  true.
+* Better error reporting. The parser now tracks the deepest error across all
+  branches, making for more intuitive error messages.
+* The spec is now being canonicalised internally which helps create (a) better
+  error messages and (b) to speed up the parser.
+
+### Changes
+
+* The "specification" format has changed drastically. If you've been using
+  `neodoc.parse`, it's output is now entirely different and likewise the input
+  to run expects the new `neodoc.parse` output. If you used this method to
+  change the spec on-the-fly, you should have a look at the new
+  `opts.transforms` option which allows you to easily hook into the
+  transformation of the neodoc spec.
+
+### Internals
+
+* **Major** overhaul of the internals. The core data structures have changed and
+  are now more composable.
+  * Instead of representing a group as an argument, we now have a `Layout` data
+    type which looks more like a classical tree:
+    ```haskell
+    data Layout a = Group IsOptional IsRepeatable Branches | Elem a
+    ```
+    It turns out that this structure holds true throught all the various stages
+    of transformation.
+  * There's finally a `Spec` datatype that formalises what a specification _is_:
+    ```haskell
+    type Branch a = NonEmpty List a
+    type Toplevel a = List (Branch a)
+    newtype Spec a = Spec {
+      program      :: String
+    , layouts      :: NonEmpty List (Toplevel a)
+    , descriptions :: List Description
+    , helpText     :: String
+    , shortHelp    :: String
+    }
+    ```
+  * A custom parser monad for arg-parsing that does **not** use monad
+    transformers. It enables neodoc to better handle errors and should generally
+    run faster. It allows the parser to keep read-only state, state that
+    isolated in alternatives and when backtracking, as well as state that is
+    "mutable", i.e. state that survives failures. In terms of running faster,
+    the worst case that previously required adding in a cache now runs fine and
+    the cache was removed.
+  * Branches in groupings as well as top-levels are now encoded at the type
+    level as `NonEmpty`
+  * Move away from records to ADTs for speed and ease of use in many scenarios
+  * Use `AsForeign` and `IsForeign` for FFI needs
+  * Improve test bed readability all over, make it more easy to add tests
+  * Overall add more comments and document entire modules in an effort to make
+    the code "contributable"
+
 ## [0.10.1] - 2016-08-18
 
 ### Fixes
 
 * Fix [#70] - Ignore ANSI escape codes in parser. This allows the neodoc to
   be colored. For example:
-
   ```
   neodoc.run(`
   ${chalk.blue('Usage:')}
       prog <command> [<args>...]
   `);
   ```
-
   Thanks [@matthewmueller] for reporting
 * Fix [#71] - Do not trim help text. This allows the developer to keep some left
   padding on the help text. The leading and trailing newlines are still removed,
   however, in order to make working with JS template strings easy.
-
   Thanks [@matthewmueller] for reporting
 * Fix optional positionals in lax-placement mode.
   For example:
@@ -533,6 +595,7 @@ section &mdash; let it fail at the lexing stage.
 [#2]: https://github.com/felixSchl/neodoc/issues/2
 [#1]: https://github.com/felixSchl/neodoc/issues/1
 
+[1.0.0-rc.0]: https://github.com/felixschl/neodoc/compare/v0.10.1...v1.0.0-rc.0
 [0.10.1]: https://github.com/felixschl/neodoc/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/felixschl/neodoc/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/felixschl/neodoc/compare/v0.9.1...v0.9.2
