@@ -237,10 +237,10 @@ argParserSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
         """
         [ fail Nothing []
-          $ "expected -iFILE"
+          $ "missing -iFILE"
 
         , fail Nothing [ "-i", "bar" ]
-          $ "expected -oFILE"
+          $ "missing -oFILE"
 
         , pass Nothing
             [ "-i", "bar", "-o", "bar" ]
@@ -267,10 +267,10 @@ argParserSpec = \_ -> describe "The parser generator" do
           -r, --redirect FILE [env: QUX]
         """
         [ fail Nothing []
-          $ "expected -iFILE"
+          $ "missing -iFILE"
 
         , fail Nothing [ "-i", "bar", "-r", "bar" ]
-            "expected -oFILE"
+            "missing -oFILE"
 
         , pass Nothing
             [ "-i", "bar", "-r", "bar", "-o", "bar" ]
@@ -310,7 +310,7 @@ argParserSpec = \_ -> describe "The parser generator" do
           -o, --output FILE
           -r, --redirect FILE
         """
-        [ fail Nothing [] "expected -iFILE"
+        [ fail Nothing [] "missing -iFILE"
           -- XXX: Would be cool to show the reason the group did not parse!
         , fail Nothing [ "-i", "bar" ] "expected <env>"
         , pass Nothing
@@ -477,10 +477,10 @@ argParserSpec = \_ -> describe "The parser generator" do
 
         , fail Nothing
             [ "foo" ]
-            "expected -i"
+            "missing -fFOZ"
         , fail Nothing
             [ "foo", "-o", "-i", "-bax" ]
-            "expected -fFOZ"
+            "missing -fFOZ"
         ]
 
     , test

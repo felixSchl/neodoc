@@ -1792,8 +1792,6 @@ $ prog -b --no-foo -a --foo
 #
 # Issue no. 13
 #
-# TODO: Extend the test runner to verify the actual error messages.
-#
 
 r"""
 Usage: prog --file <x> <a>
@@ -2561,6 +2559,13 @@ Options: -f, --foo ARG
 $ prog -f
 {"-f": true, "--foo": true}
 
+r"""
+Usage: prog mine (set|remove)
+"""
+
+$ prog mine
+""
+
 #
 # Given an option-argument to a flag is a fatal error, no pardon:
 #
@@ -3175,14 +3180,14 @@ usage: prog --foo
 """
 
 $ prog/r
-"expected --foo"
+"missing --foo"
 
 r"""
 usage: prog --foo --bar
 """
 
 $ prog/r
-"expected --foo"
+"missing --foo"
 
 r"""
 usage: prog (--foo --bar) --qux
@@ -3190,7 +3195,7 @@ usage: prog (--foo --bar) --qux
 
 # only reports error of first group
 $ prog/r
-"expected --foo"
+"missing --foo"
 
 $ prog/r --yikes
 "unknown option --yikes"
@@ -3272,7 +3277,7 @@ usage: prog move --speed=<kn>...
 """
 
 $ prog/l --speed 100
-"expected move"
+"missing move"
 
 r"""
 usage: prog move [--speed=<kn>...]...
@@ -3315,28 +3320,28 @@ usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar foo -a
-"unexpected command foo"
+"expected foo, but got bar"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar -a foo
-"unexpected command foo"
+"expected foo, but got bar"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar foo
-"unexpected command foo"
+"expected foo, but got bar"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l -a bar foo
-"unexpected command foo"
+"expected foo, but got bar"
 
 r"""
 usage: prog [foo] -a [bar]
@@ -3372,7 +3377,22 @@ $ prog configure --clientid 123
 "missing --clientsecret=<client-secret>"
 
 $ prog configure --clientid 123 --foo
-"unknown option --foo. Expected --clientsecret=<client-secret>"
+"unknown option --foo"
+
+$ prog configure --clientid 123 --clientsecret
+"option requires argument: --clientsecret"
+
+
+r"""
+usage: fbit configure ([<client-id> <client-secret>]
+                      |[--clientid=<client-id> --clientsecret=<client-secret>])
+"""
+
+$ prog configure --clientid 123
+"missing --clientsecret=<client-secret>"
+
+$ prog configure --clientid 123 --foo
+"unknown option --foo"
 
 $ prog configure --clientid 123 --clientsecret
 "option requires argument: --clientsecret"
