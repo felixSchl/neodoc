@@ -158,13 +158,17 @@ _run input (NeodocOptions opts) = do
   argv <- maybe (A.drop 2 <$> Process.argv) pure opts.argv
   env  <- maybe Process.getEnv              pure opts.env
 
+  let
+    runNeodocError' :: ∀ a. Either _ a -> Eff _ a
+    runNeodocError' = runNeodocError Nothing Nothing Nothing
+
   -- 1. obtain a spec, either by using the provided spec or by parsing a fresh
   --    one.
-  inputSpec@(Spec { program, helpText }) <- runNeodocError Nothing do
+  inputSpec@(Spec { program, helpText, shortHelp }) <- runNeodocError' do
     either pure parseHelpText input
 
   -- 2. solve the spec
-  spec@(Spec { descriptions }) <- runNeodocError Nothing do
+  spec@(Spec { descriptions }) <- runNeodocError' do
     let fromJSCallback
           :: ∀ a
            . (Pretty a)
@@ -180,8 +184,14 @@ _run input (NeodocOptions opts) = do
         (fromFoldable $ either (fromJSCallback <$> _) id opts.transforms.postsolve)
         inputSpec
 
+  let
+    runNeodocError' :: ∀ a. Either _ a -> Eff _ a
+    runNeodocError' = runNeodocError  (Just program)
+                                      (Just opts.helpFlags)
+                                      (Just shortHelp)
+
   -- 3. run the arg parser agains the spec and user input
-  output <- runNeodocError (Just program) do
+  output <- runNeodocError' do
     ArgParseResult mBranch vs <- do
       Error.capture do
         ArgParser.run spec opts env argv
@@ -200,19 +210,21 @@ _run input (NeodocOptions opts) = do
             if opts.dontExit
                 then pure (VersionOutput ver)
                 else Console.log ver *> Process.exit 0
-          Nothing -> runNeodocError (Just program) (Left Error.VersionMissingError)
+          Nothing -> runNeodocError' $ Left Error.VersionMissingError
     else pure (Output output)
 
   where
 
   runNeodocError
     :: ∀ eff a
-     . Maybe String
+     . Maybe String         -- the program name, if available
+    -> Maybe (Array String) -- the flags that trigger --help
+    -> Maybe String         -- the shortened usage text
     -> Either NeodocError a
     -> Eff (NeodocEff eff) a
-  runNeodocError mProg x = case x of
+  runNeodocError mProg mHelpFlags mShortHelp x = case x of
     Left err ->
-      let msg = renderNeodocError mProg err
+      let msg = renderNeodocError mProg mHelpFlags mShortHelp err
        in if opts.dontExit
             then throwException $ jsError msg {}
             else
@@ -221,6 +233,7 @@ _run input (NeodocOptions opts) = do
                             else msg
               in Console.error msg' *> Process.exit 1
     Right x -> pure x
+
   readPkgVersion = readPkgVersionImpl Just Nothing
 
 
@@ -283,7 +296,7 @@ parseHelpTextJS = mkFn1 go
   go help =
     case parseHelpText help of
       Left e ->
-        let msg = renderNeodocError Nothing e
+        let msg = renderNeodocError Nothing Nothing Nothing e
          in throwException $ jsError msg {}
       Right spec ->
         pure $ F.write $ Spec.toEmptyableSpec spec
@@ -313,27 +326,37 @@ parseHelpText help = do
               , shortHelp: originalUsage
               }
 
-renderNeodocError :: Maybe String -> NeodocError -> String
-renderNeodocError (Just prog) (Error.ArgParserError msg) =
+renderNeodocError
+  :: Maybe String         -- the program name, if available
+  -> Maybe (Array String) -- the flags that trigger --help
+  -> Maybe String         -- the shortened usage text
+  -> NeodocError          -- the error that occured
+  -> String
+renderNeodocError (Just prog) mHelpFlags mShortHelp (Error.ArgParserError msg) =
   -- de-capitalize the error message after the colon
-  case String.uncons msg of
+  let
+    title =
+      case String.uncons msg of
         Nothing -> msg
         Just { head, tail } ->
           let msg' = String.singleton (Char.toLower head) <> tail
-          in prog <> ": " <> msg'
-renderNeodocError _ e = pretty e
-
--- Format the user-facing help text, as printed to the console upon
--- error.
-formatHelpText :: String -> Array String -> String -> String -> String
-formatHelpText program helpFlags shortHelp errmsg = errmsg
-  <> "\n"
-  <> (dedent $ unlines $ ("  " <> _) <$> lines (dedent shortHelp))
-  <> if A.length helpFlags == 0
-      then ""
-      else "\n" <> "See "
-                    <> program <> " " <> (intercalate "/" helpFlags)
-                    <> " for more information"
+           in prog <> ": " <> msg'
+    usage = renderShortHelp mShortHelp
+    help = renderHelpFlags prog mHelpFlags
+   in title
+        <> (if String.length title > 0 then "\n" else "")
+        <> usage
+        <> (if String.length usage > 0 then "\n" else "")
+        <> help
+  where
+  renderShortHelp (Just help) =
+    dedent $ unlines $ ("  " <> _) <$> lines (dedent help)
+  renderShortHelp _ = ""
+  renderHelpFlags prog (Just flags) | A.length flags > 0 =
+    "See " <> prog <> " " <> (intercalate "/" flags)
+      <> " for more information"
+  renderHelpFlags _ _ = ""
+renderNeodocError _ _ _ e = pretty e
 
 has x = any \s ->
   maybe false (case _ of
