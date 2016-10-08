@@ -3,7 +3,7 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
-## [1.0.0-rc.0] - 2016-10-09
+## [1.0.0-rc.x] - 2016-10-09
 
 This is a pre-release of the up-coming
 
@@ -595,7 +595,7 @@ section &mdash; let it fail at the lexing stage.
 [#2]: https://github.com/felixSchl/neodoc/issues/2
 [#1]: https://github.com/felixSchl/neodoc/issues/1
 
-[1.0.0-rc.0]: https://github.com/felixschl/neodoc/compare/v0.10.1...v1.0.0-rc.0
+[1.0.0-rc.x]: https://github.com/felixschl/neodoc/compare/v0.10.1...v1.0.0-rc.1
 [0.10.1]: https://github.com/felixschl/neodoc/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/felixschl/neodoc/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/felixschl/neodoc/compare/v0.9.1...v0.9.2
