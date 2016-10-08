@@ -55,8 +55,10 @@ instance prettySolvedLayoutArg :: Pretty SolvedLayoutArg where
     go (Positional n r) = n <> rep r
     go EOA = "--"
     go Stdin = "-"
-    go (Option n mA r) = pretty n <> maybe "" pretty mA <> rep r
+    go (Option n mA r) = pretty n <> maybe "" prettyOA mA <> rep r
     rep r = if r then "..." else ""
+    prettyOA (OptionArgument n o)
+      = (if o then "[=" else "=") <> n <> (if o then "]" else "")
 
 instance asForeignSolvedLayoutArg :: AsForeign SolvedLayoutArg where
   write (Command n r) = F.toForeign {
