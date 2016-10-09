@@ -113,11 +113,14 @@ isRepeatable (Elem (Option   _ _ r)) = r
 isRepeatable _ = false
 
 setRepeatable :: Boolean -> SolvedLayout -> SolvedLayout
-setRepeatable r (Group           o _ xs) = Group o r xs
-setRepeatable r (Elem (Command     n _)) = Elem (Command n r)
-setRepeatable r (Elem (Positional  n _)) = Elem (Positional n r)
-setRepeatable r (Elem (Option   a mA _)) = Elem (Option a mA r)
-setRepeatable _ x = x
+setRepeatable r (Group o _ xs) = Group o r xs
+setRepeatable r (Elem       x) = Elem $ setElemRepeatable r x
+
+setElemRepeatable :: Boolean -> SolvedLayoutArg -> SolvedLayoutArg
+setElemRepeatable r (Command     n _) = Command n r
+setElemRepeatable r (Positional  n _) = Positional n r
+setElemRepeatable r (Option   a mA _) = Option a mA r
+setElemRepeatable _ x = x
 
 setRepeatableOr :: Boolean -> SolvedLayout -> SolvedLayout
 setRepeatableOr r (Group           o r' xs) = Group o (r || r') xs

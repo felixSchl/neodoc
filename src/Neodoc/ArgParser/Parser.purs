@@ -272,7 +272,7 @@ parseLayout skippable isSkipping l layout = do
 
       -- Track each arg key in a set of arg keys. This allows us to parse
       -- repeating options later on.
-      <* trackArg x
+      <* trackArg (Solved.setElemRepeatable true x)
 
     ) <|> fail' (unexpectedInputError (e:Nil) (known <$> i))
 
@@ -359,7 +359,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
   traceBracket l ("chunk (" <> pretty chunk <> ")") do
     vs <- go options chunk
     vs' <- if options.repeatableOptions
-              then (try $ consumeRest chunk vs) <|> pure Nil
+              then try consumeRest <|> pure Nil
               else pure Nil
     pure $ vs <> vs'
 
@@ -374,30 +374,27 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
   -- The chunk has been parsed but there may be potentially trailing input.
   -- Let's try to to parse the rest of the input by assembling a fake chunk
   -- and handing that back to the parser.
-  consumeRest
-    :: ∀ r
-     . Chunk (List SolvedLayout)
-    -> List KeyValue
-    -> ArgParser r (List KeyValue)
-  consumeRest (Fixed _) _ = pure Nil
-  consumeRest (Free xs) vs = traceBracket l "consume-reset" do
-    -- do a reverse look-up from arg-key to layout elem
-    let parsedArgs
-          = filter Solved.isFreeLayout $ Elem <$> do
-              catMaybes $ vs <#> \(key /\ _) ->
-                findMap (findElem ((_ == key) <<< toArgKey)) xs
+  consumeRest :: ∀ r. ArgParser r (List KeyValue)
+  consumeRest = traceBracket l "consume-reset" do
     input <- getInput
+    parsedArgs <- (Elem <$> _) <<< fromFoldable <<< _.trackedOpts <$> getState
     if null input || null parsedArgs
       then pure Nil
       else parseChunk false false l (Free parsedArgs)
 
   go _ (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
-  go opts (Free  xs) =
+  go opts (Free xs) = do
+    { trackedOpts } <- getState
     -- We decorate all arguments with an index from left to right, as well as
     -- marking them "Required". The "Required" wrapper is used to make
     -- repetition work, while ensuring the parser terminates.
-    let indexedLayouts = flip mapWithIndex xs \x ix -> Required (Indexed ix x)
-     in draw Nothing (length xs) indexedLayouts
+    let ixs = mapWithIndex (\x ix -> Required $ Indexed ix x) xs
+        iys = if opts.repeatableOptions
+                then mapWithIndex (\x ix -> Optional $ Indexed ix x)
+                                  (Elem <$> fromFoldable trackedOpts)
+                else Nil
+        izs = ixs <> iys
+    draw Nothing (length izs) izs
 
     where
 
