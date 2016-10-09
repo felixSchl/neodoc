@@ -111,7 +111,7 @@ import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.KeyValue
 
 _ENABLE_DEBUG_ :: Boolean
-_ENABLE_DEBUG_ = true
+_ENABLE_DEBUG_ = false
 
 initialState :: ParseState
 initialState = {
@@ -158,11 +158,7 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError
     input <- getInput
     case input of
       Nil  -> pure unit
-      toks -> do
-        { deepestError } <- getGlobalState
-        case deepestError of
-          Just (_ /\ e) -> fail' e
-          Nothing -> fail' $ unexpectedInputError Nil (known <$> toks)
+      toks -> fail' $ unexpectedInputError Nil (known <$> toks)
 
   fixError :: ParseError ArgParseError -> ParseError ArgParseError
   fixError = mapError go
@@ -272,7 +268,7 @@ parseLayout skippable isSkipping l layout = do
 
       -- Track each arg key in a set of arg keys. This allows us to parse
       -- repeating options later on.
-      <* trackArg (Solved.setElemRepeatable true x)
+      <* when (Solved.isOption x) (trackArg x)
 
     ) <|> fail' (unexpectedInputError (e:Nil) (known <$> i))
 
@@ -384,14 +380,13 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
 
   go _ (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
   go opts (Free xs) = do
-    { trackedOpts } <- getState
+    parsedArgs <- fromFoldable <<< _.trackedOpts <$> getState
     -- We decorate all arguments with an index from left to right, as well as
     -- marking them "Required". The "Required" wrapper is used to make
     -- repetition work, while ensuring the parser terminates.
     let ixs = mapWithIndex (\x ix -> Required $ Indexed ix x) xs
         iys = if opts.repeatableOptions
-                then mapWithIndex (\x ix -> Optional $ Indexed ix x)
-                                  (Elem <$> fromFoldable trackedOpts)
+                then mapWithIndex (\x ix -> Superflous $ Indexed ix (Elem x)) parsedArgs
                 else Nil
         izs = ixs <> iys
     draw Nothing (length izs) izs
@@ -492,8 +487,9 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
 
       let
         -- re-align the input using the originally assigned indices
-        xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss
-        layouts = getIndexedElem <<< unRequired <$> xss'
+        xss' = filter (not <<< isSuperflous) xss
+        xss'' = sortBy (compare `on` (getIndex <<< unRequired)) xss'
+        layouts = getIndexedElem <<< unRequired <$> xss''
 
         -- substitute any missing values using the various fallback methods
         vs = layouts <#> case _ of
@@ -517,7 +513,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
           -- values for entire groups is not possible and not logical.
           -- If a group that is allowed to be omitted fails, there won't
           -- be any values to fall back onto.
-          not (isGroup layout && isOptional layout)
+          not (isGroup layout && Solved.isOptional layout)
 
         fallbacks = mrights vs
 

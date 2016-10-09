@@ -3320,28 +3320,28 @@ usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar foo -a
-"expected foo, but got bar"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar -a foo
-"expected foo, but got bar"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar foo
-"expected foo, but got bar"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l -a bar foo
-"expected foo, but got bar"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
@@ -3419,14 +3419,14 @@ r"""
 usage: prog -e (-a | -b) -c
 """
 
+$ prog/R -a -a -b
+"unexpected option -b"
+
 $ prog/R -a -a
 {"-a": 2}
 
 $ prog/R -c -c -a -a
 {"-a": 2, "-c": 2}
-
-$ prog/R -a -a -b
-"unexpected option -b"
 
 r"""
 usage: prog [-c FOO] -a
@@ -3440,13 +3440,13 @@ r"""
 usage: prog [-c FOO] run -a
 """
 
+$ prog/lRs -c foo -a run -c bar -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
 $ prog/lRs -c foo -a -c bar -c qux run
 {"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
 
 $ prog/lRs -c foo -a -c bar run -c qux
-{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
-
-$ prog/lRs -c foo -a run -c bar -c qux
 {"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
 
 $ prog/lRs -c foo run -a -c bar -c qux
@@ -3460,13 +3460,13 @@ usage: prog [-a] f -b
 """
 
 $ prog/lR -b -a -a f
-{}
+{"f": true, "-a": 2, "-b": true}
 
 $ prog/lR -a -b -a f
-{}
+{"f": true, "-a": 2, "-b": true}
 
 $ prog/lR -a -b -a -a f
-{}
+{"f": true, "-a": 3, "-b": true}
 
 $ prog/lR -b -a -b f
-{}
+{"f": true, "-a": true, "-b": 2}
