@@ -58,6 +58,7 @@ import Data.List (
 import Data.Array as Array
 import Data.List.Partial as LU
 import Data.Bifunctor (lmap)
+import Data.Set as Set
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Data.Function (on)
 import Data.Tuple (Tuple(..), snd)
@@ -116,6 +117,7 @@ initialState :: ParseState
 initialState = {
   depth: 0
 , hasTerminated: false
+, trackedOpts: Set.empty
 }
 
 initialGlobalState :: GlobalParseState
@@ -257,9 +259,21 @@ parseLayout skippable isSkipping l layout = do
 
   go _ e@(Elem x) = getInput >>= \i -> (
     let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
-     in nTimes do
-          Tuple (toArgKey x) <<< (RichValue.from Origin.Argv) <$> go' x
-            <* modifyDepth (_ + 1)
+        key = toArgKey x
+     in do
+      nTimes do
+        Tuple key <<< RichValue.from Origin.Argv <$> go' x
+
+        -- increase the depth counter for each matched element. The depth
+        -- counter is indicative of how much input vs. spec we consumed and
+        -- and is used to determine the "best scoring" parse, and the best
+        -- error message to display.
+        <* modifyDepth (_ + 1)
+
+      -- Track each arg key in a set of arg keys. This allows us to parse
+      -- repeating options later on.
+      <* trackArg x
+
     ) <|> fail' (unexpectedInputError (e:Nil) (known <$> i))
 
     where

@@ -46,6 +46,7 @@ module Neodoc.ArgParser.Type (
 , findDescription
 , lookupDescription
 , lookupDescription'
+, trackArg
 , hasTerminated
 , setDone
 , unsetDone
@@ -73,6 +74,8 @@ import Neodoc.OptionAlias (OptionAlias)
 
 -- `ArgParser`
 import Data.Generic
+import Data.Set (Set)
+import Data.Set as Set
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -305,8 +308,9 @@ type ParseConfig r = {
 }
 
 type ParseState = {
-  depth :: Int
-, hasTerminated :: Boolean
+  depth :: Int -- how many elements have been consumed?
+, hasTerminated :: Boolean -- have we terminated using `--` or `opts.stopAt`?
+, trackedOpts :: Set SolvedLayoutArg -- the set of previouly matched args
 }
 
 type GlobalParseState = {
@@ -354,6 +358,11 @@ modifyDepth f = modifyState \s -> s { depth = f s.depth }
 
 setDepth :: ∀ r. Int -> ArgParser r Unit
 setDepth = modifyDepth <<< const
+
+trackArg :: ∀ r. SolvedLayoutArg -> ArgParser r Unit
+trackArg arg = modifyState \s -> s {
+  trackedOpts = Set.insert arg s.trackedOpts
+}
 
 setErrorAtDepth :: ∀ r. Int -> ArgParseError -> ArgParser r Unit
 setErrorAtDepth d e = do
