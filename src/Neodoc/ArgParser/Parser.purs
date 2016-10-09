@@ -469,12 +469,12 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
                   traceDraw n xss $ "...retrying (free)"
                   draw errs' (n - 1) (xs <> singleton x)
                 else do
+                  let fs = take n xss
+                      rs = drop n xss
+                      xss' = sortBy (compare `on` isFixedX) fs <> rs
                   -- try to move the positional one to the right
                   traceDraw n xss $ "...retrying (fixed)"
-                  draw errs' (n - 1) (shiftPositional Nil x xs)
-      shiftPositional ls x (r:rs) | isFreeX r
-        = shiftPositional (ls <> pure r) x rs
-      shiftPositional ls x rs = ls <> x : rs
+                  draw errs' (n - 1) xss'
 
     -- All arguments have been matched (or have failed to be matched) at least
     -- once by now. See where we're at - is there any required argument that was
