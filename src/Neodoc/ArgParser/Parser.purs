@@ -123,6 +123,7 @@ initialState = {
 initialGlobalState :: GlobalParseState
 initialGlobalState = {
   deepestError: Nothing
+, cache: Map.empty
 }
 
 type ChunkedLayout a = Layout (Chunk a)
@@ -339,9 +340,10 @@ parseExhaustively
   -> ArgParser r (List KeyValue)
 parseExhaustively _ _ _ Nil = pure Nil
 parseExhaustively skippable isSkipping l xs = skipIf hasTerminated Nil do
-  { options } <- getConfig
-  let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
-  concat <$> traverse (parseChunk skippable isSkipping (l + 2)) chunks
+  withLocalCache do
+    { options } <- getConfig
+    let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
+    concat <$> traverse (parseChunk skippable isSkipping (l + 2)) chunks
 
 parseChunk
   :: ∀ r
@@ -418,7 +420,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
             -- recursive down each of the groups branches to try and make a
             -- match. Based on wether or not `isSkipping` is set to true, allow
             -- the layout to substitute values from fallback sources.
-            vs <- try $ mod do
+            vs <- cached x $ try $ mod do
               parseLayout
                 isSkipping  -- propagate the 'isSkipping' property
                 false       -- reset 'skipable' to false
