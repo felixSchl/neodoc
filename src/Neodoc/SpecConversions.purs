@@ -11,6 +11,7 @@ import Data.Foldable (intercalate)
 import Data.Traversable (sequence)
 import Data.Pretty (class Pretty, pretty)
 import Data.NonEmpty (NonEmpty, (:|))
+import Data.NonEmpty.Extra as NonEmpty
 import Data.Foreign (Foreign)
 import Data.Foreign as F
 import Data.Foreign.Class as F
@@ -31,11 +32,9 @@ import Neodoc.Data.Description
 fromEmptyableSpec :: ∀ a. Spec (EmptyableLayout a) -> Spec (Layout a)
 fromEmptyableSpec (Spec spec@{ layouts }) =
   let layouts' = layouts <#> \branches ->
-        catMaybes $ fromFoldable $ branches <#> \branch ->
-          let branch' = catMaybes $ fromFoldable $ branch <#> \layout -> toStrictLayout layout
-            in case branch' of
-              Nil  -> Nothing
-              x:xs -> Just $ x:|xs
+        catMaybes $ branches <#> \branch ->
+          NonEmpty.fromList $ catMaybes $
+            NonEmpty.toList $ toStrictLayout <$> branch
    in Spec (spec { layouts = layouts' })
 
 toEmptyableSpec :: ∀ a. Spec (Layout a) -> Spec (EmptyableLayout a)

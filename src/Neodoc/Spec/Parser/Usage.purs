@@ -5,6 +5,7 @@ module Neodoc.Spec.Parser.Usage where
 import Prelude
 import Debug.Trace
 import Data.NonEmpty (NonEmpty, (:|))
+import Data.NonEmpty.Extra as NonEmpty
 import Neodoc.Data.Layout
 import Neodoc.Data.UsageLayout
 import Data.Functor (($>))
@@ -71,7 +72,7 @@ parse = flip L.runTokenParser do
     program: name
   , layouts:
       layouts <#> case _ of
-        Just (Group _ _ xs) -> fromFoldable $ xs
+        Just (Group _ _ xs) -> NonEmpty.toList $ xs
         Just (x@(Elem _))   -> singleton $ x :| Nil
         Nothing             -> Nil
   }

@@ -75,6 +75,7 @@ import Data.Pretty (pretty, class Pretty)
 import Control.Alt ((<|>))
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Partial.Unsafe
+import Data.NonEmpty.Extra as NonEmpty
 
 import Neodoc.Value (Value(..))
 import Neodoc.Value as Value
@@ -133,12 +134,12 @@ parse
   -> Either (ParseError ArgParseError) ArgParseResult
 parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError $
   runParser { env, options, descriptions } initialState initialGlobalState tokens $
-    let toplevelBranches = concat (fromFoldable layouts)
+    let toplevelBranches = concat (NonEmpty.toList layouts)
         hasEmpty = any ((_ == 0) <<< length) layouts
         parsers = toplevelBranches <#> \toplevel ->
           traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
             unsetFailed
-            vs <- parseExhaustively true false 0 (fromFoldable toplevel)
+            vs <- parseExhaustively true false 0 (NonEmpty.toList toplevel)
             eof
             pure $ ArgParseResult (Just toplevel) vs
         parsers' =
@@ -231,19 +232,18 @@ parseLayout skippable isSkipping l layout = do
           terminate y
 
   go options (Group o r branches) =
-    let branches' = fromFoldable branches
+    let branches' = NonEmpty.toList branches
         nEvaluations = length branches'
         parsers = flip mapWithIndex branches' \branch ix ->
           traceBracket (l + 1) ("EVALUTATION " <> show (ix + 1) <> "/" <> show nEvaluations) do
-            parseExhaustively skippable isSkipping (l + 1) (fromFoldable branch)
+            parseExhaustively skippable isSkipping (l + 1) (NonEmpty.toList branch)
     in do
         vs <- (if o then option Nil else id) do
           if length parsers == 0 then pure Nil else
             flip evalParsers parsers \vs ->
               sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
         hasInput <- not <<< null <$> getInput
-        vss <- if (hasInput && r &&
-                length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
+        vss <- if (hasInput && r && any (snd >>> isFrom Origin.Argv) vs)
                   then loop Nil
                   else pure Nil
         pure $ vs <> vss
@@ -252,7 +252,7 @@ parseLayout skippable isSkipping l layout = do
       loop acc = do
         -- parse this group repeatedly, but make successive matches optional.
         vs <- go options (Group true r branches)
-        if (length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
+        if any (snd >>> isFrom Origin.Argv) vs
           then loop $ acc <> vs
           else pure acc
 
@@ -285,7 +285,7 @@ parseLayout skippable isSkipping l layout = do
                   pure $ aliases /\ def /\ env
                 _ -> fail' $ internalError "invalid option description"
             let
-              ns = fromFoldable $ aliases <#> case _ of
+              ns = NonEmpty.toList $ aliases <#> case _ of
                     OptionAlias.Short f -> Left  f
                     OptionAlias.Long  n -> Right n
               longAliases = mrights ns
@@ -395,7 +395,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
             -- recursively, but mark successive matches as "optional".
             vss <- try do
               if (Solved.isRepeatable layout &&
-                  length (filter (snd >>> isFrom Origin.Argv) vs) > 0)
+                  any (snd >>> isFrom Origin.Argv) vs)
                   then draw errs (length xss) (xs <> pure (toOptional x))
                   else draw errs (length xs) xs
             pure $ vs <> vss

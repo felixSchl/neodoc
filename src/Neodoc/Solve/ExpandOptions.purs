@@ -32,6 +32,7 @@ import Data.String as S
 import Data.String.Unsafe as US
 import Data.String.Ext (endsWith)
 import Data.NonEmpty (NonEmpty, (:|))
+import Data.NonEmpty.Extra as NonEmpty
 import Data.NonEmpty (singleton) as NonEmpty
 import Control.MonadPlus (guard)
 import Control.Extend (duplicate)
@@ -220,7 +221,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
         --      We could just stop at the first `Just` value.
         match <- head <<< catMaybes <$> for descriptions case _ of
           OptionDescription aliases _ (Just (OptionArgument aN aO)) _ _ -> do
-            head <<< catMaybes <<< fromFoldable <$> for aliases case _ of
+            head <<< catMaybes <<< NonEmpty.toList <$> for aliases case _ of
               OptionAlias.Short f -> pure do
                 -- the haystack needs to be modified, such that the
                 -- the last (length a.name) characters are uppercased

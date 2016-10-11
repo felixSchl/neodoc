@@ -104,7 +104,7 @@ expandReferences (Spec (spec@{ layouts, descriptions })) =
   let -- expand the references per top-level branch, then remove any branches
       -- that yieleded `Nothing`.
       layouts' = (catMaybes <$> _)
-          $ fromFoldable
+          $ NonEmpty.toList
           $ (expandReferencesInBranch <$> _) <$> layouts
       layouts'' = case layouts' of
                     Nil    -> Nil :| Nil -- create empty top-level branch

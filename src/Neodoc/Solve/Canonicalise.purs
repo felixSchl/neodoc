@@ -36,7 +36,7 @@ import Data.Traversable (traverse, for)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty.Extra as NonEmpty
 import Data.Map as Map
-import Data.List (List(..), (:), fromFoldable, length, catMaybes, concat, filter)
+import Data.List (List(..), (:), length, catMaybes, concat, filter)
 import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.Foldable (any, intercalate)

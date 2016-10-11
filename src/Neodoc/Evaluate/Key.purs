@@ -9,6 +9,7 @@ import Data.Map as Map
 import Data.Pretty (class Pretty, pretty)
 import Data.Array as Array
 import Data.List (List)
+import Data.NonEmpty.Extra as NonEmpty
 import Control.Alt (alt)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
@@ -41,7 +42,7 @@ toKey (x /\ mDesc) = Key (Set.fromFoldable $ go x)
   go (Option a _ _) = OptionKey <$> fromMaybe (singleton a) do
     desc <- mDesc
     case desc of
-      (OptionDescription as _ _ _ _) -> Just $ a : fromFoldable as
+      (OptionDescription as _ _ _ _) -> Just $ a : NonEmpty.toList as
       _ -> Nothing
   go _ = singleton $ toArgKey x
 

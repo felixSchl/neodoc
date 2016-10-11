@@ -12,6 +12,7 @@ import Data.Set as Set
 import Data.Maybe (Maybe(..))
 import Data.List (List(..), (:), head, filter, singleton, fromFoldable)
 import Data.NonEmpty (NonEmpty)
+import Data.NonEmpty.Extra as NonEmpty
 import Data.Foldable (any)
 import Neodoc.Env (Env)
 import Neodoc.Data.Layout (Layout(..), Branch)
@@ -80,6 +81,6 @@ findArgKeys
 findArgKeys descriptions k =
   let xs = case findDescription descriptions k of
         Just (OptionDescription aliases _ _ _ _) ->
-          k : (fromFoldable $ OptionKey <$> aliases)
+          k : (NonEmpty.toList $ OptionKey <$> aliases)
         _ -> singleton k
    in Set.fromFoldable xs

@@ -76,7 +76,7 @@ evalParsers p parsers = do
   input       <- getInput
 
   -- Run all parsers and collect their results for further evaluation
-  let collected = fromFoldable $ parsers <#> \parser ->
+  let collected = parsers <#> \parser ->
         runParser config state globalState input $ Parser \c s g i ->
           case unParser parser c s g i of
             Step b' c' s' g' i' result ->
