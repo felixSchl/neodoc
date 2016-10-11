@@ -388,7 +388,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
     -- repetition work, while ensuring the parser terminates.
     let ixs = mapWithIndex (\x ix -> Required $ Indexed ix x) xs
         iys = if opts.repeatableOptions
-                then mapWithIndex (\x ix -> Superflous $ Indexed ix (Elem x)) parsedArgs
+                then Nil -- mapWithIndex (\x ix -> Superflous $ Indexed ix (Elem x)) parsedArgs
                 else Nil
         izs = ixs <> iys
     draw Nothing (length izs) izs
@@ -432,8 +432,8 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
             -- if the layout is marked as repeatable, try repeating the parse
             -- recursively, but mark successive matches as "optional".
             vss <- try do
-              if (Solved.isRepeatable layout &&
-                  (opts.repeatableOptions && Solved.isOptionElem layout) &&
+              if ((Solved.isRepeatable layout ||
+                  (opts.repeatableOptions && Solved.isOptionElem layout)) &&
                   any (snd >>> isFrom Origin.Argv) vs)
                   then draw errs (length xss) (xs <> pure (toOptional x))
                   else draw errs (length xs) xs
@@ -448,14 +448,12 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
                     x -> x
          in do
 
-          -- Check if we're done trying to recover.
-          -- See the `draw -1` case below (`markFailed`).
           traceDraw n xss $ "! ERROR - (error = " <> pretty err
                             <> ", layout = " <> pretty layout
                             <> ")"
 
-          -- shortcut: there's no point trying again if there's nothing left
-          -- to parse.
+          -- shortcut : there's no point trying again if there's nothing left
+          -- to parse or we ran out of tries
           if n == 0 || length xs == 0
             then
               -- note: ensure that layouts do not change their relative
