@@ -87,15 +87,13 @@ import Neodoc.Data.Layout
 import Neodoc.Data.LayoutConversion
 import Neodoc.Data.Indexed
 import Neodoc.Data.Indexed as Indexed
+import Neodoc.Data.IndexedLayout
 import Neodoc.ArgKey.Class
 import Neodoc.Solve.Error
 import Neodoc.Solve.ExpandOptions
 import Neodoc.Evaluate.Annotate
 
 import Partial.Unsafe (unsafePartial)
-
-type IndexedLayout a = Layout (IndexedLayoutArg a)
-type IndexedLayoutArg a = Indexed a
 
 expandReferences
   :: Spec ExpandedOptionsLayout
@@ -195,25 +193,3 @@ chunkBranch
 chunkBranch = fromFoldable >>> chunk case _ of
   Indexed _ (ReferenceArg _) -> true
   Indexed _ (SolvedArg    a) -> Solved.isFreeLayout (Elem a)
-
--- Assign a numerical index to each element in a layout on the given branch,
--- as if the branch was completely flat, from left to right, i.e.:
---
---      -a (-b | -c)
---
--- would become:
---
---      (1:-a) ((2:-b) | (3:-c))
---
-indexBranch
-  :: ∀ a
-   . NonEmpty List (Layout a)
-  -> NonEmpty List (IndexedLayout a)
-indexBranch branch = flip evalState 0 $ for branch indexLayout
-  where
-  indexLayout (Group o r xs) = Group o r <$> do
-    for xs (traverse indexLayout)
-  indexLayout (Elem x) = do
-    i <- State.get
-    State.put (i + 1)
-    pure (Elem (Indexed i x))
