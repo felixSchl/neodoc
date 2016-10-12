@@ -3470,3 +3470,10 @@ $ prog/lR -a -b -a -a f
 
 $ prog/lR -b -a -b f
 {"f": true, "-a": true, "-b": 2}
+
+r"""
+usage: prog -a -b -c
+"""
+
+$ prog/R -aabcbacba
+{"-a": 4, "-b": 3, "-c": 2}

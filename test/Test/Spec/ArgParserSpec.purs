@@ -978,7 +978,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         let msg = either (\e -> "Should fail with \"" <> e <> "\"")
                           pretty
                           expected
-            premsg = if A.length argv > 0
+            premsg = if not (A.null argv)
                         then intercalate " " argv
                         else "(no input)"
             help' = dedent help

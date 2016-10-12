@@ -29,6 +29,7 @@ import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
 import Neodoc.ArgParser.Argument
 import Neodoc.ArgParser.Lexer as L
+import Neodoc.ArgParser.Profile
 
 type ChunkedLayout a = Layout (Chunk a)
 
@@ -68,7 +69,7 @@ evalParsers
 evalParsers _ parsers | length parsers == 0
   = fail' $ internalError "no parsers to evaluate"
 
-evalParsers p parsers = do
+evalParsers p parsers = profile "eval-parsers" \_-> do
 
   config      <- getConfig
   state       <- getState

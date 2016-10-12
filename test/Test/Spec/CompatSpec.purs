@@ -2,6 +2,7 @@ module Test.Spec.CompatSpec (compatSpec) where
 
 import Prelude
 import Debug.Trace
+import Debug.Profile
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)
@@ -82,7 +83,8 @@ compatSpec tests =
               later (pure unit)
 
               let env = fromMaybe StrMap.empty opts.env
-                  result = Neodoc.runPure (dedent doc) (NeodocOptions opts) Nothing
+
+              result <- prof "testcase" \_-> pure $ Neodoc.runPure (dedent doc) (NeodocOptions opts) Nothing
 
               vliftEff $ case result of
                 Left e ->

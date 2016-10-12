@@ -52,6 +52,7 @@ module Neodoc.ArgParser.Parser where
 
 import Prelude
 import Debug.Trace
+import Debug.Profile
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
 , null, concat, mapWithIndex, length, take, drop, toUnfoldable, catMaybes)
@@ -109,6 +110,7 @@ import Neodoc.ArgParser.Combinators
 import Neodoc.ArgParser.Fallback
 import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.KeyValue
+import Neodoc.ArgParser.Profile
 
 _ENABLE_DEBUG_ :: Boolean
 _ENABLE_DEBUG_ = false
@@ -140,10 +142,16 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError
     let toplevelBranches = concat (NonEmpty.toList layouts)
         hasEmpty = any ((_ == 0) <<< length) layouts
         parsers = toplevelBranches <#> \toplevel ->
-          traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
-            vs <- parseExhaustively true false 0 (NonEmpty.toList toplevel)
-            eof
-            pure $ ArgParseResult (Just toplevel) vs
+          profile "top-level" \_->
+            traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
+              vs <- parseExhaustively true
+                                      false
+                                      (options.repeatableOptions)
+                                      false
+                                      0
+                                      (NonEmpty.toList toplevel)
+              eof
+              pure $ ArgParseResult (Just toplevel) vs
         parsers' =
             if hasEmpty
               then parsers <> singleton do
@@ -216,7 +224,7 @@ parseLayout
   -> Int      -- ^ recursive level
   -> SolvedLayout
   -> ArgParser r (List KeyValue)
-parseLayout skippable isSkipping l layout = do
+parseLayout skippable isSkipping l layout = profile ("parse-layout: " <> pretty layout) \_-> do
   { options } <- getConfig
   traceBracket l ("layout (" <> pretty layout <> ")") do
     go options layout
@@ -234,7 +242,12 @@ parseLayout skippable isSkipping l layout = do
         nEvaluations = length branches'
         parsers = flip mapWithIndex branches' \branch ix ->
           traceBracket (l + 1) ("EVALUTATION " <> show (ix + 1) <> "/" <> show nEvaluations) do
-            parseExhaustively skippable isSkipping (l + 1) (NonEmpty.toList branch)
+            parseExhaustively skippable
+                              isSkipping
+                              false
+                              false
+                              (l + 1)
+                              (NonEmpty.toList branch)
     in do
         vs <- (if o then option Nil else id) do
           if length parsers == 0 then pure Nil else
@@ -335,31 +348,43 @@ parseExhaustively
   :: ∀ r
    . Boolean -- ^ can we skip using fallback values?
   -> Boolean -- ^ are we currently skipping using fallback values?
+  -> Boolean -- ^ are we supposed to consume rests
+  -> Boolean -- ^ are we consuming rests
   -> Int     -- ^ recursive level
   -> List SolvedLayout
   -> ArgParser r (List KeyValue)
-parseExhaustively _ _ _ Nil = pure Nil
-parseExhaustively skippable isSkipping l xs = skipIf hasTerminated Nil do
-  withLocalCache do
-    { options } <- getConfig
-    let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
-    concat <$> traverse (parseChunk skippable isSkipping (l + 2)) chunks
+parseExhaustively _ _ _ _ _ Nil = pure Nil
+parseExhaustively skippable isSkipping consumeRests isConsumingRests l xs
+  = skipIf hasTerminated Nil do
+    profile ("parseExhaustively")\_-> withLocalCache do
+      { options } <- getConfig
+      let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
+      concat <$> do
+        traverse (parseChunk  skippable
+                              isSkipping
+                              consumeRests
+                              isConsumingRests
+                              (l + 2))
+                  chunks
 
 parseChunk
   :: ∀ r
    . Boolean  -- ^ can we skip using fallback values?
   -> Boolean  -- ^ are we currently skipping using fallback values?
+  -> Boolean  -- ^ are we supposed to consume rests
+  -> Boolean  -- ^ are we consuming rests?
   -> Int      -- ^ recursive level
   -> Chunk (List SolvedLayout)
   -> ArgParser r (List KeyValue)
-parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
-  { options } <- getConfig
-  traceBracket l ("chunk (" <> pretty chunk <> ")") do
-    vs <- go options chunk
-    vs' <- if options.repeatableOptions
-              then try consumeRest <|> pure Nil
-              else pure Nil
-    pure $ vs <> vs'
+parseChunk skippable isSkipping consumeRests isConsumingRests l chunk
+ = skipIf hasTerminated Nil do
+    { options } <- getConfig
+    traceBracket l ("chunk (" <> pretty chunk <> ")") do
+      vs  <- profile "parse-chunk" \_-> go options chunk
+      vs' <- profile "parse-chunk (rest)" \_-> if consumeRests && not isConsumingRests
+                then try consumeRest <|> pure Nil
+                else pure Nil
+      pure $ vs <> vs'
 
   where
   traceDraw :: ∀ a. (Pretty a) => Int -> (List a) -> String -> ArgParser r Unit
@@ -373,25 +398,33 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
   -- Let's try to to parse the rest of the input by assembling a fake chunk
   -- and handing that back to the parser.
   consumeRest :: ∀ r. ArgParser r (List KeyValue)
-  consumeRest = traceBracket l "consume-reset" do
+  consumeRest = traceBracket l "consume-rest" do
     input <- getInput
-    parsedArgs <- (Elem <$> _) <<< fromFoldable <<< _.trackedOpts <$> getState
-    if null input || null parsedArgs
-      then pure Nil
-      else parseChunk false false l (Free parsedArgs)
+    { trackedOpts } <- getState
+    let parsedArgs = (singletonGroup true true <<< Elem) <$> do
+                      fromFoldable trackedOpts
+    traceBracket l ("consume-rest: " <> pretty parsedArgs) do
+      if null input || null parsedArgs
+        then pure Nil
+        else parseChunk false false false true l (Free parsedArgs)
 
   go _ (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
   go opts (Free xs) = do
-    parsedArgs <- fromFoldable <<< _.trackedOpts <$> getState
+    parsedArgs <- if consumeRests
+                    then fromFoldable <<< _.trackedOpts <$> getState
+                    else pure Nil
     -- We decorate all arguments with an index from left to right, as well as
     -- marking them "Required". The "Required" wrapper is used to make
     -- repetition work, while ensuring the parser terminates.
     let ixs = mapWithIndex (\x ix -> Required $ Indexed ix x) xs
-        iys = if opts.repeatableOptions
-                then Nil -- mapWithIndex (\x ix -> Superflous $ Indexed ix (Elem x)) parsedArgs
-                else Nil
+        lixs = length ixs
+        iys = mapWithIndex (\x ix ->
+                Required $ Indexed  (lixs + ix)
+                                    (singletonGroup true true (Elem x)))
+                                    parsedArgs
         izs = ixs <> iys
-    draw Nothing (length izs) izs
+        lizs = lixs + length iys
+    profile ("draw: " <> pretty izs) \_-> draw Nothing lizs izs
 
     where
 
@@ -409,11 +442,10 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
     -- Try "drawing" from the input list
     -- We've got `n` tries left to make this work.
     draw errs n xss@(x:xs) | n >= 0 =
-
       let layout = getIndexedElem (unRequired x)
        in catch' (recover layout) $
           let mod = if isRequired x then id else option Nil
-           in do
+          in do
             traceDraw n xss ""
 
             -- parse the next layout. This could be a group, in which case we
@@ -431,11 +463,15 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
 
             -- if the layout is marked as repeatable, try repeating the parse
             -- recursively, but mark successive matches as "optional".
+            input <- getInput
             vss <- try do
-              if ((Solved.isRepeatable layout ||
-                  (opts.repeatableOptions && Solved.isOptionElem layout)) &&
-                  any (snd >>> isFrom Origin.Argv) vs)
-                  then draw errs (length xss) (xs <> pure (toOptional x))
+              if (Solved.isRepeatable layout ||
+                  (opts.repeatableOptions && Solved.isOptionElem layout))
+                  then if any (snd >>> isFrom Origin.Argv) vs
+                      then draw errs (length xss) (xs <> pure (toOptional x))
+                      else if isConsumingRests
+                            then draw errs (n - 1) (xs <> pure (toOptional x))
+                            else draw errs (length xs) xs
                   else draw errs (length xs) xs
             pure $ vs <> vss
 
@@ -447,14 +483,14 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
                     Nothing -> Just (depth /\ err)
                     x -> x
          in do
-
+          input <- getInput
           traceDraw n xss $ "! ERROR - (error = " <> pretty err
                             <> ", layout = " <> pretty layout
                             <> ")"
 
           -- shortcut : there's no point trying again if there's nothing left
           -- to parse or we ran out of tries
-          if n == 0 || length xs == 0
+          if n == 0 || null xs
             then
               -- note: ensure that layouts do not change their relative
               -- positioning, hence return the original input list, rather
@@ -487,9 +523,8 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
 
       let
         -- re-align the input using the originally assigned indices
-        xss' = filter (not <<< isSuperflous) xss
-        xss'' = sortBy (compare `on` (getIndex <<< unRequired)) xss'
-        layouts = getIndexedElem <<< unRequired <$> xss''
+        xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss
+        layouts = getIndexedElem <<< unRequired <$> xss'
 
         -- substitute any missing values using the various fallback methods
         vs = layouts <#> case _ of
@@ -518,7 +553,7 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
         fallbacks = mrights vs
 
       { depth } <- getState
-      if isSkipping && length missing > 0
+      if isSkipping && not (null missing)
         then do
           unsafePartial $ throwExpectedError depth missing input
         else
@@ -529,7 +564,12 @@ parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
               if not isSkipping
                 then do
                   traceDraw n xss "final ditch attempt"
-                  parseExhaustively true true (l + 1) layouts
+                  parseExhaustively true
+                                    true
+                                    consumeRests
+                                    isConsumingRests
+                                    (l + 1)
+                                    layouts
                 else pure fallbacks
             else unsafePartial $ throwExpectedError depth layouts input
 
@@ -623,7 +663,7 @@ traceInput :: ∀ r. ArgParser r Unit
 traceInput = traceA =<< pretty <$> getInput
 
 indent :: Int -> String
-indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
+indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l) $ LL.repeat ' '
 
 traceBracket
   :: ∀ r a
@@ -651,6 +691,5 @@ traceBracket l label p = do
 stateLabel :: ParseState -> GlobalParseState -> String
 stateLabel { hasTerminated, depth } { deepestError } =
   (if hasTerminated then "✓" else "·")
-  <> "(" <> show depth <> ")"
-  <> "(dE = " <> show (pretty <$> deepestError) <> ")"
-
+  -- <> "(" <> show depth <> ")"
+  -- <> "(dE = " <> show (pretty <$> deepestError) <> ")"

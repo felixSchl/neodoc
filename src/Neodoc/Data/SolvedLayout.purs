@@ -9,7 +9,7 @@ import Data.Bifunctor (lmap)
 import Data.Tuple.Nested ((/\))
 import Data.Foldable (intercalate, all)
 import Data.String as String
-import Data.List (List)
+import Data.List (List(Nil))
 import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty)
 import Data.Foreign as F
@@ -34,6 +34,9 @@ data SolvedLayoutArg
   | Option      OptionAlias (Maybe OptionArgument) Boolean
   | EOA
   | Stdin
+
+singletonGroup :: Boolean -> Boolean -> SolvedLayout -> SolvedLayout
+singletonGroup o r x = Group o r ((x:|Nil):|Nil)
 
 derive instance eqSolvedLayoutArg :: Eq SolvedLayoutArg
 derive instance ordSolvedLayoutArg :: Ord SolvedLayoutArg

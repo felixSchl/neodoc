@@ -18,7 +18,7 @@ module Neodoc.Solve.SmartOptions where
 import Prelude
 
 import Debug.Trace
-import Data.List (List(..), (:), length, filter)
+import Data.List (List(..), (:), length, filter, null)
 import Data.Array as Array
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
@@ -70,7 +70,7 @@ smartOptions (Spec (spec@{ layouts, descriptions })) = do
 
         opt <- case x of
           (Elem (Usage.Option n Nothing r)) ->
-            let hasDescription = length (findDescriptions (OptionAlias.Long n)) > 0
+            let hasDescription = not (null $ findDescriptions (OptionAlias.Long n))
              in if hasDescription
                 then Nothing
                 else Just $ Option n (Just arg) (r || argR)
@@ -83,7 +83,7 @@ smartOptions (Spec (spec@{ layouts, descriptions })) = do
             let h = case (Array.last cs) /\ (Array.init cs) of
                       Just t /\ Just i -> t
                       _                -> c
-                hasDescription = length (findDescriptions (OptionAlias.Short h)) > 0
+                hasDescription = not (null $ findDescriptions (OptionAlias.Short h))
              in if hasDescription
                 then Nothing
                 else Just $ OptionStack (c :| cs) (Just arg) (r || argR)

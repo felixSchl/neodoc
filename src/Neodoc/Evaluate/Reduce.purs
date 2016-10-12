@@ -126,7 +126,7 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
                     if isFlag a || isCommand a
                       then case rv.value of
                         ArrayValue xs -> pure
-                          if all isBoolValue xs && A.length xs > 0
+                          if all isBoolValue xs && not (A.null xs)
                             then
                               IntValue (A.length $ flip A.filter xs \x ->
                                   case x of
