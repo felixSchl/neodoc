@@ -61,7 +61,7 @@ getEvaluationDepth (SuccessEvaluation (ParserCont _ s _ _) _) = s.depth
 -- succeeding match or fails otherwise. If any of the parsers yields a fatal
 -- error, it is propagated immediately.
 evalParsers
-  :: ∀ b s i a e c r
+  :: ∀ b a r
    . (Ord b)
   => (a -> b)
   -> List (ArgParser r a)

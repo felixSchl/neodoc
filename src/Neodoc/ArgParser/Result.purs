@@ -10,6 +10,9 @@ import Neodoc.ArgParser.KeyValue (KeyValue)
 
 data ArgParseResult = ArgParseResult (Maybe (Branch SolvedLayoutArg)) (List KeyValue)
 
+getResult :: ArgParseResult -> List KeyValue
+getResult (ArgParseResult _ r) = r
+
 instance showArgParseResult :: Show ArgParseResult where
   show (ArgParseResult branch vs) = "ArgParseResult " <> show branch <> " " <> show vs
 

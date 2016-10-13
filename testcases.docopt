@@ -135,6 +135,11 @@ options:
     -m <msg>  Message
 
 """
+
+$ prog -a -r
+{"-a": true,
+ "-r": true}
+
 $ prog -a -r -m Hello
 {"-a": true,
  "-m": "Hello",
@@ -143,10 +148,6 @@ $ prog -a -r -m Hello
 $ prog -armyourass
 {"-a": true,
  "-m": "yourass",
- "-r": true}
-
-$ prog -a -r
-{"-a": true,
  "-r": true}
 
 
@@ -1245,7 +1246,7 @@ Options:
     -s SUBNET_NAME --subnet=SUBNET_NAME                      subnet name to create instance in
     -S SG_NAME --security-group=SG_NAME                     security group to set to the instance
     -p PROFILE_NAME --iam-instance-profile=PROFILE_NAME     IAM instance profile to start instance with
-Not at 
+Not at
 """
 
 $ prog -ssubnet-0 -asome-ami -ksome-key --instance-type=t2.micro --name=foo -Psome-profile --iam-instance-profile=some-iam-instance-profile
@@ -3357,10 +3358,10 @@ r"""
 usage: prog [foo] -a bar
 """
 
-$ prog/l -a bar
+$ prog/l bar -a
 {"-a": true, "bar": true}
 
-$ prog/l bar -a
+$ prog/l -a bar
 {"-a": true, "bar": true}
 
 #
@@ -3472,8 +3473,10 @@ $ prog/lR -b -a -b f
 {"f": true, "-a": true, "-b": 2}
 
 r"""
-usage: prog -a -b -c
+usage: prog [[-a]... [-b] [-d=ARG] [-c]] foo
+options:
+  -d=ARG  [default: 1000]
 """
 
-$ prog/R -aabcbacba
-{"-a": 4, "-b": 3, "-c": 2}
+$ prog -c -a -b -a foo
+{}

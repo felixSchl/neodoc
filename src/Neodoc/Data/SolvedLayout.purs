@@ -109,11 +109,14 @@ instance isForeignSolvedLayoutArg :: IsForeign SolvedLayoutArg where
       _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
 isRepeatable :: SolvedLayout -> Boolean
-isRepeatable (Group           _ r _) = r
-isRepeatable (Elem (Command    _ r)) = r
-isRepeatable (Elem (Positional _ r)) = r
-isRepeatable (Elem (Option   _ _ r)) = r
-isRepeatable _ = false
+isRepeatable (Group _ r _) = r
+isRepeatable (Elem      x) = isElemRepeatable x
+
+isElemRepeatable :: SolvedLayoutArg -> Boolean
+isElemRepeatable (Command    _ r) = r
+isElemRepeatable (Positional _ r) = r
+isElemRepeatable (Option   _ _ r) = r
+isElemRepeatable _ = false
 
 setRepeatable :: Boolean -> SolvedLayout -> SolvedLayout
 setRepeatable r (Group o _ xs) = Group o r xs
@@ -162,6 +165,9 @@ isGroup _ = false
 
 -- Is this layout considered "free"?
 isFreeLayout :: SolvedLayout -> Boolean
-isFreeLayout (Elem (Option _ _ _)) = true
-isFreeLayout (Elem _) = false
 isFreeLayout (Group _ _ xs) = all (all isFreeLayout) xs
+isFreeLayout (Elem x) = isFreeElem x
+
+isFreeElem :: SolvedLayoutArg -> Boolean
+isFreeElem (Option _ _ _) = true
+isFreeElem _ = false

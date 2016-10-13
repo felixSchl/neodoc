@@ -27,11 +27,11 @@ module Neodoc.ArgParser.Type (
 , Input
 , ArgParser
 , ArgParseError(..)
-, Cache
-, CacheKey
-, CacheVal
-, cached
-, withLocalCache
+-- , Cache
+-- , CacheKey
+-- , CacheVal
+-- , cached
+-- , withLocalCache
 , unexpectedInputError
 , missingArgumentsError
 , optionTakesNoArgumentError
@@ -63,45 +63,43 @@ module Neodoc.ArgParser.Type (
 
 import Prelude
 import Debug.Trace
-import Data.List (List(..))
-import Data.Either (Either(..), either)
-import Data.Bifunctor (rmap)
-import Control.Lazy (class Lazy)
-import Control.MonadPlus (class MonadPlus, class MonadZero, class Alternative)
-import Control.Plus (class Plus, class Alt)
-import Neodoc.Spec (Spec)
 import Neodoc.Data.Layout
 import Neodoc.Data.SolvedLayout
 import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
-import Neodoc.ArgParser.Lexer as L
-import Neodoc.OptionAlias (OptionAlias)
-
--- `ArgParser`
 import Data.Generic
-import Data.Set (Set)
+import Neodoc.Env
+import Neodoc.Data.LayoutConversion
+import Data.Map as Map
 import Data.Set as Set
-import Data.Tuple (Tuple)
-import Data.Tuple.Nested ((/\))
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.List (head, filter, (:))
-import Data.Pretty (pretty, class Pretty)
+import Neodoc.ArgParser.Lexer as L
+import Neodoc.ArgParser.Token as Token
+import Control.Alt ((<|>))
+import Control.Lazy (class Lazy)
+import Control.MonadPlus (class MonadPlus, class MonadZero, class Alternative)
+import Control.Plus (class Plus, class Alt)
+import Data.Bifunctor (rmap)
+import Data.Either (Either(..), either)
 import Data.Foldable (any, intercalate)
+import Data.Lazy (Lazy, defer, force)
+import Data.List (List(..))
+import Data.List (head, filter, (:))
+import Data.Map (Map)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty (singleton) as NonEmpty
-import Data.Map as Map
-import Data.Map (Map)
-import Control.Alt ((<|>))
-import Data.Lazy (Lazy, defer, force)
-import Neodoc.Env
-import Neodoc.ArgParser.Token as Token
-import Neodoc.Error (NeodocError(..)) as Neodoc
-import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
-import Neodoc.Data.Description (Description(..))
-import Neodoc.Data.LayoutConversion
-import Neodoc.Data.Indexed (Indexed)
+import Data.Pretty (pretty, class Pretty)
+import Data.Set (Set)
+import Data.Tuple (Tuple)
+import Data.Tuple.Nested ((/\))
 import Neodoc.ArgParser.KeyValue (KeyValue)
 import Neodoc.ArgParser.Required (Required)
+import Neodoc.Data.Description (Description(..))
+import Neodoc.Data.Indexed (Indexed)
+import Neodoc.Error (NeodocError(..)) as Neodoc
+import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
+import Neodoc.OptionAlias (OptionAlias)
+import Neodoc.Spec (Spec)
 
 data ParseError e = ParseError Boolean (Either String e)
 
@@ -325,17 +323,17 @@ type ParseState = {
 
 type GlobalParseState = {
   deepestError :: Maybe (Tuple Int ArgParseError)
-, cache :: Cache
+-- , cache :: Cache
 }
 
-type Cache = Map CacheKey (CacheVal)
-type CacheKey = Tuple Input (Required (Indexed SolvedLayout))
-type CacheVal = Step  ArgParseError
-                      Unit -- do not restore config
-                      ParseState
-                      Unit -- do not restore global state
-                      Input
-                      (List KeyValue)
+-- type Cache = Map CacheKey (CacheVal)
+-- type CacheKey = Tuple Input (Required (Indexed SolvedLayout))
+-- type CacheVal = Step  ArgParseError
+--                       Unit -- do not restore config
+--                       ParseState
+--                       Unit -- do not restore global state
+--                       Input
+--                       (List KeyValue)
 
 type ArgParser r a =
   Parser  ArgParseError
@@ -392,30 +390,31 @@ setErrorAtDepth d e = do
     Nothing -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
     _ -> pure unit
 
-withLocalCache
-  :: ∀ r a
-   . ArgParser r a
-  -> ArgParser r a
-withLocalCache p = do
-  { cache } <- getGlobalState
-  modifyGlobalState \s -> s { cache = Map.empty :: Cache }
-  v <- p
-  modifyGlobalState \s -> s { cache = cache }
-  pure v
+-- withLocalCache
+--   :: ∀ r a
+--    . ArgParser r a
+--   -> ArgParser r a
+-- withLocalCache p = do
+--   { cache } <- getGlobalState
+--   modifyGlobalState \s -> s { cache = Map.empty :: Cache }
+--   v <- p
+--   modifyGlobalState \s -> s { cache = cache }
+--   pure v
 
-cached
-  :: ∀ r
-   . Required (Indexed SolvedLayout)
-  -> ArgParser r (List KeyValue)
-  -> ArgParser r (List KeyValue)
-cached x p = do
-  Parser \c s (g@{cache}) i ->
-    let key = i /\ x
-     in case Map.lookup key cache of
-          Just (Step b _ s' _ i' result) -> Step b c s' g i' result
-          Nothing ->
-            case unParser p c s g i of
-              step@(Step b c' s' g' i' result) ->
-                let step' = Step b unit s' unit i' result
-                    cache = Map.alter (const (Just step')) key g.cache
-                 in Step b c' s' (g' { cache = cache }) i' result
+-- cached
+--   :: ∀ r
+--    . Required (Indexed SolvedLayout)
+--   -> ArgParser r (List KeyValue)
+--   -> ArgParser r (List KeyValue)
+-- cached x p = do
+--   Parser \c s (g@{cache}) i ->
+--     let key = i /\ x
+--      in case Map.lookup key cache of
+--           Just (Step b _ s' _ i' result) -> Step b c s' g i' result
+--           Nothing ->
+--             case unParser p c s g i of
+--               step@(Step b c' s' g' i' result) ->
+--                 let step' = Step b unit s' unit i' result
+--                     cache = Map.alter (const (Just step')) key g.cache
+--                  in Step b c' s' (g' { cache = cache }) i' result
+
