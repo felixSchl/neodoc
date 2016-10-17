@@ -1,7 +1,7 @@
 module Neodoc.ArgParser.Parser where
 
 import Prelude
-import Debug.Trace
+import Debug.Trace hiding (trace)
 import Debug.Profile
 import Data.Generic
 import Data.List (
@@ -241,23 +241,24 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
     input       <- getInput
     { options } <- getConfig
     { depth }   <- getState
-    traceA $ indent l'
-      <>   "req = " <> pretty req
+    trace l' \_->
+           "req = " <> pretty req
       <> ", rep = " <> pretty rep
       <> ", res = " <> pretty res
       <> ", sub = " <> show sub
       <> ", in = "  <> pretty input
+      <> ", out = " <> pretty out
 
     -- 1. try making a match for any arg in `req` w/o allowing substitutions.
     --    if we make a match, we proceed *and never look back*. If we do not
     --    succeed with any argument, we try the `rep` list.
-    traceA $ indent l' <> "trying via argv"
+    trace l' \_-> "trying via argv"
     mKv /\ req' /\ _ <- (_lmap Just <$> (try $ match l' false req))
                     <|> pure (Nothing /\ req /\ false)
-    traceA $ indent l' <> "req' = " <> pretty req' <> " out = " <> show (pretty <$> mKv)
+    trace l' \_-> "req' = " <> pretty req' <> " out = " <> show (pretty <$> mKv)
     case mKv of
       Just kvs@(_:_) -> do
-        traceA $ indent l' <> "matched on argv: " <> pretty kvs
+        trace l' \_-> "matched on argv: " <> pretty kvs
         let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
             rep' = nub (rep <> rRep)
         go (l' + 1) sub' (req' <> res) rep' Nil (out <> kvs)
@@ -270,12 +271,12 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
         --    `req` again.
         --    note: the insertion of `res` back into `req` *does matter*, needs
         --          more thought though, as to put it into the front or back.
-        traceA $ indent l' <> "trying via rep"
+        trace l' \_-> "trying via rep"
         mKv' /\ rep' /\ _ <- (_lmap Just <$> (try $ match l' false rep))
                           <|> pure (Nothing /\ rep /\ false)
         case mKv' of
           Just kvs@(_:_) -> do
-            traceA $ indent l' <> "matched via rep: " <> pretty kvs
+            trace l' \_-> "matched via rep: " <> pretty kvs
             let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
                 rep'' = nub (rep' <> rRep)
             go (l' + 1) sub' (req <> res) rep'' Nil (out <> kvs)
@@ -289,7 +290,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
           _ -> do
             case req' of
               Nil -> do
-                traceA $ indent l <> "empty req' after rep. done"
+                trace l' \_-> "empty req' after rep. done"
                 pure out
               _:_ | sub ->
                 let
@@ -299,9 +300,9 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
                     -> ArgParser r (List KeyValue)
                   exhaust Nil out' = pure out'
                   exhaust req'' out' = do
-                    kVs'' /\ req''' /\ changed <- match l' true req''
-                    traceA $ indent l'
-                      <> "matched via sub"
+                    kVs'' /\ req''' /\ changed <- try $ match l' true req''
+                    trace l' \_ ->
+                         "matched via sub"
                       <> " kVs''" <> pretty kVs''
                       <> ", changed = " <> show changed
                       <> ", req''' = " <> pretty req'''
@@ -311,10 +312,10 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
                       then go (l' + 1) false req''' rep res (out' <> kVs'')
                       else exhaust req''' (out' <> kVs'')
                  in do
-                  traceA $ indent l' <> "trying via sub"
+                  trace l' \_-> "trying via sub"
                   exhaust req' out
-              _ -> do
-                traceA $ indent l' <> "failed to match: " <> pretty req'
+              xs -> do
+                trace l' \_-> "failed to match: " <> pretty xs
                 fail "... (no sub)"
 
   _lmap f (a /\ b /\ c) = f a /\ b /\ c
@@ -325,6 +326,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
     -- to re-inject options for `opts.repeatableOptions`.
     let isFree = true
      in ParseElem (Arg.getId x) isFree x
+
   _isRepeatable :: Arg -> Boolean
   _isRepeatable x = Arg.isArgRepeatable x || (repOpts && Arg.isOption x)
 
@@ -344,8 +346,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
   match l sub xs = go' false xs Nil
     where
     go' locked (x:xs) ys = (do
-      traceA $ indent l
-        <> "match"
+      trace l \_-> "match"
         <> " x = " <> pretty x
         <> ", xs = " <> pretty xs
         <> ", ys = " <> pretty ys
@@ -354,9 +355,8 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
       if _isFixed x && locked
         then go' true xs (x:ys)
         else do
-          vs <- parseLayout (l + 1) (sub && not locked) x
-          traceA $ indent l
-            <> "match made!"
+          vs <- try $ parseLayout (l + 1) (sub && not locked) x
+          trace l \_-> "match made!"
             <> " x = " <> pretty x
             <> ", xs = " <> pretty xs
             <> ", ys = " <> pretty ys
@@ -381,8 +381,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
         then dropFirst (\x -> _isOptional x && _isFixed x) ys'
         else ys' /\ false
 
-      traceA $ indent l
-          <> "match eval"
+      trace l \_-> "match eval"
           <> " ys = " <> pretty ys
           <> ", ys' = " <> pretty ys'
           <> ", ys'' = " <> pretty ys''
@@ -391,7 +390,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
 
       case if sub then filter (not <<< _isOptional) ys'' else ys'' of
         Nil -> do
-          traceA $ indent l <> "match succeeded!"
+          trace l \_-> "match succeeded!"
 
           -- substitute all leaf elements. we ignore groups because these groups
           -- have failed to parse irrespective of substitution, so they are a
@@ -410,7 +409,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
           pure ((_rest <$> subVs) /\ (_fst <$> subVs) /\ (locked || changed))
         zs | changed -> go' false zs Nil
         zs -> do
-          traceA $ indent l <> "match failed!"
+          trace l \_-> "match failed!"
           fail $ "expected " <> pretty zs <> ", but got: " <>  pretty i
 
   dropFirst f xs = go' xs Nil
@@ -455,15 +454,14 @@ parseLayout l sub x = do
         p = evalParsers byOrigin parsers
      in do
       vs <- p
-      if any (isFrom Origin.Argv <<< snd) vs
+      if r && any (isFrom Origin.Argv <<< snd) vs
         then loop p vs
         else pure vs
 
      where
      loop p acc = do
-        vs <- p
-        hasInput <- not <<< null <$> getInput
-        if any (isFrom Origin.Argv <<< snd) vs && hasInput
+        vs <- p <|> pure Nil
+        if any (isFrom Origin.Argv <<< snd) vs
           then loop p (acc <> vs)
           else pure (acc <> vs)
 
@@ -472,13 +470,14 @@ parseLayout l sub x = do
         fromArgv = do
           RichValue.from Origin.Argv <$> parseArg arg
           <* modifyDepth (_ + 1)
-        nTimes = if Arg.isArgRepeatable x then some else liftM1 singleton
-     in nTimes $ Tuple x <$> do
-          if not sub
-            then fromArgv
-            else case Arg.getFallback x of
-                  Just v -> fromArgv <|> pure v
-                  _      -> fromArgv
+     in do
+      if sub
+        then singleton <<< Tuple x <$> case Arg.getFallback x of
+              Just v -> fromArgv <|> pure v
+              _      -> fromArgv
+        else
+          let nTimes = if Arg.isArgRepeatable x then some else liftM1 singleton
+           in nTimes $ Tuple x <$> fromArgv
 
 {-
   Parse a single argument. We do not substitute and ignore repetitions.
