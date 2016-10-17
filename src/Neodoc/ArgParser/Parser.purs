@@ -254,23 +254,23 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
     { options } <- getConfig
     { depth }   <- getState
     trace l' \_->
-           "req = " <> pretty req
-      <> ", rep = " <> pretty rep
-      <> ", res = " <> pretty res
-      <> ", sub = " <> show sub
-      <> ", in = "  <> pretty input
-      <> ", out = " <> pretty out
+      "solve: req = " <> pretty req
+        <> ", rep = " <> pretty rep
+        <> ", res = " <> pretty res
+        <> ", sub = " <> show sub
+        <> ", in = "  <> pretty input
+        <> ", out = " <> pretty out
 
     -- 1. try making a match for any arg in `req` w/o allowing substitutions.
     --    if we make a match, we proceed *and never look back*. If we do not
     --    succeed with any argument, we try the `rep` list.
-    trace l' \_-> "trying via argv"
-    mKv /\ req' /\ _ <- (_lmap Just <$> (try $ match l' false req))
+    trace l' \_-> "solve: trying via argv"
+    mKv /\ req' /\ _ <- (_lmap Just <$> (try $ match (l' + 1) false req))
                     <|> pure (Nothing /\ req /\ false)
-    trace l' \_-> "req' = " <> pretty req' <> " out = " <> show (pretty <$> mKv)
+    trace l' \_-> "solve: req' = " <> pretty req' <> " out = " <> show (pretty <$> mKv)
     case mKv of
       Just kvs@(_:_) -> do
-        trace l' \_-> "matched on argv: " <> pretty kvs
+        trace l' \_-> "solve: matched on argv: " <> pretty kvs
         let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
             rep' = nub (rep <> rRep)
         go (l' + 1) sub' (req' <> res) rep' Nil (out <> kvs)
@@ -283,12 +283,12 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
         --    `req` again.
         --    note: the insertion of `res` back into `req` *does matter*, needs
         --          more thought though, as to put it into the front or back.
-        trace l' \_-> "trying via rep"
-        mKv' /\ rep' /\ _ <- (_lmap Just <$> (try $ match l' false rep))
+        trace l' \_-> "solve: trying via rep"
+        mKv' /\ rep' /\ _ <- (_lmap Just <$> (try $ match (l' + 1) false rep))
                           <|> pure (Nothing /\ rep /\ false)
         case mKv' of
           Just kvs@(_:_) -> do
-            trace l' \_-> "matched via rep: " <> pretty kvs
+            trace l' \_-> "solve: matched via rep: " <> pretty kvs
             let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
                 rep'' = nub (rep' <> rRep)
             go (l' + 1) sub' (req <> res) rep'' Nil (out <> kvs)
@@ -302,7 +302,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
           _ -> do
             case req' of
               Nil -> do
-                trace l' \_-> "empty req' after rep. done"
+                trace l' \_-> "solve: empty req' after rep. done"
                 pure out
               _:_ | sub ->
                 let
@@ -312,9 +312,9 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
                     -> ArgParser r (List KeyValue)
                   exhaust Nil out' = pure out'
                   exhaust req'' out' = do
-                    kVs'' /\ req''' /\ changed <- try $ match l' true req''
+                    kVs'' /\ req''' /\ changed <- try $ match (l' + 1) true req''
                     trace l' \_ ->
-                         "matched via sub"
+                         "solve: matched via sub"
                       <> " kVs''" <> pretty kVs''
                       <> ", changed = " <> show changed
                       <> ", req''' = " <> pretty req'''
@@ -324,11 +324,11 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
                       then go (l' + 1) false req''' rep res (out' <> kVs'')
                       else exhaust req''' (out' <> kVs'')
                  in do
-                  trace l' \_-> "trying via sub"
+                  trace l' \_-> "solve: trying via sub"
                   exhaust req' out
               xs -> do
-                trace l' \_-> "failed to match: " <> pretty xs
-                fail "... (no sub)"
+                trace l' \_-> "solve: failed to match: " <> pretty xs
+                fail "..." -- XXX: throw proper error here
 
   _lmap f (a /\ b /\ c) = f a /\ b /\ c
 
@@ -358,7 +358,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
   match l sub xs = go' false xs Nil
     where
     go' locked (x:xs) ys = (do
-      trace l \_-> "match"
+      trace l \_-> "match: try"
         <> " x = " <> pretty x
         <> ", xs = " <> pretty xs
         <> ", ys = " <> pretty ys
@@ -368,7 +368,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
         then go' true xs (x:ys)
         else do
           vs <- try $ parseLayout (l + 1) (sub && not locked) x
-          trace l \_-> "match made!"
+          trace l \_-> "match: return"
             <> " x = " <> pretty x
             <> ", xs = " <> pretty xs
             <> ", ys = " <> pretty ys
@@ -393,7 +393,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
         then dropFirst (\x -> _isOptional x && _isFixed x) ys'
         else ys' /\ false
 
-      trace l \_-> "match eval"
+      trace l \_-> "match: eval"
           <> " ys = " <> pretty ys
           <> ", ys' = " <> pretty ys'
           <> ", ys'' = " <> pretty ys''
@@ -402,7 +402,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
 
       case if sub then filter (not <<< _isOptional) ys'' else ys'' of
         Nil -> do
-          trace l \_-> "match succeeded!"
+          trace l \_-> "match: succeeded!"
 
           -- substitute all leaf elements. we ignore groups because these groups
           -- have failed to parse irrespective of substitution, so they are a
@@ -421,7 +421,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
           pure ((_rest <$> subVs) /\ (_fst <$> subVs) /\ (locked || changed))
         zs | changed -> go' false zs Nil
         z:zs -> do
-          trace l \_-> "match failed!"
+          trace l \_-> "match: failed!"
           i <- getInput
           { depth } <- getState
           case i of
