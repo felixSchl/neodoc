@@ -2254,9 +2254,6 @@ $ prog/s
 $ prog/s -i 123
 {"-i": [123]}
 
-$ prog/s -i 123 -i 123
-{"-i": [123, 123]}
-
 $ prog/s -i
 "user-error"
 
@@ -2404,7 +2401,7 @@ Usage: foo -
 """
 
 $ prog
-"expected -"
+{}
 
 $ prog -
 {"-": true}

@@ -208,7 +208,8 @@ parseBranch
   -> ArgParser r (List KeyValue)
 parseBranch _ _ Nil = pure Nil
 parseBranch l sub xs = profile "parse-branch" \_-> do
-  solve l true sub xs
+  { options } <- getConfig
+  solve l options.repeatableOptions sub xs
 
 {-
   we iterate over the set of required arguments `req`.
@@ -309,9 +310,6 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
                     if (not (null kVs'')) && (any (isFrom Origin.Argv <<< snd) kVs'' || changed)
                       then go (l' + 1) false req''' rep res (out' <> kVs'')
                       else exhaust req''' (out' <> kVs'')
-                      -- else if changed
-                      --   then exhaust req''' (out' <> kVs'')
-                      --   else pure (out' <> kVs'')
                  in do
                   traceA $ indent l' <> "trying via sub"
                   exhaust req' out
@@ -339,7 +337,10 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
     :: Int -- the recursive level
     -> Boolean -- allow substitutions?
     -> List ArgParseLayout
-    -> ArgParser r (Tuple (Tuple (List KeyValue) (List ArgParseLayout)) Boolean)
+    -> ArgParser r (Tuple (Tuple
+        (List KeyValue)        -- the key-value pairs that where yielded
+        (List ArgParseLayout)) -- the layouts that did *NOT* match
+        Boolean)               -- has this changed the input?
   match l sub xs = go' false xs Nil
     where
     go' locked (x:xs) ys = (do
@@ -399,7 +400,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
                         e@(ParseElem _ _ x) -> do
                           v <- Arg.getFallback x
                           pure (e /\ x /\ v)
-                        _                 -> Nothing
+                        _ -> Nothing
 
           -- return as a triplet, the values (only fallbacks), the layouts
           -- that where responsible for the values and finally if either have
@@ -447,17 +448,32 @@ parseLayout l sub x = do
   { options } <- getConfig
   go options x
   where
-  go opts (ParseGroup _ _ _ _ branches) =
-    let parsers = parseBranch l sub <<< NonEmpty.toList <$> do
-                    NonEmpty.toList branches
-     in evalParsers byOrigin parsers
+  go opts (g@(ParseGroup _ _ _ r branches)) =
+    let parsers = NonEmpty.toList branches <#> \branch ->
+                    let args = NonEmpty.toList branch
+                     in parseBranch l sub args
+        p = evalParsers byOrigin parsers
+     in do
+      vs <- p
+      if any (isFrom Origin.Argv <<< snd) vs
+        then loop p vs
+        else pure vs
+
+     where
+     loop p acc = do
+        vs <- p
+        hasInput <- not <<< null <$> getInput
+        if any (isFrom Origin.Argv <<< snd) vs && hasInput
+          then loop p (acc <> vs)
+          else pure (acc <> vs)
 
   go opts (ParseElem _ _ x) =
     let arg = Arg.getArg x
         fromArgv = do
           RichValue.from Origin.Argv <$> parseArg arg
           <* modifyDepth (_ + 1)
-     in singleton <<< Tuple x <$> do
+        nTimes = if Arg.isArgRepeatable x then some else liftM1 singleton
+     in nTimes $ Tuple x <$> do
           if not sub
             then fromArgv
             else case Arg.getFallback x of
@@ -528,7 +544,6 @@ parseArg = go
                       pure (ArrayValue (Value.intoArray v <> vs))
                     else pure v
       _ -> fail "Expected long or short option"
-  go _ = fail "..."
 
 {-
   Convert an ordinary layout to a layout suitable for parsing. Each layout and
@@ -557,6 +572,10 @@ toParseBranch xs = evalState (for xs go) 0
   We perform this step to cache some information right along-side each argument,
   such as it's `ArgKey` and fallback value. This is going to save us from doing
   this during the hot phase of the parse.
+
+  note: we set all `id`s to 0 and copy them later from the containing layout's
+        `id`s. this allows us to cache on the arg and layout level, and to
+        associate across the two.
 -}
 toArgBranch
   :: ∀ r
