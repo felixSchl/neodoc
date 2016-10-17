@@ -346,6 +346,33 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
     Try to make a match from any of the input layouts.
     This parser deals with subsituting values, culling optional args and ensures
     order is maintained in lax-placement mode.
+
+    Value substitution takes place after exhausting all other options have been
+    exhausted, it's an effort to make anything match to consume input and
+    (possible) layouts. Substitutions are a frickle beast, since it's hard to
+    determine *when* to substitute. How do we know that if we substitute now, we
+    won't make a match later?
+
+    For example:
+
+    usage: -a [-b -c] -d
+    $ -b -a -d
+
+    Here, consumption w/o substitutions is a dead end, since `[-b -c]` won't be
+    able to match (it requires either `-b -c` or `-c -b`). Hence, we *must*
+    use subsitutions to yield a match.
+
+    The problem then arrises that, for the above input:
+      * should we substitute `-a` because it cannot be met,
+      * or should try and see if there's another layout that could be
+        substituted instead, so that `-a` will have the chance to match the `-a`
+        provided on argv?
+
+    So how do you decide which of the inputs should lay down their lives i.o.
+    to advance the pattern?
+      * Prefer to sacrifice groups first?
+      * Prefer deepest match?
+      * Prefer most non-substituted values yielded?
   -}
   match
     :: Int -- the recursive level
