@@ -11,6 +11,7 @@ module Neodoc.ArgParser.Type (
 , getGlobalState
 , setState
 , modifyState
+, modifyGlobalState
 , getInput
 , setInput
 , fail
@@ -51,7 +52,6 @@ module Neodoc.ArgParser.Type (
 , findDescription
 , lookupDescription
 , lookupDescription'
-, trackArg
 , hasTerminated
 , setDone
 , unsetDone
@@ -99,7 +99,7 @@ import Neodoc.Data.Indexed (Indexed)
 import Neodoc.Error (NeodocError(..)) as Neodoc
 import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
 import Neodoc.OptionAlias (OptionAlias)
-import Neodoc.Spec (Spec)
+import Neodoc.Spec (Spec(..), Toplevel)
 
 data ParseError e = ParseError Boolean (Either String e)
 
@@ -312,17 +312,17 @@ instance toNeodocErrorArgParseError :: ToNeodocError ArgParseError where
 type ParseConfig r = {
   env :: Env
 , options :: Options r
-, descriptions :: List Description
+, spec :: Spec SolvedLayout
 }
 
 type ParseState = {
   depth :: Int -- how many elements have been consumed?
 , hasTerminated :: Boolean -- have we terminated using `--` or `opts.stopAt`?
-, trackedOpts :: Set SolvedLayoutArg -- the set of previouly matched args
 }
 
 type GlobalParseState = {
   deepestError :: Maybe (Tuple Int ArgParseError)
+, isKnownCache :: Map Token Boolean
 -- , cache :: Cache
 }
 
@@ -352,7 +352,8 @@ findDescription alias descriptions = head $ filter matchesAlias descriptions
 
 lookupDescription :: ∀ r. OptionAlias -> ArgParser r (Maybe Description)
 lookupDescription alias = do
-  { descriptions } <- getConfig
+  { spec } <- getConfig
+  Spec { descriptions } <- pure spec
   pure $ findDescription alias descriptions
 
 lookupDescription' :: ∀ r. OptionAlias -> ArgParser r Description
@@ -376,11 +377,6 @@ modifyDepth f = modifyState \s -> s { depth = f s.depth }
 
 setDepth :: ∀ r. Int -> ArgParser r Unit
 setDepth = modifyDepth <<< const
-
-trackArg :: ∀ r. SolvedLayoutArg -> ArgParser r Unit
-trackArg arg = modifyState \s -> s {
-  trackedOpts = Set.insert arg s.trackedOpts
-}
 
 setErrorAtDepth :: ∀ r. Int -> ArgParseError -> ArgParser r Unit
 setErrorAtDepth d e = do

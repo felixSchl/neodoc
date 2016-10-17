@@ -77,12 +77,12 @@ initialState :: ParseState
 initialState = {
   depth: 0
 , hasTerminated: false
-, trackedOpts: Set.empty
 }
 
 initialGlobalState :: GlobalParseState
 initialGlobalState = {
   deepestError: Nothing
+, isKnownCache: Map.empty
 }
 
 {-
@@ -161,8 +161,8 @@ parse
   -> Env
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
-parse (Spec { layouts, descriptions }) options env tokens = do
-  runParser { env, options, descriptions } initialState initialGlobalState tokens $
+parse (spec@(Spec { layouts, descriptions })) options env tokens = do
+  runParser { env, options, spec } initialState initialGlobalState tokens $
     let hasEmpty = any null layouts
         toplevels = concat (NonEmpty.toList layouts)
 
@@ -198,8 +198,13 @@ parse (Spec { layouts, descriptions }) options env tokens = do
         { deepestError } <- getGlobalState
         case deepestError of
           Just (_ /\ e) -> fail' e
-          Nothing -> fail $ "expected EOF, got: " <> pretty toks
-
+          Nothing -> do
+            kToks <- for toks \(pTok@(PositionedToken tok _ _)) -> do
+              isKnown <- isKnownToken' tok
+              pure if isKnown
+                then known pTok
+                else unknown pTok
+            fail' $ unexpectedInputError Nil kToks
 parseBranch
   :: ∀ r
    . Int
@@ -209,7 +214,14 @@ parseBranch
 parseBranch _ _ Nil = pure Nil
 parseBranch l sub xs = profile "parse-branch" \_-> do
   { options } <- getConfig
-  solve l options.repeatableOptions sub xs
+  let xs' = if not options.laxPlacement
+            then groupBy (eq `on` _isFree) xs
+            else singleton xs
+  concat <$> for xs' (solve l options.repeatableOptions sub)
+  where
+  _isFree :: ArgParseLayout -> Boolean
+  _isFree (ParseGroup _ f _ _ _) = f
+  _isFree (ParseElem _ f _) = f
 
 {-
   we iterate over the set of required arguments `req`.
@@ -408,9 +420,23 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
           -- positionals)
           pure ((_rest <$> subVs) /\ (_fst <$> subVs) /\ (locked || changed))
         zs | changed -> go' false zs Nil
-        zs -> do
+        z:zs -> do
           trace l \_-> "match failed!"
-          fail $ "expected " <> pretty zs <> ", but got: " <>  pretty i
+          i <- getInput
+          { depth } <- getState
+          case i of
+            Nil ->
+              let c = toSimpleBranch (z:zs)
+                  e = missingArgumentsError (unsafePartial $ NonEmpty.fromList' c)
+               in setErrorAtDepth depth e *> fail' e
+            _ -> do
+              kToks <- for i \(pTok@(PositionedToken tok _ _)) -> do
+                isKnown <- isKnownToken' tok
+                pure if isKnown
+                  then known pTok
+                  else unknown pTok
+              let e = unexpectedInputError (toSimpleBranch zs) kToks
+              setErrorAtDepth depth e *> fail' e
 
   dropFirst f xs = go' xs Nil
     where go' Nil out = out /\ false
@@ -566,6 +592,15 @@ toParseBranch xs = evalState (for xs go) 0
     ParseGroup i (Arg.isFreeLayout g) o r <$> do
       for xs (traverse go)
 
+toSimpleBranch
+  :: List ArgParseLayout
+  -> List SolvedLayout
+toSimpleBranch Nil = Nil
+toSimpleBranch (x:xs) = go x : toSimpleBranch xs
+  where
+  go (ParseElem _ _ x) = Elem $ Arg.getArg x
+  go (ParseGroup _ _ o r xs) = Group o r $ (go <$> _) <$> xs
+
 {-
   Convert an ordinary branch of solved arguments into a branch of `Arg`s.
   We perform this step to cache some information right along-side each argument,
@@ -604,3 +639,47 @@ toArgBranch options env descriptions x = go <$> x
   --         Elem (Arg i x k mV o') ->
   --           Elem $ Arg i (Solved.setElemRepeatable r x) k mV (o || o')
   go (Group o r xs) = Group o r $ (go <$> _) <$> xs
+
+isKnownToken'
+  :: ∀ r
+   . Token
+  -> ArgParser r Boolean
+isKnownToken' tok = do
+  { spec } <- getConfig
+  { isKnownCache } <- getGlobalState
+  case Map.lookup tok isKnownCache of
+    Just b -> pure b
+    Nothing ->
+      let isKnown = isKnownToken spec tok
+       in isKnown <$ modifyGlobalState \s -> s {
+            isKnownCache = Map.alter (const (Just isKnown)) tok s.isKnownCache
+          }
+
+{-
+  Determine if a given token is considered known
+-}
+isKnownToken
+  :: Spec SolvedLayout
+  -> Token
+  -> Boolean
+isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInLayouts
+  where
+  occuresInDescs = any matchesDesc descriptions
+    where
+    matchesDesc (OptionDescription as _ _ _ _) = test tok
+      where
+      test (Token.LOpt n _)   = elem (OptionAlias.Long n) as
+      test (Token.SOpt s _ _) = elem (OptionAlias.Short s) as
+      test _ = false
+    matchesDesc _ = false
+  occuresInLayouts = any (any (any matchesLayout)) layouts
+    where
+    matchesLayout (Group _ _ xs) = any (any matchesLayout) xs
+    matchesLayout (Elem x) = test tok x
+      where
+      test (Token.LOpt n _)   (Solved.Option a _ _) = OptionAlias.Long n == a
+      test (Token.SOpt s _ _) (Solved.Option a _ _) = OptionAlias.Short s == a
+      test (Token.Lit n)      (Solved.Command n' _) = n == n'
+      test (Token.EOA _)      (Solved.EOA)          = true
+      test (Token.Stdin)      (Solved.Stdin)        = true
+      test _ _ = false
