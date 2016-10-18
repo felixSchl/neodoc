@@ -11,6 +11,7 @@ exports.timerStart = function () {
 
 exports.timerEnd = function (start) {
   return function () {
-    return process.hrtime(start)[1]/1000000;
+    var hrTime = process.hrtime(start);
+    return hrTime[0] * 1000 + hrTime[1] / 1000000
   };
 }

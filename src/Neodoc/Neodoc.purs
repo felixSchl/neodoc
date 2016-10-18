@@ -352,7 +352,7 @@ renderNeodocError (Just prog) mHelpFlags mShortHelp (Error.ArgParserError msg) =
   renderShortHelp (Just help) =
     dedent $ unlines $ ("  " <> _) <$> lines (dedent help)
   renderShortHelp _ = ""
-  renderHelpFlags prog (Just flags) | A.length flags > 0 =
+  renderHelpFlags prog (Just flags) | not (A.null flags) =
     "See " <> prog <> " " <> (intercalate "/" flags)
       <> " for more information"
   renderHelpFlags _ _ = ""

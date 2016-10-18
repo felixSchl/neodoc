@@ -2,13 +2,14 @@ module Neodoc.ArgParser.Evaluate where
 
 import Prelude
 import Debug.Trace
+import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Pretty
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
 , null, length, reverse)
 import Data.Function (on)
-import Data.Either (Either(..))
+import Data.Either (Either(..), fromRight)
 import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for)
@@ -29,6 +30,7 @@ import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
 import Neodoc.ArgParser.Argument
 import Neodoc.ArgParser.Lexer as L
+import Neodoc.ArgParser.Profile
 
 type ChunkedLayout a = Layout (Chunk a)
 
@@ -60,7 +62,7 @@ getEvaluationDepth (SuccessEvaluation (ParserCont _ s _ _) _) = s.depth
 -- succeeding match or fails otherwise. If any of the parsers yields a fatal
 -- error, it is propagated immediately.
 evalParsers
-  :: ∀ b s i a e c r
+  :: ∀ b a r
    . (Ord b)
   => (a -> b)
   -> List (ArgParser r a)
@@ -68,7 +70,7 @@ evalParsers
 evalParsers _ parsers | length parsers == 0
   = fail' $ internalError "no parsers to evaluate"
 
-evalParsers p parsers = do
+evalParsers p parsers = profile "eval-parsers" \_-> do
 
   config      <- getConfig
   state       <- getState
@@ -140,3 +142,45 @@ evalParsers p parsers = do
           Just (d /\ e) -> setErrorAtDepth d e
           _ -> pure unit
     pure out
+
+type Cont r = ParserCont (ParseConfig r)
+                          ParseState
+                          GlobalParseState
+                          (List PositionedToken)
+
+{-
+  Yield a successful continuation or fail.
+  The parse does not influence the outer parser state with
+  the exception of "global state".
+
+  The reason for modifying the global state in face of an
+  error is that we can propagate the "deepestError" value.
+ -}
+fork
+  :: ∀ r a
+   . ArgParser r a
+  -> ArgParser r (Tuple (Cont r) a)
+fork parser = do
+  config      <- getConfig
+  state       <- getState
+  globalState <- getGlobalState
+  input       <- getInput
+  let result = runParser config state globalState input $ Parser \c s g i ->
+        case unParser parser c s g i of
+          Step b' c' s' g' i' result ->
+            let cont = ParserCont c' s' g' i'
+              in Step b' c' s' g' i' case result of
+                Left  err -> Right (Left  (g' /\ err))
+                Right val -> Right (Right (cont /\ val))
+  unsafePartial case result of
+    Right (Left (g /\ error)) -> Parser \c s _ i -> Step false c s g i (Left error)
+    Right (Right vc)          -> pure vc
+
+{-
+  Resume a yielded, successful continuation.
+ -}
+resume
+  :: ∀ r a
+   . (Tuple (Cont r) a)
+  -> ArgParser r a
+resume ((ParserCont c s g i) /\ v) = Parser \_ _ _ _ -> Step true c s g i (Right v)

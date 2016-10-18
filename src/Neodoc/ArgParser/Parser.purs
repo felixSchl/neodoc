@@ -1,79 +1,37 @@
--- The neodoc arg parser
---
--- Parse the tokenized argv input in accordance with the layout rules specified
--- in the neodoc specification provided by the developer.
---
--- For example:
---
---      usage: prog -a -b -c
---         or: prog -d -e -f=FILE
---
---      options:
---          -f, --file FILE
---
--- This specification has 2 top-level branches, each of which need to be
--- considered individually and scored. The highest ranking top-level wins.
--- Should an error occur during parsing, the "deepest" parse error is elected
--- to be shown. This requires a single parser to track it's own depth.
---
--- Multiple permutations are trialed by runnign the parser on each branch,
--- provided with the same input state.
---
--- The arg parser, during it's operation, yields values of shape:
---
---      Alias => { Origin, Value }
---
--- where `Origin` denotes the origin of the value: provided as an argument to
--- the program, derived from the environment or a default value.
---
---
--- Parsing semantics
--- -----------------
---
--- The neodoc parser parses chunks of adjacent arguments as a unit.
--- These chunks come in 2 flavours: "free" and "fixed". "free" chunks are those
--- chunks where the contained arguments can be parsed freely in any order.
--- "fixed" chunks, on the other hand enforce a strict parse from left to right.
--- When neodoc operates in `lax-placement` mode, the entire list of arguments
--- become a single "free" chunk, but positionals and commands remain fixed
--- amongst each other, but options can be interspersed anywhere.
---
--- For example:
---
---      usage: prog foo bar -a -b -c qux
---
--- is "chunked" into: `<! foo bar !> <* -a -b -c *>`, where `<! ... !>` denotes
--- a "fixed" chunk and a `<* ... *>` denotes a free chunk.
---
--- Generally speaking, elements are elected as part of a "free" chunk if they
--- are options, or "fixed" otherwise.
-
 module Neodoc.ArgParser.Parser where
 
 import Prelude
-import Debug.Trace
+import Debug.Trace hiding (trace)
+import Debug.Profile
+import Data.Generic
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
-, null, concat, mapWithIndex, length, take, drop, toUnfoldable)
+, null, concat, mapWithIndex, length, take, drop, toUnfoldable, catMaybes, nub
+, reverse)
 import Data.Array as Array
 import Data.List.Partial as LU
 import Data.Bifunctor (lmap)
+import Data.Set as Set
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
+import Data.List.Partial as LU
 import Data.Function (on)
-import Data.Tuple (Tuple(..), snd)
+import Data.Tuple (Tuple(..), snd, fst)
 import Data.Tuple.Nested ((/\))
 import Data.Either (Either(..))
 import Data.String as String
 import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.Maybe (Maybe(..), isJust, maybe, fromJust)
 import Data.Traversable (for, traverse)
+import Data.Foldable.Extra (findMap)
 import Data.Foldable (
-  class Foldable, maximumBy, all, intercalate, sum, any, elem)
+  class Foldable, maximumBy, all, intercalate, sum, any, elem, find)
 import Data.Map as Map
 import Data.Map (Map)
 import Data.Pretty (pretty, class Pretty)
 import Control.Alt ((<|>))
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
+import Control.Monad.State
+import Control.Monad.State as State
 import Partial.Unsafe
 import Data.NonEmpty.Extra as NonEmpty
 
@@ -92,6 +50,8 @@ import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
 import Neodoc.Data.Chunk
 import Neodoc.Data.Indexed
+import Neodoc.Data.IndexedLayout
+import Neodoc.Data.LayoutConversion
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.ArgKey (ArgKey)
 import Neodoc.ArgKey.Class (toArgKey)
@@ -107,23 +67,93 @@ import Neodoc.ArgParser.Combinators
 import Neodoc.ArgParser.Fallback
 import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.KeyValue
+import Neodoc.ArgParser.Profile
+import Neodoc.ArgParser.Arg hiding (getId)
+import Neodoc.ArgParser.Debug
+import Neodoc.ArgParser.Arg as Arg
 
-_ENABLE_DEBUG_ :: Boolean
-_ENABLE_DEBUG_ = false
+type ChunkedLayout a = Layout (Chunk a)
 
 initialState :: ParseState
 initialState = {
   depth: 0
 , hasTerminated: false
-, hasFailed: false
 }
 
 initialGlobalState :: GlobalParseState
 initialGlobalState = {
   deepestError: Nothing
+, isKnownCache: Map.empty
 }
 
-type ChunkedLayout a = Layout (Chunk a)
+{-
+A recursive layout structure suited for parsing.
+
+Each nested grouping indicates if it is ought to be considered "fixed", or
+"free" in terms of the groups' occurence rules. The rules are simple:
+Groups that contain any branch that contains any positional argument are now
+"fixed". This is restriction is set in place in order to allow re-evaluating
+the group in face of repetition:
+
+"u: (-a | -b)..." says that the group *in it's entirety* should be able to occur
+one or more times. This means that all of these inputs are valid: "-ab", "-bb",
+"-abab", "-abbbab".
+
+An alternative contemplation was to "lock" the branch after the initial match.
+This, in effect, alters the spec "on-the-fly" for this pattern's evaluation.
+This would cause "u: (-a | b)..." to only match inputs: "-a", "-aa", ..., "-b",
+"-bb" and so on, mixing "a"s and "b"s would be considered a failure. Neodoc
+does not yet implement such a pattern because it is less general. The above
+could also be achieved, more flexibly, using "u: (-a...|-b...)".
+
+Secondly, this data structure presents and "id", suitable for quick cache
+lookups and identification of elements later on.
+-}
+type ParseBranch a = NonEmpty List (ParseLayout a)
+data ParseLayout a
+  = ParseElem
+      Int     -- id
+      Boolean -- free?
+      a
+  | ParseGroup
+      Int     -- id
+      Boolean -- free?
+      Boolean -- optional?
+      Boolean -- repeatable?
+      (NonEmpty List (ParseBranch a))
+type ArgParseLayout = ParseLayout Arg
+
+getElem :: ∀ a. ParseLayout a -> Maybe a
+getElem (ParseElem _ _ x) = Just x
+getElem _ = Nothing
+
+getId :: ∀ a. ParseLayout a -> Int
+getId (ParseElem id _ _) = id
+getId (ParseGroup id _ _ _ _) = id
+
+derive instance genericParseLayout :: (Generic a) => Generic (ParseLayout a)
+instance showParseLayout :: (Generic a, Show a) => Show (ParseLayout a) where
+  show = gShow
+
+instance eqParseLayout :: Eq (ParseLayout a) where
+  eq = eq `on` getId
+
+instance prettyParseLayout :: (Pretty a) => Pretty (ParseLayout a) where
+  pretty (ParseElem id free x)
+    = "E(" <> show id <> ":"
+        <> (if free then "<*" else "<!")
+        <> pretty x
+        <> (if free then "*>" else "!>")
+        <> ")"
+  pretty (ParseGroup id free o r xs)
+    = "G"
+        <> (if o then "[" else "(")
+        <> show id <> ":"
+        <> (if free then "<*" else "<!")
+        <> (intercalate "|" (pretty <$> xs))
+        <> (if free then "*>" else "!>")
+        <> (if o then "]" else ")")
+        <> (if r then "..." else "")
 
 parse
   :: ∀ r
@@ -132,25 +162,33 @@ parse
   -> Env
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
-parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError $
-  runParser { env, options, descriptions } initialState initialGlobalState tokens $
-    let toplevelBranches = concat (NonEmpty.toList layouts)
-        hasEmpty = any ((_ == 0) <<< length) layouts
-        parsers = toplevelBranches <#> \toplevel ->
-          traceBracket 0 ("top-level (" <> pretty toplevel <> ")") do
-            unsetFailed
-            vs <- parseExhaustively true false 0 (NonEmpty.toList toplevel)
+parse (spec@(Spec { layouts, descriptions })) options env tokens = do
+  runParser { env, options, spec } initialState initialGlobalState tokens $
+    let hasEmpty = any null layouts
+        toplevels = concat (NonEmpty.toList layouts)
+
+        parsers :: List (ArgParser r ArgParseResult)
+        parsers = toplevels <#> \branch ->
+          let branch' = toArgBranch options env descriptions branch
+              branch'' = toParseBranch (NonEmpty.toList branch')
+           in do
+            vs <- parseBranch 0 true branch''
             eof
-            pure $ ArgParseResult (Just toplevel) vs
-        parsers' =
-            if hasEmpty
-              then parsers <> singleton do
-                    eof $> ArgParseResult Nothing Nil
-              else parsers
-      in if length parsers' == 0
-        then eof $> ArgParseResult Nothing Nil
-        else flip evalParsers parsers' \(ArgParseResult _ vs) ->
-                sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+            pure $ ArgParseResult (Just branch) vs
+
+        parsers' :: List (ArgParser r ArgParseResult)
+        parsers' = parsers
+            -- if there were empty any layouts, such as for example:
+            --    usage: prog
+            --       or: prog
+            -- then we consolidate those into a single, artificial
+            -- parse whose only requirement is that there be no input.
+            <> if hasEmpty
+                  then singleton $ eof $> ArgParseResult Nothing Nil
+                  else Nil
+     in if null parsers'
+          then eof $> ArgParseResult Nothing Nil
+          else evalParsers (byOrigin <<< getResult) parsers'
   where
   eof :: ∀ r. ArgParser r Unit
   eof = do
@@ -158,411 +196,30 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens = lmap fixError
     case input of
       Nil  -> pure unit
       toks -> do
-        { deepestError } <- getGlobalState
-        case deepestError of
-          Just (_ /\ e) -> fail' e
-          Nothing -> fail' $ unexpectedInputError Nil (known <$> toks)
+        kToks <- for toks \(pTok@(PositionedToken tok _ _)) -> do
+          isKnown <- isKnownToken' tok
+          pure if isKnown
+            then known pTok
+            else unknown pTok
+        fail' $ unexpectedInputError Nil kToks
 
-  fixError :: ParseError ArgParseError -> ParseError ArgParseError
-  fixError = mapError go
-    where
-    go (UnexpectedInputError xs toks _) =
-      let toks' = f <<< unIsKnown <$> toks
-       in unexpectedInputError xs toks'
-      where
-      f tok | isKnownToken spec tok = known tok
-      f tok = unknown tok
-    go x = x
-
--- Determine if a given option is "known".
--- An option is considered to be known if either
---      (a) appears anywhere in a layout
---      (b) is mentioned anywhere in a description
---
--- note: this is a fairly expensive operation as currently lookups are not
---       cached. there are at least 2 ways to resolve this:
---          1. create an authorative map all options (but could lead into the
---             need of options solving and will conflict with #57)
---          2. memoize / cache the lookups
-
-isKnownToken
-  :: Spec SolvedLayout
-  -> PositionedToken
-  -> Boolean
-isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInLayouts
-  where
-  occuresInDescs = any (matchesDesc tok) descriptions
-    where
-    matchesDesc (PositionedToken token _ _) (OptionDescription as _ _ _ _) = test token
-      where
-      test (Token.LOpt n _)   = elem (OptionAlias.Long n) as
-      test (Token.SOpt s _ _) = elem (OptionAlias.Short s) as
-      test _ = false
-    matchesDesc _ _ = false
-  occuresInLayouts = any (any (any (matchesLayout tok))) layouts
-    where
-    matchesLayout tok (Group _ _ xs) = any (any (matchesLayout tok)) xs
-    matchesLayout (PositionedToken token _ _) (Elem x) = test token x
-      where
-      test (Token.LOpt n _)   (Solved.Option a _ _) = OptionAlias.Long n == a
-      test (Token.SOpt s _ _) (Solved.Option a _ _) = OptionAlias.Short s == a
-      test (Token.Lit n)      (Solved.Command n' _) = n == n'
-      test (Token.EOA _)      (Solved.EOA)          = true
-      test (Token.Stdin)      (Solved.Stdin)        = true
-      test _ _ = false
-
-parseLayout
+parseBranch
   :: ∀ r
-   . Boolean  -- ^ can we skip using fallback values?
-  -> Boolean  -- ^ are we currently skipping using fallback values?
-  -> Int      -- ^ recursive level
-  -> SolvedLayout
+   . Int
+  -> Boolean -- allow substitutions?
+  -> List ArgParseLayout
   -> ArgParser r (List KeyValue)
-parseLayout skippable isSkipping l layout = do
+parseBranch _ _ Nil = pure Nil
+parseBranch l sub xs = profile "parse-branch" \_-> do
   { options } <- getConfig
-  traceBracket l ("layout (" <> pretty layout <> ")") do
-    go options layout
-
+  let xs' = if not options.laxPlacement
+            then groupBy (eq `on` _isFree) xs
+            else singleton xs
+  concat <$> for xs' (solve l options.repeatableOptions sub)
   where
-
-  -- Terminate at singleton groups that house only positionals.
-  go options x | options.optionsFirst && isJust (termAs x)
-    = let y = unsafePartial (fromJust (termAs x))
-      in singleton <<< Tuple (toArgKey y) <<< (RichValue.from Origin.Argv) <$>
-          terminate y
-
-  go options (Group o r branches) =
-    let branches' = NonEmpty.toList branches
-        nEvaluations = length branches'
-        parsers = flip mapWithIndex branches' \branch ix ->
-          traceBracket (l + 1) ("EVALUTATION " <> show (ix + 1) <> "/" <> show nEvaluations) do
-            parseExhaustively skippable isSkipping (l + 1) (NonEmpty.toList branch)
-    in do
-        vs <- (if o then option Nil else id) do
-          if length parsers == 0 then pure Nil else
-            flip evalParsers parsers \vs ->
-              sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
-        hasInput <- not <<< null <$> getInput
-        vss <- if (hasInput && r && any (snd >>> isFrom Origin.Argv) vs)
-                  then loop Nil
-                  else pure Nil
-        pure $ vs <> vss
-
-    where
-      loop acc = do
-        -- parse this group repeatedly, but make successive matches optional.
-        vs <- go options (Group true r branches)
-        if any (snd >>> isFrom Origin.Argv) vs
-          then loop $ acc <> vs
-          else pure acc
-
-  go _ e@(Elem x) = getInput >>= \i -> (
-    let nTimes = if Solved.isRepeatable e then some else liftM1 singleton
-     in nTimes do
-          Tuple (toArgKey x) <<< (RichValue.from Origin.Argv) <$> go' x
-            <* modifyDepth (_ + 1)
-    ) <|> fail' (unexpectedInputError (e:Nil) (known <$> i))
-
-    where
-    go' (Solved.Positional n _) = positional (pretty x) n
-    go' (Solved.Command    n _) = command    (pretty x) n
-    go' (Solved.Stdin         ) = stdin
-    go' (Solved.EOA           ) = eoa <|> (pure $ ArrayValue [])
-    go' (Solved.Option a  mA r) = do
-      input       <- getInput
-      { options } <- getConfig
-      case input of
-        (PositionedToken token _ _) : _
-          | case token of
-              LOpt _ _   -> true
-              SOpt _ _ _ -> true
-              _          -> false
-          -> do
-            aliases /\ def /\ env <- do
-              description <- lookupDescription' a
-              case description of
-                (OptionDescription aliases _ _ def env) ->
-                  pure $ aliases /\ def /\ env
-                _ -> fail' $ internalError "invalid option description"
-            let
-              ns = NonEmpty.toList $ aliases <#> case _ of
-                    OptionAlias.Short f -> Left  f
-                    OptionAlias.Long  n -> Right n
-              longAliases = mrights ns
-              shortAliases = mlefts ns
-              term = any (_ `elem` options.stopAt) $ aliases <#> case _ of
-                        OptionAlias.Short s -> "-"  <> String.singleton s
-                        OptionAlias.Long  n -> "--" <> n
-
-            -- note: safe to be unsafe because of pattern match above
-            OptRes v canTerm canRepeat <- unsafePartial case token of
-              LOpt _ _ ->
-                case longAliases of
-                  Nil -> fail "Option has no long alias"
-                  _   -> choice $ longAliases <#> \alias -> try do
-                          longOption term alias mA
-              SOpt _ _ _ ->
-                case shortAliases of
-                  Nil -> fail "Option has no short alias"
-                  _   -> choice $ shortAliases <#> \alias -> try do
-                          shortOption term alias mA
-
-            -- try terminating at this option
-            if term && canTerm
-                then do
-                  vs <- terminate x
-                  pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
-                else do
-                  if isJust mA && r && canRepeat
-                      then do
-                        vs <- Array.many optionArgument
-                        pure (ArrayValue (Value.intoArray v <> vs))
-                      else pure v
-        _ -> fail "Expected long or short option"
-
-
-parseExhaustively
-  :: ∀ r
-   . Boolean -- ^ can we skip using fallback values?
-  -> Boolean -- ^ are we currently skipping using fallback values?
-  -> Int     -- ^ recursive level
-  -> List SolvedLayout
-  -> ArgParser r (List KeyValue)
-parseExhaustively _ _ _ Nil = pure Nil
-parseExhaustively skippable isSkipping l xs = skipIf hasTerminated Nil do
-  { options } <- getConfig
-  let chunks = chunkBranch options.laxPlacement options.optionsFirst xs
-  concat <$> traverse (parseChunk skippable isSkipping (l + 2)) chunks
-
-parseChunk
-  :: ∀ r
-   . Boolean  -- ^ can we skip using fallback values?
-  -> Boolean  -- ^ are we currently skipping using fallback values?
-  -> Int      -- ^ recursive level
-  -> Chunk (List SolvedLayout)
-  -> ArgParser r (List KeyValue)
-parseChunk skippable isSkipping l chunk = skipIf hasTerminated Nil do
-  traceBracket l ("chunk (" <> pretty chunk <> ")") do
-    go chunk
-
-  where
-  traceDraw :: ∀ a. (Pretty a) => Int -> (List a) -> String -> ArgParser r Unit
-  traceDraw n xss msg = trace l \input -> do
-    "draw (" <> show n <> "|" <> show skippable <> "|" <> show isSkipping <> "): "
-      <> (if String.length msg > 0 then " " <> msg else "")
-      <> " (elems: " <> pretty xss <> ")"
-      <> " (input: " <> pretty input <> ")"
-
-  go (Fixed xs) = concat <$> for xs (parseLayout skippable isSkipping l)
-  go (Free  xs) =
-    -- We decorate all arguments with an index from left to right, as well as
-    -- marking them "Required". The "Required" wrapper is used to make
-    -- repetition work, while ensuring the parser terminates.
-    let indexedLayouts = flip mapWithIndex xs \x ix -> Required (Indexed ix x)
-     in draw Nothing (length xs) indexedLayouts
-
-    where
-    draw
-      :: Maybe (Tuple Int (ParseError ArgParseError))
-      -> Int
-      -> List (Required (Indexed SolvedLayout))
-      -> ArgParser r (List KeyValue)
-
-    -- Try "drawing" from the input list
-    -- We've got `n` tries left to make this work.
-    draw errs n xss@(x:xs) | n >= 0 =
-
-      let layout = getIndexedElem (unRequired x)
-       in catch' (recover layout) $
-          let mod = if isRequired x then id else option Nil
-           in do
-            traceDraw n xss ""
-
-            -- parse the next layout. This could be a group, in which case we
-            -- recursive down each of the groups branches to try and make a
-            -- match. Based on wether or not `isSkipping` is set to true, allow
-            -- the layout to substitute values from fallback sources.
-            vs <- try $ mod do
-              parseLayout
-                isSkipping  -- propagate the 'isSkipping' property
-                false       -- reset 'skipable' to false
-                (l + 1)     -- increase the recursive level
-                if not isSkipping
-                    then setLayoutRequired true layout
-                    else layout
-
-            -- if the layout is marked as repeatable, try repeating the parse
-            -- recursively, but mark successive matches as "optional".
-            vss <- try do
-              if (Solved.isRepeatable layout &&
-                  any (snd >>> isFrom Origin.Argv) vs)
-                  then draw errs (length xss) (xs <> pure (toOptional x))
-                  else draw errs (length xs) xs
-            pure $ vs <> vss
-
-      where
-      recover layout { depth } err =
-        let
-          isFixed = not <<< Solved.isFreeLayout
-          errs' = case errs of
-                    Just (d /\ _) | depth > d -> Just (depth /\ err)
-                    Nothing -> Just (depth /\ err)
-                    x -> x
-         in do
-
-          -- Check if we're done trying to recover.
-          -- See the `draw -1` case below (`markFailed`).
-          failed <- hasFailed
-          traceDraw n xss $ "! ERROR - (state.failed = " <> show failed
-                            <> ", error = " <> pretty err
-                            <> ", layout = " <> pretty layout
-                            <> ")"
-          if failed
-            then do
-              traceDraw n xss $ "! ABORTING (failed)"
-              throw err
-
-            -- shortcut: there's no point trying again if there's nothing left
-            -- to parse.
-            else if false --  n == 0 || length xs == 0
-              then
-                -- note: ensure that layouts do not change their relative
-                -- positioning, hence return the original input list, rather
-                -- than pushing it onto the back.
-                let xs' = if isFixed layout then xss else (xs <> singleton x)
-                 in do
-                    traceDraw n xs' $ "! Skipping (shortcut)"
-                    draw errs' (-1) xs'
-              else
-                let isFixed' = isFixed <<< getIndexedElem <<< unRequired
-                    xs' =
-                      if Solved.isFreeLayout layout
-                        then xs <> singleton x
-                        -- XXX: Future work could include slicing off those
-                        -- branches in the group that are 'free' and re-queueing
-                        -- those.
-                        else
-                            let fs = take n xss
-                                rs = drop n xss
-                            in sortBy (compare `on` isFixed') fs <> rs
-                 in do
-                    traceDraw n xss $ "...retrying"
-                    draw errs' (n - 1) xs'
-
-    -- All arguments have been matched (or have failed to be matched) at least
-    -- once by now. See where we're at - is there any required argument that was
-    -- not matched at all?
-    draw errs n xss@(x:xs) | n < 0 = skipIf hasTerminated Nil do
-      input <- getInput
-      { options, env, descriptions } <- getConfig
-
-      traceDraw n xss $ ""
-
-      let
-        -- re-align the input using the originally assigned indices
-        xss' = sortBy (compare `on` (getIndex <<< unRequired)) xss
-        layouts = getIndexedElem <<< unRequired <$> xss'
-
-        -- substitute any missing values using the various fallback methods
-        vs = layouts <#> case _ of
-          layout@(Group _ _ _) -> Left layout
-          layout@(Elem arg) -> maybe (Left layout) (Right <<< Tuple (toArgKey arg)) do
-            let description = case arg of
-                  (Option alias _ _) -> findDescription alias descriptions
-                  _                  -> Nothing
-            v <- unRichValue <$> getFallbackValue options env description arg
-            pure $ RichValue v {
-              value = if isRepeatable layout
-                  then ArrayValue $ Value.intoArray v.value
-                  else v.value
-            }
-
-        -- find those layouts that did not yield any value, not even a fallback
-        -- value, but are required for a successful match.
-        missing = mlefts vs `flip filter` \layout ->
-          isRequired x &&
-          -- This may look very counter-intuitive, yet getting fallback
-          -- values for entire groups is not possible and not logical.
-          -- If a group that is allowed to be omitted fails, there won't
-          -- be any values to fall back onto.
-          not (isGroup layout && isOptional layout)
-
-        fallbacks = mrights vs
-
-      { depth } <- getState
-      if isSkipping && length missing > 0
-        then do
-          -- set the parser state to "failed".
-          -- setting this will cause no more recoveries during succesive draws.
-          setFailed
-          unsafePartial $ throwExpectedError depth missing input
-        else
-          -- special case: when the input is empty, we choose to enable skipping
-          -- "on the spot" as it's unlikely enough we'll find anything better.
-          if skippable || null input
-            then
-              if not isSkipping
-                then do
-                  traceDraw n xss "final ditch attempt"
-                  parseExhaustively true true (l + 1) layouts
-                else pure fallbacks
-            else unsafePartial $ throwExpectedError depth layouts input
-
-      where
-        throwExpectedError
-          :: ∀ r
-           . Partial
-          => Int
-          -> List SolvedLayout
-          -> List PositionedToken
-          -> ArgParser r _
-        throwExpectedError depth xss@(x:xs) input = do
-          case errs of
-            Just (d /\ e) | d > depth -> do
-              setErrorAtDepth d (extractError genericError e)
-              throw e
-            _ -> case input of
-              Nil ->
-                let e = missingArgumentsError (x:|xs)
-                 in do
-                  setErrorAtDepth depth e
-                  fail' e
-              toks ->
-                let e = unexpectedInputError xss (known <$> toks)
-                 in do
-                  setErrorAtDepth depth e
-                  fail' e
-
-    draw _ _ _ = pure Nil
-
-setLayoutRequired :: Boolean -> SolvedLayout -> SolvedLayout
-setLayoutRequired b (Group _ r xs) = Group (not b) r xs
-setLayoutRequired _ x = x
-
--- Check if a given layout qualifies as a terminating argument for options-first
--- and if so, return the argument it should be associated with.
-termAs :: SolvedLayout -> Maybe SolvedLayoutArg
-termAs (Group _ gR (((Elem x@(Solved.Positional _ pR)) :| Nil) :| Nil)) | gR || pR = Just x
-termAs (Elem x@(Solved.Positional _ r)) | r = Just x
-termAs _ = Nothing
-
--- Is this layout capable of acting as a terminator for options-first?
-canTerm :: SolvedLayout -> Boolean
-canTerm = isJust <<< termAs
-
--- Chunk a branch
---   E(foo) G(-a -b -c) E(-x) => [Fixed([E(foo)]), Free([G(-a -b -c), E(-x)])]
-chunkBranch
-  :: Boolean -- enable lax-placement mode
-  -> Boolean -- enable options-first mode
-  -> List SolvedLayout
-  -> List (Chunk (List SolvedLayout))
-chunkBranch lax optsFirst = fromFoldable >>> chunk \x ->
-  (not (optsFirst && canTerm x)) && (lax || Solved.isFreeLayout x)
-
-isFrom :: Origin -> RichValue -> Boolean
-isFrom o rv = o == RichValue.getOrigin rv
-
+  _isFree :: ArgParseLayout -> Boolean
+  _isFree (ParseGroup _ f _ _ _) = f
+  _isFree (ParseElem _ f _) = f
 
 -- Terminate the parser at the given argument and collect all subsequent
 -- values int an array ("options-first" and "stop-at")
@@ -576,56 +233,559 @@ terminate arg = do
   setDone
   setDepth 99999
   setInput Nil
-
   pure rest
 
-trace :: ∀ r. Int -> (List PositionedToken -> String) -> ArgParser r Unit
-trace l f = if _ENABLE_DEBUG_
+{-
+  we iterate over the set of required arguments `req`.
+  should we fail to make a match for any `x` in `req`, we move `x` to `res`.
+  should we be able to make a match with a successive `x'` in `req`, we
+  release all arguments from the "reserve" (`res`) back into `req` and re-
+  evaluate. should all `x` in `req` fail, we try to consume *anything* with
+  `rep`. if the input changes, we keep going - if it does not we conclude that
+  there's no match on this branch.
+-}
+solve
+  :: ∀ r
+   . Int                 -- recursive level
+  -> Boolean             -- `opts.repeatableOptions`
+  -> Boolean             -- allow substitutions?
+  -> List ArgParseLayout -- the required arguments
+  -> ArgParser r (List KeyValue)
+solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
+  where
+  go
+    :: Int                 -- the recursive level
+    -> Boolean             -- allow substitutions?
+    -> List ArgParseLayout -- the required arguments
+    -> List ArgParseLayout -- repeatable arguments
+    -> Boolean             -- can apply repetition?
+    -> List KeyValue       -- the output
+    -> ArgParser r (List KeyValue)
+  go l' sub' req rep canRep out = do
+    input       <- getInput
+    { options } <- getConfig
+    { depth }   <- getState
+    trace l' \i->
+      "solve: req = " <> pretty req
+        <> ", rep = " <> pretty rep
+        <> ", sub = " <> show sub
+        <> ", out = " <> pretty out
+        <> ", i = "   <> pretty i
+
+    -- 1. try making a match for any arg in `req` w/o allowing substitutions.
+    --    if we make a match, we proceed *and never look back*. If we do not
+    --    succeed with any argument, we try the `rep` list.
+    trace l' \i-> "solve: trying via argv, i = " <> pretty i
+    mKv /\ req' /\ _ /\ mNewRep <-
+      (_lmap Just <$> (try $ match (l' + 1) false req)) <|>
+        pure (Nothing /\ req /\ false /\ Nothing)
+    trace l' \i-> "solve: req' = " <> pretty req' <> " out = " <> show (pretty <$> mKv)
+                    <> ", i = " <> pretty i
+    case mKv of
+      Just kvs@(_:_) -> do
+        trace l' \i-> "solve: matched on argv: " <> pretty kvs <> ", i = " <> pretty i
+        let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
+            rep' = nub ((maybe Nil singleton mNewRep) <> rep <> rRep)
+        go (l' + 1) sub' req' rep' true (out <> kvs)
+      _ -> do
+        -- 2. if we did not manage to make a single `req` parse, we ought to try
+        --    if any of our args in `rep` is now able to parse. We consume at
+        --    most one and re-run in case of success. The reason for re-running
+        --    is, is that a success w/o substitution *necessarily*
+        --    means we consumed input - hence we must try previously failed
+        --    `req` again.
+        --    note: the insertion of `res` back into `req` *does matter*, needs
+        --          more thought though, as to put it into the front or back.
+        trace l' \i-> "solve: trying via rep, i = " <> pretty i
+        mKv' /\ rep' /\ _ /\ mNewRep' <-
+          if canRep
+            then do
+              (_lmap Just <$> (try $ match (l' + 1) false rep)) <|>
+                 pure (Nothing /\ rep /\ false /\ Nothing)
+            else if options.repeatableOptions
+              then
+                let repOpts = flip filter rep case _ of
+                                (ParseElem _ _ x) -> _isRepeatable x
+                                _ -> false
+                 in (_lmap Just <$> (try $ match (l' + 1) false repOpts)) <|>
+                      pure (Nothing /\ rep /\ false /\ Nothing)
+              else pure (Nothing /\ rep /\ false /\ Nothing)
+        case mKv' of
+          Just kvs@(_:_) -> do
+            trace l' \i-> "solve: matched via rep: " <> pretty kvs <> ", i = " <> pretty i
+            let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
+                rep'' = nub ((maybe Nil singleton mNewRep') <> rep' <> rRep)
+            if any (isFrom Origin.Argv <<< snd) kvs
+              then go (l' + 1) sub' req rep'' true (out <> kvs)
+              else go (l' + 1) sub' req rep'' false (out <> kvs)
+          -- 3. If we still did not manage to make a match, things aren't
+          --    looking too great. It's time for drastic measures. If the parent
+          --    is allowing us to, we repeat this above, but allow substitutions
+          --    this time. At this point, "anything" goes. If we find a match
+          --    whose result contains any value with origin `Argv`, we must
+          --    again try again all prior inputs as new input means new chances
+          --    of a successful match.
+          _ -> do
+            case req' of
+              Nil -> do
+                trace l' \i -> "solve: empty req' after rep. done. i = " <> pretty i
+                pure out
+              _:_ | sub ->
+                let
+                  exhaust
+                    :: List ArgParseLayout
+                    -> List KeyValue
+                    -> ArgParser r (List KeyValue)
+                  exhaust Nil out' = pure out'
+                  exhaust req'' out' = do
+                    kVs'' /\ req''' /\ changed /\ _ <- try $ match (l' + 1) true req''
+                    trace l' \i ->
+                         "solve: matched via sub"
+                      <> " kVs''" <> pretty kVs''
+                      <> ", changed = " <> show changed
+                      <> ", req''' = " <> pretty req'''
+                      <> ", i = " <> pretty i
+                    -- check if we consumed input. If we did, we must rinse
+                    -- and repeat the entire process with the new input.
+                    if (not (null kVs'')) && (any (isFrom Origin.Argv <<< snd) kVs'' || changed)
+                      then go (l' + 1) false req''' rep true (out' <> kVs'')
+                      else exhaust req''' (out' <> kVs'')
+                 in do
+                  trace l' \i-> "solve: trying via sub, i = " <> pretty i
+                  exhaust req' out
+              xs -> do
+                trace l' \_-> "solve: failed to match: " <> pretty xs
+                fail "..." -- XXX: throw proper error here
+
+  _lmap f (a /\ b /\ c /\ d) = f a /\ b /\ c /\ d
+
+  _toElem :: Arg -> ArgParseLayout
+  _toElem x =
+    -- note: we know it's not fixed since we only use this function
+    -- to re-inject options for `opts.repeatableOptions`.
+    let isFree = true
+     in ParseElem (Arg.getId x) isFree x
+
+  _isRepeatable :: Arg -> Boolean
+  _isRepeatable x = Arg.isArgRepeatable x || (repOpts && Arg.isOption x)
+
+  {-
+    Try to make a match from any of the input layouts.
+    This parser deals with subsituting values, culling optional args and ensures
+    order is maintained in lax-placement mode.
+
+    Value substitution takes place after exhausting all other options have been
+    exhausted, it's an effort to make anything match to consume input and
+    (possible) layouts. Substitutions are a frickle beast, since it's hard to
+    determine *when* to substitute. How do we know that if we substitute now, we
+    won't make a match later?
+
+    For example:
+
+    usage: -a [-b -c] -d
+    $ -b -a -d
+
+    Here, consumption w/o substitutions is a dead end, since `[-b -c]` won't be
+    able to match (it requires either `-b -c` or `-c -b`). Hence, we *must*
+    use subsitutions to yield a match. But which argument should be substituted?
+    We select the most eligble argument by see
+  -}
+  match
+    :: Int -- the recursive level
+    -> Boolean -- allow substitutions?
+    -> List ArgParseLayout
+    -> ArgParser r (Tuple (Tuple (Tuple
+        (List KeyValue)         -- the key-value pairs that where yielded
+        (List ArgParseLayout))  -- the layouts that did *NOT* match
+        Boolean)                -- has this changed the input?
+        (Maybe ArgParseLayout)) -- element to repeat
+  match l sub xs = go' Nothing false xs Nil Nil
+    where
+    go' errs locked (x:xs) ys matched = (do
+      trace l \i-> "match: try"
+        <> " x = " <> pretty x
+        <> ", xs = " <> pretty xs
+        <> ", ys = " <> pretty ys
+        <> ", locked = " <> show locked
+        <> ", sub = " <> show sub
+        <> ", i = " <> pretty i
+      if _isFixed x && locked
+        then go' errs true xs (x:ys) matched
+        else do
+          cvs <- fork $ parseLayout (l + 1) (sub && not locked) x
+          trace l \i-> "match: return"
+            <> " x = " <> pretty x
+            <> ", xs = " <> pretty xs
+            <> ", ys = " <> pretty ys
+            <> ", vs = " <> pretty (snd cvs)
+            <> ", locked = " <> show locked
+            <> ", sub = " <> show sub
+            <> ", i = " <> pretty i
+          go' errs (locked || _isFixed x) xs ys ((x /\ cvs) : matched)
+    ) `catch` \{ depth } e -> do
+      let errs' = case errs of
+                    Just (d /\ _) | depth > d -> Just (depth /\ e)
+                    Nothing -> Just (depth /\ e)
+                    x -> x
+      go' errs' (locked || _isFixed x) xs (x:ys) matched
+
+    {-
+      Evaluate the result. We've tried all `req` items agains the same input
+      now and none of them managed to make a match. Since all of these items
+      are "free", substituting or removing one of them is not going to make a
+      difference for the others.
+    -}
+    go' errs locked Nil ys Nil = do
+      i <- getInput
+
+      -- re-arrange the pattern into it's original order.
+      let ys' = sortBy (compare `on` getId) ys
+
+      -- drop optional, fixed layouts.
+      ys'' /\ changed <- pure do
+       if locked
+        then dropFirst (\x -> _isOptionalGroup x && _isFixed x) ys'
+        else ys' /\ false
+
+      trace l \i-> "match: eval"
+          <> " ys = " <> pretty ys
+          <> ", ys' = " <> pretty ys'
+          <> ", ys'' = " <> pretty ys''
+          <> ", locked = " <> show locked
+          <> ", sub = " <> show sub
+          <> ", i = " <> pretty i
+
+      case if sub then filter (not <<< _isOptionalGroup) ys'' else ys'' of
+        Nil -> do
+          trace l \i-> "match: succeeded!, i = " <> pretty i
+
+          -- substitute all leaf elements. we ignore groups because these groups
+          -- have failed to parse irrespective of substitution, so they are a
+          -- not considered a legible match.
+          let subVs = catMaybes $ ys'' <#> case _ of
+                        e@(ParseElem _ _ x) -> do
+                          v <- Arg.getFallback x
+                          pure (e /\ x /\ v)
+                        _ -> Nothing
+
+          -- return as a triplet, the values (only fallbacks), the layouts
+          -- that where responsible for the values and finally if either have
+          -- been locked (which indicates a possible change in input) or if
+          -- we noticed a change during `dropFirst` (also releated to locking /
+          -- positionals)
+          pure ((_rest <$> subVs) /\ (_fst <$> subVs) /\ (locked || changed) /\ Nothing)
+
+        zs | changed -> go' errs false zs Nil Nil
+
+        z:zs -> do
+          trace l \i-> "match: failed!" <> pretty (z:zs) <> ", i = " <> pretty i
+          i <- getInput
+          { depth } <- getState
+          case errs of
+            Just (d /\ e) | d > depth -> do
+              setErrorAtDepth d (extractError genericError e)
+              throw e
+            _ -> case i of
+              Nil ->
+                let c = toSimpleBranch (z:zs)
+                    e = missingArgumentsError (unsafePartial $ NonEmpty.fromList' c)
+                in setErrorAtDepth depth e *> fail' e
+              _ -> do
+                kToks <- for i \(pTok@(PositionedToken tok _ _)) -> do
+                  isKnown <- isKnownToken' tok
+                  pure if isKnown
+                    then known pTok
+                    else unknown pTok
+                let e = unexpectedInputError (toSimpleBranch zs) kToks
+                setErrorAtDepth depth e *> fail' e
+
+    {-
+      Evaluate the matches.
+      Each match is a triplet of (arg, continuation, values). We choose the best
+      ranking triplet, inject it's parse state ("resume" the parse), yield it's
+      values and return all losing arguments as non-matched.
+    -}
+    go' _ locked Nil ys (matches@(_:_)) =
+      let
+          -- select the best-ranking match based on the values it yielded
+          matches' = sortBy (compare `on` (byOrigin <<< snd <<< snd)) matches
+          x = fst $ unsafePartial (LU.last matches')
+          cvs = snd $ unsafePartial (LU.last matches')
+          vs = snd cvs
+          xs' = fst <$> unsafePartial (LU.init matches')
+          rep = if _isLayoutRepeatable x then Just x else Nothing
+       in do
+        -- resume the parser state with the continuation and the yielded value
+        resume cvs
+
+        -- re-sort the remaining elements (XXX: could this be skipped?)
+        pure (vs /\ (sortBy (compare `on` getId) $ xs' <> ys) /\ locked /\ rep)
+
+  dropFirst f xs = go' xs Nil
+    where go' Nil out = out /\ false
+          go' (x:xs) out = if f x then (xs <> out) /\ true else go' xs (x:out)
+
+  _fst  (a /\ b /\ c) = a
+  _rest (a /\ b /\ c) = b /\ c
+
+  _isFixed :: ArgParseLayout -> Boolean
+  _isFixed (ParseGroup _ f _ _ _) = not f
+  _isFixed (ParseElem _ f _) = not f
+
+  _hasFallback :: ArgParseLayout -> Boolean
+  _hasFallback (ParseElem _ _ x) = isJust (Arg.getFallback x)
+  _hasFallback _ = false
+
+  _isOptionalGroup :: ArgParseLayout -> Boolean
+  _isOptionalGroup (ParseGroup _ _ o _ _) = o
+  _isOptionalGroup _ = false
+
+  _isLayoutRepeatable :: ArgParseLayout -> Boolean
+  _isLayoutRepeatable (ParseElem _ _ x) = Arg.isArgRepeatable x
+  _isLayoutRepeatable (ParseGroup _ _ _ r _) = r
+
+
+byOrigin :: List KeyValue -> Int
+byOrigin vs = sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
+
+isFrom :: Origin -> RichValue -> Boolean
+isFrom o rv = o == RichValue.getOrigin rv
+
+parseLayout
+  :: ∀ r
+   . Int
+  -> Boolean
+  -> ArgParseLayout
+  -> ArgParser r (List KeyValue)
+parseLayout l sub x = skipIf hasTerminated Nil do
+  { options } <- getConfig
+  go options x
+  where
+   -- Terminate at singleton groups that house only positionals.
+  go options x | options.optionsFirst && isJust (termAs x)
+    = let y = unsafePartial (fromJust (termAs x))
+      in singleton <<< Tuple y <<< (RichValue.from Origin.Argv) <$>
+        terminate (Arg.getArg y)
+
+  go opts (g@(ParseGroup _ _ _ r branches)) =
+    let parsers = NonEmpty.toList branches <#> \branch ->
+                    let args = NonEmpty.toList branch
+                     in parseBranch l true args
+        p = evalParsers byOrigin parsers
+     in do
+      vs <- p
+      if r && any (isFrom Origin.Argv <<< snd) vs
+        then loop p vs
+        else pure vs
+
+     where
+     loop p acc = do
+        vs <- p <|> pure Nil
+        if any (isFrom Origin.Argv <<< snd) vs
+          then loop p (acc <> vs)
+          else pure (acc <> vs)
+
+  go opts (ParseElem _ _ x) =
+    let arg = Arg.getArg x
+        fromArgv = do
+          RichValue.from Origin.Argv <$> parseArg arg
+          <* modifyDepth (_ + 1)
+     in do
+      if sub
+        then singleton <<< Tuple x <$> case Arg.getFallback x of
+              Just v -> fromArgv <|> pure v
+              _      -> fromArgv
+        else
+          let nTimes = if Arg.isArgRepeatable x then some else liftM1 singleton
+           in nTimes $ Tuple x <$> fromArgv
+
+{-
+  Parse a single argument. We do not substitute and ignore repetitions.
+-}
+parseArg
+  :: ∀ r
+   . SolvedLayoutArg
+  -> ArgParser r Value
+parseArg x = go x
+  where
+  go (Solved.Positional n _) = positional n n
+  go (Solved.Command    n _) = command    n n
+  go (Solved.Stdin         ) = stdin
+  go (Solved.EOA           ) = eoa <|> (pure $ ArrayValue [])
+  go (Solved.Option a  mA r) = do
+    input       <- getInput
+    { options } <- getConfig
+    case input of
+      (PositionedToken token _ _) : _
+        | case token of
+            LOpt _ _   -> true
+            SOpt _ _ _ -> true
+            _          -> false
+        -> do
+          aliases /\ def /\ env <- do
+            description <- lookupDescription' a
+            case description of
+              (OptionDescription aliases' _ _ def' env') ->
+                pure $ aliases' /\ def' /\ env'
+              _ -> fail' $ internalError "invalid option description"
+          let
+            ns = NonEmpty.toList $ aliases <#> case _ of
+                  OptionAlias.Short f -> Left  f
+                  OptionAlias.Long  n -> Right n
+            longAliases = mrights ns
+            shortAliases = mlefts ns
+            term = any (_ `elem` options.stopAt) $ aliases <#> case _ of
+                      OptionAlias.Short s -> "-"  <> String.singleton s
+                      OptionAlias.Long  n -> "--" <> n
+
+          -- note: safe to be unsafe because of pattern match above
+          OptRes v canTerm canRepeat <- unsafePartial case token of
+            LOpt _ _ ->
+              case longAliases of
+                Nil -> fail "Option has no long alias"
+                _   -> choice $ longAliases <#> \alias -> try do
+                        longOption term alias mA
+            SOpt _ _ _ ->
+              case shortAliases of
+                Nil -> fail "Option has no short alias"
+                _   -> choice $ shortAliases <#> \alias -> try do
+                        shortOption term alias mA
+
+          -- try terminating at this option
+          if term && canTerm
               then do
-                input       <- getInput
-                state       <- getState
-                globalState <- getGlobalState
-                traceA $ indent l <> stateLabel state globalState <> (f input)
-              else pure unit
-traceError :: ∀ r a. Int -> String -> ArgParser r a  -> ArgParser r a
-traceError l s = catch' \st e ->
-  trace l (\_ -> "! " <> s <> ": " <> pretty e)
-    *> setState st
-    *> throw e
+                vs <- terminate x
+                pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
+              else do
+                if isJust mA && r && canRepeat
+                    then do
+                      vs <- Array.many optionArgument
+                      pure (ArrayValue (Value.intoArray v <> vs))
+                    else pure v
+      _ -> fail "Expected long or short option"
 
-traceInput :: ∀ r. ArgParser r Unit
-traceInput = traceA =<< pretty <$> getInput
+{-
+  Convert an ordinary layout to a layout suitable for parsing. Each layout and
+  element get their own unique id in a shared namespace. For example:
+    `G0(E1, G2(E3))`
+      where `G` denotes a Group and `E` denotes an element.
+  Further, we determine up-front which layout is "free" and which one is "fixed",
+  saving us unncessary traversals during the hot phase of the parse.
+-}
+toParseBranch
+  :: List ArgLayout
+  -> List ArgParseLayout
+toParseBranch xs = evalState (for xs go) 0
+  where
+  nextId = State.get <* State.modify (_ + 1)
+  go (e@(Elem x)) = do
+    i <- nextId
+    pure (ParseElem i (Arg.isFreeLayout e) (Arg.setId i x))
+  go (g@(Group o r xs)) = do
+    i <- nextId
+    ParseGroup i (Arg.isFreeLayout g) o r <$> do
+      for xs (traverse go)
 
-indent :: Int -> String
-indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
+toSimpleBranch
+  :: List ArgParseLayout
+  -> List SolvedLayout
+toSimpleBranch Nil = Nil
+toSimpleBranch (x:xs) = go x : toSimpleBranch xs
+  where
+  go (ParseElem _ _ x) = Elem $ Arg.getArg x
+  go (ParseGroup _ _ o r xs) = Group o r $ (go <$> _) <$> xs
 
-traceBracket
-  :: ∀ r a
-   . (Pretty a)
-  => Int
-  -> String
-  -> ArgParser r a
-  -> ArgParser r a
-traceBracket l label p = do
-  input       <- getInput
-  state       <- getState
-  globalState <- getGlobalState
-  trace l \_ ->
-    stateLabel state globalState <> " parsing " <> label <> " (input: " <> pretty input <> ")"
-  output <- traceError l (stateLabel state globalState <> " failed to parse " <> label) p
-  input       <- getInput
-  state       <- getState
-  globalState <- getGlobalState
-  trace l \_ ->
-    stateLabel state globalState <> " successfully parsed " <> label <> "!"
-      <> " (output: " <> pretty output <> ")"
-      <> " (new input: " <> pretty input <> ")"
-  pure output
+{-
+  Convert an ordinary branch of solved arguments into a branch of `Arg`s.
+  We perform this step to cache some information right along-side each argument,
+  such as it's `ArgKey` and fallback value. This is going to save us from doing
+  this during the hot phase of the parse.
 
-stateLabel :: ParseState -> GlobalParseState -> String
-stateLabel { hasFailed, hasTerminated, depth } { deepestError } =
-  (if hasTerminated then "✓" else "·")
-  <> (if hasFailed then "✘" else "·")
-  <> "(" <> show depth <> ")"
-  <> "(dE = " <> show (pretty <$> deepestError) <> ")"
+  note: we set all `id`s to 0 and copy them later from the containing layout's
+        `id`s. this allows us to cache on the arg and layout level, and to
+        associate across the two.
+-}
+toArgBranch
+  :: ∀ r
+   . Options r
+  -> Env
+  -> List Description
+  -> Branch SolvedLayoutArg
+  -> Branch Arg
+toArgBranch options env descriptions x = go <$> x
+  where
+  go (Elem x) =
+    let description = case x of
+          (Option alias _ _) -> findDescription alias descriptions
+          _                  -> Nothing
+        fallback = do
+          v <- unRichValue <$> getFallbackValue options env description x
+          pure $ RichValue v {
+            value = if Solved.isElemRepeatable x
+                      then ArrayValue $ Value.intoArray v.value
+                      else v.value
+          }
+     in Elem $ Arg 0 x (toArgKey x) fallback false
+  -- note: uncomment to collapse [-a] into an optional -a
+  -- go (Group o r (((e@(Elem _)):|Nil):|Nil))
+  --   = let e' = go e
+  --      in unsafePartial $ case e' of
+  --         Elem (Arg i x k mV o') ->
+  --           Elem $ Arg i (Solved.setElemRepeatable r x) k mV (o || o')
+  go (Group o r xs) = Group o r $ (go <$> _) <$> xs
 
+-- Check if a given layout qualifies as a terminating argument for options-first
+-- and if so, return the argument it should be associated with.
+termAs :: ArgParseLayout -> Maybe Arg
+termAs x = go x
+  where
+  go (ParseGroup _ _ _ gR (((ParseElem _ _ x@(Arg _ (Solved.Positional _ pR) _ _ _)) :| Nil) :| Nil)) | gR || pR = Just x
+  go (ParseElem _ _ x@(Arg _ (Solved.Positional _ r) _ _ _)) | r = Just x
+  go _ = Nothing
+
+{-
+  Cached lookup if a token is known or not
+-}
+isKnownToken'
+  :: ∀ r
+   . Token
+  -> ArgParser r Boolean
+isKnownToken' tok = do
+  { spec } <- getConfig
+  { isKnownCache } <- getGlobalState
+  case Map.lookup tok isKnownCache of
+    Just b -> pure b
+    Nothing ->
+      let isKnown = isKnownToken spec tok
+       in isKnown <$ modifyGlobalState \s -> s {
+            isKnownCache = Map.alter (const (Just isKnown)) tok s.isKnownCache
+          }
+
+{-
+  Determine if a given token is considered known
+-}
+isKnownToken
+  :: Spec SolvedLayout
+  -> Token
+  -> Boolean
+isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInLayouts
+  where
+  occuresInDescs = any matchesDesc descriptions
+    where
+    matchesDesc (OptionDescription as _ _ _ _) = test tok
+      where
+      test (Token.LOpt n _)   = elem (OptionAlias.Long n) as
+      test (Token.SOpt s _ _) = elem (OptionAlias.Short s) as
+      test _ = false
+    matchesDesc _ = false
+  occuresInLayouts = any (any (any matchesLayout)) layouts
+    where
+    matchesLayout (Group _ _ xs) = any (any matchesLayout) xs
+    matchesLayout (Elem x) = test tok x
+      where
+      test (Token.LOpt n _)   (Solved.Option a _ _) = OptionAlias.Long n == a
+      test (Token.SOpt s _ _) (Solved.Option a _ _) = OptionAlias.Short s == a
+      test (Token.Lit n)      (Solved.Command n' _) = n == n'
+      test (Token.EOA _)      (Solved.EOA)          = true
+      test (Token.Stdin)      (Solved.Stdin)        = true
+      test _ _ = false

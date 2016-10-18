@@ -17,7 +17,7 @@ import Control.MonadPlus (guard)
 import Data.Either (Either)
 import Data.List (
   List(..), many, some, singleton, length, modifyAt, (:), fromFoldable, filter
-, reverse)
+, reverse, null)
 import Data.List.Partial (head, tail) as PartialList
 import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
 import Data.Tuple (Tuple(Tuple), snd, fst)
@@ -107,7 +107,7 @@ parse = flip L.runTokenParser do
           Nil  -> maybe Nil (singleton <<< singleton) eoa
           x:xs -> (x <> (maybe Nil (singleton) eoa)) : xs
 
-        branches'' = filter (\x -> length x > 0) branches'
+        branches'' = filter (not <<< null) branches'
 
     pure $ case branches'' of
       Nil -> Nothing

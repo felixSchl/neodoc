@@ -9,7 +9,7 @@ import Data.Bifunctor (lmap)
 import Data.Tuple.Nested ((/\))
 import Data.Foldable (intercalate, all)
 import Data.String as String
-import Data.List (List)
+import Data.List (List(Nil))
 import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty)
 import Data.Foreign as F
@@ -34,6 +34,9 @@ data SolvedLayoutArg
   | Option      OptionAlias (Maybe OptionArgument) Boolean
   | EOA
   | Stdin
+
+singletonGroup :: Boolean -> Boolean -> SolvedLayout -> SolvedLayout
+singletonGroup o r x = Group o r ((x:|Nil):|Nil)
 
 derive instance eqSolvedLayoutArg :: Eq SolvedLayoutArg
 derive instance ordSolvedLayoutArg :: Ord SolvedLayoutArg
@@ -106,18 +109,24 @@ instance isForeignSolvedLayoutArg :: IsForeign SolvedLayoutArg where
       _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
 isRepeatable :: SolvedLayout -> Boolean
-isRepeatable (Group           _ r _) = r
-isRepeatable (Elem (Command    _ r)) = r
-isRepeatable (Elem (Positional _ r)) = r
-isRepeatable (Elem (Option   _ _ r)) = r
-isRepeatable _ = false
+isRepeatable (Group _ r _) = r
+isRepeatable (Elem      x) = isElemRepeatable x
+
+isElemRepeatable :: SolvedLayoutArg -> Boolean
+isElemRepeatable (Command    _ r) = r
+isElemRepeatable (Positional _ r) = r
+isElemRepeatable (Option   _ _ r) = r
+isElemRepeatable _ = false
 
 setRepeatable :: Boolean -> SolvedLayout -> SolvedLayout
-setRepeatable r (Group           o _ xs) = Group o r xs
-setRepeatable r (Elem (Command     n _)) = Elem (Command n r)
-setRepeatable r (Elem (Positional  n _)) = Elem (Positional n r)
-setRepeatable r (Elem (Option   a mA _)) = Elem (Option a mA r)
-setRepeatable _ x = x
+setRepeatable r (Group o _ xs) = Group o r xs
+setRepeatable r (Elem       x) = Elem $ setElemRepeatable r x
+
+setElemRepeatable :: Boolean -> SolvedLayoutArg -> SolvedLayoutArg
+setElemRepeatable r (Command     n _) = Command n r
+setElemRepeatable r (Positional  n _) = Positional n r
+setElemRepeatable r (Option   a mA _) = Option a mA r
+setElemRepeatable _ x = x
 
 setRepeatableOr :: Boolean -> SolvedLayout -> SolvedLayout
 setRepeatableOr r (Group           o r' xs) = Group o (r || r') xs
@@ -138,6 +147,10 @@ isCommand :: SolvedLayoutArg -> Boolean
 isCommand (Command _ _) = true
 isCommand _ = false
 
+isOptionElem :: SolvedLayout -> Boolean
+isOptionElem (Elem x) = isOption x
+isOptionElem _ = false
+
 isOption :: SolvedLayoutArg -> Boolean
 isOption (Option _ _ _) = true
 isOption _ = false
@@ -152,6 +165,9 @@ isGroup _ = false
 
 -- Is this layout considered "free"?
 isFreeLayout :: SolvedLayout -> Boolean
-isFreeLayout (Elem (Option _ _ _)) = true
-isFreeLayout (Elem _) = false
 isFreeLayout (Group _ _ xs) = all (all isFreeLayout) xs
+isFreeLayout (Elem x) = isFreeElem x
+
+isFreeElem :: SolvedLayoutArg -> Boolean
+isFreeElem (Option _ _ _) = true
+isFreeElem _ = false

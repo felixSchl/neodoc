@@ -3,8 +3,9 @@ module Data.Pretty where
 import Prelude
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
-import Data.List (List)
+import Data.List (List, fromFoldable)
 import Data.Map (Map)
+import Data.Set (Set)
 import Data.Map as Map
 import Data.Either
 import Data.StrMap (StrMap)
@@ -32,6 +33,9 @@ instance prettyMap :: (Pretty k, Pretty v) => Pretty (Map k v) where
 instance prettyStrMap :: (Pretty v) => Pretty (StrMap v) where
   pretty kvs = intercalate ", " $ StrMap.toList kvs <#> \(k /\ v) ->
                   k <> " => " <> pretty v
+
+instance prettySet :: (Pretty k) => Pretty (Set k) where
+  pretty ks = pretty $ fromFoldable ks
 
 instance prettyEither :: (Pretty e, Pretty a) => Pretty (Either e a) where
   pretty (Left e) = pretty e

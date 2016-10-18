@@ -150,6 +150,10 @@ Options:
   `opts.versionFlags` is non-empty and `opts.version` is not set.
 * `opts.helpFlags` - An array of flags that trigger the special help
   behavior: Print the full program help text and exit with code 0.
+* `opts.repeatableOptions` - Allow options to be repeated even if the spec does
+  not explicitly allow this. This "loosens" up the parser to accept more input
+  and makes for a more intuitive command line. _Please note:_ repeatability
+  is still subject to chunking (use `opts.laxPlacement` to relax this further).
 * `opts.transforms.presolve` - an array of functions to be called prior to
   "solving" the input. This function takes the spec as it's only parameter.
   At this point, the spec is mostly untouched by neodoc with the exception of

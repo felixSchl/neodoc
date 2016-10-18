@@ -135,6 +135,11 @@ options:
     -m <msg>  Message
 
 """
+
+$ prog -a -r
+{"-a": true,
+ "-r": true}
+
 $ prog -a -r -m Hello
 {"-a": true,
  "-m": "Hello",
@@ -143,10 +148,6 @@ $ prog -a -r -m Hello
 $ prog -armyourass
 {"-a": true,
  "-m": "yourass",
- "-r": true}
-
-$ prog -a -r
-{"-a": true,
  "-r": true}
 
 
@@ -1245,7 +1246,7 @@ Options:
     -s SUBNET_NAME --subnet=SUBNET_NAME                      subnet name to create instance in
     -S SG_NAME --security-group=SG_NAME                     security group to set to the instance
     -p PROFILE_NAME --iam-instance-profile=PROFILE_NAME     IAM instance profile to start instance with
-Not at 
+Not at
 """
 
 $ prog -ssubnet-0 -asome-ami -ksome-key --instance-type=t2.micro --name=foo -Psome-profile --iam-instance-profile=some-iam-instance-profile
@@ -2403,7 +2404,7 @@ Usage: foo -
 """
 
 $ prog
-"expected -"
+{}
 
 $ prog -
 {"-": true}
@@ -2564,7 +2565,7 @@ Usage: prog mine (set|remove)
 """
 
 $ prog mine
-""
+"missing set"
 
 #
 # Given an option-argument to a flag is a fatal error, no pardon:
@@ -2594,15 +2595,15 @@ $ prog/s -fb
 
 r"""Usage: git <command> -f"""
 $ prog
-"expected <command>"
+"missing <command>"
 
 r"""Usage: git COMMAND -f"""
 $ prog
-"expected COMMAND"
+"missing COMMAND"
 
 r"""Usage: git pull -f"""
 $ prog
-"expected pull"
+"missing pull"
 
 r"""
 Usage: git <command> -f
@@ -3320,28 +3321,28 @@ usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar foo -a
-"expected foo, but got bar"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar -a foo
-"expected foo, but got bar"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l bar foo
-"expected foo, but got bar"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
 """
 
 $ prog/l -a bar foo
-"expected foo, but got bar"
+"unexpected command foo"
 
 r"""
 usage: prog [foo] -a [bar]
@@ -3357,10 +3358,10 @@ r"""
 usage: prog [foo] -a bar
 """
 
-$ prog/l -a bar
+$ prog/l bar -a
 {"-a": true, "bar": true}
 
-$ prog/l bar -a
+$ prog/l -a bar
 {"-a": true, "bar": true}
 
 #
@@ -3396,3 +3397,124 @@ $ prog configure --clientid 123 --foo
 
 $ prog configure --clientid 123 --clientsecret
 "option requires argument: --clientsecret"
+
+#
+# repeatable options (#32)
+#
+
+r"""
+usage: prog (-c | -d) foo -e
+"""
+
+$ prog/R -c -c -c foo -e -e
+{"-c": 3, "foo": true, "-e": 2}
+
+r"""
+usage: prog -a -b -c
+"""
+
+$ prog/R -a -a -b -c -b -a -c -b -a -c -bbbb -aaa -c
+{"-a": 7, "-b": 7, "-c": 4}
+
+r"""
+usage: prog -e (-a | -b) -c
+"""
+
+$ prog/R -a -a -b
+"unexpected option -b"
+
+$ prog/R -a -a
+{"-a": 2}
+
+$ prog/R -c -c -a -a
+{"-a": 2, "-c": 2}
+
+r"""
+usage: prog [-c FOO] -a
+"""
+
+$ prog/Rs -c foo -a -c bar -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true}
+
+
+r"""
+usage: prog [-c FOO] run -a
+"""
+
+$ prog/lRs -c foo -a run -c bar -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+$ prog/lRs -c foo -a -c bar -c qux run
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+$ prog/lRs -c foo -a -c bar run -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+$ prog/lRs -c foo run -a -c bar -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+$ prog/lRs run -c foo -a -c bar -c qux
+{"-c": ["foo", "bar", "qux"], "-a": true, "run": true}
+
+r"""
+usage: prog [-a] f -b
+"""
+
+$ prog/lR -b -a -a f
+{"f": true, "-a": 2, "-b": true}
+
+$ prog/lR -a -b -a f
+{"f": true, "-a": 2, "-b": true}
+
+$ prog/lR -a -b -a -a f
+{"f": true, "-a": 3, "-b": true}
+
+$ prog/lR -b -a -b f
+{"f": true, "-a": true, "-b": 2}
+
+r"""
+usage: prog [-a] f -b=ARG
+options:
+    -bARG  asdf [default: 100]
+"""
+
+$ prog/lR -a -a f
+"missing -bARG"
+
+$ prog/lR -b=20 -a -a f
+{"f": true, "-a": 2, "-b": 20}
+
+r"""
+usage: prog [-a] f [-b=ARG]
+options:
+    -bARG  asdf [default: 100]
+"""
+
+$ prog/lR -a -a f
+{"-a": 2, "f": true}
+
+r"""
+usage: prog [[-a]... [-b] [-d=ARG] [-c]] foo
+options:
+  -d=ARG  [default: 1000]
+"""
+
+$ prog -c -a -b -a foo
+{"foo": true, "-a": 2, "-b": true, "-c": true, "-d": 1000}
+
+# "fixed" groups should be able to move within the boundaries of other
+# surrounding "fixed" groups
+#
+
+r"""
+usage: p -x [-y <command>] -z
+"""
+
+$ prog/l -z -x
+{"-x": true, "-z": true}
+
+$ prog/l -z -x -y foo
+{"-x": true, "-z": true, "-y": true, "<command>": "foo"}
+
+$ prog/l -z -x foo -y
+{"-x": true, "-z": true, "-y": true, "<command>": "foo"}

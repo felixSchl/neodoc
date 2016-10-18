@@ -2,6 +2,7 @@ module Test.Spec.CompatSpec (compatSpec) where
 
 import Prelude
 import Debug.Trace
+import Debug.Profile
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)
@@ -62,6 +63,7 @@ compatSpec tests =
                                       , smartOptions: opts.smartOptions
                                       , requireFlags: opts.requireFlags
                                       , laxPlacement: opts.laxPlacement
+                                      , repeatableOptions: opts.repeatableOptions
                                       }
           describe (intercalate " " (
             (toUnfoldable $ StrMap.toList env <#> \t ->
@@ -81,40 +83,8 @@ compatSpec tests =
               later (pure unit)
 
               let env = fromMaybe StrMap.empty opts.env
-                  result = Neodoc.runPure (dedent doc) (NeodocOptions opts) Nothing
 
-
-              --       -- scan the input text
-              --       { usage, options, originalUsage } <- Error.capture do
-              --         Scanner.scan $ dedent doc
-              --
-              --       -- lex/parse the usage section
-              --       { program, layouts } <- do
-              --         toks <- Error.capture $ Lexer.lexUsage usage
-              --         Error.capture $ Spec.parseUsage toks
-              --
-              --       -- lex/parse the description section(s)
-              --       descriptions <- concat <$> for options \description -> do
-              --         toks <- Error.capture $ Lexer.lexDescs description
-              --         Error.capture $ Spec.parseDescription toks
-              --
-              --       -- solve the input spec
-              --       spec' <- Error.capture do
-              --         Solver.solve
-              --           { smartOptions: opts.smartOptions }
-              --           (Spec { program
-              --                 , layouts
-              --                 , descriptions
-              --                 , helpText: doc
-              --                 , shortHelp: originalUsage
-              --                 })
-              --
-              --       -- run the arg parser
-              --       ArgParseResult mBranch vs <- Error.capture do
-              --         ArgParser.run spec' opts env argv
-              --
-              --       -- evaluate the results
-              --       pure $ Evaluate.reduce env descriptions mBranch vs
+              result <- prof "testcase" \_-> pure $ Neodoc.runPure (dedent doc) (NeodocOptions opts) Nothing
 
               vliftEff $ case result of
                 Left e ->

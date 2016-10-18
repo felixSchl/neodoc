@@ -2,6 +2,8 @@ module Debug.Profile where
 
 import Prelude
 import Debug.Trace
+import Data.Either
+import Data.Tuple.Nested
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
 import Control.Monad.Eff.Unsafe
@@ -22,6 +24,23 @@ profileA msg f =
       let t' = unsafePerformEff $ timerEnd t
       traceA $ msg <> " (" <> (show t') <> " ms)"
       pure a
+    else f unit
+
+profileS :: ∀ a. String -> (Unit -> a) -> a
+profileS msg f =
+  if _ENABLE_PROFILING_
+    then
+      let t' = unsafePerformEff timerStart
+          c = \_->
+                -- note: purescript appears to sort these assignments
+                -- alphabetically, which means, we must name our variables
+                -- accordingly. This depends on internal compiler behavior and
+                -- may break w/ an update of purescript.
+                let z = f unit
+                    t = unsafePerformEff $ timerEnd t'
+                 in z /\ t
+       in case c unit of
+            r /\ t -> trace (msg <> " (" <> (show t) <> " ms)") \_-> r
     else f unit
 
 profileParser :: ∀ s m a. (Monad m) => String -> P.ParserT s m a -> P.ParserT s m a

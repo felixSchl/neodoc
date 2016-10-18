@@ -1,7 +1,7 @@
 module Neodoc.ArgParser.Required where
 
 import Prelude
-import Data.Function (on)
+import Data.Generic
 import Data.Tuple.Nested ((/\))
 import Data.Map as Map
 import Data.Map (Map())
@@ -14,35 +14,42 @@ import Data.Pretty (class Pretty, pretty)
 import Data.Foldable (intercalate)
 
 -- | Auxiliary data structure for permutation parsing
-data Required a = Required a | Optional a
+data Required  a
+  = Required   a
+  | Optional   a
+  | Superflous a
 
-instance eqRequired :: (Eq a) => Eq (Required a) where
-  eq (Required a) (Required a') = a == a'
-  eq (Optional a) (Optional a') = a == a'
-  eq _            _             = false
+derive instance eqRequired :: (Eq a) => Eq (Required a)
+derive instance ordRequired :: (Ord a) => Ord (Required a)
+derive instance genericRequired :: (Generic a) => Generic (Required a)
 
--- XXX: this is provisionary
-instance ordRequired :: (Ord a) => Ord (Required a) where
-  compare (Required _) (Optional _) = GT
-  compare (Optional _) (Required _) = LT
-  compare a b = compare (unRequired a) (unRequired b)
+instance showRequired :: (Generic a, Show a) => Show (Required a) where
+  show = gShow
 
-instance showRequired :: (Show a) => Show (Required a) where
-  show (Required a) = "Required " <> show a
-  show (Optional a) = "Optional " <> show a
-
-instance pretty :: (Pretty a) => Pretty (Required a) where
-  pretty (Required x) = "R(" <> pretty x <> ")"
-  pretty (Optional x) = "O(" <> pretty x <> ")"
+instance prettyRequired :: (Pretty a) => Pretty (Required a) where
+  pretty (Required   x) = "R(" <> pretty x <> ")"
+  pretty (Optional   x) = "O(" <> pretty x <> ")"
+  pretty (Superflous x) = "S(" <> pretty x <> ")"
 
 unRequired :: ∀ a. Required a -> a
-unRequired (Required a) = a
-unRequired (Optional a) = a
+unRequired (Required   a) = a
+unRequired (Optional   a) = a
+unRequired (Superflous a) = a
 
 isRequired :: ∀ a. Required a -> Boolean
 isRequired (Required _) = true
 isRequired _            = false
 
+isOptional :: ∀ a. Required a -> Boolean
+isOptional (Optional _) = true
+isOptional _            = false
+
+isSuperflous :: ∀ a. Required a -> Boolean
+isSuperflous (Superflous _) = true
+isSuperflous _              = false
+
 toOptional :: ∀ a. Required a -> Required a
-toOptional (Required a) = Optional a
-toOptional (Optional a) = Optional a
+toOptional x = Optional (unRequired x)
+
+toSuperflous :: ∀ a. Required a -> Required a
+toSuperflous x = Superflous (unRequired x)

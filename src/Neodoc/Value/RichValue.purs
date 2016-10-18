@@ -33,7 +33,7 @@ instance showRichValue :: Show RichValue where
   show = gShow
 
 instance prettyRichValue :: Pretty RichValue where
-  pretty (RichValue v) = pretty v.value <> " " <> "(" <> show v.origin <> ")"
+  pretty (RichValue v) = pretty v.value <> " " <> "(" <> pretty v.origin <> ")"
 
 
 unRichValue :: RichValue -> RichValueObj

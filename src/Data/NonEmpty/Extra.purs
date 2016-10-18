@@ -33,3 +33,10 @@ fromList
   -> Maybe (NonEmpty List a)
 fromList (x:xs) = Just (x :| xs)
 fromList Nil = Nothing
+
+fromList'
+  :: ∀ a
+   . Partial
+  => List a
+  -> NonEmpty List a
+fromList' (x:xs) = x :| xs

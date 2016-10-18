@@ -55,18 +55,20 @@ newtype Kase = Kase {
 }
 
 type Flags = {
-  optionsFirst :: Boolean -- ^ 'p'
-, smartOptions :: Boolean -- ^ 's'
-, requireFlags :: Boolean -- ^ 'r'
-, laxPlacement :: Boolean -- ^ 'l'
+  optionsFirst      :: Boolean -- ^ 'p'
+, smartOptions      :: Boolean -- ^ 's'
+, requireFlags      :: Boolean -- ^ 'r'
+, laxPlacement      :: Boolean -- ^ 'l'
+, repeatableOptions :: Boolean -- ^ 'R'
 }
 
 parseFlags :: String -> Flags
 parseFlags s = {
-  optionsFirst: String.contains "p" s
-, smartOptions: String.contains "s" s
-, requireFlags: String.contains "r" s
-, laxPlacement: String.contains "l" s
+  optionsFirst:      String.contains "p" s
+, smartOptions:      String.contains "s" s
+, requireFlags:      String.contains "r" s
+, laxPlacement:      String.contains "l" s
+, repeatableOptions: String.contains "R" s
 }
 
 renderFlags :: Flags -> String
@@ -74,6 +76,7 @@ renderFlags f = (if f.optionsFirst then "p" else "")
              <> (if f.smartOptions then "s" else "")
              <> (if f.requireFlags then "r" else "")
              <> (if f.laxPlacement then "l" else "")
+             <> (if f.repeatableOptions then "R" else "")
 
 readTests :: ∀ eff
    . String
@@ -110,6 +113,7 @@ readTests filepath = do
                         , smartOptions: false
                         , requireFlags: false
                         , laxPlacement: false
+                        , repeatableOptions: false
                         } $ parseFlags <$> do
                               P.char '/'
                               fromCharArray <$> A.many alpha
@@ -149,6 +153,7 @@ readTests filepath = do
                       , stopAt:       []
                       , requireFlags: flags.requireFlags
                       , laxPlacement: flags.laxPlacement
+                      , repeatableOptions: flags.repeatableOptions
                       , version:      Nothing
                       , versionFlags: []
                       , helpFlags:    []
