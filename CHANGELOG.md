@@ -3,9 +3,21 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
-## [1.0.0-rc.x] - 2016-10-09
+## [1.0.0] - 2016-10-19 :tada:
 
-This is a pre-release of the up-coming
+The first major release of neodoc.
+
+### Where the project is at
+
+As a run up to v1, I decided to spend a lot of my time refactoring the code-base
+for various reasons. Primarily the core data structures that were employed prior
+to the refactor were insufficiently flexible and, looking back, clearly the
+wrong choice. The new core data structure, which resembles a tree, is by far
+more elegant and flexible, allows transformations and traversals and is more
+obviously "correct". Secondly, I acknowledged that the code was hard to follow
+and hindered adoption / contributors from getting into the code base. The most
+important pieces of the codebase are now documented and hopefully approachable
+enough.
 
 ### New features
 
@@ -16,10 +28,17 @@ This is a pre-release of the up-coming
   is true.
 * `--help` will now simply return the help as a string if `opts.dontExit` is
   true.
+* A new option `options.repeatableOptions` is introduced that allows consuming
+  excess options. Many command line utilities do not care about excess options,
+  so now neodoc can be told to not care either. This means that after
+  successfully parsing a bunch of options, any option may-reoccur again.
 * Better error reporting. The parser now tracks the deepest error across all
   branches, making for more intuitive error messages.
 * The spec is now being canonicalised internally which helps create (a) better
   error messages and (b) to speed up the parser.
+* **considerably** better performance under difficult configurations and edge
+  cases, i.e. when combining `opts.laxPlacement` with `opts.requiredFlags` and
+  so on.
 
 ### Changes
 
@@ -34,6 +53,9 @@ This is a pre-release of the up-coming
 
 * **Major** overhaul of the internals. The core data structures have changed and
   are now more composable.
+  * The arg parser has been rewritten from the ground up, with next to none code
+    sharing. The goal was a more efficient, simpler and better documented
+    solution that is easier to reason about and debug.
   * Instead of representing a group as an argument, we now have a `Layout` data
     type which looks more like a classical tree:
     ```haskell
@@ -595,7 +617,7 @@ section &mdash; let it fail at the lexing stage.
 [#2]: https://github.com/felixSchl/neodoc/issues/2
 [#1]: https://github.com/felixSchl/neodoc/issues/1
 
-[1.0.0-rc.x]: https://github.com/felixschl/neodoc/compare/v0.10.1...v1.0.0-rc.1
+[1.0.0]: https://github.com/felixschl/neodoc/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/felixschl/neodoc/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/felixschl/neodoc/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/felixschl/neodoc/compare/v0.9.1...v0.9.2
