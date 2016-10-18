@@ -13,6 +13,7 @@ import Data.List.Partial as LU
 import Data.Bifunctor (lmap)
 import Data.Set as Set
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
+import Data.List.Partial as LU
 import Data.Function (on)
 import Data.Tuple (Tuple(..), snd, fst)
 import Data.Tuple.Nested ((/\))
@@ -185,9 +186,9 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens = do
             <> if hasEmpty
                   then singleton $ eof $> ArgParseResult Nothing Nil
                   else Nil
-     in if null parsers
+     in if null parsers'
           then eof $> ArgParseResult Nothing Nil
-          else evalParsers (byOrigin <<< getResult) parsers
+          else evalParsers (byOrigin <<< getResult) parsers'
   where
   eof :: ∀ r. ArgParser r Unit
   eof = do
@@ -195,16 +196,13 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens = do
     case input of
       Nil  -> pure unit
       toks -> do
-        { deepestError } <- getGlobalState
-        case deepestError of
-          Just (_ /\ e) -> fail' e
-          Nothing -> do
-            kToks <- for toks \(pTok@(PositionedToken tok _ _)) -> do
-              isKnown <- isKnownToken' tok
-              pure if isKnown
-                then known pTok
-                else unknown pTok
-            fail' $ unexpectedInputError Nil kToks
+        kToks <- for toks \(pTok@(PositionedToken tok _ _)) -> do
+          isKnown <- isKnownToken' tok
+          pure if isKnown
+            then known pTok
+            else unknown pTok
+        fail' $ unexpectedInputError Nil kToks
+
 parseBranch
   :: ∀ r
    . Int
@@ -223,6 +221,20 @@ parseBranch l sub xs = profile "parse-branch" \_-> do
   _isFree (ParseGroup _ f _ _ _) = f
   _isFree (ParseElem _ f _) = f
 
+-- Terminate the parser at the given argument and collect all subsequent
+-- values int an array ("options-first" and "stop-at")
+terminate :: ∀ r. SolvedLayoutArg -> ArgParser r Value
+terminate arg = do
+  input <- getInput
+  let rest = ArrayValue $ toUnfoldable $ StringValue <<< Token.getSource <$> input
+
+  -- XXX: yeah, this is functional programming, alright. this needs to be
+  -- re-visited. How can we avoid at least `setDone` and `setDepth`?
+  setDone
+  setDepth 99999
+  setInput Nil
+  pure rest
+
 {-
   we iterate over the set of required arguments `req`.
   should we fail to make a match for any `x` in `req`, we move `x` to `res`.
@@ -239,59 +251,73 @@ solve
   -> Boolean             -- allow substitutions?
   -> List ArgParseLayout -- the required arguments
   -> ArgParser r (List KeyValue)
-solve l repOpts sub req = go l sub req Nil Nil Nil
+solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
   where
   go
     :: Int                 -- the recursive level
     -> Boolean             -- allow substitutions?
     -> List ArgParseLayout -- the required arguments
     -> List ArgParseLayout -- repeatable arguments
-    -> List ArgParseLayout -- the "reserve"
+    -> Boolean             -- can apply repetition?
     -> List KeyValue       -- the output
     -> ArgParser r (List KeyValue)
-  go l' sub' req rep res out = do
+  go l' sub' req rep canRep out = do
     input       <- getInput
     { options } <- getConfig
     { depth }   <- getState
-    trace l' \_->
+    trace l' \i->
       "solve: req = " <> pretty req
         <> ", rep = " <> pretty rep
-        <> ", res = " <> pretty res
         <> ", sub = " <> show sub
-        <> ", in = "  <> pretty input
         <> ", out = " <> pretty out
+        <> ", i = "   <> pretty i
 
     -- 1. try making a match for any arg in `req` w/o allowing substitutions.
     --    if we make a match, we proceed *and never look back*. If we do not
     --    succeed with any argument, we try the `rep` list.
-    trace l' \_-> "solve: trying via argv"
-    mKv /\ req' /\ _ <- (_lmap Just <$> (try $ match (l' + 1) false req))
-                    <|> pure (Nothing /\ req /\ false)
-    trace l' \_-> "solve: req' = " <> pretty req' <> " out = " <> show (pretty <$> mKv)
+    trace l' \i-> "solve: trying via argv, i = " <> pretty i
+    mKv /\ req' /\ _ /\ mNewRep <-
+      (_lmap Just <$> (try $ match (l' + 1) false req)) <|>
+        pure (Nothing /\ req /\ false /\ Nothing)
+    trace l' \i-> "solve: req' = " <> pretty req' <> " out = " <> show (pretty <$> mKv)
+                    <> ", i = " <> pretty i
     case mKv of
       Just kvs@(_:_) -> do
-        trace l' \_-> "solve: matched on argv: " <> pretty kvs
+        trace l' \i-> "solve: matched on argv: " <> pretty kvs <> ", i = " <> pretty i
         let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
-            rep' = nub (rep <> rRep)
-        go (l' + 1) sub' (req' <> res) rep' Nil (out <> kvs)
+            rep' = nub ((maybe Nil singleton mNewRep) <> rep <> rRep)
+        go (l' + 1) sub' req' rep' true (out <> kvs)
       _ -> do
         -- 2. if we did not manage to make a single `req` parse, we ought to try
         --    if any of our args in `rep` is now able to parse. We consume at
-        --    most one and flush `res` in case of success. The reason for
-        --    flushing is, is that a success w/o substitution *necessarily*
+        --    most one and re-run in case of success. The reason for re-running
+        --    is, is that a success w/o substitution *necessarily*
         --    means we consumed input - hence we must try previously failed
         --    `req` again.
         --    note: the insertion of `res` back into `req` *does matter*, needs
         --          more thought though, as to put it into the front or back.
-        trace l' \_-> "solve: trying via rep"
-        mKv' /\ rep' /\ _ <- (_lmap Just <$> (try $ match (l' + 1) false rep))
-                          <|> pure (Nothing /\ rep /\ false)
+        trace l' \i-> "solve: trying via rep, i = " <> pretty i
+        mKv' /\ rep' /\ _ /\ mNewRep' <-
+          if canRep
+            then do
+              (_lmap Just <$> (try $ match (l' + 1) false rep)) <|>
+                 pure (Nothing /\ rep /\ false /\ Nothing)
+            else if options.repeatableOptions
+              then
+                let repOpts = flip filter rep case _ of
+                                (ParseElem _ _ x) -> _isRepeatable x
+                                _ -> false
+                 in (_lmap Just <$> (try $ match (l' + 1) false repOpts)) <|>
+                      pure (Nothing /\ rep /\ false /\ Nothing)
+              else pure (Nothing /\ rep /\ false /\ Nothing)
         case mKv' of
           Just kvs@(_:_) -> do
-            trace l' \_-> "solve: matched via rep: " <> pretty kvs
+            trace l' \i-> "solve: matched via rep: " <> pretty kvs <> ", i = " <> pretty i
             let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
-                rep'' = nub (rep' <> rRep)
-            go (l' + 1) sub' (req <> res) rep'' Nil (out <> kvs)
+                rep'' = nub ((maybe Nil singleton mNewRep') <> rep' <> rRep)
+            if any (isFrom Origin.Argv <<< snd) kvs
+              then go (l' + 1) sub' req rep'' true (out <> kvs)
+              else go (l' + 1) sub' req rep'' false (out <> kvs)
           -- 3. If we still did not manage to make a match, things aren't
           --    looking too great. It's time for drastic measures. If the parent
           --    is allowing us to, we repeat this above, but allow substitutions
@@ -302,7 +328,7 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
           _ -> do
             case req' of
               Nil -> do
-                trace l' \_-> "solve: empty req' after rep. done"
+                trace l' \i -> "solve: empty req' after rep. done. i = " <> pretty i
                 pure out
               _:_ | sub ->
                 let
@@ -312,25 +338,26 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
                     -> ArgParser r (List KeyValue)
                   exhaust Nil out' = pure out'
                   exhaust req'' out' = do
-                    kVs'' /\ req''' /\ changed <- try $ match (l' + 1) true req''
-                    trace l' \_ ->
+                    kVs'' /\ req''' /\ changed /\ _ <- try $ match (l' + 1) true req''
+                    trace l' \i ->
                          "solve: matched via sub"
                       <> " kVs''" <> pretty kVs''
                       <> ", changed = " <> show changed
                       <> ", req''' = " <> pretty req'''
+                      <> ", i = " <> pretty i
                     -- check if we consumed input. If we did, we must rinse
                     -- and repeat the entire process with the new input.
                     if (not (null kVs'')) && (any (isFrom Origin.Argv <<< snd) kVs'' || changed)
-                      then go (l' + 1) false req''' rep res (out' <> kVs'')
+                      then go (l' + 1) false req''' rep true (out' <> kVs'')
                       else exhaust req''' (out' <> kVs'')
                  in do
-                  trace l' \_-> "solve: trying via sub"
+                  trace l' \i-> "solve: trying via sub, i = " <> pretty i
                   exhaust req' out
               xs -> do
                 trace l' \_-> "solve: failed to match: " <> pretty xs
                 fail "..." -- XXX: throw proper error here
 
-  _lmap f (a /\ b /\ c) = f a /\ b /\ c
+  _lmap f (a /\ b /\ c /\ d) = f a /\ b /\ c /\ d
 
   _toElem :: Arg -> ArgParseLayout
   _toElem x =
@@ -360,76 +387,77 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
 
     Here, consumption w/o substitutions is a dead end, since `[-b -c]` won't be
     able to match (it requires either `-b -c` or `-c -b`). Hence, we *must*
-    use subsitutions to yield a match.
-
-    The problem then arrises that, for the above input:
-      * should we substitute `-a` because it cannot be met,
-      * or should try and see if there's another layout that could be
-        substituted instead, so that `-a` will have the chance to match the `-a`
-        provided on argv?
-
-    So how do you decide which of the inputs should lay down their lives i.o.
-    to advance the pattern?
-      * Prefer to sacrifice groups first?
-      * Prefer deepest match?
-      * Prefer most non-substituted values yielded?
+    use subsitutions to yield a match. But which argument should be substituted?
+    We select the most eligble argument by see
   -}
   match
     :: Int -- the recursive level
     -> Boolean -- allow substitutions?
     -> List ArgParseLayout
-    -> ArgParser r (Tuple (Tuple
-        (List KeyValue)        -- the key-value pairs that where yielded
-        (List ArgParseLayout)) -- the layouts that did *NOT* match
-        Boolean)               -- has this changed the input?
-  match l sub xs = go' false xs Nil
+    -> ArgParser r (Tuple (Tuple (Tuple
+        (List KeyValue)         -- the key-value pairs that where yielded
+        (List ArgParseLayout))  -- the layouts that did *NOT* match
+        Boolean)                -- has this changed the input?
+        (Maybe ArgParseLayout)) -- element to repeat
+  match l sub xs = go' Nothing false xs Nil Nil
     where
-    go' locked (x:xs) ys = (do
-      trace l \_-> "match: try"
+    go' errs locked (x:xs) ys matched = (do
+      trace l \i-> "match: try"
         <> " x = " <> pretty x
         <> ", xs = " <> pretty xs
         <> ", ys = " <> pretty ys
         <> ", locked = " <> show locked
         <> ", sub = " <> show sub
+        <> ", i = " <> pretty i
       if _isFixed x && locked
-        then go' true xs (x:ys)
+        then go' errs true xs (x:ys) matched
         else do
-          vs <- try $ parseLayout (l + 1) (sub && not locked) x
-          trace l \_-> "match: return"
+          cvs <- fork $ parseLayout (l + 1) (sub && not locked) x
+          trace l \i-> "match: return"
             <> " x = " <> pretty x
             <> ", xs = " <> pretty xs
             <> ", ys = " <> pretty ys
-            <> ", vs = " <> pretty vs
+            <> ", vs = " <> pretty (snd cvs)
             <> ", locked = " <> show locked
             <> ", sub = " <> show sub
-          pure (vs /\ (sortBy (compare `on` getId) $ xs <> ys) /\ locked)
-    ) `catch` \_ e -> do
-      go' (locked || _isFixed x) xs (x:ys)
+            <> ", i = " <> pretty i
+          go' errs (locked || _isFixed x) xs ys ((x /\ cvs) : matched)
+    ) `catch` \{ depth } e -> do
+      let errs' = case errs of
+                    Just (d /\ _) | depth > d -> Just (depth /\ e)
+                    Nothing -> Just (depth /\ e)
+                    x -> x
+      go' errs' (locked || _isFixed x) xs (x:ys) matched
 
     {-
       Evaluate the result. We've tried all `req` items agains the same input
       now and none of them managed to make a match. Since all of these items
-      are "free", substituting or removing one of them is not going to make abs
+      are "free", substituting or removing one of them is not going to make a
       difference for the others.
     -}
-    go' locked Nil ys = do
+    go' errs locked Nil ys Nil = do
       i <- getInput
+
+      -- re-arrange the pattern into it's original order.
       let ys' = sortBy (compare `on` getId) ys
+
+      -- drop optional, fixed layouts.
       ys'' /\ changed <- pure do
        if locked
-        then dropFirst (\x -> _isOptional x && _isFixed x) ys'
+        then dropFirst (\x -> _isOptionalGroup x && _isFixed x) ys'
         else ys' /\ false
 
-      trace l \_-> "match: eval"
+      trace l \i-> "match: eval"
           <> " ys = " <> pretty ys
           <> ", ys' = " <> pretty ys'
           <> ", ys'' = " <> pretty ys''
           <> ", locked = " <> show locked
           <> ", sub = " <> show sub
+          <> ", i = " <> pretty i
 
-      case if sub then filter (not <<< _isOptional) ys'' else ys'' of
+      case if sub then filter (not <<< _isOptionalGroup) ys'' else ys'' of
         Nil -> do
-          trace l \_-> "match: succeeded!"
+          trace l \i-> "match: succeeded!, i = " <> pretty i
 
           -- substitute all leaf elements. we ignore groups because these groups
           -- have failed to parse irrespective of substitution, so they are a
@@ -445,29 +473,57 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
           -- been locked (which indicates a possible change in input) or if
           -- we noticed a change during `dropFirst` (also releated to locking /
           -- positionals)
-          pure ((_rest <$> subVs) /\ (_fst <$> subVs) /\ (locked || changed))
-        zs | changed -> go' false zs Nil
+          pure ((_rest <$> subVs) /\ (_fst <$> subVs) /\ (locked || changed) /\ Nothing)
+
+        zs | changed -> go' errs false zs Nil Nil
+
         z:zs -> do
-          trace l \_-> "match: failed!"
+          trace l \i-> "match: failed!" <> pretty (z:zs) <> ", i = " <> pretty i
           i <- getInput
           { depth } <- getState
-          case i of
-            Nil ->
-              let c = toSimpleBranch (z:zs)
-                  e = missingArgumentsError (unsafePartial $ NonEmpty.fromList' c)
-               in setErrorAtDepth depth e *> fail' e
-            _ -> do
-              kToks <- for i \(pTok@(PositionedToken tok _ _)) -> do
-                isKnown <- isKnownToken' tok
-                pure if isKnown
-                  then known pTok
-                  else unknown pTok
-              let e = unexpectedInputError (toSimpleBranch zs) kToks
-              setErrorAtDepth depth e *> fail' e
+          case errs of
+            Just (d /\ e) | d > depth -> do
+              setErrorAtDepth d (extractError genericError e)
+              throw e
+            _ -> case i of
+              Nil ->
+                let c = toSimpleBranch (z:zs)
+                    e = missingArgumentsError (unsafePartial $ NonEmpty.fromList' c)
+                in setErrorAtDepth depth e *> fail' e
+              _ -> do
+                kToks <- for i \(pTok@(PositionedToken tok _ _)) -> do
+                  isKnown <- isKnownToken' tok
+                  pure if isKnown
+                    then known pTok
+                    else unknown pTok
+                let e = unexpectedInputError (toSimpleBranch zs) kToks
+                setErrorAtDepth depth e *> fail' e
+
+    {-
+      Evaluate the matches.
+      Each match is a triplet of (arg, continuation, values). We choose the best
+      ranking triplet, inject it's parse state ("resume" the parse), yield it's
+      values and return all losing arguments as non-matched.
+    -}
+    go' _ locked Nil ys (matches@(_:_)) =
+      let
+          -- select the best-ranking match based on the values it yielded
+          matches' = sortBy (compare `on` (byOrigin <<< snd <<< snd)) matches
+          x = fst $ unsafePartial (LU.last matches')
+          cvs = snd $ unsafePartial (LU.last matches')
+          vs = snd cvs
+          xs' = fst <$> unsafePartial (LU.init matches')
+          rep = if _isLayoutRepeatable x then Just x else Nothing
+       in do
+        -- resume the parser state with the continuation and the yielded value
+        resume cvs
+
+        -- re-sort the remaining elements (XXX: could this be skipped?)
+        pure (vs /\ (sortBy (compare `on` getId) $ xs' <> ys) /\ locked /\ rep)
 
   dropFirst f xs = go' xs Nil
     where go' Nil out = out /\ false
-          go' (x:xs) out = if f x then (out <> xs) /\ true else go' xs (x:out)
+          go' (x:xs) out = if f x then (xs <> out) /\ true else go' xs (x:out)
 
   _fst  (a /\ b /\ c) = a
   _rest (a /\ b /\ c) = b /\ c
@@ -480,9 +536,14 @@ solve l repOpts sub req = go l sub req Nil Nil Nil
   _hasFallback (ParseElem _ _ x) = isJust (Arg.getFallback x)
   _hasFallback _ = false
 
-  _isOptional :: ArgParseLayout -> Boolean
-  _isOptional (ParseGroup _ _ o _ _) = o
-  _isOptional (ParseElem _ _ x) = Arg.isOptional x
+  _isOptionalGroup :: ArgParseLayout -> Boolean
+  _isOptionalGroup (ParseGroup _ _ o _ _) = o
+  _isOptionalGroup _ = false
+
+  _isLayoutRepeatable :: ArgParseLayout -> Boolean
+  _isLayoutRepeatable (ParseElem _ _ x) = Arg.isArgRepeatable x
+  _isLayoutRepeatable (ParseGroup _ _ _ r _) = r
+
 
 byOrigin :: List KeyValue -> Int
 byOrigin vs = sum $ (Origin.weight <<< _.origin <<< unRichValue <<< snd) <$> vs
@@ -496,14 +557,20 @@ parseLayout
   -> Boolean
   -> ArgParseLayout
   -> ArgParser r (List KeyValue)
-parseLayout l sub x = do
+parseLayout l sub x = skipIf hasTerminated Nil do
   { options } <- getConfig
   go options x
   where
+   -- Terminate at singleton groups that house only positionals.
+  go options x | options.optionsFirst && isJust (termAs x)
+    = let y = unsafePartial (fromJust (termAs x))
+      in singleton <<< Tuple y <<< (RichValue.from Origin.Argv) <$>
+        terminate (Arg.getArg y)
+
   go opts (g@(ParseGroup _ _ _ r branches)) =
     let parsers = NonEmpty.toList branches <#> \branch ->
                     let args = NonEmpty.toList branch
-                     in parseBranch l sub args
+                     in parseBranch l true args
         p = evalParsers byOrigin parsers
      in do
       vs <- p
@@ -539,7 +606,7 @@ parseArg
   :: ∀ r
    . SolvedLayoutArg
   -> ArgParser r Value
-parseArg = go
+parseArg x = go x
   where
   go (Solved.Positional n _) = positional n n
   go (Solved.Command    n _) = command    n n
@@ -587,7 +654,7 @@ parseArg = go
           -- try terminating at this option
           if term && canTerm
               then do
-                vs <- fail "not implemented" -- TODO: terminate x
+                vs <- terminate x
                 pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
               else do
                 if isJust mA && r && canRepeat
@@ -667,6 +734,18 @@ toArgBranch options env descriptions x = go <$> x
   --           Elem $ Arg i (Solved.setElemRepeatable r x) k mV (o || o')
   go (Group o r xs) = Group o r $ (go <$> _) <$> xs
 
+-- Check if a given layout qualifies as a terminating argument for options-first
+-- and if so, return the argument it should be associated with.
+termAs :: ArgParseLayout -> Maybe Arg
+termAs x = go x
+  where
+  go (ParseGroup _ _ _ gR (((ParseElem _ _ x@(Arg _ (Solved.Positional _ pR) _ _ _)) :| Nil) :| Nil)) | gR || pR = Just x
+  go (ParseElem _ _ x@(Arg _ (Solved.Positional _ r) _ _ _)) | r = Just x
+  go _ = Nothing
+
+{-
+  Cached lookup if a token is known or not
+-}
 isKnownToken'
   :: ∀ r
    . Token

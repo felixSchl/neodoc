@@ -2254,6 +2254,9 @@ $ prog/s
 $ prog/s -i 123
 {"-i": [123]}
 
+$ prog/s -i 123 -i 123
+{"-i": [123, 123]}
+
 $ prog/s -i
 "user-error"
 
@@ -2562,7 +2565,7 @@ Usage: prog mine (set|remove)
 """
 
 $ prog mine
-""
+"missing set"
 
 #
 # Given an option-argument to a flag is a fatal error, no pardon:
@@ -2592,15 +2595,15 @@ $ prog/s -fb
 
 r"""Usage: git <command> -f"""
 $ prog
-"expected <command>"
+"missing <command>"
 
 r"""Usage: git COMMAND -f"""
 $ prog
-"expected COMMAND"
+"missing COMMAND"
 
 r"""Usage: git pull -f"""
 $ prog
-"expected pull"
+"missing pull"
 
 r"""
 Usage: git <command> -f
@@ -3470,10 +3473,48 @@ $ prog/lR -b -a -b f
 {"f": true, "-a": true, "-b": 2}
 
 r"""
+usage: prog [-a] f -b=ARG
+options:
+    -bARG  asdf [default: 100]
+"""
+
+$ prog/lR -a -a f
+"missing -bARG"
+
+$ prog/lR -b=20 -a -a f
+{"f": true, "-a": 2, "-b": 20}
+
+r"""
+usage: prog [-a] f [-b=ARG]
+options:
+    -bARG  asdf [default: 100]
+"""
+
+$ prog/lR -a -a f
+{"-a": 2, "f": true}
+
+r"""
 usage: prog [[-a]... [-b] [-d=ARG] [-c]] foo
 options:
   -d=ARG  [default: 1000]
 """
 
 $ prog -c -a -b -a foo
-{}
+{"foo": true, "-a": 2, "-b": true, "-c": true, "-d": 1000}
+
+# "fixed" groups should be able to move within the boundaries of other
+# surrounding "fixed" groups
+#
+
+r"""
+usage: p -x [-y <command>] -z
+"""
+
+$ prog/l -z -x
+{"-x": true, "-z": true}
+
+$ prog/l -z -x -y foo
+{"-x": true, "-z": true, "-y": true, "<command>": "foo"}
+
+$ prog/l -z -x foo -y
+{"-x": true, "-z": true, "-y": true, "<command>": "foo"}

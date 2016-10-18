@@ -314,7 +314,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         """
         [ fail Nothing [] "missing -iFILE"
           -- XXX: Would be cool to show the reason the group did not parse!
-        , fail Nothing [ "-i", "bar" ] "expected <env>"
+        , fail Nothing [ "-i", "bar" ] "missing <env>"
         , pass Nothing
             [ "-i", "bar", "x", "-o", "bar" ]
             [ "--input"  :> V.str "bar"
@@ -324,7 +324,7 @@ argParserSpec = \_ -> describe "The parser generator" do
             , "-o"       :> V.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-            "expected -iFILE, but got -o"
+            "unexpected option -o"
         ]
 
     , test
@@ -644,9 +644,7 @@ argParserSpec = \_ -> describe "The parser generator" do
                     , optionsFirst = true
                     }))
             [ "-n", "-a", "-b", "-c" ]
-            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
-            , "ARGS" :> V.array []
-            ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
         ]
 
     , test
