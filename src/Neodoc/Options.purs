@@ -108,7 +108,7 @@ instance isForeign :: IsForeign NeodocOptions where
     readSmartOptions  = _readBool "smartOptions"      _defaults.smartOptions
     readRequireFlags  = _readBool "requireFlags"      _defaults.requireFlags
     readLaxPlacement  = _readBool "laxPlacement"      _defaults.laxPlacement
-    readRepeatOptions = _readBool "repeatableOptions" _defaults.laxPlacement
+    readRepeatOptions = _readBool "repeatableOptions" _defaults.repeatableOptions
     readVersion       = _maybe    "version"
     readStopAt        = _default  "stopAt"            _defaults.stopAt
     readVersionFlags  = _default  "versionFlags"      _defaults.versionFlags
