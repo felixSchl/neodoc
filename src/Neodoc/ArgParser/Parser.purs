@@ -2,6 +2,7 @@ module Neodoc.ArgParser.Parser where
 
 import Prelude
 import Debug.Trace hiding (trace)
+import Debug.Trace (trace) as Debug
 import Debug.Profile
 import Data.Generic
 import Data.Newtype (unwrap)
@@ -230,7 +231,7 @@ parseBranch (Args3 l sub xs) = do
     let p = solve $ Args4 l options.repeatableOptions sub x
      in if options.allowUnknown
           then do
-            vs  <- many unknownToken
+            vs  <- many unknownOption
             vs' <- p
             pure $ vs <> vs'
           else p
@@ -286,14 +287,15 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
   go (Args6 l' sub' req rep canRep out) = do
     (ParseArgs { options } { depth } _ input) <- getParseState
 
+    unknowns <- if options.allowUnknown then many unknownOption else pure Nil
+
     -- trace l' \i->
     --   "solve: req = " <> pretty req
     --     <> ", rep = " <> pretty rep
     --     <> ", sub = " <> show sub
     --     <> ", out = " <> pretty out
+    --     <> ", ? = "   <> pretty unknowns
     --     <> ", i = "   <> pretty i
-
-    unknowns <- if options.allowUnknown then many unknownToken else pure Nil
 
     -- 1. try making a match for any arg in `req` w/o allowing substitutions.
     --    if we make a match, we proceed *and never look back*. If we do not
@@ -591,7 +593,7 @@ parseLayout
 parseLayout l sub x = do
  skipIf hasTerminated Nil do
   { options } <- getConfig
-  vs  <- if  options.allowUnknown then many unknownToken else pure Nil
+  vs  <- if  options.allowUnknown then many unknownOption else pure Nil
   vs' <- go options x
   pure $ vs <> vs'
   where
@@ -778,18 +780,22 @@ termAs x = go x
   go (ParseElem _ _ x@(Arg _ (Solved.Positional _ r) _ _ _)) | r = Just x
   go _ = Nothing
 
-unknownToken :: ∀ r. ArgParser r KeyValue
-unknownToken = do
+unknownOption :: ∀ r. ArgParser r KeyValue
+unknownOption = do
   i <- getInput
   case i of
-    (PositionedToken tok source _):toks -> do
+    (PositionedToken tok source _):toks |
+      case tok of
+        LOpt _ _ -> true
+        SOpt _ _ _ -> true
+        _ -> false -> do
       isKnown <- isKnownToken' tok
       if isKnown
-        then fail "expected unknown token"
+        then fail "expected unknown option"
         else setInput toks
           *> modifyDepth (_ + 1)
           $> (_UNKNOWN_ARG /\ RichValue.from Origin.Argv (StringValue source))
-    _ -> fail "expected unknown token"
+    _ -> fail "expected unknown option"
 
 {-
   Cached lookup if a token is known or not

@@ -3576,3 +3576,10 @@ $ prog/lur foo -acb
 
 $ prog/lur foo -ac -b
 {"-a": true, "-b": true, "?": ["-c"], "foo": true}
+
+r"""
+usage: p ship new <name>...
+"""
+
+$ prog/u ship new --fast foo
+{"<name>": ["foo"], "new": true, "ship": true, "?": ["--fast"]}
