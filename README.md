@@ -165,6 +165,8 @@ Options:
   "solving" the input, just prior to passing the spec to the arg-parser. This
   function takes the spec as it's only parameter. At this point, the spec has
   been fully solved, expanded and canonicalised.
+* `opts.allowUnknown` - Collect unknown options under a special key `?` instead
+  of failing. Useful to send an unknown subset of options to another program.
 
 For example:
 
