@@ -64,6 +64,7 @@ compatSpec tests =
                                       , requireFlags: opts.requireFlags
                                       , laxPlacement: opts.laxPlacement
                                       , repeatableOptions: opts.repeatableOptions
+                                      , allowUnknown: opts.allowUnknown
                                       }
           describe (intercalate " " (
             (toUnfoldable $ StrMap.toList env <#> \t ->

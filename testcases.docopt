@@ -3527,3 +3527,52 @@ usage: p [[<args>]...]
 
 $ prog/rRslup
 {"<args>": []}
+
+r"""
+usage: p
+"""
+
+$ prog/u -a -b -c
+{"?": ["-a", "-b", "-c"]}
+
+r"""
+usage: p -b
+"""
+
+$ prog/u -a -b -c
+{"-b": true, "?": ["-a", "-c"]}
+
+r"""
+usage: p [-b [-a]]
+"""
+
+$ prog/u -a -b -c
+{"-b": true, "-a": true, "?": ["-c"]}
+
+$ prog/ur -a -b -c
+{"-b": true, "-a": true, "?": ["-c"]}
+
+$ prog/lur -a -b -c
+{"-b": true, "-a": true, "?": ["-c"]}
+
+$ prog/lurR -a -b -c
+{"-b": true, "-a": true, "?": ["-c"]}
+
+r"""
+usage: p [-b [-a]] foo
+"""
+
+$ prog/u -acb foo
+{"-a": true, "?": ["-cb"], "foo": true}
+
+$ prog/lu foo -acb
+{"-a": true, "?": ["-cb"], "foo": true}
+
+# This is a tricky one: '-a' is known and gets consumed, but since it does not
+# take an argument it leaves a '-cb' on the input. Then, '-c' is not known, so
+# we consume the entire token: '-cb', resulting in a missing '-b'.
+$ prog/lur foo -acb
+"missing -b"
+
+$ prog/lur foo -ac -b
+{"-a": true, "-b": true, "?": ["-c"], "foo": true}

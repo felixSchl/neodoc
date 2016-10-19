@@ -45,6 +45,7 @@ newtype NeodocOptions = NeodocOptions {
 , versionFlags :: Array OptionAlias -- ^ list of flags that trigger 'version'
 , helpFlags    :: Array OptionAlias -- ^ list of flags that trigger 'help'
 , repeatableOptions :: Boolean -- ^ options are always allowed to repeat
+, allowUnknown      :: Boolean -- ^ allow unknown options in the input
 , transforms   :: {
     presolve :: ∀ eff. Either
       (Array (Spec UsageLayout -> Eff JsCallbackEff (Spec UsageLayout)))
@@ -72,6 +73,7 @@ defaultOptionsObj = {
 , helpFlags:    [ OA.Short 'h', OA.Long "help"    ]
 , transforms:   { presolve: Right [], postsolve: Right [] }
 , repeatableOptions: false
+, allowUnknown: false
 }
 
 customize :: NeodocOptions -> (_ -> _) -> NeodocOptions
@@ -92,6 +94,7 @@ instance isForeign :: IsForeign NeodocOptions where
     , helpFlags:    _
     , transforms:   _
     , repeatableOptions: _
+    , allowUnknown: _
     }
       <$> readArgv         v
       <*> readEnv          v
@@ -106,6 +109,7 @@ instance isForeign :: IsForeign NeodocOptions where
       <*> readHelpFlags    v
       <*> readTransforms   v
       <*> readRepeatOptions v
+      <*> readAllowUnknown v
 
     where
     readArgv          = _maybe "argv"
@@ -116,6 +120,7 @@ instance isForeign :: IsForeign NeodocOptions where
     readRequireFlags  = _readBool "requireFlags"      defaultOptionsObj.requireFlags
     readLaxPlacement  = _readBool "laxPlacement"      defaultOptionsObj.laxPlacement
     readRepeatOptions = _readBool "repeatableOptions" defaultOptionsObj.repeatableOptions
+    readAllowUnknown  = _readBool "allowUnknown"      defaultOptionsObj.allowUnknown
     readVersion       = _maybe    "version"
     readStopAt        = _default  "stopAt"            defaultOptionsObj.stopAt
     readVersionFlags  = _default  "versionFlags"      defaultOptionsObj.versionFlags
