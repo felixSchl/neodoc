@@ -69,6 +69,12 @@ describe('neodoc', () => {
         expect(out).to.deep.equal({"--help": 1, ".help": help });
       });
 
+      it('should return the help (implicit, should not fail)', () => {
+        const help = 'usage: p <word>';
+        const out = neodoc.run(help, { dontExit: true, argv: [ '--help' ]});
+        expect(out).to.deep.equal({"--help": 1, ".help": help });
+      });
+
       it('should return the help (implicit w/ alias)', () => {
         const help = `\
           usage: p
