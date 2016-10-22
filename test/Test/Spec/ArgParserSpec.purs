@@ -998,7 +998,10 @@ argParserSpec = \_ -> describe "The parser generator" do
 
               Error.capture do
                 Solver.solve
-                  { smartOptions: false }
+                  { smartOptions: false
+                  , versionFlags: Nil
+                  , helpFlags: Nil
+                  }
                   (Spec { program
                         , layouts
                         , descriptions

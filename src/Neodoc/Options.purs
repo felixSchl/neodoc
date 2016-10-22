@@ -1,27 +1,30 @@
 module Neodoc.Options where
 
 import Prelude
-import Data.Maybe (Maybe(..), maybe, fromMaybe)
-import Data.Either (Either(..), fromRight)
-import Data.Foreign (F, Foreign)
-import Data.Foreign as F
-import Data.Foreign.Class as F
-import Data.Foreign.Index as F
-import Data.Foreign.Index ((!))
 import Data.Foreign.Class
-import Data.Foreign.Extra as F
-import Control.Monad.Eff.Exception (Error, throwException, error, EXCEPTION)
+import Data.List (List)
 import Control.Monad.Eff
 import Neodoc.Spec
 import Neodoc.Data.EmptyableLayout
 import Neodoc.Data.UsageLayout
 import Neodoc.Data.SolvedLayout
+import Neodoc.OptionAlias as OA
 import Neodoc.Solve.Error
-import Neodoc.Solve (SolveOptions)
-import Neodoc.ArgParser.Options as ArgParser
-import Neodoc.Env (Env(), unwrapEnv)
-import Neodoc.SpecConversions (fromEmptyableSpec, toEmptyableSpec)
 import Unsafe.Coerce
+import Data.Foreign as F
+import Data.Foreign.Class as F
+import Data.Foreign.Extra as F
+import Data.Foreign.Index as F
+import Neodoc.ArgParser.Options as ArgParser
+import Control.Monad.Eff.Exception (Error, throwException, error, EXCEPTION)
+import Data.Either (Either(..), fromRight)
+import Data.Foreign (F, Foreign)
+import Data.Foreign.Index ((!))
+import Data.Maybe (Maybe(..), maybe, fromMaybe)
+import Neodoc.Env (Env, unwrapEnv)
+import Neodoc.OptionAlias (OptionAlias)
+import Neodoc.Solve (SolveOptions)
+import Neodoc.SpecConversions (fromEmptyableSpec, toEmptyableSpec)
 
 foreign import data JSCALLBACK :: !
 
@@ -38,8 +41,8 @@ newtype NeodocOptions = NeodocOptions {
 , requireFlags :: Boolean      -- ^ do not ignore missing flags
 , laxPlacement :: Boolean      -- ^ allow positionals/commands to be appear anywhere
 , version      :: Maybe String -- ^ the version string to display
-, versionFlags :: Array String -- ^ list of flags that trigger 'version'
-, helpFlags    :: Array String -- ^ list of flags that trigger 'help'
+, versionFlags :: Array OptionAlias -- ^ list of flags that trigger 'version'
+, helpFlags    :: Array OptionAlias -- ^ list of flags that trigger 'help'
 , repeatableOptions :: Boolean -- ^ options are always allowed to repeat
 , transforms   :: {
     presolve :: ∀ eff. Either
@@ -64,8 +67,8 @@ _defaults = {
 , requireFlags: false
 , laxPlacement: false
 , version:      Nothing
-, versionFlags: [ "--version" ]
-, helpFlags:    [ "--help"    ]
+, versionFlags: [ OA.Long "version" ]
+, helpFlags:    [ OA.Long "help"    ]
 , transforms:   { presolve: Right [], postsolve: Right [] }
 , repeatableOptions: false
 }

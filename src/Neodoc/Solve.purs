@@ -2,23 +2,27 @@ module Neodoc.Solve where
 
 import Prelude
 import Debug.Trace
-import Data.Either (Either(..), either)
-import Data.List (List(..))
-import Data.List as List
-import Data.Foldable (class Foldable)
-import Data.Traversable (for)
 import Neodoc.Spec
-import Neodoc.Spec as Spec
 import Neodoc.Data.UsageLayout
 import Neodoc.Data.SolvedLayout
 import Neodoc.Solve.Error
-import Neodoc.Solve.SmartOptions as Solve
+import Data.List as List
+import Neodoc.Solve.Canonicalise as Solve
 import Neodoc.Solve.ExpandOptions as Solve
 import Neodoc.Solve.ExpandReferences as Solve
-import Neodoc.Solve.Canonicalise as Solve
+import Neodoc.Solve.ImplicitFlags as Solve
+import Neodoc.Solve.SmartOptions as Solve
+import Neodoc.Spec as Spec
+import Data.Either (Either(..), either)
+import Data.Foldable (class Foldable)
+import Data.List (List(..))
+import Data.Traversable (for)
+import Neodoc.OptionAlias (OptionAlias)
 
 type SolveOptions r = {
   smartOptions :: Boolean
+, versionFlags :: List OptionAlias
+, helpFlags :: List OptionAlias
   | r
 }
 
@@ -29,12 +33,13 @@ solve'
   -> List (Spec SolvedLayout -> Either SolveError (Spec SolvedLayout))
   -> Spec UsageLayout
   -> Either SolveError (Spec SolvedLayout)
-solve' { smartOptions } usageTs solvedTs =
+solve' { smartOptions, helpFlags, versionFlags } usageTs solvedTs =
       (if smartOptions then Solve.smartOptions else pure)
   >=> flip (List.foldM (#)) usageTs
   >=> Solve.expandOptions
   >=> Solve.expandReferences
   >=> Solve.canonicalise
+  >=> Solve.implicitFlags (helpFlags <> versionFlags)
   >=> flip (List.foldM (#)) solvedTs
 
 solve

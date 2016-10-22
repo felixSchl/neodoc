@@ -179,7 +179,10 @@ _run input (NeodocOptions opts) = do
            in Right result
     Error.capture do
       Solver.solve'
-        opts
+        { smartOptions: opts.smartOptions
+        , helpFlags: fromFoldable opts.helpFlags
+        , versionFlags: fromFoldable opts.versionFlags
+        }
         (fromFoldable $ either (fromJSCallback <$> _) id opts.transforms.presolve)
         (fromFoldable $ either (fromJSCallback <$> _) id opts.transforms.postsolve)
         inputSpec
@@ -187,7 +190,7 @@ _run input (NeodocOptions opts) = do
   let
     runNeodocError' :: ∀ a. Either _ a -> Eff _ a
     runNeodocError' = runNeodocError  (Just program)
-                                      (Just opts.helpFlags)
+                                      (Just (pretty <$> opts.helpFlags))
                                       (Just shortHelp)
 
   -- 3. run the arg parser agains the spec and user input
@@ -197,13 +200,13 @@ _run input (NeodocOptions opts) = do
         ArgParser.run spec opts env argv
     pure $ Evaluate.reduce env descriptions mBranch vs
 
-  if output `has` opts.helpFlags then
+  if output `has` (pretty <$> opts.helpFlags) then
     let helpText' = trimHelp helpText
      in if opts.dontExit
           then pure (HelpOutput helpText')
           else Console.log helpText' *> Process.exit 0
     else
-      if output `has` opts.versionFlags then do
+      if output `has` (pretty <$> opts.versionFlags) then do
         mVer <- maybe readPkgVersion (pure <<< pure) opts.version
         case mVer of
           Just ver ->
@@ -268,7 +271,11 @@ _runPure input (NeodocOptions opts) mVer = do
   -- 2. solve the spec
   spec@(Spec { descriptions }) <- do
     Error.capture do
-      Solver.solve opts inputSpec
+      Solver.solve {
+        smartOptions: opts.smartOptions
+      , helpFlags: fromFoldable opts.helpFlags
+      , versionFlags: fromFoldable opts.versionFlags
+      } inputSpec
 
   -- 3. run the arg parser agains the spec and user input
   ArgParseResult mBranch vs <- do
@@ -277,10 +284,10 @@ _runPure input (NeodocOptions opts) mVer = do
 
   let output = Evaluate.reduce env descriptions mBranch vs
 
-  if output `has` opts.helpFlags
+  if output `has` (pretty <$> opts.helpFlags)
     then pure (HelpOutput (trimHelp helpText))
     else
-      if output `has` opts.versionFlags then do
+      if output `has` (pretty <$> opts.versionFlags) then do
         case mVer of
           Just ver -> pure (VersionOutput ver)
           Nothing ->  Left Error.VersionMissingError

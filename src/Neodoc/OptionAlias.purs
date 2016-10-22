@@ -9,7 +9,8 @@ module Neodoc.OptionAlias (
 
 import Prelude
 import Data.String as String
-import Data.List (List(), (:))
+import Data.Maybe (Maybe(..))
+import Data.List (List(Nil), (:))
 import Data.Either (Either(..))
 import Data.Function (on)
 import Data.Generic (class Generic, gEq, gShow)
@@ -36,16 +37,21 @@ instance showOptionAlias :: Show OptionAlias where
 
 instance isForeignOptionAlias :: IsForeign OptionAlias where
   read v = do
-    typ :: String <- String.toUpper <$> F.readProp "type" v
-
-    case typ of
-      "SHORT" -> Short <$> F.readProp "char" v
-      "LONG"  -> Long  <$> F.readProp "name" v
-      _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
+    s :: String <- read v
+    case String.uncons s of
+      Just { head: '-', tail } ->
+        case String.uncons tail of
+          Just { head: '-', tail: "" } ->
+            Left $ F.JSONError "long option must have a name"
+          Just { head: '-', tail: tail' } -> pure $ Long tail'
+          Just { head, tail: "" } -> pure $ Short head
+          _ -> Left $ F.JSONError "short option must have a singe char"
+      Nothing -> Left $ F.JSONError "option may not be empty"
+      _ -> Left $ F.JSONError "option must start with a dash"
 
 instance asForeignOptionAlias :: AsForeign OptionAlias where
-  write (Short c) = F.toForeign { type: "Short", char: c }
-  write (Long  n) = F.toForeign { type: "Long", name: n }
+  write (Short c) = F.toForeign $ "-"  <> (String.singleton c)
+  write (Long  n) = F.toForeign $ "--" <> n
 
 instance prettyOptionAlias :: Pretty OptionAlias where
   pretty (Short c) = "-"  <> (String.singleton c)

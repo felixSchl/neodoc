@@ -242,6 +242,8 @@ solveSpec = \_ ->
         let description' = if S.length description > 0
                               then description
                               else "(no description)"
+            helpFlags = Nil -- XXX: {sh,c}ould be tested
+            versionFlags = Nil -- XXX: {sh,c}ould be tested
          in describe description' $
           let message = case expected of
                 Left err     -> "should fail with: " <> show err
@@ -277,7 +279,7 @@ solveSpec = \_ ->
                       , helpText: ""
                       , shortHelp: ""
                     })
-                  lmap pretty $ solve { smartOptions } spec
+                  lmap pretty $ solve { smartOptions, helpFlags, versionFlags } spec
             case expected' /\ output' of
               Left expected /\ Left actual | expected /= actual  ->
                 throwException $ error $

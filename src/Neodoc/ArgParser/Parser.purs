@@ -447,17 +447,17 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
         then dropFirst (\x -> _isOptionalGroup x && _isFixed x) ys'
         else ys' /\ false
 
-      trace l \i-> "match: eval"
+      trace l \i' -> "match: eval"
           <> " ys = " <> pretty ys
           <> ", ys' = " <> pretty ys'
           <> ", ys'' = " <> pretty ys''
           <> ", locked = " <> show locked
           <> ", sub = " <> show sub
-          <> ", i = " <> pretty i
+          <> ", i = " <> pretty i'
 
       case if sub then filter (not <<< _isOptionalGroup) ys'' else ys'' of
         Nil -> do
-          trace l \i-> "match: succeeded!, i = " <> pretty i
+          trace l \i' -> "match: succeeded!, i = " <> pretty i'
 
           -- substitute all leaf elements. we ignore groups because these groups
           -- have failed to parse irrespective of substitution, so they are a
@@ -478,7 +478,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
         zs | changed -> go' errs false zs Nil Nil
 
         z:zs -> do
-          trace l \i-> "match: failed!" <> pretty (z:zs) <> ", i = " <> pretty i
+          trace l \i' -> "match: failed!" <> pretty (z:zs) <> ", i = " <> pretty i'
           i <- getInput
           { depth } <- getState
           case errs of
