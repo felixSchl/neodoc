@@ -89,14 +89,14 @@ type NeodocEff e = (
 )
 
 data Output
-  = VersionOutput String
-  | Output (StrMap Value)
-  | HelpOutput String
+  = VersionOutput (StrMap Value) String
+  | Output        (StrMap Value)
+  | HelpOutput    (StrMap Value) String
 
 instance prettyOutput :: Pretty Output where
-  pretty (VersionOutput s) = s
-  pretty (HelpOutput    s) = s
-  pretty (Output        s) = show s -- TODO: make pretty
+  pretty (VersionOutput _ s) = s
+  pretty (HelpOutput    _ s) = s
+  pretty (Output          s) = pretty s
 
 runJS
   :: ∀ eff
@@ -114,9 +114,13 @@ runJS = mkFn2 go
                             <*> (F.read fOpts)
     x <- _run spec opts
     pure case x of
-      (Output        x) -> F.toForeign (rawValue <$> x)
-      (HelpOutput    x) -> F.toForeign x
-      (VersionOutput x) -> F.toForeign x
+      (Output x) -> F.toForeign (rawValue <$> x)
+      (HelpOutput x s) ->
+        let x' = StrMap.insert ".help" (StringValue s) x
+         in F.toForeign (rawValue <$> x')
+      (VersionOutput x s) ->
+        let x' = StrMap.insert ".version" (StringValue s) x
+         in F.toForeign (rawValue <$> x')
 
   -- | Convert a Value into a JS-native value.
   rawValue :: Value -> Unit
@@ -203,7 +207,7 @@ _run input (NeodocOptions opts) = do
   if output `has` (pretty <$> opts.helpFlags) then
     let helpText' = trimHelp helpText
      in if opts.dontExit
-          then pure (HelpOutput helpText')
+          then pure (HelpOutput output helpText')
           else Console.log helpText' *> Process.exit 0
     else
       if output `has` (pretty <$> opts.versionFlags) then do
@@ -211,7 +215,7 @@ _run input (NeodocOptions opts) = do
         case mVer of
           Just ver ->
             if opts.dontExit
-                then pure (VersionOutput ver)
+                then pure (VersionOutput output ver)
                 else Console.log ver *> Process.exit 0
           Nothing -> runNeodocError' $ Left Error.VersionMissingError
     else pure (Output output)
@@ -285,11 +289,11 @@ _runPure input (NeodocOptions opts) mVer = do
   let output = Evaluate.reduce env descriptions mBranch vs
 
   if output `has` (pretty <$> opts.helpFlags)
-    then pure (HelpOutput (trimHelp helpText))
+    then pure (HelpOutput output (trimHelp helpText))
     else
       if output `has` (pretty <$> opts.versionFlags) then do
         case mVer of
-          Just ver -> pure (VersionOutput ver)
+          Just ver -> pure (VersionOutput output ver)
           Nothing ->  Left Error.VersionMissingError
       else pure (Output output)
 

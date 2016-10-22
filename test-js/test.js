@@ -60,13 +60,13 @@ describe('neodoc', () => {
       it('should return the help', () => {
         const help = 'usage: p [--help]';
         const out = neodoc.run(help, { dontExit: true, argv: [ '--help' ]});
-        expect(out).to.equal(help);
+        expect(out).to.deep.equal({"--help": 1, ".help": help });
       });
 
       it('should return the help (implicit)', () => {
         const help = 'usage: p';
         const out = neodoc.run(help, { dontExit: true, argv: [ '--help' ]});
-        expect(out).to.equal(help);
+        expect(out).to.deep.equal({"--help": 1, ".help": help });
       });
 
       it('should return the help (implicit w/ alias)', () => {
@@ -75,13 +75,13 @@ describe('neodoc', () => {
           options:
             -h, --help`;
         const out = neodoc.run(help, { dontExit: true, argv: [ '-h' ]});
-        expect(out).to.equal(help);
+        expect(out).to.deep.equal({"--help": 1, "-h": 1, ".help": help });
       });
 
       it('should accept custom helpFlags (implicit)', () => {
         const help = 'usage: p'
         const out = neodoc.run(help, { dontExit: true, argv: [ '-h' ], helpFlags: [ '-h' ]});
-        expect(out).to.equal(help);
+        expect(out).to.deep.equal({"-h": 1, ".help": help });
       });
     });
 
@@ -90,14 +90,14 @@ describe('neodoc', () => {
         const version = '1.0.0';
         const help = 'usage: p [--version]';
         const out = neodoc.run(help, { dontExit: true, argv: [ '--version' ], version });
-        expect(out).to.equal(version);
+        expect(out).to.deep.equal({"--version": 1, ".version": version });
       });
 
       it('should return the version (implicit)', () => {
         const version = '1.0.0';
         const help = 'usage: p';
         const out = neodoc.run(help, { dontExit: true, argv: [ '--version' ], version});
-        expect(out).to.equal(version);
+        expect(out).to.deep.equal({"--version": 1, ".version": version });
       });
 
       it('should return the version (implicit w/ alias)', () => {
@@ -107,14 +107,14 @@ describe('neodoc', () => {
           options:
             -v, --version`;
         const out = neodoc.run(help, { dontExit: true, argv: [ '-v' ], version});
-        expect(out).to.equal(version);
+        expect(out).to.deep.equal({"--version": 1, "-v": 1, ".version": version });
       });
 
       it('should accept custom versionFlags (implicit)', () => {
         const version = '1.0.0';
         const help = 'usage: p'
         const out = neodoc.run(help, { dontExit: true, argv: [ '-v' ], versionFlags: [ '-v' ], version});
-        expect(out).to.equal(version);
+        expect(out).to.deep.equal({"-v": 1, ".version": version });
       });
     });
   });
