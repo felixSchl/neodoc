@@ -3,6 +3,34 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
+## [1.1.0] - 2016-10-22
+
+### Fix
+
+* Fix [#72]: Add special flags to spec implicitely
+
+### Changes
+
+* Imrpove special flags behavior with `opts.dontExit`. Instead of just returning
+  a string, return the output and add a special key `.help` for `opts.helpFlags`
+  and `.version` for `opts.versionFlags`, respectively.
+* Allow dots in option names
+* Improve `OptionAlias` JS representation. It is now just a string. This makes
+  it easy to write, read and validate `opts.helpFlags` and `opts.versionFlags`.
+
+## [1.0.2] - 2016-10-20
+
+### Changes
+
+* Fix [#80]: Allow slashes in command names
+
+## [1.0.1] - 2016-10-20
+
+### Fix
+
+* Fix bug in foreign instance, where `opts.repeatableOptions` would not be read
+  properly
+
 ## [1.0.0] - 2016-10-19 :tada:
 
 The first major release of neodoc.
@@ -545,6 +573,15 @@ section &mdash; let it fail at the lexing stage.
 
 [@matthewmueller]: https://github.com/matthewmueller
 
+[#80]: https://github.com/felixSchl/neodoc/issues/80
+[#79]: https://github.com/felixSchl/neodoc/issues/79
+[#78]: https://github.com/felixSchl/neodoc/issues/78
+[#77]: https://github.com/felixSchl/neodoc/issues/77
+[#76]: https://github.com/felixSchl/neodoc/issues/76
+[#75]: https://github.com/felixSchl/neodoc/issues/75
+[#74]: https://github.com/felixSchl/neodoc/issues/74
+[#73]: https://github.com/felixSchl/neodoc/issues/73
+[#72]: https://github.com/felixSchl/neodoc/issues/72
 [#71]: https://github.com/felixSchl/neodoc/issues/71
 [#70]: https://github.com/felixSchl/neodoc/issues/70
 [#69]: https://github.com/felixSchl/neodoc/issues/69
@@ -617,6 +654,9 @@ section &mdash; let it fail at the lexing stage.
 [#2]: https://github.com/felixSchl/neodoc/issues/2
 [#1]: https://github.com/felixSchl/neodoc/issues/1
 
+[1.1.0]: https://github.com/felixschl/neodoc/compare/v1.0.2...v1.1.0
+[1.0.2]: https://github.com/felixschl/neodoc/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/felixschl/neodoc/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/felixschl/neodoc/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/felixschl/neodoc/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/felixschl/neodoc/compare/v0.9.2...v0.10.0
