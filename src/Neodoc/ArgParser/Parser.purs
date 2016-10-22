@@ -52,6 +52,7 @@ import Neodoc.Data.Chunk
 import Neodoc.Data.Indexed
 import Neodoc.Data.IndexedLayout
 import Neodoc.Data.LayoutConversion
+import Neodoc.OptionAlias (OptionAlias)
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.ArgKey (ArgKey)
 import Neodoc.ArgKey.Class (toArgKey)
@@ -162,15 +163,17 @@ parse
   -> Env
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
-parse (spec@(Spec { layouts, descriptions })) options env tokens = do
+parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags } env tokens = do
   runParser { env, options, spec } initialState initialGlobalState tokens $
     let hasEmpty = any null layouts
         toplevels = concat (NonEmpty.toList layouts)
-
-        parsers :: List (ArgParser r ArgParseResult)
-        parsers = toplevels <#> \branch ->
+        toplevels' = toplevels <#> \branch ->
           let branch' = toArgBranch options env descriptions branch
-              branch'' = toParseBranch (NonEmpty.toList branch')
+           in branch /\ branch'
+        hasImplicitEmpty = any (canMatchEmptyInput <<< snd) toplevels'
+        implicitToplevels = mkImplicitToplevel (helpFlags <> versionFlags) hasImplicitEmpty
+        parsers = implicitToplevels <> toplevels' <#> \(branch /\ branch') ->
+          let branch'' = toParseBranch (NonEmpty.toList branch')
            in do
             vs <- parseBranch 0 true branch''
             eof
@@ -202,6 +205,30 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens = do
             then known pTok
             else unknown pTok
         fail' $ unexpectedInputError Nil kToks
+
+  -- create an implicit top-level to make "-h/--help" and "--version" "just
+  -- work". The idea is to remove the empty fallback for '--help' and
+  -- '--version' in order to fail that top-level branch.
+  mkImplicitToplevel :: List OptionAlias -> Boolean -> _
+  mkImplicitToplevel flags o = case flags of
+    Nil -> Nil
+    f : fs -> pure
+      let args = toOption f :| (toOption <$> fs)
+          branch = (Group o true $ args <#> \a -> Elem a :| Nil) :| Nil
+          branch' = (Group o true $ args <#> \a ->
+                      (Elem $  Arg 0
+                                  a
+                                  (toArgKey a)
+                                  (if o
+                                    then Just $ RichValue.from Origin.Empty $ BoolValue false
+                                    else Nothing)
+                                  false
+                      ) :| Nil
+                    ) :| Nil
+       in branch /\ branch'
+    where
+    toOption :: OptionAlias -> SolvedLayoutArg
+    toOption a = Option a Nothing true
 
 parseBranch
   :: ∀ r
@@ -789,3 +816,15 @@ isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInL
       test (Token.EOA _)      (Solved.EOA)          = true
       test (Token.Stdin)      (Solved.Stdin)        = true
       test _ _ = false
+
+{-
+  Pre-emptively determine if a branch can match the empty input.
+-}
+canMatchEmptyInput
+  :: NonEmpty List ArgLayout
+  -> Boolean
+canMatchEmptyInput xs = any go xs
+  where go (Group o _ xs) = if o then true
+                                 else all canMatchEmptyInput xs
+        go (Elem x) = isJust $ getFallback x
+

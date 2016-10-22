@@ -144,25 +144,19 @@ readTests filepath = do
         ]
       P.skipSpaces *> skipComments *>  P.skipSpaces
       pure $ Kase { out: output
-                    , options: NeodocOptions {
-                        argv:         pure input
-                      , optionsFirst: flags.optionsFirst
-                      , env:          pure env
-                      , dontExit:     true
-                      , smartOptions: flags.smartOptions
-                      , stopAt:       []
-                      , requireFlags: flags.requireFlags
-                      , laxPlacement: flags.laxPlacement
-                      , repeatableOptions: flags.repeatableOptions
-                      , version:      Nothing
-                      , versionFlags: []
-                      , helpFlags:    []
-                      , transforms: {
-                          presolve: Right []
-                        , postsolve: Right []
-                        }
-                      }
-                    }
+                  , options: NeodocOptions $ defaultOptionsObj {
+                      argv              = pure input
+                    , optionsFirst      = flags.optionsFirst
+                    , env               = pure env
+                    , dontExit          = true
+                    , smartOptions      = flags.smartOptions
+                    , requireFlags      = flags.requireFlags
+                    , laxPlacement      = flags.laxPlacement
+                    , repeatableOptions = flags.repeatableOptions
+                    , versionFlags      = []
+                    , helpFlags         = []
+                  }
+                }
 
       where
         envVar = do

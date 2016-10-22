@@ -3,6 +3,7 @@ const neodoc = require('../');
 const path = require('path');
 const chalk = require('chalk');
 const expect = require('chai').expect;
+const assert = require('assert');
 
 const EXAMPLES = path.resolve(__dirname, '..', 'examples');
 const GIT_EXAMPLE = path.resolve(EXAMPLES, 'git');
@@ -67,6 +68,18 @@ describe('neodoc', () => {
         const help = 'usage: p';
         const out = neodoc.run(help, { dontExit: true, argv: [ '--help' ]});
         expect(out).to.deep.equal({"--help": 1, ".help": help });
+      });
+
+      it('should not allow empty usage through implicit', () => {
+        const help = 'usage: p <word>';
+        try {
+          neodoc.run(help, { dontExit: true, argv: []});
+          assert(false, 'should have thrown');
+        } catch(e) {
+          expect(e.message).to.equal(
+            'usage: p <word>\nSee p -h/--help for more information'
+          );
+        }
       });
 
       it('should return the help (implicit, should not fail)', () => {

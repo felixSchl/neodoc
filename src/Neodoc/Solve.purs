@@ -10,7 +10,6 @@ import Data.List as List
 import Neodoc.Solve.Canonicalise as Solve
 import Neodoc.Solve.ExpandOptions as Solve
 import Neodoc.Solve.ExpandReferences as Solve
-import Neodoc.Solve.ImplicitFlags as Solve
 import Neodoc.Solve.SmartOptions as Solve
 import Neodoc.Spec as Spec
 import Data.Either (Either(..), either)
@@ -21,8 +20,6 @@ import Neodoc.OptionAlias (OptionAlias)
 
 type SolveOptions r = {
   smartOptions :: Boolean
-, versionFlags :: List OptionAlias
-, helpFlags :: List OptionAlias
   | r
 }
 
@@ -33,13 +30,12 @@ solve'
   -> List (Spec SolvedLayout -> Either SolveError (Spec SolvedLayout))
   -> Spec UsageLayout
   -> Either SolveError (Spec SolvedLayout)
-solve' { smartOptions, helpFlags, versionFlags } usageTs solvedTs =
+solve' { smartOptions } usageTs solvedTs =
       (if smartOptions then Solve.smartOptions else pure)
   >=> flip (List.foldM (#)) usageTs
   >=> Solve.expandOptions
   >=> Solve.expandReferences
   >=> Solve.canonicalise
-  >=> Solve.implicitFlags (helpFlags <> versionFlags)
   >=> flip (List.foldM (#)) solvedTs
 
 solve

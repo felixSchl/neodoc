@@ -998,10 +998,7 @@ argParserSpec = \_ -> describe "The parser generator" do
 
               Error.capture do
                 Solver.solve
-                  { smartOptions: false
-                  , versionFlags: Nil
-                  , helpFlags: Nil
-                  }
+                  { smartOptions: false }
                   (Spec { program
                         , layouts
                         , descriptions
@@ -1030,7 +1027,15 @@ argParserSpec = \_ -> describe "The parser generator" do
         let opts = fromMaybe defaultOptions mOptions
             result = do
               ArgParseResult mBranch vs <- do
-                lmap pretty $ ArgParser.run spec opts env argv
+                lmap pretty $ ArgParser.run spec {
+                    optionsFirst:      opts.optionsFirst
+                  , stopAt:            opts.stopAt
+                  , requireFlags:      opts.requireFlags
+                  , laxPlacement:      opts.laxPlacement
+                  , repeatableOptions: opts.repeatableOptions
+                  , helpFlags:         Nil
+                  , versionFlags:      Nil
+                  } env argv
               pure $ Evaluate.reduce env descriptions mBranch vs
          in case result of
             Left msg {- XXX: Check against `ArgParserError`? -} ->

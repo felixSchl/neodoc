@@ -55,9 +55,9 @@ newtype NeodocOptions = NeodocOptions {
 }
 
 defaultOptions :: NeodocOptions
-defaultOptions = NeodocOptions _defaults
+defaultOptions = NeodocOptions defaultOptionsObj
 
-_defaults = {
+defaultOptionsObj = {
   argv:         Nothing
 , env:          Nothing
 , optionsFirst: false
@@ -68,7 +68,7 @@ _defaults = {
 , laxPlacement: false
 , version:      Nothing
 , versionFlags: [ OA.Long "version" ]
-, helpFlags:    [ OA.Long "help"    ]
+, helpFlags:    [ OA.Short 'h', OA.Long "help"    ]
 , transforms:   { presolve: Right [], postsolve: Right [] }
 , repeatableOptions: false
 }
@@ -106,16 +106,16 @@ instance isForeign :: IsForeign NeodocOptions where
     where
     readArgv          = _maybe "argv"
     readEnv v         = (unwrapEnv <$> _) <$> F.readPropMaybe "env" v
-    readOptionsFirst  = _readBool "optionsFirst"      _defaults.optionsFirst
-    readDontExit      = _readBool "dontExit"          _defaults.dontExit
-    readSmartOptions  = _readBool "smartOptions"      _defaults.smartOptions
-    readRequireFlags  = _readBool "requireFlags"      _defaults.requireFlags
-    readLaxPlacement  = _readBool "laxPlacement"      _defaults.laxPlacement
-    readRepeatOptions = _readBool "repeatableOptions" _defaults.repeatableOptions
+    readOptionsFirst  = _readBool "optionsFirst"      defaultOptionsObj.optionsFirst
+    readDontExit      = _readBool "dontExit"          defaultOptionsObj.dontExit
+    readSmartOptions  = _readBool "smartOptions"      defaultOptionsObj.smartOptions
+    readRequireFlags  = _readBool "requireFlags"      defaultOptionsObj.requireFlags
+    readLaxPlacement  = _readBool "laxPlacement"      defaultOptionsObj.laxPlacement
+    readRepeatOptions = _readBool "repeatableOptions" defaultOptionsObj.repeatableOptions
     readVersion       = _maybe    "version"
-    readStopAt        = _default  "stopAt"            _defaults.stopAt
-    readVersionFlags  = _default  "versionFlags"      _defaults.versionFlags
-    readHelpFlags     = _default  "helpFlags"         _defaults.helpFlags
+    readStopAt        = _default  "stopAt"            defaultOptionsObj.stopAt
+    readVersionFlags  = _default  "versionFlags"      defaultOptionsObj.versionFlags
+    readHelpFlags     = _default  "helpFlags"         defaultOptionsObj.helpFlags
     readTransforms v = do
       transforms :: Foreign <- F.defaultIfUndefined "transforms" (F.toForeign {}) v
       { presolve: _, postsolve: _ }

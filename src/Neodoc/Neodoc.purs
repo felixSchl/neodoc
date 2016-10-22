@@ -201,7 +201,15 @@ _run input (NeodocOptions opts) = do
   output <- runNeodocError' do
     ArgParseResult mBranch vs <- do
       Error.capture do
-        ArgParser.run spec opts env argv
+        ArgParser.run spec {
+            optionsFirst:      opts.optionsFirst
+          , stopAt:            opts.stopAt
+          , requireFlags:      opts.requireFlags
+          , laxPlacement:      opts.laxPlacement
+          , repeatableOptions: opts.repeatableOptions
+          , helpFlags:         fromFoldable opts.helpFlags
+          , versionFlags:      fromFoldable opts.versionFlags
+          } env argv
     pure $ Evaluate.reduce env descriptions mBranch vs
 
   if output `has` (pretty <$> opts.helpFlags) then
@@ -275,16 +283,20 @@ _runPure input (NeodocOptions opts) mVer = do
   -- 2. solve the spec
   spec@(Spec { descriptions }) <- do
     Error.capture do
-      Solver.solve {
-        smartOptions: opts.smartOptions
-      , helpFlags: fromFoldable opts.helpFlags
-      , versionFlags: fromFoldable opts.versionFlags
-      } inputSpec
+      Solver.solve { smartOptions: opts.smartOptions } inputSpec
 
   -- 3. run the arg parser agains the spec and user input
   ArgParseResult mBranch vs <- do
     Error.capture do
-      ArgParser.run spec opts env argv
+      ArgParser.run spec {
+          optionsFirst:      opts.optionsFirst
+        , stopAt:            opts.stopAt
+        , requireFlags:      opts.requireFlags
+        , laxPlacement:      opts.laxPlacement
+        , repeatableOptions: opts.repeatableOptions
+        , helpFlags:         fromFoldable opts.helpFlags
+        , versionFlags:      fromFoldable opts.versionFlags
+        } env argv
 
   let output = Evaluate.reduce env descriptions mBranch vs
 
