@@ -55,6 +55,7 @@ usageParserSpec = \_ -> do
     describe "positionals" do
       runSingleArgumentTests
         [ pass "BAR"       $ po "BAR"
+        , pass "B/AR"      $ po "B/AR"
         , pass "<foo-qux>" $ po "<foo-qux>"
         , pass "<QUX>"     $ po "<QUX>"
         , pass "<QuX>"     $ po "<QuX>"
@@ -84,6 +85,8 @@ usageParserSpec = \_ -> do
         , fail "--bar = <foo>"
         , pass "--barFOO"      $ lopt_ "barFOO"
         , pass "--foo/bar"     $ lopt_ "foo/bar"
+        , pass "--foo.bar"     $ lopt_ "foo.bar"
+        , pass "--foo.bar.quz" $ lopt_ "foo.bar.quz"
 
         , fail "--bar[ = foo]"
         , pass "--bar[=<foo>]"  $ lopt  "bar" (arg_ "<foo>")
@@ -104,6 +107,10 @@ usageParserSpec = \_ -> do
         , fail "--bar [ = <foo>]"
 
         , fail "--bar="
+        , fail "--bar/"
+        , fail "--bar."
+        , fail "--bar/=bar"
+        , fail "--bar.=foo"
         , fail "--bar=<>"
         , fail "--bar=--foo"
         , fail "--bar=-foo"

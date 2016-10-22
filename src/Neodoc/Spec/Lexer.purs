@@ -396,6 +396,9 @@ _longOption = do
       <$> alphaNum
       <*> (many $ P.choice [
             alphaNum
+          , P.try $ P.char '.'
+              <* (P.notFollowedBy $ P.string "..")
+              <* P.lookAhead alphaNum
           , P.oneOf [ '-', '/' ] <* P.lookAhead alphaNum
           ])
 
