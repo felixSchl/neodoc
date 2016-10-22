@@ -272,10 +272,10 @@ _anyName = do
     (:)
       <$> alphaNum
       <*> many do
-            P.choice $ P.try <$> [
+            P.choice [
               identLetter
-            , P.char '.' <* (P.notFollowedBy $ P.string "..")
-            , P.oneOf [ '-', '_' ]
+            , P.oneOf [ '-', '_', '/' ]
+            , P.try $ P.char '.' <* (P.notFollowedBy $ P.string "..")
           ]
   where bind = bindP
 
@@ -396,7 +396,7 @@ _longOption = do
       <$> alphaNum
       <*> (many $ P.choice [
             alphaNum
-          , P.oneOf [ '-' ] <* P.lookAhead alphaNum
+          , P.oneOf [ '-', '/' ] <* P.lookAhead alphaNum
           ])
 
   arg <- P.option Nothing $ P.choice [

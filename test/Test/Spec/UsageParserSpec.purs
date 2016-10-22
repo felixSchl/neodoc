@@ -59,6 +59,7 @@ usageParserSpec = \_ -> do
         , pass "<QUX>"     $ po "<QUX>"
         , pass "<QuX>"     $ po "<QuX>"
         , pass "<quux>"    $ po "<quux>"
+        , pass "<qu/ux>"   $ po "<qu/ux>"
         ]
 
     -- Commands are basically the same as positionals with some exception.
@@ -66,7 +67,8 @@ usageParserSpec = \_ -> do
     -- do not only have uppercase letters.
     describe "commands" do
       runSingleArgumentTests
-        [ pass "0" $ co "0" ]
+        [ pass "0" $ co "0"
+        , pass "foo/bar" $ co "foo/bar" ]
 
     -- Test long options in various formats.
     -- Each entry is run for both singular and repeated version.
@@ -81,6 +83,7 @@ usageParserSpec = \_ -> do
         , fail "--bar = fOo"
         , fail "--bar = <foo>"
         , pass "--barFOO"      $ lopt_ "barFOO"
+        , pass "--foo/bar"     $ lopt_ "foo/bar"
 
         , fail "--bar[ = foo]"
         , pass "--bar[=<foo>]"  $ lopt  "bar" (arg_ "<foo>")
