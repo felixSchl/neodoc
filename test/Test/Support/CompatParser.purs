@@ -153,8 +153,6 @@ readTests filepath = do
                     , requireFlags      = flags.requireFlags
                     , laxPlacement      = flags.laxPlacement
                     , repeatableOptions = flags.repeatableOptions
-                    , versionFlags      = []
-                    , helpFlags         = []
                   }
                 }
 

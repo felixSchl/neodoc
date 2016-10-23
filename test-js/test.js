@@ -61,7 +61,7 @@ describe('neodoc', () => {
       it('should return the help', () => {
         const help = 'usage: p [--help]';
         const out = neodoc.run(help, { dontExit: true, argv: [ '--help' ]});
-        expect(out).to.deep.equal({"--help": 1, ".help": help });
+        expect(out).to.deep.equal({"--help": true, ".help": help });
       });
 
       it('should return the help (implicit)', () => {
@@ -77,7 +77,9 @@ describe('neodoc', () => {
           assert(false, 'should have thrown');
         } catch(e) {
           expect(e.message).to.equal(
-            'usage: p <word>\nSee p -h/--help for more information'
+            'p: missing <word>\n'
+          + 'usage: p <word>\n'
+          + 'See p -h/--help for more information'
           );
         }
       });
@@ -109,7 +111,7 @@ describe('neodoc', () => {
         const version = '1.0.0';
         const help = 'usage: p [--version]';
         const out = neodoc.run(help, { dontExit: true, argv: [ '--version' ], version });
-        expect(out).to.deep.equal({"--version": 1, ".version": version });
+        expect(out).to.deep.equal({"--version": true, ".version": version });
       });
 
       it('should return the version (implicit)', () => {

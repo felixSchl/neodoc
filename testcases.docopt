@@ -153,12 +153,12 @@ $ prog -armyourass
 
 r"""Usage: prog [options]
 
-Options: --version
+Options: --vertical
          --verbose
 
 """
-$ prog --version
-{"--version": true}
+$ prog --vertical
+{"--vertical": true}
 
 $ prog --verbose
 {"--verbose": true}
@@ -2053,32 +2053,32 @@ $ prog -vv
 #
 
 r"""
-Usage: foo -h [options]
-Options: -h
+Usage: foo -x [options]
+Options: -x
 """
 
 $ prog
 {}
 
-$ prog -h
-{"-h": true}
+$ prog -x
+{"-x": true}
 
-$ prog -h -h
+$ prog -x -x
 "user-error"
 
 r"""
-Usage: foo -h [options] -h
-Options: -h
+Usage: foo -x [options] -x
+Options: -x
 """
 
 $ prog
 {}
 
-$ prog -h
-{"-h": 1}
+$ prog -x
+{"-x": 1}
 
-$ prog -h -h
-{"-h": 2}
+$ prog -x -x
+{"-x": 2}
 
 r"""
 Usage: foo --input [options]

@@ -163,35 +163,41 @@ parse
   -> Env
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
-parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags } env tokens = do
-  runParser { env, options, spec } initialState initialGlobalState tokens $
-    let hasEmpty = any null layouts
-        toplevels = concat (NonEmpty.toList layouts)
-        toplevels' = toplevels <#> \branch ->
-          let branch' = toArgBranch options env descriptions branch
-           in branch /\ branch'
-        hasImplicitEmpty = any (canMatchEmptyInput <<< snd) toplevels'
-        implicitToplevels = mkImplicitToplevel (helpFlags <> versionFlags) hasImplicitEmpty
-        parsers = implicitToplevels <> toplevels' <#> \(branch /\ branch') ->
-          let branch'' = toParseBranch (NonEmpty.toList branch')
-           in do
-            vs <- parseBranch 0 true branch''
-            eof
-            pure $ ArgParseResult (Just branch) vs
+parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags } env tokens =
+  let hasEmpty = any null layouts
+      toplevels = concat (NonEmpty.toList layouts)
 
-        parsers' :: List (ArgParser r ArgParseResult)
-        parsers' = parsers
-            -- if there were empty any layouts, such as for example:
-            --    usage: prog
-            --       or: prog
-            -- then we consolidate those into a single, artificial
-            -- parse whose only requirement is that there be no input.
-            <> if hasEmpty
-                  then singleton $ eof $> ArgParseResult Nothing Nil
-                  else Nil
-     in if null parsers'
-          then eof $> ArgParseResult Nothing Nil
-          else evalParsers (byOrigin <<< getResult) parsers'
+      -- construct a parser for each branch. we must yield the list key-values
+      -- along-side the branch that matched the result.
+      parsers :: List (ArgParser r ArgParseResult)
+      parsers = toplevels <#> \branch ->
+        let branch' = toArgBranch options env descriptions branch
+            branch'' = toParseBranch (NonEmpty.toList branch')
+         in ArgParseResult (Just branch) <$>
+              parseBranch 0 true branch'' <* eof
+
+      parsers' :: List (ArgParser r ArgParseResult)
+      parsers' = parsers
+          -- if there were empty any layouts, such as for example:
+          --    usage: prog
+          --       or: prog
+          -- then we consolidate those into a single, artificial
+          -- parse whose only requirement is that there be no input.
+          <> if hasEmpty
+                then pure $ ArgParseResult Nothing Nil <$ eof
+                else Nil
+
+   in runParser { env, options, spec } initialState initialGlobalState tokens $
+      let p = if null parsers'
+                then eof $> ArgParseResult Nothing Nil
+                else evalParsers (byOrigin <<< getResult) parsers'
+       in p `catch` \_ e ->
+          let implicitFlags = helpFlags <> versionFlags
+              mImplicitP = mkImplicitToplevelP implicitFlags false
+           in case mImplicitP of
+                Just implicitP -> implicitP <|> throw e
+                _              -> throw e
+
   where
   eof :: ∀ r. ArgParser r Unit
   eof = do
@@ -209,9 +215,9 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
   -- create an implicit top-level to make "-h/--help" and "--version" "just
   -- work". The idea is to remove the empty fallback for '--help' and
   -- '--version' in order to fail that top-level branch.
-  mkImplicitToplevel :: List OptionAlias -> Boolean -> _
-  mkImplicitToplevel flags o = case flags of
-    Nil -> Nil
+  mkImplicitToplevelP :: List OptionAlias -> Boolean -> _
+  mkImplicitToplevelP flags o = case flags of
+    Nil -> Nothing
     f : fs -> pure
       let args = toOption f :| (toOption <$> fs)
           branch = (Group o true $ args <#> \a -> Elem a :| Nil) :| Nil
@@ -225,7 +231,9 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
                                   false
                       ) :| Nil
                     ) :| Nil
-       in branch /\ branch'
+          branch'' = toParseBranch (NonEmpty.toList branch')
+       in ArgParseResult (Just branch) <$>
+            parseBranch 0 true branch'' <* eof
     where
     toOption :: OptionAlias -> SolvedLayoutArg
     toOption a = Option a Nothing true
