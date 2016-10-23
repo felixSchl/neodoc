@@ -3,7 +3,7 @@
 
 // module Debug.Profile
 
-const _timers = {};
+var _timers = {};
 
 exports.timerStart = function () {
   return process.hrtime();
