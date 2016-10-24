@@ -73,6 +73,9 @@ defaultOptionsObj = {
 , repeatableOptions: false
 }
 
+customize :: NeodocOptions -> (_ -> _) -> NeodocOptions
+customize (NeodocOptions o) f = NeodocOptions (f o)
+
 instance isForeign :: IsForeign NeodocOptions where
   read v = NeodocOptions <$> do
     { argv:         _

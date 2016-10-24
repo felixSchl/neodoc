@@ -9,6 +9,9 @@
   "scripts": {
     "build:src": "shx mkdir -p dist && pulp build --to dist/neodoc.purs.js --skip-entry-point --optimise -m Neodoc && shx echo \"module.exports = PS;\" >> dist/neodoc.purs.js",
     "build:lib": "babel lib --out-dir dist",
+    "build:example": "pulp build -I example-purs --to output/example.js",
+    "prerun:example": "npm run -s build:example",
+    "run:example": "NODE_PATH=output node ./output/example.js",
     "prebuild": "shx rm -rf dist",
     "build": "npm run -s build:src && npm run -s build:lib",
     "pretest": "npm run -s build",

@@ -4,11 +4,13 @@ module Neodoc.OptionAlias (
   , isLong
   , isShort
   , toAliasList
+  , fromString
   , module NonEmpty
   ) where
 
 import Prelude
 import Data.String as String
+import Data.Bifunctor (lmap)
 import Data.Maybe (Maybe(..))
 import Data.List (List(Nil), (:))
 import Data.Either (Either(..))
@@ -38,16 +40,19 @@ instance showOptionAlias :: Show OptionAlias where
 instance isForeignOptionAlias :: IsForeign OptionAlias where
   read v = do
     s :: String <- read v
-    case String.uncons s of
-      Just { head: '-', tail } ->
-        case String.uncons tail of
-          Just { head: '-', tail: "" } ->
-            Left $ F.JSONError "long option must have a name"
-          Just { head: '-', tail: tail' } -> pure $ Long tail'
-          Just { head, tail: "" } -> pure $ Short head
-          _ -> Left $ F.JSONError "short option must have a singe char"
-      Nothing -> Left $ F.JSONError "option may not be empty"
-      _ -> Left $ F.JSONError "option must start with a dash"
+    lmap F.JSONError (fromString s)
+
+fromString :: String -> Either String OptionAlias
+fromString s = case String.uncons s of
+  Just { head: '-', tail } ->
+    case String.uncons tail of
+      Just { head: '-', tail: "" } ->
+        Left "long option must have a name"
+      Just { head: '-', tail: tail' } -> pure $ Long tail'
+      Just { head, tail: "" } -> pure $ Short head
+      _ -> Left "short option must have a singe char"
+  Nothing -> Left "option may not be empty"
+  _ -> Left "option must start with a dash"
 
 instance asForeignOptionAlias :: AsForeign OptionAlias where
   write (Short c) = F.toForeign $ "-"  <> (String.singleton c)

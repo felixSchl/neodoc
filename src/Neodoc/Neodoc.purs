@@ -7,12 +7,15 @@ module Neodoc (
 , parseHelpText
 , parseHelpTextJS
 , readSpec
+, lookup
+, lookup'
 , Output (..)
 , module Reexports
 ) where
 
 import Prelude
 import Data.Array as A
+import Data.Generic
 import Data.Bifunctor (lmap)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
@@ -71,6 +74,8 @@ import Neodoc.ArgParser as ArgParser
 import Neodoc.ArgParser (ArgParseResult(..))
 import Neodoc.Evaluate as Evaluate
 import Neodoc.Data.SolvedLayout
+import Neodoc.Value as Value
+import Neodoc.OptionAlias as OptionAlias
 
 import Neodoc.Options as Reexports
 
@@ -93,10 +98,30 @@ data Output
   | Output        (StrMap Value)
   | HelpOutput    (StrMap Value) String
 
+getArgs :: Output -> StrMap Value
+getArgs (VersionOutput x _) = x
+getArgs (Output          x) = x
+getArgs (HelpOutput    x _) = x
+
+lookup :: String -> Output -> Maybe Value
+lookup k o = StrMap.lookup k (getArgs o)
+
+lookup' :: String -> Output -> Either String Value
+lookup' k o = case StrMap.lookup k (getArgs o) of
+                  Just v -> Right v
+                  _ -> case OptionAlias.fromString k of
+                              Right _ -> Right (BoolValue false)
+                              _       -> Left $ "no such key: " <> show k
+
 instance prettyOutput :: Pretty Output where
   pretty (VersionOutput _ s) = s
   pretty (HelpOutput    _ s) = s
   pretty (Output          s) = pretty s
+
+instance showOutput :: Show Output where
+  show (VersionOutput x s) = "VersionOutput " <> show x <> " " <> show s
+  show (HelpOutput    x s) = "HelpOutput " <> show x <> " " <> show s
+  show (Output          s) = "Output " <> show s
 
 runJS
   :: ∀ eff
