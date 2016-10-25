@@ -2,6 +2,7 @@ module Neodoc.Spec.Lexer where
 
 import Prelude
 import Data.Array as A
+import Debug.Profile
 import Data.Bifunctor (lmap)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty as NonEmpty
@@ -77,7 +78,8 @@ instance showMode :: Show Mode where
   show (Descriptions) = "Descriptions"
 
 lex :: Mode -> String -> Either SpecParseError (List PositionedToken)
-lex m input = lmap (SpecParseError <<< getParseErrorMessage) $
+lex m input = profileS ("spec-parser::lex (" <> show m <> ")") \_->
+                lmap (SpecParseError <<< getParseErrorMessage) $
   -- perform a simple transformation to avoid 'manyTill' and safe some millis
   -- lexing. Hopefully this won't be necessary when purescript-parsing improves
   -- performance, a faster parsing library shows up or the purescript compiler

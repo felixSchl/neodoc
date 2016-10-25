@@ -1,6 +1,7 @@
 module Neodoc.Spec.Parser.Description where
 
 import Prelude
+import Debug.Profile
 import Data.Tuple.Nested ((/\))
 import Data.Tuple (swap) as Tuple
 import Data.NonEmpty ((:|))
@@ -43,7 +44,7 @@ data Content
   | Env     String
 
 parse :: (List L.PositionedToken) -> Either P.ParseError (List Description)
-parse = flip L.runTokenParser do
+parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
   markIndent do
     reverse <$> go Nil
     <* L.eof
