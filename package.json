@@ -37,7 +37,12 @@
     "docopt",
     "neodoc",
     "cli",
-    "parser"
+    "parser",
+    "parsing",
+    "argument",
+    "args",
+    "option",
+    "command"
   ],
   "author": "Felix Schlitter <felixschlitter@gmail.com>",
   "license": "LicenseRef-LICENSE",
