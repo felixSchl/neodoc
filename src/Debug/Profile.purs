@@ -10,7 +10,7 @@ import Control.Monad.Eff.Unsafe
 import Text.Parsing.Parser (PState(..), ParserT(..), unParserT) as P
 
 _ENABLE_PROFILING_ :: Boolean
-_ENABLE_PROFILING_ = true
+_ENABLE_PROFILING_ = false
 
 prof :: ∀ m a. (Monad m) => String -> (Unit -> m a) -> m a
 prof = profileA

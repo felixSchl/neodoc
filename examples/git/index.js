@@ -1,10 +1,6 @@
 require('shelljs/global');
 
-console.time('foo')
 const neodoc = require('../..');
-console.timeEnd('foo')
-
-console.time('run')
 const args = neodoc.run(`
 usage: git [--version] [--help] [-C <path>] [-c <name=value>]
            [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
@@ -27,7 +23,6 @@ The most commonly used git commands are:
 concept guides. See 'git help <command>' or 'git help <concept>'
 to read about a specific subcommand or concept.
 `, { optionsFirst: true, smartOptions: true, version: '1.0.0', versionFlags: ['--info-path'] });
-console.timeEnd('run')
 
 if (args['<command>']) {
   require(`./${args['<command>']}`)(
