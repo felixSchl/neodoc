@@ -3,6 +3,7 @@ module Neodoc.ArgParser.Argument where
 import Prelude
 import Debug.Trace
 import Data.List.Partial as LU
+import Data.Tuple.Nested ((/\))
 import Data.Array as A
 import Data.Array.Partial as AU
 import Control.Plus (empty)
@@ -59,7 +60,7 @@ stdin = token "-" case _ of
   _     -> Nothing
 
 token :: ∀ r a. String -> (Token -> Maybe a) -> ArgParser r a
-token name test = Parser \c s g i ->
+token name test = Parser \(c /\ s /\ g /\ i) ->
   let _return = Step true c s g
       _fail m = Step false c s g i (Left $ ParseError false (Left m))
    in case i of

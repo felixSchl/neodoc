@@ -2,6 +2,7 @@ module Neodoc.ArgParser.Combinators where
 
 import Prelude
 import Data.Foldable (foldl, class Foldable)
+import Data.Tuple.Nested ((/\))
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Either (Either(..))
@@ -11,8 +12,8 @@ option :: ∀ e c s g i a. a -> Parser e c s g i a -> Parser e c s g i a
 option a p = p <|> pure a
 
 try :: ∀ e c s g i a. Parser e c s g i a -> Parser e c s g i a
-try p = Parser \c s g i ->
-  let step = unParser p c s g i
+try p = Parser \(a@(c /\ s /\ g /\ i)) ->
+  let step = unParser p a
    in case step of
         Step _ _ _ g' _ e@(Left _) -> Step false c s g' i e
         _                         -> step

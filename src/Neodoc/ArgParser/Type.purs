@@ -1,6 +1,7 @@
 module Neodoc.ArgParser.Type (
   ParseError (..)
 , Parser (..)
+, ParserArgs (..)
 , Step (..)
 , Result
 , IsConsumed
@@ -114,10 +115,11 @@ instance prettyParseError :: (Pretty e) => Pretty (ParseError e) where
   pretty (ParseError false e) = either id pretty e
   pretty (ParseError true e) = "Fatal: " <> either id pretty e
 
+type ParserArgs c s g i = Tuple (Tuple (Tuple c s) g) i
 type IsConsumed = Boolean
 type Result e a = Either (ParseError e) a
 data Step e c s g i a = Step IsConsumed c s g i (Result e a)
-data Parser e c s g i a = Parser (c -> s -> g -> i -> Step e c s g i a)
+data Parser e c s g i a = Parser (ParserArgs c s g i -> Step e c s g i a)
 
 setConsumed :: ∀ e c s g i a. Boolean -> Step e c s g i a -> Step e c s g i a
 setConsumed b (Step _ c s g i a) = Step b c s g i a
@@ -125,42 +127,42 @@ setConsumed b (Step _ c s g i a) = Step b c s g i a
 setConsumedOr :: ∀ e c s g i a. Boolean -> Step e c s g i a -> Step e c s g i a
 setConsumedOr b (Step b' c s g i a) = Step (b || b') c s g i a
 
-unParser :: ∀ e c s g i a. Parser e c s g i a -> c -> s -> g -> i -> Step e c s g i a
+unParser :: ∀ e c s g i a. Parser e c s g i a -> ParserArgs c s g i -> Step e c s g i a
 unParser (Parser f) = f
 
 instance applyParser :: Apply (Parser e c s g i) where
   apply = ap
 
 instance applicativeParser :: Applicative (Parser e c s g i) where
-  pure a = Parser \c s g i -> Step false c s g i (Right a)
+  pure a = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Right a)
 
 instance functorParser :: Functor (Parser e c s g i) where
-  map f p = Parser \c s g i ->
-    let step = unParser p c s g i
+  map f p = Parser \args ->
+    let step = unParser p args
      in case step of (Step b c' s' g' i' a) -> Step b c' s' g' i' (f <$> a)
 
 instance bindParser :: Bind (Parser e c s g i) where
-  bind p f = Parser \c s g i ->
-    let step = unParser p c s g i
+  bind p f = Parser \args ->
+    let step = unParser p args
      in case step of
           Step b c' s' g' i' (Left  err) -> Step b c' s' g' i' (Left err)
-          Step b c' s' g' i' (Right res) -> setConsumedOr b $ unParser (f res) c' s' g' i'
+          Step b c' s' g' i' (Right res) -> setConsumedOr b $ unParser (f res) (c' /\ s' /\ g' /\ i')
 
 instance monadParser :: Monad (Parser e c s g i)
 
 catch :: ∀ e c s g i a. Parser e c s g i a -> (s -> ParseError e -> Parser e c s g i a) -> Parser e c s g i a
-catch p f = Parser \c s g i ->
-  let step = unParser p c s g i
+catch p f = Parser \(args@(c /\ s /\ g /\ i)) ->
+  let step = unParser p args
    in case step of
       Step consumed _ s' g' _ (Left (e@(ParseError fatal _)))
-        | not (fatal || consumed) -> unParser (f s' e) c s g' i
+        | not (fatal || consumed) -> unParser (f s' e) (c /\ s /\ g' /\ i)
       _ -> step
 
 catch' :: ∀ e c s g i a. (s -> ParseError e -> Parser e c s g i a) -> Parser e c s g i a -> Parser e c s g i a
 catch' = flip catch
 
 throw :: ∀ e c s g i a. ParseError e -> Parser e c s g i a
-throw e = Parser \c s g i -> Step false c s g i (Left e)
+throw e = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Left e)
 
 instance altParser :: Alt (Parser e c s g i) where
   alt p1 p2 = catch p1 (\_ _ -> p2)
@@ -171,48 +173,48 @@ instance plusParser :: Plus (Parser e c s g i) where
 instance alternativeParser :: Alternative (Parser e c s g i)
 
 instance lazyParser :: Lazy (Parser e c s g i a) where
-  defer f = Parser \c i -> unParser (f unit) c i
+  defer f = Parser \args -> unParser (f unit) args
 
 getConfig :: ∀ e c s g i. Parser e c s g i c
-getConfig = Parser \c s g i -> Step false c s g i (Right c)
+getConfig = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Right c)
 
 getState :: ∀ e c s g i. Parser e c s g i s
-getState = Parser \c s g i -> Step false c s g i (Right s)
+getState = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Right s)
 
 setState :: ∀ e c s g i. s -> Parser e c s g i Unit
-setState s = Parser \c _ g i -> Step false c s g i (Right unit)
+setState s = Parser \(c /\ _ /\ g /\ i) -> Step false c s g i (Right unit)
 
 modifyState :: ∀ e c s g i. (s -> s) -> Parser e c s g i Unit
-modifyState f = Parser \c s g i -> Step false c (f s) g i (Right unit)
+modifyState f = Parser \(c /\ s /\ g /\ i) -> Step false c (f s) g i (Right unit)
 
 getGlobalState :: ∀ e c s g i. Parser e c s g i g
-getGlobalState = Parser \c s g i -> Step false c s g i (Right g)
+getGlobalState = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Right g)
 
 modifyGlobalState :: ∀ e c s g i. (g -> g) -> Parser e c s g i Unit
-modifyGlobalState f = Parser \c s g i -> Step false c s (f g) i (Right unit)
+modifyGlobalState f = Parser \(c /\ s /\ g /\ i) -> Step false c s (f g) i (Right unit)
 
 getInput :: ∀ e c s g i. Parser e c s g i i
-getInput = Parser \c s g i -> Step false c s g i (Right i)
+getInput = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Right i)
 
 setInput :: ∀ e c s g i. i -> Parser e c s g i Unit
-setInput i = Parser \c s g _ -> Step false c s g i (Right unit)
+setInput i = Parser \(c /\ s /\ g /\ _) -> Step false c s g i (Right unit)
 
 runParser :: ∀ e c s g i a. c -> s -> g -> i -> Parser e c s g i a -> Either (ParseError e) a
 runParser c s g i p =
-  let step = unParser p c s g i
+  let step = unParser p (c /\ s /\ g /\ i)
    in case step of (Step _ _ _ _ _ r) -> r
 
 fail :: ∀ e c s g i a. String -> Parser e c s g i a
-fail message = Parser \c s g i -> Step false c s g i (Left $ ParseError false (Left message))
+fail message = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Left $ ParseError false (Left message))
 
 fail' :: ∀ e c s g i a. e -> Parser e c s g i a
-fail' e = Parser \c s g i -> Step false c s g i (Left $ ParseError false (Right e))
+fail' e = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Left $ ParseError false (Right e))
 
 fatal :: ∀ e c s g i a. String -> Parser e c s g i a
-fatal message = Parser \c s g i -> Step false c s g i (Left $ ParseError true (Left message))
+fatal message = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Left $ ParseError true (Left message))
 
 fatal' :: ∀ e c s g i a. e -> Parser e c s g i a
-fatal' e = Parser \c s g i -> Step false c s g i (Left $ ParseError true (Right e))
+fatal' e = Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Left $ ParseError true (Right e))
 
 extractError :: ∀ e . (String -> e) -> ParseError e -> e
 extractError f (ParseError _ (Left  s)) = f s
@@ -409,13 +411,13 @@ cached
   -> ArgParser r _
   -> ArgParser r _
 cached x b p = do
-  Parser \c (s@{ hasTerminated }) (g@{ cache }) i ->
+  Parser \(args@(c /\ (s@{ hasTerminated }) /\ (g@{ cache }) /\ i)) ->
     let key = x /\ b /\ hasTerminated /\ i
      in case Map.lookup key cache of
           Just (CachedStep b' _ _ _ i' result) ->
             Step b' c s g i' result
           Nothing ->
-            case unParser p c s g i of
+            case unParser p args of
               step@(Step b c' s' g' i' result) ->
                 let step' = CachedStep b unit s' unit i' result
                     cache = Map.alter (const (Just step')) key g.cache
