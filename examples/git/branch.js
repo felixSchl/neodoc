@@ -1,8 +1,12 @@
 require('shelljs/global');
 
+console.time('req')
+const neodoc = require('../..')
+console.timeEnd('req')
+
 // Note: --merged needed to be made optional. The git help seems off here.
 module.exports = (argv) => {
-const args = require('../..').run(`
+const args = neodoc.run(`
 
 usage: git branch [options] [-r | -a] [--merged | --no-merged]
    or: git branch [options] [-r] (-d | -D) <branchname>...

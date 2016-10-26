@@ -28,11 +28,11 @@ module Neodoc.ArgParser.Type (
 , Input
 , ArgParser
 , ArgParseError(..)
--- , Cache
--- , CacheKey
--- , CacheVal
--- , cached
--- , withLocalCache
+, Cache
+, CacheKey
+, CachedStep
+, cached
+, withLocalCache
 , unexpectedInputError
 , missingArgumentsError
 , optionTakesNoArgumentError
@@ -92,14 +92,16 @@ import Data.Pretty (pretty, class Pretty)
 import Data.Set (Set)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
-import Neodoc.ArgParser.KeyValue (KeyValue)
-import Neodoc.ArgParser.Required (Required)
+
 import Neodoc.Data.Description (Description(..))
 import Neodoc.Data.Indexed (Indexed)
+import Neodoc.Spec (Spec(..), Toplevel)
 import Neodoc.Error (NeodocError(..)) as Neodoc
 import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
 import Neodoc.OptionAlias (OptionAlias)
-import Neodoc.Spec (Spec(..), Toplevel)
+import Neodoc.ArgParser.KeyValue (KeyValue)
+import Neodoc.ArgParser.Required (Required)
+import Neodoc.ArgParser.ParseLayout
 
 data ParseError e = ParseError Boolean (Either String e)
 
@@ -323,17 +325,22 @@ type ParseState = {
 type GlobalParseState = {
   deepestError :: Maybe (Tuple Int ArgParseError)
 , isKnownCache :: Map Token Boolean
--- , cache :: Cache
+, cache :: Cache
 }
 
--- type Cache = Map CacheKey (CacheVal)
--- type CacheKey = Tuple Input (Required (Indexed SolvedLayout))
--- type CacheVal = Step  ArgParseError
---                       Unit -- do not restore config
---                       ParseState
---                       Unit -- do not restore global state
---                       Input
---                       (List KeyValue)
+type Cache = Map CacheKey CachedStep
+type CacheKey = Tuple (Tuple (List Int) Boolean) Input
+data CachedStep
+  = CachedStep  Boolean
+                Unit -- do not restore config
+                ParseState
+                Unit -- do not restore global state
+                Input
+                (Result ArgParseError (Tuple (Tuple (Tuple
+                  (List KeyValue)
+                  (List ArgParseLayout))
+                  Boolean)
+                  (Maybe ArgParseLayout)))
 
 type ArgParser r a =
   Parser  ArgParseError
@@ -386,31 +393,30 @@ setErrorAtDepth d e = do
     Nothing -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
     _ -> pure unit
 
--- withLocalCache
---   :: ∀ r a
---    . ArgParser r a
---   -> ArgParser r a
--- withLocalCache p = do
---   { cache } <- getGlobalState
---   modifyGlobalState \s -> s { cache = Map.empty :: Cache }
---   v <- p
---   modifyGlobalState \s -> s { cache = cache }
---   pure v
+withLocalCache :: ∀ r a. ArgParser r a -> ArgParser r a
+withLocalCache p = do
+  { cache } <- getGlobalState
+  modifyGlobalState \s -> s { cache = Map.empty :: Cache }
+  let reset = modifyGlobalState \s -> s { cache = cache }
+  r <- p `catch` \_ e -> reset *> throw e
+  reset
+  pure r
 
--- cached
---   :: ∀ r
---    . Required (Indexed SolvedLayout)
---   -> ArgParser r (List KeyValue)
---   -> ArgParser r (List KeyValue)
--- cached x p = do
---   Parser \c s (g@{cache}) i ->
---     let key = i /\ x
---      in case Map.lookup key cache of
---           Just (Step b _ s' _ i' result) -> Step b c s' g i' result
---           Nothing ->
---             case unParser p c s g i of
---               step@(Step b c' s' g' i' result) ->
---                 let step' = Step b unit s' unit i' result
---                     cache = Map.alter (const (Just step')) key g.cache
---                  in Step b c' s' (g' { cache = cache }) i' result
-
+cached
+  :: ∀ r
+   . List Int
+  -> Boolean
+  -> ArgParser r _
+  -> ArgParser r _
+cached x b p = do
+  Parser \c s (g@{ cache }) i ->
+    let key = x /\ b /\ i
+     in case Map.lookup key cache of
+          Just (CachedStep b' _ _ _ i' result) ->
+            Step b' c s g i' result
+          Nothing ->
+            case unParser p c s g i of
+              step@(Step b c' s' g' i' result) ->
+                let step' = CachedStep b unit s' unit i' result
+                    cache = Map.alter (const (Just step')) key g.cache
+                 in Step b c' s' (g' { cache = cache }) i' result

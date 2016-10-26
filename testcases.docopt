@@ -3518,3 +3518,10 @@ $ prog/l -z -x -y foo
 
 $ prog/l -z -x foo -y
 {"-x": true, "-z": true, "-y": true, "<command>": "foo"}
+
+r"""
+usage: p [[<args>]...]
+"""
+
+$ prog/rRslup
+{}
