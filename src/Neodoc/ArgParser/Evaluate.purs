@@ -2,6 +2,7 @@ module Neodoc.ArgParser.Evaluate where
 
 import Prelude
 import Debug.Trace
+import Debug.Profile
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Pretty

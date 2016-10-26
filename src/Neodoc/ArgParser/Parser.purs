@@ -86,7 +86,8 @@ initialGlobalState :: GlobalParseState
 initialGlobalState = {
   deepestError: Nothing
 , isKnownCache: Map.empty
-, cache: Map.empty
+, matchCache: Map.empty
+, argCache: Map.empty
 }
 
 parse
@@ -120,8 +121,7 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
                 then pure $ ArgParseResult Nothing Nil <$ eof
                 else Nil
 
-   in profileS "arg-parser::run-parser" \_->
-      runParser { env, options, spec } initialState initialGlobalState tokens $
+   in runParser { env, options, spec } initialState initialGlobalState tokens $
         let p = if null parsers'
                   then eof $> ArgParseResult Nothing Nil
                   else evalParsers (byOrigin <<< getResult) parsers'
@@ -129,7 +129,7 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
             let implicitFlags = helpFlags <> versionFlags
                 -- note: must re-set the cache since the running ids in this
                 --       implicit branch may overlap.
-                mImplicitP = withLocalCache <$> do
+                mImplicitP = withLocalCaches <$> do
                   mkImplicitToplevelP implicitFlags false
             in case mImplicitP of
                   Just implicitP -> implicitP <|> throw e
@@ -367,7 +367,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
     use subsitutions to yield a match. But which argument should be substituted?
     We select the most eligble argument by see
   -}
-  match l sub xs = cached (getId <$> xs) sub $ match' l sub xs
+  match l sub xs = cachedMatch (getId <$> xs) sub $ match' l sub xs
   match'
     :: Int -- the recursive level
     -> Boolean -- allow substitutions?
@@ -536,7 +536,7 @@ parseLayout
   -> Boolean
   -> ArgParseLayout
   -> ArgParser r (List KeyValue)
-parseLayout l sub x =
+parseLayout l sub x = do
  skipIf hasTerminated Nil do
   { options } <- getConfig
   go options x
@@ -568,7 +568,8 @@ parseLayout l sub x =
   go opts (ParseElem _ _ x) =
     let arg = Arg.getArg x
         fromArgv = do
-          RichValue.from Origin.Argv <$> parseArg arg
+          RichValue.from Origin.Argv <$> do
+            cachedArg (Arg.getId x) $ parseArg arg
           <* modifyDepth (_ + 1)
      in do
       if sub
@@ -586,7 +587,7 @@ parseArg
   :: ∀ r
    . SolvedLayoutArg
   -> ArgParser r Value
-parseArg x =  go x
+parseArg x = go x
   where
   go (Solved.Positional n _) = positional n n
   go (Solved.Command    n _) = command    n n

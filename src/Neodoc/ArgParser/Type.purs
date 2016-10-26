@@ -35,10 +35,19 @@ module Neodoc.ArgParser.Type (
 , ArgParser
 , ArgParseError(..)
 , Cache
-, CacheKey
 , CachedStep
-, cached
-, withLocalCache
+
+, MatchCache
+, MatchCacheKey
+, CachedMatch
+, cachedMatch
+, withLocalCaches
+
+, ArgCache
+, ArgCacheKey
+, CachedArg
+, cachedArg
+
 , unexpectedInputError
 , missingArgumentsError
 , optionTakesNoArgumentError
@@ -108,6 +117,7 @@ import Neodoc.OptionAlias (OptionAlias)
 import Neodoc.ArgParser.KeyValue (KeyValue)
 import Neodoc.ArgParser.Required (Required)
 import Neodoc.ArgParser.ParseLayout
+import Neodoc.Value (Value(..))
 
 data ParseError e = ParseError Boolean (Either String e)
 
@@ -359,23 +369,33 @@ type ParseState = {
 type GlobalParseState = {
   deepestError :: Maybe (Tuple Int ArgParseError)
 , isKnownCache :: Map Token Boolean
-, cache :: Cache
+, matchCache   :: MatchCache
+, argCache     :: ArgCache
 }
 
-type Cache = Map CacheKey CachedStep
-type CacheKey = Tuple ((Tuple (Tuple (List Int) Boolean)) Boolean) Input
-data CachedStep
-  = CachedStep  Boolean
-                Unit -- do not restore config
-                ParseState
-                Unit -- do not restore global state
-                Input
-                (Result ArgParseError (Tuple (Tuple (Tuple
-                  (List KeyValue)
-                  (List ArgParseLayout))
-                  Boolean)
-                  (Maybe ArgParseLayout)))
+{- A general cache type -}
+type Cache k v = Map k (CachedStep v)
+data CachedStep v = CachedStep  Boolean
+                                Unit -- do not restore config
+                                ParseState
+                                Unit -- do not restore global state
+                                Input
+                                (Result ArgParseError v)
 
+{- A cache of matches -}
+type MatchCache = Cache MatchCacheKey CachedMatch
+type MatchCacheKey = Tuple ((Tuple (Tuple (List Int) Boolean)) Boolean) Input
+type CachedMatch = Tuple (Tuple (Tuple (List KeyValue)
+                                        (List ArgParseLayout))
+                                Boolean)
+                          (Maybe ArgParseLayout)
+
+{- A cache of parsed args -}
+type ArgCache = Cache ArgCacheKey CachedArg
+type ArgCacheKey = Tuple Int Input
+type CachedArg = Value
+
+{- The arg parser type  -}
 type ArgParser r a =
   Parser  ArgParseError
           (ParseConfig r)
@@ -427,30 +447,54 @@ setErrorAtDepth d e = do
     Nothing -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
     _ -> pure unit
 
-withLocalCache :: ∀ r a. ArgParser r a -> ArgParser r a
-withLocalCache p = do
-  { cache } <- getGlobalState
-  modifyGlobalState \s -> s { cache = Map.empty :: Cache }
-  let reset = modifyGlobalState \s -> s { cache = cache }
+withLocalCaches :: ∀ r a. ArgParser r a -> ArgParser r a
+withLocalCaches p = do
+  { matchCache, argCache } <- getGlobalState
+  modifyGlobalState \s -> s {
+    matchCache = Map.empty :: MatchCache
+  , argCache = Map.empty :: ArgCache
+  }
+  let reset = modifyGlobalState \s -> s {
+        matchCache = matchCache
+      , argCache = argCache
+      }
   r <- p `catch` \_ e -> reset *> throw e
   reset
   pure r
 
-cached
+cachedMatch
   :: ∀ r
    . List Int
   -> Boolean
   -> ArgParser r _
   -> ArgParser r _
-cached x b p = do
-  Parser \(args@(c /\ (s@{ hasTerminated }) /\ (g@{ cache }) /\ i)) ->
+cachedMatch x b p = do
+  Parser \(args@(c /\ (s@{ hasTerminated }) /\ (g@{ matchCache }) /\ i)) ->
     let key = x /\ b /\ hasTerminated /\ i
-     in case Map.lookup key cache of
+     in case Map.lookup key matchCache of
           Just (CachedStep b' _ _ _ i' result) ->
             Step b' (c /\ s /\ g /\ i') result
           Nothing ->
             case unParser p args of
               step@(Step b (c' /\ s' /\ g' /\ i') result) ->
                 let step' = CachedStep b unit s' unit i' result
-                    cache = Map.alter (const (Just step')) key g.cache
-                 in Step b (c' /\ s' /\ (g' { cache = cache }) /\ i') result
+                    cache' = Map.alter (const (Just step')) key g.matchCache
+                 in Step b (c' /\ s' /\ (g' { matchCache = cache' }) /\ i') result
+
+cachedArg
+  :: ∀ r
+   . Int
+  -> ArgParser r CachedArg
+  -> ArgParser r CachedArg
+cachedArg x p = do
+  Parser \(args@(c /\ s /\ (g@{ argCache }) /\ i)) ->
+    let key = x /\ i
+     in case Map.lookup key argCache of
+          Just (CachedStep b' _ _ _ i' result) ->
+            Step b' (c /\ s /\ g /\ i') result
+          Nothing ->
+            case unParser p args of
+              step@(Step b (c' /\ s' /\ g' /\ i') result) ->
+                let step' = CachedStep b unit s' unit i' result
+                    cache' = Map.alter (const (Just step')) key g.argCache
+                 in Step b (c' /\ s' /\ (g' { argCache = cache' }) /\ i') result
