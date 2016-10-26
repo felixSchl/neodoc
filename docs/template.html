@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html$if(lang)$ lang="$lang$"$endif$$if(dir)$ dir="$dir$"$endif$>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+$for(author-meta)$
+  <meta name="author" content="$author-meta$">
+$endfor$
+$if(date-meta)$
+  <meta name="dcterms.date" content="$date-meta$">
+$endif$
+$if(keywords)$
+  <meta name="keywords" content="$for(keywords)$$keywords$$sep$, $endfor$">
+$endif$
+  <title>$if(title-prefix)$$title-prefix$ – $endif$$pagetitle$</title>
+  <style type="text/css">code{white-space: pre;}</style>
+$if(quotes)$
+  <style type="text/css">q { quotes: "“" "”" "‘" "’"; }</style>
+$endif$
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.7.0/styles/tomorrow.min.css">
+$if(math)$
+  $math$
+$endif$
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+$for(header-includes)$
+  $header-includes$
+$endfor$
+$for(css)$
+  <link rel="stylesheet" href="$css$">
+$endfor$
+</head>
+<body itemscope itemtype="http://schema.org/TechArticle">
+$for(include-before)$
+$include-before$
+$endfor$
+$if(title)$
+<header>
+<h1 class="title" itemprop="name">$title$</h1>
+$if(subtitle)$
+<p class="version" itemprop="version">$subtitle$</p>
+$endif$
+$for(author)$
+<cite class="author" itemprop="author">By $author$</cite>
+$endfor$
+$if(date)$
+<h3 class="date">$date$</h3>
+$endif$
+</header>
+$endif$
+<figure id="header-image">
+  <img src="https://raw.githubusercontent.com/felixSchl/felixSchl.github.io/master/neodoc/neodoc.png" width="500" />
+</figure>
+$if(toc)$
+<h2 id="contents">Contents</h2>
+<nav id="$idprefix$TOC">
+$toc$
+</nav>
+$endif$
+$body$
+<footer>
+  Licensed under the MIT license.
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.7.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/languages/purescript.min.js"></script>
+<script src="highlight.js"></script>
+$for(include-after)$
+$include-after$
+$endfor$
+</body>
+</html>
