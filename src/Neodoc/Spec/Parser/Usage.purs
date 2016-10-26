@@ -4,6 +4,7 @@ module Neodoc.Spec.Parser.Usage where
 
 import Prelude
 import Debug.Trace
+import Debug.Profile
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty.Extra as NonEmpty
 import Neodoc.Data.Layout
@@ -48,7 +49,7 @@ type UsageParseResult = {
 parse
   :: List L.PositionedToken
   -> Either P.ParseError UsageParseResult
-parse = flip L.runTokenParser do
+parse = profileS "spec-parser::parse-usage" \_-> flip L.runTokenParser do
   -- Calculate and mark the original program indentation.
   P.Position _ startCol <- L.nextTokPos <?> "Program name"
   name    <- program

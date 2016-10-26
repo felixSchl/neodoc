@@ -2,6 +2,8 @@ module Neodoc.Spec.Lexer where
 
 import Prelude
 import Data.Array as A
+import Debug.Profile
+import Data.Pretty
 import Data.Bifunctor (lmap)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty as NonEmpty
@@ -10,6 +12,7 @@ import Data.Monoid (mempty)
 import Data.Functor (($>))
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
+import Control.Lazy (defer)
 import Control.Monad.Transformerless.State (State, evalState)
 import Control.MonadPlus (guard)
 import Data.Either (Either(..), fromRight)
@@ -41,62 +44,21 @@ import Text.Parsing.Parser.String (
   skipSpaces, anyChar, string, char, oneOf, whiteSpace, eof, noneOf
 , satisfy) as P
 
-
--- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
-skipSpaces = go
-  where
-    go = (do
-      P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
-      go
-    ) <|> pure unit
-    bind = bindP
-
--- | Optimal: Translate [[<anything>-]options] to @anything
--- | this saves us looking ahead repeatedly when parsing '['.
-referenceRegex :: Regex
-referenceRegex
-  = unsafePartial $ fromRight $
-      regex
-        "\\[(([^\\]](?!\\s*-?\\s*options\\s*))*?.?)\\s*-?\\s*options\\s*(\\.\\.\\.)?\\s*\\]"
-        (Regex.parseFlags "gmi")
-
--- | Optimal: Typeclass-less bind instance
--- | TODO: how to make the inner bind typeclass-less?
-bindP p f = P.ParserT $ \s -> do
-  (P.Result input result consumed pos) <- P.unParserT p s
-  case result of
-    Left err  -> pure (P.Result input (Left err) consumed pos)
-    Right a -> do
-      (P.Result input' result' consumed' pos') <- P.unParserT (f a) (P.PState input pos)
-      pure (P.Result input' result' (consumed || consumed') pos')
-
 data Mode = Usage | Descriptions
 
 instance showMode :: Show Mode where
-  show (Usage)        = "Usage"
-  show (Descriptions) = "Descriptions"
-
-lex :: Mode -> String -> Either SpecParseError (List PositionedToken)
-lex m input = lmap (SpecParseError <<< getParseErrorMessage) $
-  -- perform a simple transformation to avoid 'manyTill' and safe some millis
-  -- lexing. Hopefully this won't be necessary when purescript-parsing improves
-  -- performance, a faster parsing library shows up or the purescript compiler
-  -- improves in performance.
-  let input' = case m of
-                Usage        -> Regex.replace referenceRegex "@$1" input
-                Descriptions -> input
-   in P.runParser input' (parseTokens m)
-
-lexDescs :: String -> Either SpecParseError (List PositionedToken)
-lexDescs = lex Descriptions
-
-lexUsage :: String -> Either SpecParseError (List PositionedToken)
-lexUsage = lex Usage
+  show Usage        = "Usage"
+  show Descriptions = "Descriptions"
 
 type OptionArgument = {
   name     :: String
 , optional :: Boolean
 }
+
+-- | Parser that  parses a stream of tokens
+type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
+
+data PositionedToken = PositionedToken P.Position Token
 
 data Token
   = LParen
@@ -119,42 +81,37 @@ data Token
   | Garbage Char
   | DoubleDash
 
-prettyPrintToken :: Token -> String
-prettyPrintToken LParen        = show '('
-prettyPrintToken RParen        = show ')'
-prettyPrintToken LSquare       = show '['
-prettyPrintToken RSquare       = show ']'
-prettyPrintToken Dash          = show '-'
-prettyPrintToken VBar          = show '|'
-prettyPrintToken Newline       = show '\n'
-prettyPrintToken Colon         = show ':'
-prettyPrintToken Comma         = show ','
-prettyPrintToken TripleDot     = "..."
-prettyPrintToken DoubleDash    = "--"
-prettyPrintToken (Reference r) = "Reference " ~~ show r
-prettyPrintToken (Garbage   c) = "Garbage "   ~~ show c
-prettyPrintToken (Tag k v)     = "Tag "       ~~ (show k) ~~ " "  ~~ (show v)
-prettyPrintToken (Name      n) = "Name "      ~~ show n
-prettyPrintToken (ShoutName n) = "ShoutName " ~~ show n
-prettyPrintToken (AngleName n) = "AngleName " ~~ show n
-prettyPrintToken (LOpt n arg)  = "--" <> n <> arg'
-  where arg' = fromMaybe "" do
-                arg <#> \a ->
-                  if a.optional then "[" else ""
-                    <> a.name
-                    <> if a.optional then "]" else ""
-prettyPrintToken (SOpt (c :| cs) arg) = "-" <> n <> arg'
-  where n = fromCharArray $ A.cons c cs
-        arg' = fromMaybe "" do
-                arg <#> \a ->
-                  if a.optional then "[" else ""
-                    <> a.name
-                    <> if a.optional then "]" else ""
-
-data PositionedToken = PositionedToken P.Position Token
-
-instance showToken :: Show Token where
-  show = show <<< prettyPrintToken
+instance prettyToken :: Pretty Token where
+  pretty LParen        = show '('
+  pretty RParen        = show ')'
+  pretty LSquare       = show '['
+  pretty RSquare       = show ']'
+  pretty Dash          = show '-'
+  pretty VBar          = show '|'
+  pretty Newline       = show '\n'
+  pretty Colon         = show ':'
+  pretty Comma         = show ','
+  pretty TripleDot     = "..."
+  pretty DoubleDash    = "--"
+  pretty (Reference r) = "Reference " ~~ show r
+  pretty (Garbage   c) = "Garbage "   ~~ show c
+  pretty (Tag k v)     = "Tag "       ~~ show k ~~ " "  ~~ show v
+  pretty (Name      n) = "Name "      ~~ show n
+  pretty (ShoutName n) = "ShoutName " ~~ show n
+  pretty (AngleName n) = "AngleName " ~~ show n
+  pretty (LOpt n arg)  = "--" <> n <> arg'
+    where arg' = fromMaybe "" do
+                  arg <#> \a ->
+                    if a.optional then "[" else ""
+                      <> a.name
+                      <> if a.optional then "]" else ""
+  pretty (SOpt (c :| cs) arg) = "-" <> n <> arg'
+    where n = fromCharArray $ A.cons c cs
+          arg' = fromMaybe "" do
+                  arg <#> \a ->
+                    if a.optional then "[" else ""
+                      <> a.name
+                      <> if a.optional then "]" else ""
 
 instance eqToken :: Eq Token where
   eq LParen            LParen             = true
@@ -193,8 +150,52 @@ instance eqToken :: Eq Token where
   eq (Garbage c)       (Garbage c')       = c == c'
   eq _ _                                  = false
 
-instance showPositionedToken :: Show PositionedToken where
-  show (PositionedToken pos tok) = "PositionedToken " <> show pos <> " " <> show tok
+
+-- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
+skipSpaces = go
+  where
+    go = (do
+      P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
+      go
+    ) <|> pure unit
+    bind = bindP
+
+-- | Optimal: Translate [[<anything>-]options] to @anything
+-- | this saves us looking ahead repeatedly when parsing '['.
+referenceRegex :: Regex
+referenceRegex
+  = unsafePartial $ fromRight $
+      regex
+        "\\[(([^\\]](?!\\s*-?\\s*options\\s*))*?.?)\\s*-?\\s*options\\s*(\\.\\.\\.)?\\s*\\]"
+        (Regex.parseFlags "gmi")
+
+-- | Optimal: Typeclass-less bind instance
+-- | TODO: how to make the inner bind typeclass-less?
+bindP p f = P.ParserT $ \s -> do
+  (P.Result input result consumed pos) <- P.unParserT p s
+  case result of
+    Left err  -> pure (P.Result input (Left err) consumed pos)
+    Right a -> do
+      (P.Result input' result' consumed' pos') <- P.unParserT (f a) (P.PState input pos)
+      pure (P.Result input' result' (consumed || consumed') pos')
+
+lex :: Mode -> String -> Either SpecParseError (List PositionedToken)
+lex m input = profileS ("spec-parser::lex (" <> show m <> ")") \_->
+                lmap (SpecParseError <<< getParseErrorMessage) $
+  -- perform a simple transformation to avoid 'manyTill' and safe some millis
+  -- lexing. Hopefully this won't be necessary when purescript-parsing improves
+  -- performance, a faster parsing library shows up or the purescript compiler
+  -- improves in performance.
+  let input' = case m of
+                Usage        -> Regex.replace referenceRegex "@$1" input
+                Descriptions -> input
+   in P.runParser input' (parseTokens m)
+
+lexDescs :: String -> Either SpecParseError (List PositionedToken)
+lexDescs = lex Descriptions <<< trimDescSection
+
+lexUsage :: String -> Either SpecParseError (List PositionedToken)
+lexUsage = lex Usage
 
 parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
 parseTokens m =
@@ -445,9 +446,6 @@ identLetter = alphaNum <|> P.oneOf ['_', '-']
 flag :: P.Parser String Char
 flag = lowerAlphaNum
 
--- | Parser that  parses a stream of tokens
-type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
-
 -- | Test the token at the head of the stream
 token :: ∀ a. (Token -> Maybe a) -> TokenParser a
 token test = P.ParserT $ \(P.PState toks pos) ->
@@ -466,7 +464,8 @@ token test = P.ParserT $ \(P.PState toks pos) ->
 
 -- | Match the token at the head of the stream
 match :: Token -> TokenParser Unit
-match tok = token (guard <<< (_ == tok)) P.<?> prettyPrintToken tok
+match tok = token (guard <<< (_ == tok)) <|> defer \_->
+              P.fail $ "Expected " <> pretty tok
 
 anyToken :: TokenParser Token
 anyToken = token $ Just
@@ -578,3 +577,5 @@ runTokenParser s =
 
 getParseErrorMessage :: P.ParseError -> String
 getParseErrorMessage (P.ParseError m _ _) = m
+
+foreign import trimDescSection :: String -> String

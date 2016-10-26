@@ -14,6 +14,7 @@ module Neodoc (
 ) where
 
 import Prelude
+import Debug.Profile
 import Data.Array as A
 import Data.Generic
 import Data.Bifunctor (lmap)
@@ -306,12 +307,12 @@ _runPure input (NeodocOptions opts) mVer = do
     either pure parseHelpText input
 
   -- 2. solve the spec
-  spec@(Spec { descriptions }) <- do
+  spec@(Spec { descriptions }) <- profileS "::solve" \_-> do
     Error.capture do
       Solver.solve { smartOptions: opts.smartOptions } inputSpec
 
   -- 3. run the arg parser agains the spec and user input
-  ArgParseResult mBranch vs <- do
+  ArgParseResult mBranch vs <- profileS "::arg-parser" \_-> do
     Error.capture do
       ArgParser.run spec {
           optionsFirst:      opts.optionsFirst
@@ -323,7 +324,8 @@ _runPure input (NeodocOptions opts) mVer = do
         , versionFlags:      fromFoldable opts.versionFlags
         } env argv
 
-  let output = Evaluate.reduce env descriptions mBranch vs
+  let output = profileS "::reduce-values" \_->
+                Evaluate.reduce env descriptions mBranch vs
 
   if output `has` (pretty <$> opts.helpFlags)
     then pure (HelpOutput output (trimHelp helpText))
@@ -354,16 +356,16 @@ parseHelpText
   -> Either NeodocError (Spec UsageLayout)
 parseHelpText help = do
   -- scan the input text
-  { originalUsage, usage, options } <- Error.capture do
+  { originalUsage, usage, options } <- profileS "::scan" \_-> Error.capture do
     Scanner.scan $ dedent help
 
   -- lex/parse the usage section
-  { program, layouts } <- do
+  { program, layouts } <- profileS "::parse/lex usage" \_-> do
     toks <- Error.capture $ Lexer.lexUsage usage
     Error.capture $ Spec.parseUsage toks
 
   -- lex/parse the description section(s)
-  descriptions <- concat <$> for options \description -> do
+  descriptions <- concat <$> for options \description -> profileS "::parse/lex desc" \_-> do
     toks <- Error.capture $ Lexer.lexDescs description
     Error.capture $ Spec.parseDescription toks
 
