@@ -1,8 +1,6 @@
 require('shelljs/global');
 
-console.time('req')
 const neodoc = require('../..')
-console.timeEnd('req')
 
 // Note: --merged needed to be made optional. The git help seems off here.
 module.exports = (argv) => {

@@ -3519,9 +3519,11 @@ $ prog/l -z -x -y foo
 $ prog/l -z -x foo -y
 {"-x": true, "-z": true, "-y": true, "<command>": "foo"}
 
+# note: this test confirms termination when caching
+
 r"""
 usage: p [[<args>]...]
 """
 
 $ prog/rRslup
-{}
+{"<args>": []}

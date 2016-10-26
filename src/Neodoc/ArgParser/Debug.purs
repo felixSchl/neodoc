@@ -10,7 +10,7 @@ import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Token
 
 _ENABLE_DEBUG_ :: Boolean
-_ENABLE_DEBUG_ = true
+_ENABLE_DEBUG_ = false
 
 trace :: ∀ r. Int -> (List PositionedToken -> String) -> ArgParser r Unit
 trace l f = if _ENABLE_DEBUG_

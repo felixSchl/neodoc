@@ -329,7 +329,7 @@ type GlobalParseState = {
 }
 
 type Cache = Map CacheKey CachedStep
-type CacheKey = Tuple (Tuple (List Int) Boolean) Input
+type CacheKey = Tuple ((Tuple (Tuple (List Int) Boolean)) Boolean) Input
 data CachedStep
   = CachedStep  Boolean
                 Unit -- do not restore config
@@ -409,8 +409,8 @@ cached
   -> ArgParser r _
   -> ArgParser r _
 cached x b p = do
-  Parser \c s (g@{ cache }) i ->
-    let key = x /\ b /\ i
+  Parser \c (s@{ hasTerminated }) (g@{ cache }) i ->
+    let key = x /\ b /\ hasTerminated /\ i
      in case Map.lookup key cache of
           Just (CachedStep b' _ _ _ i' result) ->
             Step b' c s g i' result
