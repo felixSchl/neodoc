@@ -81,9 +81,9 @@ evalParsers p parsers = do
   let collected = parsers <#> \parser ->
         runParser config state globalState input $ Parser \a ->
           case unParser parser a of
-            Step b' c' s' g' i' result ->
+            Step b' a'@(c' /\ s' /\ g' /\ i') result ->
               let cont = ParserCont c' s' g' i'
-               in Step b' c' s' g' i' case result of
+               in Step b' a' case result of
                   Left  (err@(ParseError true _)) -> Left err
                   Left  err -> Right $ ErrorEvaluation   cont err
                   Right val -> Right $ SuccessEvaluation cont val
@@ -93,7 +93,7 @@ evalParsers p parsers = do
   -- we have to fail with an internal error message in the impossible case this
   -- is not true.
   case mlefts collected of
-    error:_ -> Parser \(c /\ s /\ g /\ i) -> Step false c s g i (Left error)
+    error:_ -> Parser \a -> Step false a (Left error)
     _       -> pure unit
 
   let
@@ -112,11 +112,11 @@ evalParsers p parsers = do
   -- match", take a pick.
   case bestSuccess of
     Just (SuccessEvaluation (ParserCont c s g i) val) -> do
-      applyResults results $ Parser \_ -> Step true c s g i (Right val)
+      applyResults results $ Parser \_ -> Step true (c /\ s /\ g /\ i) (Right val)
     _ -> case deepestErrors of
       Just errors -> case errors of
         (ErrorEvaluation (ParserCont c s g i) e):es | null es || not (null input) -> do
-          applyResults results $ Parser \_ -> Step false c s g i (Right unit)
+          applyResults results $ Parser \_ -> Step false (c /\ s /\ g /\ i) (Right unit)
           { depth        } <- getState
           { deepestError } <- getGlobalState
           case deepestError of
@@ -167,16 +167,17 @@ fork parser = do
   input       <- getInput
   let result = runParser config state globalState input $ Parser \a ->
         case unParser parser a of
-          Step b' c' s' g' i' result ->
-            let cont = ParserCont c' s' g' i'
-              in Step b' c' s' g' i' case result of
-                Left  err -> Right (Left  (g' /\ err))
-                Right val -> Right (Right (cont /\ val))
+          Step b' a' result ->
+          --  TODO: use tuple in `ParserCont`
+            let cont = ParserCont (getC a') (getS a') (getG a') (getI a')
+              in Step b' a' case result of
+                Left  err -> Right (Left  (getG a' /\ err))
+                Right val -> Right (Right (cont    /\ val))
   unsafePartial case result of
     Right (Left (g /\ error)) ->
-      Parser \(c /\ s /\ _ /\ i) ->
-        Step false c s g i (Left error)
-    Right (Right vc)          -> pure vc
+      Parser \a ->
+        Step false (setG g a) (Left error)
+    Right (Right vc) -> pure vc
 
 {-
   Resume a yielded, successful continuation.
@@ -185,4 +186,4 @@ resume
   :: ∀ r a
    . (Tuple (Cont r) a)
   -> ArgParser r a
-resume ((ParserCont c s g i) /\ v) = Parser \_ -> Step true c s g i (Right v)
+resume ((ParserCont c s g i) /\ v) = Parser \_ -> Step true (c /\ s /\ g /\ i) (Right v)

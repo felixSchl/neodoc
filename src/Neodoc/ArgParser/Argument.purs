@@ -60,14 +60,14 @@ stdin = token "-" case _ of
   _     -> Nothing
 
 token :: ∀ r a. String -> (Token -> Maybe a) -> ArgParser r a
-token name test = Parser \(c /\ s /\ g /\ i) ->
-  let _return = Step true c s g
-      _fail m = Step false c s g i (Left $ ParseError false (Left m))
-   in case i of
+token name test = Parser \a ->
+  let _return = \i r -> Step true (setI i a) r
+      _fail m = Step false a (Left $ ParseError false (Left m))
+   in case getI a of
     (PositionedToken token source _) : ss ->
       case test token of
         Nothing -> _fail $ "expected " <> name <> ", but got: " <> source
-        Just a  -> _return ss (Right a)
+        Just r  -> _return ss (Right r)
     _ -> _fail $ "expected " <> name
 
 type CanRepeat = Boolean

@@ -15,8 +15,8 @@ try :: ∀ e c s g i a. Parser e c s g i a -> Parser e c s g i a
 try p = Parser \(a@(c /\ s /\ g /\ i)) ->
   let step = unParser p a
    in case step of
-        Step _ _ _ g' _ e@(Left _) -> Step false c s g' i e
-        _                         -> step
+        Step _ a' e@(Left _) -> Step false (setG (getG a') a) e
+        _                    -> step
 
 -- | Parse one of a set of alternatives.
 choice :: ∀  f e c s g i a. (Foldable f) => f (Parser e c s g i a) -> Parser e c s g i a
