@@ -1,6 +1,7 @@
 require('shelljs/global');
 
-const args = require('../..').run(`
+const neodoc = require('../..');
+const args = neodoc.run(`
 usage: git [--version] [--help] [-C <path>] [-c <name=value>]
            [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
            [-p|--paginate|--no-pager] [--no-replace-objects] [--bare]

@@ -2,6 +2,7 @@ module Neodoc.ArgParser.Evaluate where
 
 import Prelude
 import Debug.Trace
+import Debug.Profile
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Pretty
@@ -70,7 +71,7 @@ evalParsers
 evalParsers _ parsers | length parsers == 0
   = fail' $ internalError "no parsers to evaluate"
 
-evalParsers p parsers = profile "eval-parsers" \_-> do
+evalParsers p parsers = do
 
   config      <- getConfig
   state       <- getState
@@ -79,11 +80,11 @@ evalParsers p parsers = profile "eval-parsers" \_-> do
 
   -- Run all parsers and collect their results for further evaluation
   let collected = parsers <#> \parser ->
-        runParser config state globalState input $ Parser \c s g i ->
-          case unParser parser c s g i of
-            Step b' c' s' g' i' result ->
+        runParser config state globalState input $ Parser \a ->
+          case unParser parser a of
+            Step b' a'@(c' /\ s' /\ g' /\ i') result ->
               let cont = ParserCont c' s' g' i'
-               in Step b' c' s' g' i' case result of
+               in Step b' a' case result of
                   Left  (err@(ParseError true _)) -> Left err
                   Left  err -> Right $ ErrorEvaluation   cont err
                   Right val -> Right $ SuccessEvaluation cont val
@@ -93,15 +94,15 @@ evalParsers p parsers = profile "eval-parsers" \_-> do
   -- we have to fail with an internal error message in the impossible case this
   -- is not true.
   case mlefts collected of
-    error:_ -> Parser \c s g i -> Step false c s g i (Left error)
+    error:_ -> Parser \a -> Step false a (Left error)
     _       -> pure unit
 
   let
     results = mrights collected
-    errors = filter isErrorEvaluation results
     successes = reverse $ filter isSuccessEvaluation results
     eqByDepth = eq `on` getEvaluationDepth
     cmpByDepth = compare `on` getEvaluationDepth
+    errors = filter isErrorEvaluation results
     deepestErrors = last $ groupBy eqByDepth $ sortBy cmpByDepth errors
     bestSuccess = do
       deepest <- last $ groupBy eqByDepth $ sortBy cmpByDepth successes
@@ -112,11 +113,11 @@ evalParsers p parsers = profile "eval-parsers" \_-> do
   -- match", take a pick.
   case bestSuccess of
     Just (SuccessEvaluation (ParserCont c s g i) val) -> do
-      applyResults results $ Parser \_ _ _ _ -> Step true c s g i (Right val)
+      applyResults results $ Parser \_ -> Step true (c /\ s /\ g /\ i) (Right val)
     _ -> case deepestErrors of
       Just errors -> case errors of
         (ErrorEvaluation (ParserCont c s g i) e):es | null es || not (null input) -> do
-          applyResults results $ Parser \_ _ _ _ -> Step false c s g i (Right unit)
+          applyResults results $ Parser \_ -> Step false (c /\ s /\ g /\ i) (Right unit)
           { depth        } <- getState
           { deepestError } <- getGlobalState
           case deepestError of
@@ -165,16 +166,19 @@ fork parser = do
   state       <- getState
   globalState <- getGlobalState
   input       <- getInput
-  let result = runParser config state globalState input $ Parser \c s g i ->
-        case unParser parser c s g i of
-          Step b' c' s' g' i' result ->
-            let cont = ParserCont c' s' g' i'
-              in Step b' c' s' g' i' case result of
-                Left  err -> Right (Left  (g' /\ err))
-                Right val -> Right (Right (cont /\ val))
+  let result = runParser config state globalState input $ Parser \a ->
+        case unParser parser a of
+          Step b' a' result ->
+          --  TODO: use tuple in `ParserCont`
+            let cont = ParserCont (getC a') (getS a') (getG a') (getI a')
+              in Step b' a' case result of
+                Left  err -> Right (Left  (getG a' /\ err))
+                Right val -> Right (Right (cont    /\ val))
   unsafePartial case result of
-    Right (Left (g /\ error)) -> Parser \c s _ i -> Step false c s g i (Left error)
-    Right (Right vc)          -> pure vc
+    Right (Left (g /\ error)) ->
+      Parser \a ->
+        Step false (setG g a) (Left error)
+    Right (Right vc) -> pure vc
 
 {-
   Resume a yielded, successful continuation.
@@ -183,4 +187,4 @@ resume
   :: ∀ r a
    . (Tuple (Cont r) a)
   -> ArgParser r a
-resume ((ParserCont c s g i) /\ v) = Parser \_ _ _ _ -> Step true c s g i (Right v)
+resume ((ParserCont c s g i) /\ v) = Parser \_ -> Step true (c /\ s /\ g /\ i) (Right v)

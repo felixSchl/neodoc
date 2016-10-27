@@ -18,7 +18,7 @@ import Control.MonadPlus (guard)
 import Data.Either (Either(..), fromRight)
 import Data.Identity (Identity())
 import Data.Foldable (foldMap)
-import Data.List (List(..), many, catMaybes, toUnfoldable, (:), some)
+import Data.List (List(..), many, catMaybes, toUnfoldable, (:), some, reverse)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (fromCharArray, trim)
 import Data.String (singleton, toUpper, split, joinWith) as String
@@ -181,7 +181,7 @@ bindP p f = P.ParserT $ \s -> do
 
 lex :: Mode -> String -> Either SpecParseError (List PositionedToken)
 lex m input = profileS ("spec-parser::lex (" <> show m <> ")") \_->
-                lmap (SpecParseError <<< getParseErrorMessage) $
+  lmap (SpecParseError <<< getParseErrorMessage) $
   -- perform a simple transformation to avoid 'manyTill' and safe some millis
   -- lexing. Hopefully this won't be necessary when purescript-parsing improves
   -- performance, a faster parsing library shows up or the purescript compiler
@@ -204,12 +204,31 @@ parseTokens m =
                     Descriptions -> parseDescriptionToken
    in do
     skipSpaces
-    xs <- many $ parsePositionedToken tokParser
+    xs <- many' $ parsePositionedToken tokParser
     P.eof <|> void do
       i <- getInput
       P.fail $ "Unexpected input: " ~~ i
     pure xs
-  where bind = bindP
+  where
+  bind = bindP
+
+-- optimal: tail recursive many' implementation specialized for lists
+many' p = reverse <$> go Nil
+  where go acc = do
+          v <- P.option Nothing (Just <$> p)
+          case v of
+            Nothing -> pure acc
+            Just v  -> go (v:acc)
+          where bind = bindP
+
+-- optimal: tail recursive many' implementation specialized for arrays
+manyA' p = A.fromFoldable <<< reverse <$> go Nil
+  where go acc = do
+          v <- P.option Nothing (Just <$> p)
+          case v of
+            Nothing -> pure acc
+            Just v  -> go (v : acc)
+          where bind = bindP
 
 parsePositionedToken :: (P.Parser String Token) -> P.Parser String PositionedToken
 parsePositionedToken p = PositionedToken <$> getPosition <*> p
@@ -272,7 +291,7 @@ _anyName = do
   foldMap String.singleton <$> do
     (:)
       <$> alphaNum
-      <*> many do
+      <*> many' do
             P.choice [
               identLetter
             , P.oneOf [ '-', '_', '/' ]
@@ -312,7 +331,7 @@ _eoa = do
 _reference :: P.Parser String Token
 _reference = Reference <$> do
   P.char '@'
-  foldMap String.singleton <$> many (P.noneOf [' ', '\n'])
+  foldMap String.singleton <$> many' (P.noneOf [' ', '\n'])
   where bind = bindP
 
 _tag :: P.Parser String Token
@@ -345,34 +364,28 @@ _shortOption = do
 
   P.char '-'
   x  <- validChar
-  xs <- A.many validChar
+  xs <- manyA' validChar
 
   arg <- P.option Nothing $ P.choice [
 
     -- Case 1: -foo=BAR
     Just <$> do
       P.char '='
-      n <- P.choice [ _angleName, _anyName ]
-      pure  { name:     n
-            , optional: false
-            }
+      name <- P.choice [ _angleName, _anyName ]
+      pure  { name, optional: false }
 
     -- Case 2: Option[=ARG]
   , Just <$> do
       P.char '['
       P.optional $ P.char '='
-      n <- P.choice [ _angleName, _anyName ]
+      name <- P.choice [ _angleName, _anyName ]
       P.char ']'
-      pure  { name:     n
-            , optional: true
-            }
+      pure  { name, optional: true }
 
     -- Case 3: Option<ARG>
   , Just <$> do
-      n <- _angleName
-      pure { name:     n
-            , optional: false
-            }
+      name <- _angleName
+      pure { name, optional: false }
   ]
 
   -- Ensure the argument is correctly bounded
@@ -395,7 +408,7 @@ _longOption = do
   name' <- foldMap String.singleton <$> do
     (:)
       <$> alphaNum
-      <*> (many $ P.choice [
+      <*> (many' $ P.choice [
             alphaNum
           , P.try $ P.char '.'
               <* (P.notFollowedBy $ P.string "..")

@@ -1,6 +1,7 @@
 module Neodoc.ArgParser.Type (
   ParseError (..)
 , Parser (..)
+, ParserArgs (..)
 , Step (..)
 , Result
 , IsConsumed
@@ -24,15 +25,29 @@ module Neodoc.ArgParser.Type (
 , extractError
 , mapError
 
+-- for plumbing
+, setC, setS, setG, setI
+, getC, getS, getG, getI
+, mapC, mapS, mapG, mapI
+
 -- `ArgParser`
 , Input
 , ArgParser
 , ArgParseError(..)
--- , Cache
--- , CacheKey
--- , CacheVal
--- , cached
--- , withLocalCache
+, Cache
+, CachedStep
+
+, MatchCache
+, MatchCacheKey
+, CachedMatch
+, cachedMatch
+, withLocalCaches
+
+, ArgCache
+, ArgCacheKey
+, CachedArg
+, cachedArg
+
 , unexpectedInputError
 , missingArgumentsError
 , optionTakesNoArgumentError
@@ -92,14 +107,17 @@ import Data.Pretty (pretty, class Pretty)
 import Data.Set (Set)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
-import Neodoc.ArgParser.KeyValue (KeyValue)
-import Neodoc.ArgParser.Required (Required)
+
 import Neodoc.Data.Description (Description(..))
 import Neodoc.Data.Indexed (Indexed)
+import Neodoc.Spec (Spec(..), Toplevel)
 import Neodoc.Error (NeodocError(..)) as Neodoc
 import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
 import Neodoc.OptionAlias (OptionAlias)
-import Neodoc.Spec (Spec(..), Toplevel)
+import Neodoc.ArgParser.KeyValue (KeyValue)
+import Neodoc.ArgParser.Required (Required)
+import Neodoc.ArgParser.ParseLayout
+import Neodoc.Value (Value(..))
 
 data ParseError e = ParseError Boolean (Either String e)
 
@@ -112,53 +130,81 @@ instance prettyParseError :: (Pretty e) => Pretty (ParseError e) where
   pretty (ParseError false e) = either id pretty e
   pretty (ParseError true e) = "Fatal: " <> either id pretty e
 
+mapC :: ∀ c s g i. (c -> c) -> ParserArgs c s g i -> ParserArgs c s g i
+mapC f (c /\ s /\ g /\ i) = (f c) /\ s /\ g /\ i
+mapS :: ∀ c s g i. (s -> s) -> ParserArgs c s g i -> ParserArgs c s g i
+mapS f (c /\ s /\ g /\ i) = c /\ (f s) /\ g /\ i
+mapG :: ∀ c s g i. (g -> g) -> ParserArgs c s g i -> ParserArgs c s g i
+mapG f (c /\ s /\ g /\ i) = c /\ s /\ (f g) /\ i
+mapI :: ∀ c s g i. (i -> i) -> ParserArgs c s g i -> ParserArgs c s g i
+mapI f (c /\ s /\ g /\ i) = c /\ s /\ g /\ (f i)
+
+getC :: ∀ c s g i. ParserArgs c s g i -> c
+getC (c /\ _ /\ _ /\ _) = c
+getS :: ∀ c s g i. ParserArgs c s g i -> s
+getS (_ /\ s /\ _ /\ _) = s
+getG :: ∀ c s g i. ParserArgs c s g i -> g
+getG (_ /\ _ /\ g /\ _) = g
+getI :: ∀ c s g i. ParserArgs c s g i -> i
+getI (_ /\ _ /\ _ /\ i) = i
+
+setC :: ∀ c s g i. c -> ParserArgs c s g i -> ParserArgs c s g i
+setC c = mapC (const c)
+setS :: ∀ c s g i. s -> ParserArgs c s g i -> ParserArgs c s g i
+setS s = mapS (const s)
+setG :: ∀ c s g i. g -> ParserArgs c s g i -> ParserArgs c s g i
+setG g = mapG (const g)
+setI :: ∀ c s g i. i -> ParserArgs c s g i -> ParserArgs c s g i
+setI i = mapI (const i)
+
+type ParserArgs c s g i = Tuple (Tuple (Tuple c s) g) i
 type IsConsumed = Boolean
 type Result e a = Either (ParseError e) a
-data Step e c s g i a = Step IsConsumed c s g i (Result e a)
-data Parser e c s g i a = Parser (c -> s -> g -> i -> Step e c s g i a)
+data Step e c s g i a = Step IsConsumed (ParserArgs c s g i) (Result e a)
+data Parser e c s g i a = Parser (ParserArgs c s g i -> Step e c s g i a)
 
 setConsumed :: ∀ e c s g i a. Boolean -> Step e c s g i a -> Step e c s g i a
-setConsumed b (Step _ c s g i a) = Step b c s g i a
+setConsumed b (Step _ a r) = Step b a r
 
 setConsumedOr :: ∀ e c s g i a. Boolean -> Step e c s g i a -> Step e c s g i a
-setConsumedOr b (Step b' c s g i a) = Step (b || b') c s g i a
+setConsumedOr b (Step b' a r) = Step (b || b') a r
 
-unParser :: ∀ e c s g i a. Parser e c s g i a -> c -> s -> g -> i -> Step e c s g i a
+unParser :: ∀ e c s g i a. Parser e c s g i a -> ParserArgs c s g i -> Step e c s g i a
 unParser (Parser f) = f
 
 instance applyParser :: Apply (Parser e c s g i) where
   apply = ap
 
 instance applicativeParser :: Applicative (Parser e c s g i) where
-  pure a = Parser \c s g i -> Step false c s g i (Right a)
+  pure r = Parser \a -> Step false a (Right r)
 
 instance functorParser :: Functor (Parser e c s g i) where
-  map f p = Parser \c s g i ->
-    let step = unParser p c s g i
-     in case step of (Step b c' s' g' i' a) -> Step b c' s' g' i' (f <$> a)
+  map f p = Parser \args ->
+    let step = unParser p args
+     in case step of (Step b a' r) -> Step b a' (f <$> r)
 
 instance bindParser :: Bind (Parser e c s g i) where
-  bind p f = Parser \c s g i ->
-    let step = unParser p c s g i
+  bind p f = Parser \args ->
+    let step = unParser p args
      in case step of
-          Step b c' s' g' i' (Left  err) -> Step b c' s' g' i' (Left err)
-          Step b c' s' g' i' (Right res) -> setConsumedOr b $ unParser (f res) c' s' g' i'
+          Step b a' (Left  err) -> Step b a' (Left err)
+          Step b a' (Right res) -> setConsumedOr b $ unParser (f res) a'
 
 instance monadParser :: Monad (Parser e c s g i)
 
 catch :: ∀ e c s g i a. Parser e c s g i a -> (s -> ParseError e -> Parser e c s g i a) -> Parser e c s g i a
-catch p f = Parser \c s g i ->
-  let step = unParser p c s g i
+catch p f = Parser \(args@(c /\ s /\ g /\ i)) ->
+  let step = unParser p args
    in case step of
-      Step consumed _ s' g' _ (Left (e@(ParseError fatal _)))
-        | not (fatal || consumed) -> unParser (f s' e) c s g' i
+      Step consumed (_ /\ s' /\ g' /\ _) (Left (e@(ParseError fatal _)))
+        | not (fatal || consumed) -> unParser (f s' e) (c /\ s /\ g' /\ i)
       _ -> step
 
 catch' :: ∀ e c s g i a. (s -> ParseError e -> Parser e c s g i a) -> Parser e c s g i a -> Parser e c s g i a
 catch' = flip catch
 
 throw :: ∀ e c s g i a. ParseError e -> Parser e c s g i a
-throw e = Parser \c s g i -> Step false c s g i (Left e)
+throw e = Parser \a -> Step false a (Left e)
 
 instance altParser :: Alt (Parser e c s g i) where
   alt p1 p2 = catch p1 (\_ _ -> p2)
@@ -169,48 +215,48 @@ instance plusParser :: Plus (Parser e c s g i) where
 instance alternativeParser :: Alternative (Parser e c s g i)
 
 instance lazyParser :: Lazy (Parser e c s g i a) where
-  defer f = Parser \c i -> unParser (f unit) c i
+  defer f = Parser \args -> unParser (f unit) args
 
 getConfig :: ∀ e c s g i. Parser e c s g i c
-getConfig = Parser \c s g i -> Step false c s g i (Right c)
+getConfig = Parser \a -> Step false a (Right (getC a))
 
 getState :: ∀ e c s g i. Parser e c s g i s
-getState = Parser \c s g i -> Step false c s g i (Right s)
+getState = Parser \a -> Step false a (Right (getS a))
 
 setState :: ∀ e c s g i. s -> Parser e c s g i Unit
-setState s = Parser \c _ g i -> Step false c s g i (Right unit)
+setState s = Parser \a -> Step false (mapS (const s) a) (Right unit)
 
 modifyState :: ∀ e c s g i. (s -> s) -> Parser e c s g i Unit
-modifyState f = Parser \c s g i -> Step false c (f s) g i (Right unit)
+modifyState f = Parser \a -> Step false (mapS f a) (Right unit)
 
 getGlobalState :: ∀ e c s g i. Parser e c s g i g
-getGlobalState = Parser \c s g i -> Step false c s g i (Right g)
+getGlobalState = Parser \a -> Step false a (Right (getG a))
 
 modifyGlobalState :: ∀ e c s g i. (g -> g) -> Parser e c s g i Unit
-modifyGlobalState f = Parser \c s g i -> Step false c s (f g) i (Right unit)
+modifyGlobalState f = Parser \a -> Step false (mapG f a) (Right unit)
 
 getInput :: ∀ e c s g i. Parser e c s g i i
-getInput = Parser \c s g i -> Step false c s g i (Right i)
+getInput = Parser \a -> Step false a (Right (getI a))
 
 setInput :: ∀ e c s g i. i -> Parser e c s g i Unit
-setInput i = Parser \c s g _ -> Step false c s g i (Right unit)
+setInput i = Parser \a -> Step false (mapI (const i) a) (Right unit)
 
 runParser :: ∀ e c s g i a. c -> s -> g -> i -> Parser e c s g i a -> Either (ParseError e) a
 runParser c s g i p =
-  let step = unParser p c s g i
-   in case step of (Step _ _ _ _ _ r) -> r
+  let step = unParser p (c /\ s /\ g /\ i)
+   in case step of (Step _ _ r) -> r
 
 fail :: ∀ e c s g i a. String -> Parser e c s g i a
-fail message = Parser \c s g i -> Step false c s g i (Left $ ParseError false (Left message))
+fail message = Parser \a -> Step false a (Left $ ParseError false (Left message))
 
 fail' :: ∀ e c s g i a. e -> Parser e c s g i a
-fail' e = Parser \c s g i -> Step false c s g i (Left $ ParseError false (Right e))
+fail' e = Parser \a -> Step false a (Left $ ParseError false (Right e))
 
 fatal :: ∀ e c s g i a. String -> Parser e c s g i a
-fatal message = Parser \c s g i -> Step false c s g i (Left $ ParseError true (Left message))
+fatal message = Parser \a -> Step false a (Left $ ParseError true (Left message))
 
 fatal' :: ∀ e c s g i a. e -> Parser e c s g i a
-fatal' e = Parser \c s g i -> Step false c s g i (Left $ ParseError true (Right e))
+fatal' e = Parser \a -> Step false a (Left $ ParseError true (Right e))
 
 extractError :: ∀ e . (String -> e) -> ParseError e -> e
 extractError f (ParseError _ (Left  s)) = f s
@@ -323,18 +369,33 @@ type ParseState = {
 type GlobalParseState = {
   deepestError :: Maybe (Tuple Int ArgParseError)
 , isKnownCache :: Map Token Boolean
--- , cache :: Cache
+, matchCache   :: MatchCache
+, argCache     :: ArgCache
 }
 
--- type Cache = Map CacheKey (CacheVal)
--- type CacheKey = Tuple Input (Required (Indexed SolvedLayout))
--- type CacheVal = Step  ArgParseError
---                       Unit -- do not restore config
---                       ParseState
---                       Unit -- do not restore global state
---                       Input
---                       (List KeyValue)
+{- A general cache type -}
+type Cache k v = Map k (CachedStep v)
+data CachedStep v = CachedStep  Boolean
+                                Unit -- do not restore config
+                                ParseState
+                                Unit -- do not restore global state
+                                Input
+                                (Result ArgParseError v)
 
+{- A cache of matches -}
+type MatchCache = Cache MatchCacheKey CachedMatch
+type MatchCacheKey = Tuple ((Tuple (Tuple (List Int) Boolean)) Boolean) Input
+type CachedMatch = Tuple (Tuple (Tuple (List KeyValue)
+                                        (List ArgParseLayout))
+                                Boolean)
+                          (Maybe ArgParseLayout)
+
+{- A cache of parsed args -}
+type ArgCache = Cache ArgCacheKey CachedArg
+type ArgCacheKey = Tuple Int Input
+type CachedArg = Value
+
+{- The arg parser type  -}
 type ArgParser r a =
   Parser  ArgParseError
           (ParseConfig r)
@@ -386,31 +447,54 @@ setErrorAtDepth d e = do
     Nothing -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
     _ -> pure unit
 
--- withLocalCache
---   :: ∀ r a
---    . ArgParser r a
---   -> ArgParser r a
--- withLocalCache p = do
---   { cache } <- getGlobalState
---   modifyGlobalState \s -> s { cache = Map.empty :: Cache }
---   v <- p
---   modifyGlobalState \s -> s { cache = cache }
---   pure v
+withLocalCaches :: ∀ r a. ArgParser r a -> ArgParser r a
+withLocalCaches p = do
+  { matchCache, argCache } <- getGlobalState
+  modifyGlobalState \s -> s {
+    matchCache = Map.empty :: MatchCache
+  , argCache = Map.empty :: ArgCache
+  }
+  let reset = modifyGlobalState \s -> s {
+        matchCache = matchCache
+      , argCache = argCache
+      }
+  r <- p `catch` \_ e -> reset *> throw e
+  reset
+  pure r
 
--- cached
---   :: ∀ r
---    . Required (Indexed SolvedLayout)
---   -> ArgParser r (List KeyValue)
---   -> ArgParser r (List KeyValue)
--- cached x p = do
---   Parser \c s (g@{cache}) i ->
---     let key = i /\ x
---      in case Map.lookup key cache of
---           Just (Step b _ s' _ i' result) -> Step b c s' g i' result
---           Nothing ->
---             case unParser p c s g i of
---               step@(Step b c' s' g' i' result) ->
---                 let step' = Step b unit s' unit i' result
---                     cache = Map.alter (const (Just step')) key g.cache
---                  in Step b c' s' (g' { cache = cache }) i' result
+cachedMatch
+  :: ∀ r
+   . List Int
+  -> Boolean
+  -> ArgParser r _
+  -> ArgParser r _
+cachedMatch x b p = do
+  Parser \(args@(c /\ (s@{ hasTerminated }) /\ (g@{ matchCache }) /\ i)) ->
+    let key = x /\ b /\ hasTerminated /\ i
+     in case Map.lookup key matchCache of
+          Just (CachedStep b' _ _ _ i' result) ->
+            Step b' (c /\ s /\ g /\ i') result
+          Nothing ->
+            case unParser p args of
+              step@(Step b (c' /\ s' /\ g' /\ i') result) ->
+                let step' = CachedStep b unit s' unit i' result
+                    cache' = Map.alter (const (Just step')) key g.matchCache
+                 in Step b (c' /\ s' /\ (g' { matchCache = cache' }) /\ i') result
 
+cachedArg
+  :: ∀ r
+   . Int
+  -> ArgParser r CachedArg
+  -> ArgParser r CachedArg
+cachedArg x p = do
+  Parser \(args@(c /\ s /\ (g@{ argCache }) /\ i)) ->
+    let key = x /\ i
+     in case Map.lookup key argCache of
+          Just (CachedStep b' _ _ _ i' result) ->
+            Step b' (c /\ s /\ g /\ i') result
+          Nothing ->
+            case unParser p args of
+              step@(Step b (c' /\ s' /\ g' /\ i') result) ->
+                let step' = CachedStep b unit s' unit i' result
+                    cache' = Map.alter (const (Just step')) key g.argCache
+                 in Step b (c' /\ s' /\ (g' { argCache = cache' }) /\ i') result
