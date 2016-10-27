@@ -225,7 +225,7 @@ _run input (NeodocOptions opts) = do
 
   -- 3. run the arg parser agains the spec and user input
   output <- runNeodocError' do
-    ArgParseResult mBranch vs <- do
+    ArgParseResult mBranch vs <- profileS "::arg-parser" \_-> do
       Error.capture do
         ArgParser.run spec {
             optionsFirst:      opts.optionsFirst

@@ -367,7 +367,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
     use subsitutions to yield a match. But which argument should be substituted?
     We select the most eligble argument by see
   -}
-  match l sub xs = cachedMatch (getId <$> xs) sub $ match' l sub xs
+  match l sub xs = {-cachedMatch (getId <$> xs) sub $-} match' l sub xs
   match'
     :: Int -- the recursive level
     -> Boolean -- allow substitutions?
@@ -569,7 +569,8 @@ parseLayout l sub x = do
     let arg = Arg.getArg x
         fromArgv = do
           RichValue.from Origin.Argv <$> do
-            cachedArg (Arg.getId x) $ parseArg arg
+            {-cachedArg (Arg.getId x) $-}
+              parseArg arg
           <* modifyDepth (_ + 1)
      in do
       if sub
