@@ -17,6 +17,7 @@ import Data.Foreign.Extra as F
 import Data.Foreign.Index as F
 import Neodoc.ArgParser.Options as ArgParser
 import Control.Monad.Eff.Exception (Error, throwException, error, EXCEPTION)
+import Control.Monad.Except (runExcept)
 import Data.Either (Either(..), fromRight)
 import Data.Foreign (F, Foreign)
 import Data.Foreign.Index ((!))
@@ -131,7 +132,7 @@ instance isForeign :: IsForeign NeodocOptions where
         pure $ Left $ callbacks <#> \fn ->
           \(spec :: Spec UsageLayout) ->
             let spec' = (unsafeCoerce fn) (F.write $ toEmptyableSpec spec)
-             in case fromEmptyableSpec <$> (F.read spec' :: Either _ (Spec (EmptyableLayout UsageLayoutArg))) of
+             in case fromEmptyableSpec <$> ((runExcept $ F.read spec') :: Either _ (Spec (EmptyableLayout UsageLayoutArg))) of
                   Left e  -> throwException $ error $ show e
                   Right s -> pure s
       readPostsolveTransforms v = do
@@ -140,7 +141,7 @@ instance isForeign :: IsForeign NeodocOptions where
         pure $ Left $ callbacks <#> \fn ->
           \(spec :: Spec SolvedLayout) ->
             let spec' = (unsafeCoerce fn) (F.write $ toEmptyableSpec spec)
-             in case fromEmptyableSpec <$> (F.read spec' :: Either _ (Spec (EmptyableLayout SolvedLayoutArg))) of
+             in case fromEmptyableSpec <$> ((runExcept $ F.read spec') :: Either _ (Spec (EmptyableLayout SolvedLayoutArg))) of
                   Left e  -> throwException $ error $ show e
                   Right s -> pure s
     _maybe           = F.readPropMaybe

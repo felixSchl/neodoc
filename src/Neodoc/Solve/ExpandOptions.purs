@@ -29,6 +29,7 @@ import Data.Either (Either(..), either)
 import Data.Traversable (for, traverse)
 import Data.Foldable (any)
 import Data.String as S
+import Data.String (Pattern(..))
 import Data.String.Unsafe as US
 import Data.String.Ext (endsWith)
 import Data.NonEmpty (NonEmpty, (:|))
@@ -36,9 +37,6 @@ import Data.NonEmpty.Extra as NonEmpty
 import Data.NonEmpty (singleton) as NonEmpty
 import Control.MonadPlus (guard)
 import Control.Extend (duplicate)
-import Control.Monad.Trans (lift)
-import Control.Monad.Maybe.Trans (runMaybeT, MaybeT(..))
-import Control.Monad.Except.Trans (runExceptT, ExceptT)
 import Neodoc.Spec
 import Neodoc.Spec as Spec
 import Neodoc.OptionAlias as OptionAlias
@@ -347,7 +345,7 @@ infixl 9 posArgsEq as ^=^
 stripAngles :: String -> String
 stripAngles = stripPrefix <<< stripSuffix
   where
-  stripPrefix s = fromMaybe s (S.stripPrefix "<" s)
-  stripSuffix s = fromMaybe s (S.stripSuffix ">" s)
+  stripPrefix s = fromMaybe s (S.stripPrefix (Pattern "<") s)
+  stripSuffix s = fromMaybe s (S.stripSuffix (Pattern ">") s)
 
 

@@ -9,6 +9,7 @@ import Data.Array as Array
 import Data.Maybe (Maybe(..), maybe)
 import Data.Foldable (intercalate)
 import Data.List (List)
+import Data.List.NonEmpty as NEL
 import Data.String (singleton) as String
 import Data.Either (Either(..))
 import Data.NonEmpty (NonEmpty, (:|))
@@ -18,6 +19,7 @@ import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
 import Data.Foreign.Extra as F
+import Control.Monad.Error.Class (throwError, catchError)
 import Neodoc.Data.Layout
 import Neodoc.Data.OptionArgument
 
@@ -98,12 +100,12 @@ instance isForeignUsageLayoutArg :: IsForeign UsageLayoutArg where
           <$> readOptionStack v
           <*> F.readPropMaybe "argument" v
           <*> F.readProp "repeatable" v
-      _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
+      _ -> F.fail $ F.errorAt "type" $ F.JSONError $ "unknown type: " <> typ
 
     where
-    readOptionStack v = do
-      lmap (F.errorAt "chars") do
-        F.readNonemptyArray =<< v ! "chars"
+    readOptionStack v =
+      catchError (F.readNonemptyArray =<< v ! "chars") \es ->
+        F.fail $ F.errorAt "chars" $ NEL.head es
 
 instance prettyUsageLayoutArg :: Pretty UsageLayoutArg where
   pretty = go

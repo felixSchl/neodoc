@@ -1,14 +1,15 @@
 module Neodoc.Scanner.Error where
 
+import Prelude
 import Data.Pretty (class Pretty, pretty)
 import Neodoc.Error (NeodocError(..)) as Neodoc
 import Neodoc.Error.Class (class ToNeodocError)
 import Text.Parsing.Parser as P
 
-newtype ScanError = ScanError P.ParseError
+newtype ScanError = ScanError String
 
 instance toNeodocErrorScanError :: ToNeodocError ScanError where
-  toNeodocError (ScanError (P.ParseError m _ _)) = Neodoc.ScanError m
+  toNeodocError (ScanError msg) = Neodoc.ScanError msg
 
 instance prettyScanError :: Pretty ScanError where
-  pretty (ScanError (P.ParseError m _ _)) = m
+  pretty (ScanError msg) = msg

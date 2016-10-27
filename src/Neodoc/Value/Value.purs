@@ -67,7 +67,7 @@ instance isForeignValue :: IsForeign Value where
     <|> (FloatValue  <$> F.readNumber  v)
     <|> (StringValue <$> F.readString  v)
     <|> (ArrayValue  <$> (F.readArray v >>= \vs -> for vs F.read))
-    <|> (Left $ F.JSONError "Invalid value")
+    <|> (F.fail $ F.JSONError "Invalid value")
 
 instance asForeignValue :: AsForeign Value where
   write (BoolValue    v) = F.toForeign v

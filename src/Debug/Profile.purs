@@ -4,10 +4,11 @@ import Prelude
 import Debug.Trace
 import Data.Either
 import Data.Tuple.Nested
+import Data.Newtype (unwrap)
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
 import Control.Monad.Eff.Unsafe
-import Text.Parsing.Parser (PState(..), ParserT(..), unParserT) as P
+import Text.Parsing.Parser (ParserT(..)) as P
 
 _ENABLE_PROFILING_ :: Boolean
 _ENABLE_PROFILING_ = false
@@ -42,9 +43,6 @@ profileS msg f =
        in case c unit of
             r /\ t -> trace (msg <> " (" <> (show t) <> " ms)") \_-> r
     else f unit
-
-profileParser :: ∀ s m a. (Monad m) => String -> P.ParserT s m a -> P.ParserT s m a
-profileParser msg p = P.ParserT $ \s -> profileA msg \_ -> P.unParserT p s
 
 foreign import timerStart :: ∀ eff. Eff eff Int
 foreign import timerEnd :: ∀ eff. Int -> Eff eff Int

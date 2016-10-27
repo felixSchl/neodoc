@@ -102,7 +102,7 @@ pass ::  Maybe Options                -- ^ The options
 pass opts i o = { argv:     i
                 , env:      []
                 , options:  opts
-                , expected: Right $ StrMap.fromList $ fromFoldable o
+                , expected: Right $ StrMap.fromFoldable $ fromFoldable o
                 }
 
 pass' :: Maybe Options                 -- ^ The options
@@ -113,7 +113,7 @@ pass' :: Maybe Options                 -- ^ The options
 pass' opts i e o = { argv:     i
                    , env:      e
                    , options:  opts
-                   , expected: Right $ StrMap.fromList $ fromFoldable o
+                   , expected: Right $ StrMap.fromFoldable $ fromFoldable o
                    }
 
 fail  :: Maybe Options -- ^ The options
@@ -1066,9 +1066,6 @@ argParserSpec = \_ -> describe "The parser generator" do
                         <> pretty r
                     else pure unit)
                 expected
-
-getParseErrorMessage :: P.ParseError -> String
-getParseErrorMessage (P.ParseError s _ _) = s
 
 getSolveErrorMessage :: SolveError -> String
 getSolveErrorMessage (SolveError s) = s

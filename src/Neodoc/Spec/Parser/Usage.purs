@@ -5,6 +5,7 @@ module Neodoc.Spec.Parser.Usage where
 import Prelude
 import Debug.Trace
 import Debug.Profile
+import Data.Pretty
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty.Extra as NonEmpty
 import Neodoc.Data.Layout
@@ -24,7 +25,7 @@ import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
 import Data.Tuple (Tuple(Tuple), snd, fst)
 import Data.Tuple.Nested (tuple3)
 import Partial.Unsafe (unsafePartial)
-import Text.Parsing.Parser (ParseError, fatal, fail) as P
+import Text.Parsing.Parser (ParseError, fail, fatal, consume) as P
 import Text.Parsing.Parser.Combinators (
   try, optional, choice, sepBy1, between,
   optionMaybe, lookAhead, option
@@ -51,7 +52,7 @@ parse
   -> Either P.ParseError UsageParseResult
 parse = profileS "spec-parser::parse-usage" \_-> flip L.runTokenParser do
   -- Calculate and mark the original program indentation.
-  P.Position _ startCol <- L.nextTokPos <?> "Program name"
+  P.Position { column: startCol } <- L.nextTokPos <?> "Program name"
   name    <- program
   layouts <- markLine do
     markIndent' startCol $ do
@@ -63,12 +64,15 @@ parse = profileS "spec-parser::parse-usage" \_-> flip L.runTokenParser do
               L.colon
             name' <- program
             if name /= name'
-               then P.fatal
-                      $ "Program name mismatch: Expected \"" <> name <> "\""
+               then do
+                  P.fatal
+                      $ "Program name mismatch: "
+                          <> "Expected \"" <> name <> "\""
                           <> ", but got \"" <> name' <> "\""
                else layout name
 
   L.eof <?> "End of usage section"
+
   pure {
     program: name
   , layouts:

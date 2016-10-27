@@ -10,10 +10,12 @@ import Data.Either (Either(..))
 import Data.Array as Array
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.List (List(..), (:), fromFoldable)
+import Data.List.NonEmpty as NEL
 import Data.Foreign
 import Data.Foreign.NullOrUndefined
 import Data.Foreign.Index
 import Data.Foreign.Class
+import Control.Monad.Except (throwError, catchError)
 
 prettyForeignError :: ForeignError -> String
 prettyForeignError = go
@@ -48,14 +50,14 @@ readNonemptyArray v = do
   xs :: Array a <- read v
   case Array.uncons xs of
     Just { head, tail } -> pure $ head :| tail
-    _ -> Left $ JSONError $ "array is empty"
+    _ -> fail $ JSONError $ "array is empty"
 
 readNonemptyList :: forall a. (IsForeign a) => Foreign -> F (NonEmpty List a)
 readNonemptyList v = do
   xs :: Array a <- read v
   case fromFoldable xs of
     head : tail -> pure $ head :| tail
-    _ -> Left $ JSONError $ "list is empty"
+    _ -> fail $ JSONError $ "list is empty"
 
 -- | Is this Foreign value an object?
 isObject :: Foreign -> Boolean
@@ -64,7 +66,7 @@ isObject f = typeOf f == "object"
 -- | Interpret a foreign value as a JS dictionary
 readObject :: Foreign -> F (StrMap Foreign)
 readObject value | isObject value = pure $ unsafeFromForeign value
-readObject value = Left (TypeMismatch "object" (typeOf value))
+readObject value = fail (TypeMismatch "object" (typeOf value))
 
 foreign import undefined :: ∀ a. a
 foreign import toString  :: ∀ a. a -> String
@@ -80,3 +82,6 @@ isTruthy (Truthy f) = _isTruthy f
 
 instance isForeignTruthy :: IsForeign Truthy where
   read v = pure $ Truthy v
+
+errorAtIndex :: ∀ a. Int -> F a -> F a
+errorAtIndex i f = catchError f \es -> fail $ ErrorAtIndex i (NEL.head es)

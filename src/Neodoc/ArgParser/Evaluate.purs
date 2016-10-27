@@ -6,6 +6,7 @@ import Debug.Profile
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Pretty
+import Data.Newtype (unwrap)
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
 , null, length, reverse)
@@ -115,8 +116,8 @@ evalParsers p parsers = do
     Just (SuccessEvaluation (ParserCont c s g i) val) -> do
       applyResults results $ Parser \_ -> Step true (c /\ s /\ g /\ i) (Right val)
     _ -> case deepestErrors of
-      Just errors -> case errors of
-        (ErrorEvaluation (ParserCont c s g i) e):es | null es || not (null input) -> do
+      Just errors -> case unwrap errors of
+        (ErrorEvaluation (ParserCont c s g i) e) :| es | null es || not (null input) -> do
           applyResults results $ Parser \_ -> Step false (c /\ s /\ g /\ i) (Right unit)
           { depth        } <- getState
           { deepestError } <- getGlobalState

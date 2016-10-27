@@ -2,6 +2,8 @@ module Neodoc.Spec.Parser.Description where
 
 import Prelude
 import Debug.Profile
+import Debug.Trace
+import Data.Pretty
 import Data.Tuple.Nested ((/\))
 import Data.Tuple (swap) as Tuple
 import Data.NonEmpty ((:|))
@@ -14,11 +16,12 @@ import Control.Monad (when)
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.MonadPlus (guard)
+import Data.String (Pattern(..))
 import Data.String as String
 import Data.List (
   List(..), (:), many, some, head, length, filter, catMaybes, reverse,
   singleton)
-import Text.Parsing.Parser (ParseError, fail) as P
+import Text.Parsing.Parser (ParseError, fail, fatal) as P
 import Text.Parsing.Parser.Combinators (
   (<?>), try, choice, lookAhead, manyTill,
   option, optionMaybe, optional, notFollowedBy,
@@ -33,6 +36,7 @@ import Partial.Unsafe
 import Neodoc.Value
 import Neodoc.Value as Value
 import Neodoc.Spec.Lexer as L
+import Neodoc.Spec.Parser.Base (getInput)
 import Neodoc.Spec.Parser.Combinators
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.OptionAlias (Aliases)
@@ -42,6 +46,10 @@ import Neodoc.Data.Description
 data Content
   = Default String
   | Env     String
+
+instance showContent :: Show Content where
+  show (Default s) = "Default " <> show s
+  show (Env s) = "Env " <> show s
 
 parse :: (List L.PositionedToken) -> Either P.ParseError (List Description)
 parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
@@ -112,17 +120,17 @@ parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
         env      = head envs     >>= id
 
     when (length defaults > 1) do
-      P.fail $
+      P.fatal $
         "Option " <> (intercalate ", " $ pretty <$> aliases)
                   <> " has multiple defaults!"
 
     when (length envs > 1) do
-      P.fail $
+      P.fatal $
         "Option " <> (intercalate ", " $ pretty <$> aliases)
                   <> " has multiple environment mappings!"
 
     when (isJust default && isNothing arg) do
-      P.fail $
+      P.fatal $
         "Option " <> (intercalate ", " $ pretty <$> aliases)
                   <> " does not take arguments. "
                   <> "Cannot specify defaults."
@@ -150,7 +158,7 @@ parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
       aliases <- foldl (\acc next -> do
         cur <- acc
         if next `elem` cur
-          then P.fail $ "Option appears multiple times: " <> pretty next
+          then P.fatal $ "Option appears multiple times: " <> pretty next
           else pure $ cur <> singleton next
       ) (pure Nil) (_.alias <$> xs)
 
@@ -161,7 +169,7 @@ parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
           Nothing  -> pure (Just next)
           Just arg ->
             if arg.name ^/=^ next.name
-              then P.fail $
+              then P.fatal $
                 "Option-arguments mismatch: "
                   <> (show $ prettyAdhocOptArg arg)
                   <> " and "
@@ -280,5 +288,5 @@ infixl 9 notPosArgsEq as ^/=^
 stripAngles :: String -> String
 stripAngles = stripPrefix <<< stripSuffix
   where
-  stripPrefix s = fromMaybe s (String.stripPrefix "<" s)
-  stripSuffix s = fromMaybe s (String.stripSuffix ">" s)
+  stripPrefix s = fromMaybe s (String.stripPrefix (Pattern "<") s)
+  stripSuffix s = fromMaybe s (String.stripSuffix (Pattern ">") s)

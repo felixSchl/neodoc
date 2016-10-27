@@ -14,16 +14,10 @@ import Data.List (
 , some, filter, head, toUnfoldable, sortBy, groupBy, last, null
 , tail, many, mapWithIndex)
 import Data.Maybe (Maybe(..), maybe, fromMaybe, isNothing, isJust)
-import Text.Parsing.Parser (
-  PState(..), ParseError(..), ParserT(..), Result(..), fail
-, parseFailedFatal, parseFailed, unParserT, fatal) as P
-import Text.Parsing.Parser.Combinators (
-  option, try, lookAhead, (<?>), choice) as P
-import Text.Parsing.Parser.Pos (Position(..)) as P
 import Data.String.Ext ((~~))
 import Data.String as String
 import Data.Pretty (pretty)
-import Data.String (fromCharArray, stripPrefix)
+import Data.String (fromCharArray, stripPrefix, Pattern(..))
 import Partial.Unsafe (unsafePartial)
 
 import Neodoc.ArgParser.Type
@@ -157,7 +151,7 @@ longOption term n mArg = do
   -- The name is a substring of the input and no explicit argument has been
   -- provdided.
   go (LOpt n' Nothing) _ | not isFlag
-    = case stripPrefix n n' of
+    = case stripPrefix (Pattern n) n' of
         Just s ->
           pure { rawValue:        Just s
                 , hasConsumedArg: false

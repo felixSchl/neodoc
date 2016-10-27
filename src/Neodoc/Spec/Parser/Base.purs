@@ -7,7 +7,8 @@ module Neodoc.Spec.Parser.Base where
 import Prelude
 import Control.Alt ((<|>))
 import Data.List (List(), many)
-import Text.Parsing.Parser (PState(..), ParserT(..), Result(..)) as P
+import Data.Tuple.Nested ((/\))
+import Text.Parsing.Parser (ParserT(..), ParseState(..)) as P
 import Text.Parsing.Parser.Pos (Position(..)) as P
 import Text.Parsing.Parser.String (satisfy, char, string) as P
 import Data.Array as A
@@ -17,32 +18,30 @@ import Data.Maybe (Maybe(Nothing, Just))
 import Data.Either (Either(Right))
 import Debug.Trace (traceShow)
 import Control.MonadPlus (guard)
+import Control.Monad.Except (ExceptT(..), throwError)
+import Control.Monad.State (StateT(..))
 
 debug :: ∀ a m. (Show a, Monad m) => a -> m Unit
 debug x = traceShow x $ const $ pure unit
 
 -- | Return the current parser position
 getPosition :: ∀ a m. (Monad m) => P.ParserT a m P.Position
-getPosition = P.ParserT $ \(P.PState s pos) ->
-  pure (P.Result s (Right pos) false pos)
+getPosition = (P.ParserT <<< ExceptT <<< StateT) \(s@(P.ParseState i pos _)) ->
+  pure $ Right pos /\ (P.ParseState i pos false)
 
 sof :: ∀ a m. (Monad m) => P.ParserT a m Unit
 sof = do
-  P.Position line col <- getPosition
-  guard $ col == 1 && line == 1
+  P.Position { line, column } <- getPosition
+  guard $ column == 1 && line == 1
 
 -- | Return the current parser column
 getCol :: ∀ a m. (Monad m) => P.ParserT a m Int
-getCol = do
-  P.Position _ col <- getPosition
-  pure col
+getCol = getPosition <#> \(P.Position s) -> s.column
 
 -- | Return the current parser row
 -- | XXX: Use either `line` or `row` - not both!
 getRow :: ∀ a m. (Monad m) => P.ParserT a m Int
-getRow = do
-  P.Position row _ <- getPosition
-  pure row
+getRow = getPosition <#> \(P.Position s) -> s.line
 
 -- | Return the current parser row
 -- | XXX: Use either `line` or `row` - not both!
@@ -53,9 +52,17 @@ tryMaybe :: ∀ s m a. (Monad m) => P.ParserT s m a -> P.ParserT s m (Maybe a)
 tryMaybe p = (Just <$> p) <|> (pure Nothing)
 
 -- | Return the current parser position
-getInput :: ∀ a m. (Monad m, Show a) => P.ParserT a m a
-getInput = P.ParserT $ \(P.PState s pos) ->
-  pure (P.Result s (Right s) false pos)
+getInput :: ∀ i m. (Monad m) => P.ParserT i m i
+getInput = (P.ParserT <<< ExceptT <<< StateT) \(s@(P.ParseState i pos _)) ->
+  pure $ Right i /\ (P.ParseState i pos false)
+
+setInput :: ∀ i m. (Monad m) => i -> P.ParserT i m Unit
+setInput i = (P.ParserT <<< ExceptT <<< StateT) \(s@(P.ParseState _ pos _)) ->
+  pure $ Right unit /\ (P.ParseState i pos false)
+
+setPos :: ∀ i m. (Monad m) => P.Position -> P.ParserT i m Unit
+setPos pos = (P.ParserT <<< ExceptT <<< StateT) \(s@(P.ParseState i _ _)) ->
+  pure $ Right unit /\ (P.ParseState i pos false)
 
 traceInput :: ∀ a m. (Show a, Monad m) => P.ParserT a m Unit
 traceInput = getInput >>= debug

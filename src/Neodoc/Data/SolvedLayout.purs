@@ -106,7 +106,7 @@ instance isForeignSolvedLayoutArg :: IsForeign SolvedLayoutArg where
           <$> F.readProp "name" v
           <*> F.readPropMaybe "argument" v
           <*> F.readProp "repeatable" v
-      _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
+      _ -> F.fail $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
 isRepeatable :: SolvedLayout -> Boolean
 isRepeatable (Group _ r _) = r

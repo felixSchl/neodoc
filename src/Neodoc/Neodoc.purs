@@ -17,6 +17,7 @@ import Prelude
 import Debug.Profile
 import Data.Array as A
 import Data.Generic
+import Data.Newtype (unwrap)
 import Data.Bifunctor (lmap)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
@@ -30,6 +31,7 @@ import Data.StrMap as StrMap
 import Data.List (
   List(..), (:), many, toUnfoldable, concat, fromFoldable, catMaybes, filter
 , length)
+import Data.List.NonEmpty as NEL
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.Traversable (for)
 import Data.Pretty (class Pretty, pretty)
@@ -48,6 +50,7 @@ import Control.Monad.Eff.Console as Console
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Unsafe
+import Control.Monad.Except (throwError, catchError, runExcept)
 import Node.Process (PROCESS)
 import Node.Process as Process
 import Node.FS (FS)
@@ -133,11 +136,11 @@ runJS
 runJS = mkFn2 go
   where
   go fSpec fOpts = do
-    spec /\ opts <- either (throwException <<< error <<< F.prettyForeignError)
-                    pure
-                    do
-                      Tuple <$> (readSpec fSpec)
-                            <*> (F.read fOpts)
+    spec /\ opts <- either (throwException <<< error <<< F.prettyForeignError <<< NEL.head)
+                      pure
+                      (runExcept $ do
+                        Tuple <$> (readSpec fSpec)
+                              <*> (F.read fOpts))
     x <- _run spec opts
     pure case x of
       (Output x) -> F.toForeign (rawValue <$> x)
@@ -198,7 +201,7 @@ _run input (NeodocOptions opts) = do
     either pure parseHelpText input
 
   -- 2. solve the spec
-  spec@(Spec { descriptions }) <- runNeodocError' do
+  spec@(Spec { descriptions }) <- profileS "::solve" \_-> runNeodocError' do
     let fromJSCallback
           :: ∀ a
            . (Pretty a)

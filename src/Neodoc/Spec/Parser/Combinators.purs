@@ -5,15 +5,16 @@
 module Neodoc.Spec.Parser.Combinators where
 
 import Prelude
-import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Class (lift)
 import Control.MonadPlus (guard)
-import Control.Monad.Transformerless.State (State, evalState)
-import Control.Monad.Transformerless.State (get, modify) as State
 import Data.List (List(..), (:))
 import Data.Either (Either(..))
-import Text.Parsing.Parser (PState(..), ParserT(..), Result(..)) as P
+import Control.Monad.State (State(..), evalState)
+import Control.Monad.State as State
+import Text.Parsing.Parser (ParseState(..), ParserT(..)) as P
 import Text.Parsing.Parser.Combinators ((<?>), try) as P
 import Text.Parsing.Parser.Pos (Position(..)) as P
+import Neodoc.Spec.Parser.Base (getInput, getPosition)
 
 import Neodoc.Spec.Lexer (TokenParser, PositionedToken(..))
 import Neodoc.Spec.ParserState
@@ -28,10 +29,11 @@ traceState = do
 -- Get the position of the token at the head of the stream.
 --
 getTokenPosition :: TokenParser P.Position
-getTokenPosition = P.ParserT $ \(P.PState s pos) ->
-  pure case s of
-    (PositionedToken spos _):_ -> P.Result s (Right spos) false pos
-    otherwise                  -> P.Result s (Right pos)  false pos
+getTokenPosition = do
+  toks <- getInput
+  case toks of
+    (PositionedToken pos _):xs -> pure pos
+    _                          -> getPosition
 
 -- |
 -- Mark the current indentation level
@@ -39,9 +41,9 @@ getTokenPosition = P.ParserT $ \(P.PState s pos) ->
 markIndent :: ∀ a. TokenParser a -> TokenParser a
 markIndent p = do
   currentIndent <- ParserState.getIndentation <$> lift State.get
-  P.Position _ col <- getTokenPosition
+  P.Position { column } <- getTokenPosition
   P.try do
-    lift $ State.modify (flip ParserState.setIndentation col)
+    lift $ State.modify (flip ParserState.setIndentation column)
     a <- p
     lift $ State.modify (flip ParserState.setIndentation currentIndent)
     pure a
@@ -52,12 +54,11 @@ markIndent p = do
 markLine :: ∀ a. TokenParser a -> TokenParser a
 markLine p = do
   currentLine <- ParserState.getLine <$> lift State.get
-  P.Position tokLine _ <- getTokenPosition
+  P.Position { line } <- getTokenPosition
   P.try do
-    lift $ State.modify (flip ParserState.setLine tokLine)
-    a <- p
-    lift $ State.modify (flip ParserState.setLine currentLine)
-    pure a
+    (lift $ State.modify (flip ParserState.setLine line))
+      *> p <*
+    (lift $ State.modify (flip ParserState.setLine currentLine))
 
 -- |
 -- Mark a custom indentation level
@@ -75,9 +76,9 @@ markIndent' level p = do
 --
 checkIndentation :: (Int -> Int -> Boolean) -> TokenParser Unit
 checkIndentation rel = do
-  P.Position _ col <- getTokenPosition
+  P.Position { column } <- getTokenPosition
   current <- ParserState.getIndentation <$> lift State.get
-  guard (col `rel` current)
+  guard (column `rel` current)
 
 -- |
 -- Check that the current indentation level is past the current mark
@@ -115,7 +116,7 @@ sameIndent = checkIndentation (==) P.<?> "same indentation"
 --
 checkLine :: (Int -> Int -> Boolean) -> TokenParser Unit
 checkLine rel = do
-  P.Position line _ <- getTokenPosition
+  P.Position { line } <- getTokenPosition
   current <- ParserState.getLine <$> lift State.get
   guard (line `rel` current)
 

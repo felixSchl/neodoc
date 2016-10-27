@@ -4,6 +4,7 @@ import Prelude
 import Debug.Trace hiding (trace)
 import Debug.Profile
 import Data.Generic
+import Data.Newtype (unwrap)
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
 , null, concat, mapWithIndex, length, take, drop, toUnfoldable, catMaybes, nub
@@ -14,6 +15,7 @@ import Data.Bifunctor (lmap)
 import Data.Set as Set
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Data.List.Partial as LU
+import Data.List.NonEmpty as NEL
 import Data.Function (on)
 import Data.Tuple (Tuple(..), snd, fst)
 import Data.Tuple.Nested ((/\))
@@ -185,7 +187,7 @@ parseBranch _ _ Nil = pure Nil
 parseBranch l sub xs = do
   { options } <- getConfig
   let xs' = if not options.laxPlacement
-            then groupBy (eq `on` _isFree) xs
+            then NEL.toList <$> groupBy (eq `on` _isFree) xs
             else singleton xs
   concat <$> for xs' (solve l options.repeatableOptions sub)
   where
@@ -372,11 +374,10 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
     :: Int -- the recursive level
     -> Boolean -- allow substitutions?
     -> List ArgParseLayout
-    -> ArgParser r (Tuple (Tuple (Tuple
-        (List KeyValue)         -- the key-value pairs that where yielded
-        (List ArgParseLayout))  -- the layouts that did *NOT* match
-        Boolean)                -- has this changed the input?
-        (Maybe ArgParseLayout)) -- element to repeat
+    -> ArgParser r (Tuple (List KeyValue)
+                    (Tuple (List ArgParseLayout)
+                            (Tuple Boolean
+                                    (Maybe ArgParseLayout))))
   match' l sub xs = go' Nothing false xs Nil Nil
     where
     go' errs locked (x:xs) ys matched = (do

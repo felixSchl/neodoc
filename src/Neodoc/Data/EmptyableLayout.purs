@@ -18,6 +18,7 @@ import Data.Foreign.Class as F
 import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
+import Control.Monad.Except (throwError)
 
 -- XXX: This type is required i.o to be able to have 0-length branches in case
 --      an expansion yields an empty result. Ideally, we would use the same
@@ -57,7 +58,7 @@ instance isForeignEmptyableLayout :: (IsForeign a) => IsForeign (EmptyableLayout
             fromFoldable <$> do
               (fromFoldable <$> _) <$> do
                 F.readProp "branches" v :: F (Array (Array (EmptyableLayout a)))
-      _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
+      _ -> F.fail $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
 instance asForeignEmptyableLayout :: (AsForeign a) => AsForeign (EmptyableLayout a) where
   write (EmptyableElem x) = F.toForeign {

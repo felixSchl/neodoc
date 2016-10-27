@@ -157,7 +157,7 @@ setG g = mapG (const g)
 setI :: ∀ c s g i. i -> ParserArgs c s g i -> ParserArgs c s g i
 setI i = mapI (const i)
 
-type ParserArgs c s g i = Tuple (Tuple (Tuple c s) g) i
+type ParserArgs c s g i = Tuple c (Tuple s (Tuple g i))
 type IsConsumed = Boolean
 type Result e a = Either (ParseError e) a
 data Step e c s g i a = Step IsConsumed (ParserArgs c s g i) (Result e a)
@@ -384,11 +384,11 @@ data CachedStep v = CachedStep  Boolean
 
 {- A cache of matches -}
 type MatchCache = Cache MatchCacheKey CachedMatch
-type MatchCacheKey = Tuple ((Tuple (Tuple (List Int) Boolean)) Boolean) Input
-type CachedMatch = Tuple (Tuple (Tuple (List KeyValue)
-                                        (List ArgParseLayout))
-                                Boolean)
-                          (Maybe ArgParseLayout)
+type MatchCacheKey = Tuple (List Int) (Tuple Boolean (Tuple Boolean Input))
+type CachedMatch = Tuple (List KeyValue)
+                          (Tuple (List ArgParseLayout)
+                                  (Tuple Boolean
+                                          (Maybe ArgParseLayout)))
 
 {- A cache of parsed args -}
 type ArgCache = Cache ArgCacheKey CachedArg
