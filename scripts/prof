@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+# Profile against the sample benchmark
+#
+# When neodoc has profiling enabled, it will print lines of the format:
+#   <label>(<decimal>ms)
+#
+# Based on this, we can run one of the examples 'x' times and average the time
+# the label took. Additionally, we want to get an idea of how long it takes to
+# require neodoc as a node module itself.
+
+# Configuration ################################################################
+ITERATIONS=20
+################################################################################
+
+export NEODOC_ENABLE_PROFILE
+
+# Derive a key suitable to be used as a bash variable name.
+# usage: pass the to-be-escaped string via stdin.
+function mk_key {
+	sed 's/[^a-zA-Z0-9]/_/g'
+}
+
+# Add a new time record for a given label.
+function add_time {
+	local -r label=$1
+	local -r value=$2
+	local key && key=$(mk_key <<< "$label")
+	eval "if [ -z \$${key}_label ]; then keys+=(${key}); fi"
+	eval "${key}_label=\"$label\""
+	eval "${key}_values+=($value)"
+}
+
+# Get all times for a given key
+function get_times {
+	local -r key=$1
+	eval "echo \${${key}_values[@]}"
+}
+
+# Get the nice-looking label for a given key
+function get_label {
+	local -r key=$1
+	eval "echo \${${key}_label}"
+}
+
+# Given a list of floats, i.e. "10.0 11.0 ...", calculate the
+# average. Uses the `ITERATIONS` global.
+function avg_vals {
+	local -r times=$1
+	local IFS=' ' i=0 exp=''
+	for t in $times; do
+		let 'i+=1'
+		if [ $i -eq 1 ]; then
+			exp=$t
+		else
+			exp="$exp + $t"
+		fi
+	done
+	printf %.2f "$(bc -l <<< "($exp)/${ITERATIONS}.0")"
+}
+
+# Strip ansi escape codes from stdin
+function strip_esc {
+	perl -pe 's/\e\[?.*?[\@-~]//g'
+}
+
+# Execute the profile suite
+for i in $(eval echo "{1..$ITERATIONS}"); do
+	echo -ne "running: ${i}/${ITERATIONS}..." \\r
+
+	# track the time it takes to require neodoc
+	add_time require "$(NEODOC_ENABLE_PROFILE=false node -e '
+		console.time("require")
+		require(".");
+		console.timeEnd("require")
+	' | sed 's/.* \(.*\)ms/\1/')"
+
+	# execute and test against the git example!
+	IFS=$'\n'
+	label=
+	for line in $(NEODOC_ENABLE_PROFILE=true node examples/git | strip_esc); do
+		key=$(echo "$line" | sed 's/\(.*\)([0-9.]* ms).*/\1/')
+		value=$(echo "$line" | sed 's/.*(\([0-9.]*\) ms).*/\1/')
+		if [[ -n "$key" ]] && [[ -n "$value" ]] && [[ "$key" != "$value" ]]; then
+			add_time "$key" "$value"
+		fi
+	done
+done
+
+# calculate the averages
+IFS=$' '
+for key in $(eval 'echo ${keys[@]}'); do
+	echo "$(get_label "$key")===>$(avg_vals "$(get_times "$key")")"
+done | column -t -s'===>'
