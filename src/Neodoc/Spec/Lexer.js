@@ -5,6 +5,7 @@ exports.trimDescSection = function(str) {
   str = '\n' + str; // note: ensure to capture match on first line
   var regex = /(.*(--?\S* *(((?!\[default *:|\[env *:)\S*) *(\.{3})?)?)|(^\s*)?\[(default|env): ("(?:[^"\\]|\\.)*"\s*|.*)*\])/gmi;
   var out = '';
+  var m;
   while ((m = regex.exec(str)) !== null) {
     if (m.index === regex.lastIndex) {
       regex.lastIndex++;
