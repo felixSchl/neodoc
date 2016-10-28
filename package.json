@@ -27,6 +27,8 @@
     "clean": "git stash && git clean -fdX",
     "prerelease": "npm run -s clean && npm install && npm run -s deps && npm test",
     "release": "npm version",
+    "preprof": "npm run -s build",
+    "prof": "./scripts/prof",
     "postrelease": "git push --tags && npm publish"
   },
   "repository": {
