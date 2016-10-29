@@ -12,7 +12,7 @@ option :: ∀ e c s g i a. a -> Parser e c s g i a -> Parser e c s g i a
 option a p = p <|> pure a
 
 try :: ∀ e c s g i a. Parser e c s g i a -> Parser e c s g i a
-try p = Parser \(a@(c /\ s /\ g /\ i)) ->
+try p = Parser \(a@(ParseArgs c s g i)) ->
   let step = unParser p a
    in case step of
         Step _ a' e@(Left _) -> Step false (setG (getG a') a) e

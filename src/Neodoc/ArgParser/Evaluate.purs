@@ -83,7 +83,7 @@ evalParsers p parsers = do
   let collected = parsers <#> \parser ->
         runParser config state globalState input $ Parser \a ->
           case unParser parser a of
-            Step b' a'@(c' /\ s' /\ g' /\ i') result ->
+            Step b' a'@(ParseArgs c' s' g' i') result ->
               let cont = ParserCont c' s' g' i'
                in Step b' a' case result of
                   Left  (err@(ParseError true _)) -> Left err
@@ -114,11 +114,11 @@ evalParsers p parsers = do
   -- match", take a pick.
   case bestSuccess of
     Just (SuccessEvaluation (ParserCont c s g i) val) -> do
-      applyResults results $ Parser \_ -> Step true (c /\ s /\ g /\ i) (Right val)
+      applyResults results $ Parser \_ -> Step true (ParseArgs c s g i) (Right val)
     _ -> case deepestErrors of
       Just errors -> case unwrap errors of
         (ErrorEvaluation (ParserCont c s g i) e) :| es | null es || not (null input) -> do
-          applyResults results $ Parser \_ -> Step false (c /\ s /\ g /\ i) (Right unit)
+          applyResults results $ Parser \_ -> Step false (ParseArgs c s g i) (Right unit)
           { depth        } <- getState
           { deepestError } <- getGlobalState
           case deepestError of
@@ -188,4 +188,4 @@ resume
   :: ∀ r a
    . (Tuple (Cont r) a)
   -> ArgParser r a
-resume ((ParserCont c s g i) /\ v) = Parser \_ -> Step true (c /\ s /\ g /\ i) (Right v)
+resume ((ParserCont c s g i) /\ v) = Parser \_ -> Step true (ParseArgs c s g i) (Right v)

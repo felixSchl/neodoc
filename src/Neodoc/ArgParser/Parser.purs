@@ -10,6 +10,7 @@ import Data.List (
 , null, concat, mapWithIndex, length, take, drop, toUnfoldable, catMaybes, nub
 , reverse)
 import Data.Array as Array
+import Data.Optimize.Uncurried
 import Data.List.Partial as LU
 import Data.Bifunctor (lmap)
 import Data.Set as Set
@@ -131,7 +132,7 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
             let implicitFlags = helpFlags <> versionFlags
                 -- note: must re-set the cache since the running ids in this
                 --       implicit branch may overlap.
-                mImplicitP = withLocalCaches <$> do
+                mImplicitP = {-withLocalCaches <$>-} do
                   mkImplicitToplevelP implicitFlags false
             in case mImplicitP of
                   Just implicitP -> implicitP <|> throw e
@@ -189,7 +190,7 @@ parseBranch l sub xs = do
   let xs' = if not options.laxPlacement
             then NEL.toList <$> groupBy (eq `on` _isFree) xs
             else singleton xs
-  concat <$> for xs' (solve l options.repeatableOptions sub)
+  concat <$> for xs' (\x -> solve $ Args4 l options.repeatableOptions sub x)
   where
   _isFree :: ArgParseLayout -> Boolean
   _isFree (ParseGroup _ f _ _ _) = f
@@ -220,22 +221,25 @@ terminate arg = do
 -}
 solve
   :: ∀ r
-   . Int                 -- recursive level
-  -> Boolean             -- `opts.repeatableOptions`
-  -> Boolean             -- allow substitutions?
-  -> List ArgParseLayout -- the required arguments
+   . Args4
+      Int                   -- recursive level
+      Boolean               -- `opts.repeatableOptions`
+      Boolean               -- allow substitutions?
+      (List ArgParseLayout) -- the required arguments
   -> ArgParser r (List KeyValue)
-solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
+solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
+  $ go (Args6 l sub req Nil true Nil)
   where
   go
-    :: Int                 -- the recursive level
-    -> Boolean             -- allow substitutions?
-    -> List ArgParseLayout -- the required arguments
-    -> List ArgParseLayout -- repeatable arguments
-    -> Boolean             -- can apply repetition?
-    -> List KeyValue       -- the output
+    :: Args6
+        Int                   -- the recursive level
+        Boolean               -- allow substitutions?
+        (List ArgParseLayout) -- the required arguments
+        (List ArgParseLayout) -- repeatable arguments
+        Boolean               -- can apply repetition?
+        (List KeyValue)       -- the output
     -> ArgParser r (List KeyValue)
-  go l' sub' req rep canRep out = do
+  go (Args6 l' sub' req rep canRep out) = do
     input       <- getInput
     { options } <- getConfig
     { depth }   <- getState
@@ -253,7 +257,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
     --    succeed with any argument, we try the `rep` list.
     -- trace l' \i-> "solve: trying via argv, i = " <> pretty i
     mKv /\ req' /\ _ /\ mNewRep <-
-      (_lmap Just <$> (try $ match (l' + 1) false req)) <|>
+      (_lmap Just <$> (try $ match (Args3 (l' + 1) false req))) <|>
         pure (Nothing /\ req /\ false /\ Nothing)
 
     -- trace l' \i-> "solve: req' = " <> pretty req'
@@ -265,7 +269,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
         -- trace l' \i-> "solve: matched on argv: " <> pretty kvs <> ", i = " <> pretty i
         let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
             rep' = nub ((maybe Nil singleton mNewRep) <> rep <> rRep)
-        go (l' + 1) sub' req' rep' true (out <> kvs)
+        go (Args6 (l' + 1) sub' req' rep' true (out <> kvs))
       _ -> do
         -- 2. if we did not manage to make a single `req` parse, we ought to try
         --    if any of our args in `rep` is now able to parse. We consume at
@@ -279,14 +283,14 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
         mKv' /\ rep' /\ _ /\ mNewRep' <-
           if canRep
             then do
-              (_lmap Just <$> (try $ match (l' + 1) false rep)) <|>
+              (_lmap Just <$> (try $ match (Args3 (l' + 1) false rep))) <|>
                  pure (Nothing /\ rep /\ false /\ Nothing)
             else if options.repeatableOptions
               then
                 let repOpts = flip filter rep case _ of
                                 (ParseElem _ _ x) -> _isRepeatable x
                                 _ -> false
-                 in (_lmap Just <$> (try $ match (l' + 1) false repOpts)) <|>
+                 in (_lmap Just <$> (try $ match (Args3 (l' + 1) false repOpts))) <|>
                       pure (Nothing /\ rep /\ false /\ Nothing)
               else pure (Nothing /\ rep /\ false /\ Nothing)
         case mKv' of
@@ -295,8 +299,8 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
             let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
                 rep'' = nub ((maybe Nil singleton mNewRep') <> rep' <> rRep)
             if any (isFrom Origin.Argv <<< snd) kvs
-              then go (l' + 1) sub' req rep'' true (out <> kvs)
-              else go (l' + 1) sub' req rep'' false (out <> kvs)
+              then go (Args6 (l' + 1) sub' req rep'' true (out <> kvs))
+              else go (Args6 (l' + 1) sub' req rep'' false (out <> kvs))
           -- 3. If we still did not manage to make a match, things aren't
           --    looking too great. It's time for drastic measures. If the parent
           --    is allowing us to, we repeat this above, but allow substitutions
@@ -317,7 +321,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
                     -> ArgParser r (List KeyValue)
                   exhaust Nil out' = pure out'
                   exhaust req'' out' = do
-                    kVs'' /\ req''' /\ changed /\ _ <- try $ match (l' + 1) true req''
+                    kVs'' /\ req''' /\ changed /\ _ <- try $ match (Args3 (l' + 1) true req'')
                     -- trace l' \i ->
                     --      "solve: matched via sub"
                     --   <> " kVs''" <> pretty kVs''
@@ -327,7 +331,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
                     -- check if we consumed input. If we did, we must rinse
                     -- and repeat the entire process with the new input.
                     if (not (null kVs'')) && (any (isFrom Origin.Argv <<< snd) kVs'' || changed)
-                      then go (l' + 1) false req''' rep true (out' <> kVs'')
+                      then go (Args6 (l' + 1) false req''' rep true (out' <> kVs''))
                       else exhaust req''' (out' <> kVs'')
                  in do
                   -- trace l' \i-> "solve: trying via sub, i = " <> pretty i
@@ -369,18 +373,19 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
     use subsitutions to yield a match. But which argument should be substituted?
     We select the most eligble argument by see
   -}
-  match l sub xs = {-cachedMatch (getId <$> xs) sub $-} match' l sub xs
+  match a@(Args3 l sub xs) = {-cachedMatch (getId <$> xs) sub $-} match' a
   match'
-    :: Int -- the recursive level
-    -> Boolean -- allow substitutions?
-    -> List ArgParseLayout
+    :: Args3
+        Int -- the recursive level
+        Boolean -- allow substitutions?
+        (List ArgParseLayout)
     -> ArgParser r (Tuple (List KeyValue)
                     (Tuple (List ArgParseLayout)
                             (Tuple Boolean
                                     (Maybe ArgParseLayout))))
-  match' l sub xs = go' Nothing false xs Nil Nil
+  match' (Args3 l sub xs) = go' (Args5 Nothing false xs Nil Nil)
     where
-    go' errs locked (x:xs) ys matched = (do
+    go' (Args5 errs locked (x:xs) ys matched) = (do
       -- trace l \i-> "match: try"
       --   <> " x = " <> pretty x
       --   <> ", xs = " <> pretty xs
@@ -389,7 +394,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
       --   <> ", sub = " <> show sub
       --   <> ", i = " <> pretty i
       if _isFixed x && locked
-        then go' errs true xs (x:ys) matched
+        then go' (Args5 errs true xs (x:ys) matched)
         else do
           let sub' = sub && not locked
           cvs <- fork $ parseLayout (l + 1) sub' x
@@ -401,13 +406,13 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
           --   <> ", locked = " <> show locked
           --   <> ", sub = " <> show sub
           --   <> ", i = " <> pretty i
-          go' errs (locked || _isFixed x) xs ys ((x /\ cvs) : matched)
+          go' (Args5 errs (locked || _isFixed x) xs ys ((x /\ cvs) : matched))
     ) `catch` \{ depth } e -> do
       let errs' = case errs of
                     Just (d /\ _) | depth > d -> Just (depth /\ e)
                     Nothing -> Just (depth /\ e)
                     x -> x
-      go' errs' (locked || _isFixed x) xs (x:ys) matched
+      go' (Args5 errs' (locked || _isFixed x) xs (x:ys) matched)
 
     {-
       Evaluate the result. We've tried all `req` items agains the same input
@@ -415,7 +420,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
       are "free", substituting or removing one of them is not going to make a
       difference for the others.
     -}
-    go' errs locked Nil ys Nil = do
+    go' (Args5 errs locked Nil ys Nil) = do
       i <- getInput
 
       -- re-arrange the pattern into it's original order.
@@ -455,7 +460,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
           -- positionals)
           pure ((_rest <$> subVs) /\ (_fst <$> subVs) /\ (locked || changed) /\ Nothing)
 
-        zs | changed -> go' errs false zs Nil Nil
+        zs | changed -> go' (Args5 errs false zs Nil Nil)
 
         z:zs -> do
           -- trace l \i' -> "match: failed!" <> pretty (z:zs) <> ", i = " <> pretty i'
@@ -485,7 +490,7 @@ solve l repOpts sub req = skipIf hasTerminated Nil $ go l sub req Nil true Nil
       ranking triplet, inject it's parse state ("resume" the parse), yield it's
       values and return all losing arguments as non-matched.
     -}
-    go' _ locked Nil ys (matches@(_:_)) =
+    go' (Args5 _ locked Nil ys (matches@(_:_))) =
       let
           -- select the best-ranking match based on the values it yielded
           matches' = sortBy (compare `on` (byOrigin <<< snd <<< snd)) matches
