@@ -10,7 +10,7 @@
 # require neodoc as a node module itself.
 
 # Configuration ################################################################
-ITERATIONS=20
+ITERATIONS=${ITERATIONS:-10}
 ################################################################################
 
 export NEODOC_ENABLE_PROFILE
@@ -44,10 +44,9 @@ function get_label {
 }
 
 # Given a list of floats, i.e. "10.0 11.0 ...", calculate the
-# average. Uses the `ITERATIONS` global.
 function avg_vals {
 	local -r times=$1
-	local IFS=' ' i=0 exp=''
+	local ms= IFS=' ' i=0 exp=''
 	for t in $times; do
 		let 'i+=1'
 		if [ $i -eq 1 ]; then
@@ -56,7 +55,13 @@ function avg_vals {
 			exp="$exp + $t"
 		fi
 	done
-	printf %.2f "$(bc -l <<< "($exp)/${ITERATIONS}.0")"
+
+	ms=$(bc -l <<< "($exp)/${i}.0")
+	calls_per_run=$(bc <<< "${i}/${ITERATIONS}")
+	printf $'%.3f|%s|%.3f\n' \
+		"$ms" \
+		"$calls_per_run" \
+		"$(bc <<< "${ms}*${calls_per_run}")"
 }
 
 # Strip ansi escape codes from stdin
@@ -88,7 +93,10 @@ for i in $(eval echo "{1..$ITERATIONS}"); do
 done
 
 # calculate the averages
-IFS=$' '
-for key in $(eval 'echo ${keys[@]}'); do
-	echo "$(get_label "$key")===>$(avg_vals "$(get_times "$key")")"
-done | column -t -s'===>'
+{
+	IFS=$' '
+	echo 'label|self ms|calls|tot ms'
+	for key in $(eval 'echo ${keys[@]}'); do
+		echo "$(get_label "$key")|$(avg_vals "$(get_times "$key")")"
+	done
+} | column -t -s'|'
