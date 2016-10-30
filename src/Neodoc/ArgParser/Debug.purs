@@ -56,7 +56,7 @@ traceBracket l label p = do
       <> " (new input: " <> pretty input' <> ")"
   pure output
 
-stateLabel :: ParseState -> GlobalParseState -> String
+stateLabel :: ArgParseState -> GlobalArgParseState -> String
 stateLabel { hasTerminated, depth } { deepestError } =
   (if hasTerminated then "✓" else "·")
   -- <> "(" <> show depth <> ")"

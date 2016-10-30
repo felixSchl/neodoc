@@ -56,7 +56,7 @@ isSuccessEvaluation :: ∀ c s g i e a. Evaluation c s g i e a -> Boolean
 isSuccessEvaluation (SuccessEvaluation _ _) = true
 isSuccessEvaluation _ = false
 
-getEvaluationDepth :: ∀ c g i e a. Evaluation c ParseState g i e a -> Int
+getEvaluationDepth :: ∀ c g i e a. Evaluation c ArgParseState g i e a -> Int
 getEvaluationDepth (ErrorEvaluation (ParserCont _ s _ _) _) = s.depth
 getEvaluationDepth (SuccessEvaluation (ParserCont _ s _ _) _) = s.depth
 
@@ -146,8 +146,8 @@ evalParsers p parsers = do
     pure out
 
 type Cont r = ParserCont (ParseConfig r)
-                          ParseState
-                          GlobalParseState
+                          ArgParseState
+                          GlobalArgParseState
                           (List PositionedToken)
 
 {-

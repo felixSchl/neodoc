@@ -7,8 +7,9 @@ import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Maybe (Maybe(..))
 import Data.NonEmpty (NonEmpty, (:|))
+import Data.NonEmpty.Extra as NonEmpty
 import Data.List (List(..), (:))
-
+import Partial.Unsafe
 
 -- Traverse a non-empty list, calling a function on each element and it's
 -- potential neighbor. The function is ought to return a tuple of elements

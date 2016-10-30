@@ -5,6 +5,9 @@ module Neodoc.ArgParser.Type (
 , Step (..)
 , Result
 , IsConsumed
+, return
+, error
+, customError
 , unParser
 , runParser
 , getConfig
@@ -62,8 +65,8 @@ module Neodoc.ArgParser.Type (
 , isUnknown
 , unIsKnown
 , ParseConfig
-, ParseState
-, GlobalParseState
+, ArgParseState
+, GlobalArgParseState
 , findDescription
 , lookupDescription
 , lookupDescription'
@@ -122,6 +125,9 @@ import Neodoc.Value (Value(..))
 
 data ParseError e = ParseError Boolean (Either String e)
 
+error msg = ParseError false (Left msg)
+customError e = ParseError false (Right e)
+
 mapError f (ParseError b e) = ParseError b (rmap  f e)
 
 instance showParseError :: (Show e) => Show (ParseError e) where
@@ -176,8 +182,11 @@ unParser (Parser f) = f
 instance applyParser :: Apply (Parser e c s g i) where
   apply = ap
 
+return :: ∀ e c s g i a. a -> Parser e c s g i a
+return r = Parser \a -> Step false a (Right r)
+
 instance applicativeParser :: Applicative (Parser e c s g i) where
-  pure r = Parser \a -> Step false a (Right r)
+  pure = return
 
 instance functorParser :: Functor (Parser e c s g i) where
   map f p = Parser \args -> case unParser p args of
@@ -359,12 +368,12 @@ type ParseConfig r = {
 , spec :: Spec SolvedLayout
 }
 
-type ParseState = {
+type ArgParseState = {
   depth :: Int -- how many elements have been consumed?
 , hasTerminated :: Boolean -- have we terminated using `--` or `opts.stopAt`?
 }
 
-type GlobalParseState = {
+type GlobalArgParseState = {
   deepestError :: Maybe (Tuple Int ArgParseError)
 , isKnownCache :: Map Token Boolean
 , matchCache   :: MatchCache
@@ -375,7 +384,7 @@ type GlobalParseState = {
 type Cache k v = Map k (CachedStep v)
 data CachedStep v = CachedStep  Boolean
                                 Unit -- do not restore config
-                                ParseState
+                                ArgParseState
                                 Unit -- do not restore global state
                                 Input
                                 (Result ArgParseError v)
@@ -397,8 +406,8 @@ type CachedArg = Value
 type ArgParser r a =
   Parser  ArgParseError
           (ParseConfig r)
-          ParseState
-          GlobalParseState
+          ArgParseState
+          GlobalArgParseState
           Input
           a
 

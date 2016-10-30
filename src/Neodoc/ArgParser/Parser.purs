@@ -79,13 +79,13 @@ import Neodoc.ArgParser.ParseLayout
 
 type ChunkedLayout a = Layout (Chunk a)
 
-initialState :: ParseState
+initialState :: ArgParseState
 initialState = {
   depth: 0
 , hasTerminated: false
 }
 
-initialGlobalState :: GlobalParseState
+initialGlobalState :: GlobalArgParseState
 initialGlobalState = {
   deepestError: Nothing
 , isKnownCache: Map.empty
@@ -143,11 +143,11 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
   eof = do
     input <- getInput
     case input of
-      Nil  -> pure unit
+      Nil  -> return unit
       toks -> do
         kToks <- for toks \(pTok@(PositionedToken tok _ _)) -> do
           isKnown <- isKnownToken' tok
-          pure if isKnown
+          return if isKnown
             then known pTok
             else unknown pTok
         fail' $ unexpectedInputError Nil kToks
@@ -158,7 +158,7 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
   mkImplicitToplevelP :: List OptionAlias -> Boolean -> _
   mkImplicitToplevelP flags o = case flags of
     Nil -> Nothing
-    f : fs -> pure
+    f : fs -> Just
       let args = toOption f :| (toOption <$> fs)
           branch = (Group o true $ args <#> \a -> Elem a :| Nil) :| Nil
           branch' = (Group o true $ args <#> \a ->
@@ -184,7 +184,7 @@ parseBranch
   -> Boolean -- allow substitutions?
   -> List ArgParseLayout
   -> ArgParser r (List KeyValue)
-parseBranch _ _ Nil = pure Nil
+parseBranch _ _ Nil = return Nil
 parseBranch l sub xs = do
   { options } <- getConfig
   let xs' = if not options.laxPlacement
@@ -208,7 +208,7 @@ terminate arg = do
   setDone
   setDepth 99999
   setInput Nil
-  pure rest
+  return rest
 
 {-
   we iterate over the set of required arguments `req`.
@@ -256,9 +256,9 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
     --    if we make a match, we proceed *and never look back*. If we do not
     --    succeed with any argument, we try the `rep` list.
     -- trace l' \i-> "solve: trying via argv, i = " <> pretty i
-    mKv /\ req' /\ _ /\ mNewRep <-
+    Args4 mKv req' _ mNewRep <-
       (_lmap Just <$> (try $ match (Args3 (l' + 1) false req))) <|>
-        pure (Nothing /\ req /\ false /\ Nothing)
+        return (Args4 Nothing req false Nothing)
 
     -- trace l' \i-> "solve: req' = " <> pretty req'
     --                 <> " out = " <> show (pretty <$> mKv)
@@ -280,19 +280,19 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         --    note: the insertion of `res` back into `req` *does matter*, needs
         --          more thought though, as to put it into the front or back.
         -- trace l' \i-> "solve: trying via rep, i = " <> pretty i
-        mKv' /\ rep' /\ _ /\ mNewRep' <-
+        Args4 mKv' rep' _ mNewRep' <-
           if canRep
             then do
               (_lmap Just <$> (try $ match (Args3 (l' + 1) false rep))) <|>
-                 pure (Nothing /\ rep /\ false /\ Nothing)
+                 return (Args4 Nothing rep false Nothing)
             else if options.repeatableOptions
               then
                 let repOpts = flip filter rep case _ of
                                 (ParseElem _ _ x) -> _isRepeatable x
                                 _ -> false
                  in (_lmap Just <$> (try $ match (Args3 (l' + 1) false repOpts))) <|>
-                      pure (Nothing /\ rep /\ false /\ Nothing)
-              else pure (Nothing /\ rep /\ false /\ Nothing)
+                      return (Args4 Nothing rep false Nothing)
+              else return (Args4 Nothing rep false Nothing)
         case mKv' of
           Just kvs@(_:_) -> do
             -- trace l' \i-> "solve: matched via rep: " <> pretty kvs <> ", i = " <> pretty i
@@ -312,16 +312,16 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
             case req' of
               Nil -> do
                 -- trace l' \i -> "solve: empty req' after rep. done. i = " <> pretty i
-                pure out
+                return out
               _:_ | sub ->
                 let
                   exhaust
                     :: List ArgParseLayout
                     -> List KeyValue
                     -> ArgParser r (List KeyValue)
-                  exhaust Nil out' = pure out'
+                  exhaust Nil out' = return out'
                   exhaust req'' out' = do
-                    kVs'' /\ req''' /\ changed /\ _ <- try $ match (Args3 (l' + 1) true req'')
+                    Args4 kVs'' req''' changed _ <- try $ match (Args3 (l' + 1) true req'')
                     -- trace l' \i ->
                     --      "solve: matched via sub"
                     --   <> " kVs''" <> pretty kVs''
@@ -340,7 +340,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
                 -- trace l' \_-> "solve: failed to match: " <> pretty xs
                 fail "..." -- XXX: throw proper error here
 
-  _lmap f (a /\ b /\ c /\ d) = f a /\ b /\ c /\ d
+  _lmap f (Args4 a b c d) = Args4 (f a) b c d
 
   _toElem :: Arg -> ArgParseLayout
   _toElem x =
@@ -379,10 +379,10 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         Int -- the recursive level
         Boolean -- allow substitutions?
         (List ArgParseLayout)
-    -> ArgParser r (Tuple (List KeyValue)
-                    (Tuple (List ArgParseLayout)
-                            (Tuple Boolean
-                                    (Maybe ArgParseLayout))))
+    -> ArgParser r (Args4 (List KeyValue)
+                          (List ArgParseLayout)
+                          (Boolean)
+                          (Maybe ArgParseLayout))
   match' (Args3 l sub xs) = go' (Args5 Nothing false xs Nil Nil)
     where
     go' (Args5 errs locked (x:xs) ys matched) = (do
@@ -427,7 +427,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
       let ys' = sortBy (compare `on` getId) ys
 
       -- drop optional, fixed layouts.
-      ys'' /\ changed <- pure do
+      ys'' /\ changed <- return do
        if locked
         then dropFirst (\x -> _isOptionalGroup x && _isFixed x) ys'
         else ys' /\ false
@@ -450,7 +450,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
           let subVs = catMaybes $ ys'' <#> case _ of
                         e@(ParseElem _ _ x) -> do
                           v <- Arg.getFallback x
-                          pure (e /\ x /\ v)
+                          Just (e /\ x /\ v)
                         _ -> Nothing
 
           -- return as a triplet, the values (only fallbacks), the layouts
@@ -458,7 +458,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
           -- been locked (which indicates a possible change in input) or if
           -- we noticed a change during `dropFirst` (also releated to locking /
           -- positionals)
-          pure ((_rest <$> subVs) /\ (_fst <$> subVs) /\ (locked || changed) /\ Nothing)
+          return (Args4 (_rest <$> subVs) (_fst <$> subVs) (locked || changed) Nothing)
 
         zs | changed -> go' (Args5 errs false zs Nil Nil)
 
@@ -478,7 +478,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
               _ -> do
                 kToks <- for i \(pTok@(PositionedToken tok _ _)) -> do
                   isKnown <- isKnownToken' tok
-                  pure if isKnown
+                  return if isKnown
                     then known pTok
                     else unknown pTok
                 let e = unexpectedInputError (toSimpleBranch zs) kToks
@@ -504,7 +504,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         resume cvs
 
         -- re-sort the remaining elements (XXX: could this be skipped?)
-        pure (vs /\ (sortBy (compare `on` getId) $ xs' <> ys) /\ locked /\ rep)
+        return (Args4 vs (sortBy (compare `on` getId) $ xs' <> ys) locked rep)
 
   dropFirst f xs = go' xs Nil
     where go' Nil out = out /\ false
@@ -562,14 +562,14 @@ parseLayout l sub x = do
       vs <- p
       if r && any (isFrom Origin.Argv <<< snd) vs
         then loop p vs
-        else pure vs
+        else return vs
 
      where
      loop p acc = do
-        vs <- p <|> pure Nil
+        vs <- p <|> return Nil
         if any (isFrom Origin.Argv <<< snd) vs
           then loop p (acc <> vs)
-          else pure (acc <> vs)
+          else return (acc <> vs)
 
   go opts (ParseElem _ _ x) =
     let arg = Arg.getArg x
@@ -581,7 +581,7 @@ parseLayout l sub x = do
      in do
       if sub
         then singleton <<< Tuple x <$> case Arg.getFallback x of
-              Just v -> fromArgv <|> pure v
+              Just v -> fromArgv <|> return v
               _      -> fromArgv
         else
           let nTimes = if Arg.isArgRepeatable x then some else liftM1 singleton
@@ -599,7 +599,7 @@ parseArg x = go x
   go (Solved.Positional n _) = positional n n
   go (Solved.Command    n _) = command    n n
   go (Solved.Stdin         ) = stdin
-  go (Solved.EOA           ) = eoa <|> (pure $ ArrayValue [])
+  go (Solved.EOA           ) = eoa <|> (return $ ArrayValue [])
   go (Solved.Option a  mA r) = do
     input       <- getInput
     { options } <- getConfig
@@ -614,7 +614,7 @@ parseArg x = go x
             description <- lookupDescription' a
             case description of
               (OptionDescription aliases' _ _ def' env') ->
-                pure $ aliases' /\ def' /\ env'
+                return $ aliases' /\ def' /\ env'
               _ -> fail' $ internalError "invalid option description"
           let
             ns = NonEmpty.toList $ aliases <#> case _ of
@@ -643,13 +643,13 @@ parseArg x = go x
           if term && canTerm
               then do
                 vs <- terminate x
-                pure (ArrayValue (Value.intoArray v <> Value.intoArray vs))
+                return (ArrayValue (Value.intoArray v <> Value.intoArray vs))
               else do
                 if isJust mA && r && canRepeat
                     then do
                       vs <- Array.many optionArgument
-                      pure (ArrayValue (Value.intoArray v <> vs))
-                    else pure v
+                      return (ArrayValue (Value.intoArray v <> vs))
+                    else return v
       _ -> fail "Expected long or short option"
 
 {-

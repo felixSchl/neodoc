@@ -29,22 +29,22 @@ import Data.String.Regex (test, parseFlags, replace) as Regex
 import Data.String.Ext ((^=), (~~))
 import Partial.Unsafe (unsafePartial)
 import Neodoc.Spec.Error (SpecParseError(..))
-import Neodoc.Spec.Parser.Base (
-  lowerAlphaNum, alphaNum, alpha, space, lowerAlpha, upperAlpha, string'
-, getPosition, getInput, spaces, eol, setInput, setPos)
-import Neodoc.Spec.ParserState (ParserState(..))
-import Neodoc.Spec.ParserState as ParserState
-import Text.Parsing.Parser (
-  ParseError(..), Parser, ParseState(..), ParserT(..), runParser, runParserT, fail
-, parseErrorMessage, consume, error) as P
-import Text.Parsing.Parser.Combinators ((<??>))
-import Text.Parsing.Parser.Combinators (
-  (<?>), notFollowedBy, try, choice, lookAhead, optional, between, manyTill
-, option) as P
+
+import Neodoc.Spec.Parser.Base as LEGACY
+import Text.Parsing.Parser as LEGACY
+import Text.Parsing.Parser.Combinators as LEGACY
+
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
-import Text.Parsing.Parser.String (
-  skipSpaces, anyChar, string, char, oneOf, whiteSpace, eof, noneOf
-, satisfy) as P
+
+import Neodoc.Spec.ParserState as ParserState
+import Neodoc.Spec.ParserState (ParserState(..))
+
+import Neodoc.ArgParser.Type (Parser(..), ParserArgs(..), Step(..))
+import Neodoc.ArgParser.Type as P
+import Neodoc.ArgParser.Combinators as P
+import Neodoc.ArgParser.Combinators ((<?>), (<??>))
+import Neodoc.ArgParser.Parsers.String (StringParserState)
+import Neodoc.ArgParser.Parsers.String as P
 
 data Mode = Usage | Descriptions
 
@@ -57,13 +57,36 @@ type OptionArgument = {
 , optional :: Boolean
 }
 
+-- -- | Parser that parses a stream of tokens
+-- type TokenParser a
+--   = Parser
+--       String
+--       Unit
+--       ParserState
+--       Unit
+--       (List PositionedToken)
+--       a
+
 -- | Parser that  parses a stream of tokens
-type TokenParser a = P.ParserT (List PositionedToken) (State ParserState) a
+type TokenParser a = LEGACY.ParserT (List PositionedToken) (State ParserState) a
+
+-- | Parser that parses strings
+type StringParser a
+  = Parser
+      String
+      Unit
+      StringParserState
+      Unit
+      String
+      a
 
 data PositionedToken = PositionedToken P.Position Token
 
 instance prettyPositionedToken :: Pretty PositionedToken where
   pretty (PositionedToken _ tok) = pretty tok
+
+instance showPositionedToken :: Show PositionedToken where
+  show (PositionedToken pos tok) = "PositionedToken " <> show pos <> " " <> show  tok
 
 data Token
   = LParen
@@ -85,6 +108,9 @@ data Token
   | AngleName String
   | Garbage Char
   | DoubleDash
+
+instance showToken :: Show Token where
+  show = pretty --- XXX: TEMP
 
 instance prettyToken :: Pretty Token where
   pretty LParen        = show '('
@@ -157,12 +183,11 @@ instance eqToken :: Eq Token where
 
 
 -- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
-skipSpaces = go
-  where
-    go = (do
-      P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
-      go
-    ) <|> pure unit
+skipSpaces :: ∀ e c g. StringParser Unit
+skipSpaces = (do
+    P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
+    skipSpaces
+  ) <|> pure unit
 
 -- | Optimal: Translate [[<anything>-]options] to @anything
 -- | this saves us looking ahead repeatedly when parsing '['.
@@ -176,7 +201,6 @@ referenceRegex
 -- -- | Optimal: Typeclass-less bind instance
 lex :: Mode -> String -> Either SpecParseError (List PositionedToken)
 lex m input = profileS ("spec-parser::lex (" <> show m <> ")") \_->
-  lmap (SpecParseError <<< P.parseErrorMessage) $
   -- perform a simple transformation to avoid 'manyTill' and safe some millis
   -- lexing. Hopefully this won't be necessary when purescript-parsing improves
   -- performance, a faster parsing library shows up or the purescript compiler
@@ -184,7 +208,8 @@ lex m input = profileS ("spec-parser::lex (" <> show m <> ")") \_->
   let input' = case m of
                 Usage        -> Regex.replace referenceRegex "@$1" input
                 Descriptions -> input
-   in P.runParser input' (parseTokens m)
+   in lmap (SpecParseError <<< (P.extractError id)) $
+        P.runParser unit { position: P.initialPos } unit input' (parseTokens m)
 
 lexDescs :: String -> Either SpecParseError (List PositionedToken)
 lexDescs = lex Descriptions <<< trimDescSection
@@ -192,7 +217,7 @@ lexDescs = lex Descriptions <<< trimDescSection
 lexUsage :: String -> Either SpecParseError (List PositionedToken)
 lexUsage = lex Usage
 
-parseTokens :: Mode -> P.Parser String (L.List PositionedToken)
+parseTokens :: Mode -> StringParser (L.List PositionedToken)
 parseTokens m =
   let tokParser = case m of
                     Usage        -> parseUsageToken
@@ -201,8 +226,8 @@ parseTokens m =
     skipSpaces
     xs <- many' $ parsePositionedToken tokParser
     P.eof <|> void do
-      i <- getInput
-      P.fail $ "Unexpected input: " ~~ i
+      i <- P.getInput
+      P.fail $ "Unexpected input: " <> i
     pure xs
 
 -- optimal: tail recursive many' implementation specialized for lists
@@ -221,10 +246,10 @@ manyA' p = A.fromFoldable <<< reverse <$> go Nil
             Nothing -> pure acc
             Just v  -> go (v : acc)
 
-parsePositionedToken :: (P.Parser String Token) -> P.Parser String PositionedToken
-parsePositionedToken p = PositionedToken <$> getPosition <*> p
+parsePositionedToken :: StringParser Token -> StringParser PositionedToken
+parsePositionedToken p = PositionedToken <$> P.getPosition <*> p
 
-parseUsageToken :: P.Parser String Token
+parseUsageToken :: StringParser Token
 parseUsageToken = P.choice [
     P.char   '('   $> LParen
   , P.char   ')'   $> RParen
@@ -244,7 +269,7 @@ parseUsageToken = P.choice [
   ]
   <* skipSpaces -- skip spaces *AND* newlines
 
-parseDescriptionToken :: P.Parser String Token
+parseDescriptionToken :: StringParser Token
 parseDescriptionToken = P.choice [
     P.char   ','   $> Comma
   , P.char   '('   $> LParen
@@ -258,28 +283,28 @@ parseDescriptionToken = P.choice [
   , P.try _tag
   , P.char '[' $> LSquare
   , _reference
-  , eol $> Newline
+  , P.eol $> Newline
   , Garbage <$> P.anyChar
   ]
-  <* spaces -- skip only spaces ' ' and '\t'
+  <* P.spaces -- skip only spaces ' ' and '\t'
 
 maybeShoutNameRegex :: Regex
 maybeShoutNameRegex
   = unsafePartial $ fromRight $
       regex "[a-zA-Z]" (Regex.parseFlags "gi")
 
-maybeShoutName :: P.Parser String Token
+maybeShoutName :: StringParser Token
 maybeShoutName = do
   n <- _anyName
   pure if (String.toUpper n == n && Regex.test maybeShoutNameRegex n)
           then ShoutName n
           else Name n
 
-_anyName :: P.Parser String String
+_anyName :: StringParser String
 _anyName = do
   foldMap String.singleton <$> do
     (:)
-      <$> alphaNum
+      <$> P.alphaNum
       <*> many' do
             P.choice [
               identLetter
@@ -287,10 +312,10 @@ _anyName = do
             , P.try $ P.char '.' <* (P.notFollowedBy $ P.string "..")
           ]
 
-white :: P.Parser String Unit
+white :: StringParser Unit
 white = void $ P.oneOf [ '\n', '\r', ' ', '\t' ]
 
-_stdin :: P.Parser String Token
+_stdin :: StringParser Token
 _stdin = do
   P.char '-'
   -- Ensure the argument is correctly bounded
@@ -303,7 +328,7 @@ _stdin = do
   ])
   pure Dash
 
-_eoa :: P.Parser String Token
+_eoa :: StringParser Token
 _eoa = do
   P.string "--"
   -- Ensure the argument is correctly bounded
@@ -314,12 +339,12 @@ _eoa = do
   ])
   pure DoubleDash
 
-_reference :: P.Parser String Token
+_reference :: StringParser Token
 _reference = Reference <$> do
   P.char '@'
   foldMap String.singleton <$> many' (P.noneOf [' ', '\n'])
 
-_tag :: P.Parser String Token
+_tag :: StringParser Token
 _tag = P.between (P.char '[') (P.char ']') do
   s <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
   case A.uncons (String.split (Pattern ":") s) of
@@ -329,7 +354,7 @@ _tag = P.between (P.char '[') (P.char ']') do
       let v = trim (String.joinWith ":" xs)
        in pure (Tag x v)
 
-_angleName :: P.Parser String String
+_angleName :: StringParser String
 _angleName = do
   P.char '<'
   n <- foldMap String.singleton <$> do
@@ -342,9 +367,9 @@ _angleName = do
   P.char '>'
   pure $ "<" ~~ n ~~ ">"
 
-_shortOption :: P.Parser String Token
+_shortOption :: StringParser Token
 _shortOption = do
-  let validChar = alphaNum <|> P.oneOf [ '?' ]
+  let validChar = P.alphaNum <|> P.oneOf [ '?' ]
 
   P.char '-'
   x  <- validChar
@@ -384,19 +409,19 @@ _shortOption = do
 
   pure $ SOpt (x:|xs) arg
 
-_longOption :: P.Parser String Token
+_longOption :: StringParser Token
 _longOption = do
   P.string "--"
 
   name' <- foldMap String.singleton <$> do
     (:)
-      <$> alphaNum
+      <$> P.alphaNum
       <*> (many' $ P.choice [
-            alphaNum
+            P.alphaNum
           , P.try $ P.char '.'
               <* (P.notFollowedBy $ P.string "..")
-              <* P.lookAhead alphaNum
-          , P.oneOf [ '-', '/' ] <* P.lookAhead alphaNum
+              <* P.lookAhead P.alphaNum
+          , P.oneOf [ '-', '/' ] <* P.lookAhead P.alphaNum
           ])
 
   arg <- P.option Nothing $ P.choice [
@@ -432,17 +457,30 @@ _longOption = do
 
   pure $ LOpt name' arg
 
-identStart :: P.Parser String Char
-identStart = alpha
+identStart :: StringParser Char
+identStart = P.alpha
 
-identLetter :: P.Parser String Char
-identLetter = alphaNum <|> P.oneOf ['_', '-']
+identLetter :: StringParser Char
+identLetter = P.alphaNum <|> P.oneOf ['_', '-']
 
-flag :: P.Parser String Char
-flag = lowerAlphaNum
+flag :: StringParser Char
+flag = P.lowerAlphaNum
+
+-- token :: ∀ a. (Token -> Maybe a) -> TokenParser a
+-- token test = Parser \(args@(ParseArgs _ _ _ toks)) ->
+--   case toks of
+--     (PositionedToken ppos tok):xs ->
+--       case test tok of
+--         Just a ->
+--           let nextpos = case xs of
+--                 (PositionedToken npos _):_ -> npos
+--                 Nil -> ppos
+--           in Step true (P.setI xs args) (Right a)
+--         _ -> Step false args (Left (P.error "Token did not match predicate"))
+--     _ -> Step false args (Left (P.error "Expected token, but met EOF"))
 
 token :: ∀ a. (Token -> Maybe a) -> TokenParser a
-token test = (P.ParserT <<< ExceptT <<< StateT) \(s@(P.ParseState toks pos _)) ->
+token test = (LEGACY.ParserT <<< ExceptT <<< StateT) \(s@(LEGACY.ParseState toks pos _)) ->
   pure case toks of
     (PositionedToken ppos tok):xs ->
       case test tok of
@@ -450,20 +488,20 @@ token test = (P.ParserT <<< ExceptT <<< StateT) \(s@(P.ParseState toks pos _)) -
           let nextpos = case xs of
                 (PositionedToken npos _):_ -> npos
                 Nil -> ppos
-          in (Right a) /\ (P.ParseState xs nextpos true)
-        _ -> (Left (P.error "Token did not match predicate" pos false)) /\ s
-    _ -> (Left (P.error "Expected token, but met EOF" pos false)) /\ s
+          in (Right a) /\ (LEGACY.ParseState xs nextpos true)
+        _ -> (Left (LEGACY.error "Token did not match predicate" pos false)) /\ s
+    _ -> (Left (LEGACY.error "Expected token, but met EOF" pos false)) /\ s
 
 -- | Match the token at the head of the stream
 match :: Token -> TokenParser Unit
 match tok = token (guard <<< (_ == tok)) <|> defer \_->
-              P.fail $ "Expected " <> pretty tok
+              LEGACY.fail $ "Expected " <> pretty tok
 
 eof :: TokenParser Unit
 eof = do
-  toks <- getInput
+  toks <- LEGACY.getInput
   case toks of
-    _:_ -> P.fail "Expected EOF"
+    _:_ -> LEGACY.fail "Expected EOF"
     _   -> pure unit
 
 anyToken :: TokenParser Token
@@ -503,7 +541,7 @@ tripleDot :: TokenParser Unit
 tripleDot = match TripleDot
 
 garbage :: TokenParser Unit
-garbage = "garbage" <??> token go
+garbage = "garbage" LEGACY.<??> token go
   where
     go (Garbage _) = Just unit
     go _           = Nothing
@@ -511,7 +549,7 @@ garbage = "garbage" <??> token go
 lopt :: TokenParser { name :: String
                     , arg  :: Maybe OptionArgument
                     }
-lopt = "long-option" <??> token go
+lopt = "long-option" LEGACY.<??> token go
   where
     go (LOpt n a) = Just { name: n, arg: a }
     go _          = Nothing
@@ -519,37 +557,37 @@ lopt = "long-option" <??> token go
 sopt :: TokenParser { chars :: NonEmpty Array Char
                     , arg   :: Maybe OptionArgument
                     }
-sopt = "short-option" <??> token go
+sopt = "short-option" LEGACY.<??> token go
   where
     go (SOpt cs a) = Just { chars: cs , arg: a }
     go _ = Nothing
 
 name :: TokenParser String
-name = "name" <??> token go
+name = "name" LEGACY.<??> token go
   where
     go (Name n) = Just n
     go _        = Nothing
 
 tag :: String -> TokenParser String
-tag s = ("tag: " ~~ s) <??> token go
+tag s = ("tag: " ~~ s) LEGACY.<??> token go
   where
     go (Tag k v) | k ^= s = Just v
     go _                  = Nothing
 
 reference :: TokenParser String
-reference = "reference" <??> token go
+reference = "reference" LEGACY.<??> token go
   where
     go (Reference r) = Just r
     go _             = Nothing
 
 angleName :: TokenParser String
-angleName = "<name>" <??> token go
+angleName = "<name>" LEGACY.<??> token go
   where
     go (AngleName n) = Just n
     go _             = Nothing
 
 shoutName :: TokenParser String
-shoutName = "NAME" <??> token go
+shoutName = "NAME" LEGACY.<??> token go
   where
     go (ShoutName n) = Just n
     go _             = Nothing
@@ -557,18 +595,26 @@ shoutName = "NAME" <??> token go
 -- | Return the next token's position w/o consuming anything
 nextTokPos :: TokenParser P.Position
 nextTokPos = do
-  toks <- getInput
+  toks <- LEGACY.getInput
   case toks of
     (PositionedToken pos _):xs -> pure pos
-    _                          -> P.fail "Expected token, met EOF"
+    _                          -> LEGACY.fail "Expected token, met EOF"
+
+-- runTokenParser
+--   :: ∀ a
+--    . List PositionedToken
+--   -> TokenParser a
+--   -> Either String a
+-- runTokenParser s p = lmap (P.extractError id) do
+--   P.runParser unit ParserState.initialState unit s p
 
 runTokenParser
   :: ∀ a
    . List PositionedToken
   -> TokenParser a
-  -> Either P.ParseError a
+  -> Either LEGACY.ParseError a
 runTokenParser s =
   flip evalState ParserState.initialState
-    <<< P.runParserT s
+    <<< LEGACY.runParserT s
 
 foreign import trimDescSection :: String -> String
