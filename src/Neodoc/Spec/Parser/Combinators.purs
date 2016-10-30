@@ -16,7 +16,9 @@ import Text.Parsing.Parser.Combinators ((<?>), try) as P
 import Text.Parsing.Parser.Pos (Position(..)) as P
 import Neodoc.Spec.Parser.Base (getInput, getPosition)
 
-import Neodoc.Spec.Lexer (TokenParser, PositionedToken(..))
+import Neodoc.Spec.Lexer
+import Neodoc.Spec.Token
+import Neodoc.Spec.TokenParser
 import Neodoc.Spec.ParserState
 import Neodoc.Spec.ParserState as ParserState
 

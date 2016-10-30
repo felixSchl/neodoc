@@ -21,11 +21,14 @@ import Data.String as String
 import Data.List (
   List(..), (:), many, some, head, length, filter, catMaybes, reverse,
   singleton)
-import Text.Parsing.Parser (ParseError, fail, fatal) as P
-import Text.Parsing.Parser.Combinators (
-  (<?>), try, choice, lookAhead, manyTill,
-  option, optionMaybe, optional, notFollowedBy,
-  sepBy, sepBy1, (<??>)) as P
+
+import Text.Parsing.Parser as P
+import Text.Parsing.Parser.Combinators as P
+
+import Neodoc.Spec.Lexer as L
+import Neodoc.Spec.Token as L
+import Neodoc.Spec.TokenParser as L
+
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(Nothing, Just), isJust, isNothing, maybe, fromMaybe)
 import Data.Generic (class Generic, gEq, gShow)
