@@ -50,7 +50,7 @@ type UsageParseResult = {
 parse
   :: List L.PositionedToken
   -> Either P.ParseError UsageParseResult
-parse = profileS "spec-parser::parse-usage" \_-> flip L.runTokenParser do
+parse toks = profileS "spec-parser::parse-usage" \_-> L.runTokenParser toks do
   -- Calculate and mark the original program indentation.
   P.Position { column: startCol } <- L.nextTokPos <?> "Program name"
   name    <- program
@@ -58,7 +58,7 @@ parse = profileS "spec-parser::parse-usage" \_-> flip L.runTokenParser do
     markIndent' startCol $ do
      (:|)
       <$> (layout name)
-      <*> many do
+      <*> many' do
             P.optional $ P.try do
               L.name >>= guard <<< (_ == "or")
               L.colon
@@ -89,15 +89,15 @@ parse = profileS "spec-parser::parse-usage" \_-> flip L.runTokenParser do
   layout :: String -> L.TokenParser (Maybe UsageLayout)
   layout name = do
     branches <- "Option, Positional, Command, Group or Reference elements" <??> do
-      (many $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
+      (many' $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
     eoa <- P.choice [
       P.try $ do
         maybeInParens do
           maybeInParens do
             L.doubleDash
-            many elem
-          many elem
-        many elem
+            many' elem
+          many' elem
+        many' elem
         pure $ Just $ Elem EOA
     , (do
         L.eof <|> (P.lookAhead $ lessIndented <|> sameIndent)
@@ -212,3 +212,12 @@ parse = profileS "spec-parser::parse-usage" \_-> flip L.runTokenParser do
         <*> p
     fromMaybe (pure unit) close
     pure v
+
+-- optimal: tail recursive many' implementation specialized for lists
+many' p = reverse <$> go Nil
+  where go acc = do
+          v <- P.option Nothing (Just <$> p)
+          case v of
+            Nothing -> pure acc
+            Just v  -> go (v:acc)
+

@@ -11,9 +11,8 @@ import Neodoc.Env (Env)
 import Neodoc.Spec (Spec)
 import Neodoc.Data.SolvedLayout (SolvedLayout)
 import Neodoc.ArgParser.Options (Options)
-import Neodoc.ArgParser.Type (
-  ParseError, ArgParser, ArgParseError, extractError, malformedInputError
-, genericError)
+import Neodoc.Parsing.Parser
+import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Parser (parse)
 import Neodoc.ArgParser.Result (ArgParseResult(..))
 import Neodoc.ArgParser.Lexer as Lexer

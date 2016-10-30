@@ -20,6 +20,7 @@ import Data.Pretty (pretty)
 import Data.String (fromCharArray, stripPrefix, Pattern(..))
 import Partial.Unsafe (unsafePartial)
 
+import Neodoc.Parsing.Parser
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Token
 import Neodoc.OptionAlias as OptionAlias

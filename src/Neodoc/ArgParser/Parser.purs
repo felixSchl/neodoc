@@ -59,6 +59,8 @@ import Neodoc.OptionAlias (OptionAlias)
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.ArgKey (ArgKey)
 import Neodoc.ArgKey.Class (toArgKey)
+import Neodoc.Parsing.Parser
+import Neodoc.Parsing.Parser.Combinators
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
@@ -67,7 +69,6 @@ import Neodoc.ArgParser.Argument
 import Neodoc.ArgParser.Lexer as L
 import Neodoc.ArgParser.Evaluate
 import Neodoc.ArgParser.Required
-import Neodoc.ArgParser.Combinators
 import Neodoc.ArgParser.Fallback
 import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.KeyValue

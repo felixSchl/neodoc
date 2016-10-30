@@ -1,4 +1,4 @@
-module Neodoc.ArgParser.Parsers.String where
+module Neodoc.Parsing.Parser.String where
 
 import Prelude hiding (between)
 import Control.Alt ((<|>))
@@ -9,8 +9,8 @@ import Data.Array as A
 import Data.Newtype (wrap)
 import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Either (Either(..))
-import Neodoc.ArgParser.Type
-import Neodoc.ArgParser.Combinators
+import Neodoc.Parsing.Parser
+import Neodoc.Parsing.Parser.Combinators
 import Text.Parsing.Parser.Pos (Position(..), updatePosString) as P
 
 type StringParser e c g = Parser e c StringParserState g String
@@ -116,3 +116,4 @@ space = satisfy \c -> c == ' ' || c == '\t'
 
 spaces  :: ∀ e c g. StringParser e c g (List Char)
 spaces = many space
+

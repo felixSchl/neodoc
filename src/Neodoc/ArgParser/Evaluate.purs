@@ -27,6 +27,7 @@ import Neodoc.Data.Layout
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
 import Neodoc.Data.Chunk
+import Neodoc.Parsing.Parser
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token

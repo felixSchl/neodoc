@@ -1,4 +1,4 @@
-module Neodoc.ArgParser.Combinators where
+module Neodoc.Parsing.Parser.Combinators where
 
 import Prelude
 import Data.Foldable (foldl, class Foldable)
@@ -6,7 +6,7 @@ import Data.Tuple.Nested ((/\))
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Either (Either(..))
-import Neodoc.ArgParser.Type
+import Neodoc.Parsing.Parser
 
 option :: ∀ e c s g i a. a -> Parser e c s g i a -> Parser e c s g i a
 option a p = p <|> pure a

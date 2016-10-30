@@ -33,18 +33,17 @@ import Neodoc.Spec.Error (SpecParseError(..))
 import Neodoc.Spec.Parser.Base as LEGACY
 import Text.Parsing.Parser as LEGACY
 import Text.Parsing.Parser.Combinators as LEGACY
-
 import Text.Parsing.Parser.Pos (Position, initialPos) as P
+
+import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
+import Neodoc.Parsing.Parser.String (StringParserState)
+import Neodoc.Parsing.Parser.String as P
+import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
+import Neodoc.Parsing.Parser.Combinators as P
+import Neodoc.Parsing.Parser as P
 
 import Neodoc.Spec.ParserState as ParserState
 import Neodoc.Spec.ParserState (ParserState(..))
-
-import Neodoc.ArgParser.Type (Parser(..), ParserArgs(..), Step(..))
-import Neodoc.ArgParser.Type as P
-import Neodoc.ArgParser.Combinators as P
-import Neodoc.ArgParser.Combinators ((<?>), (<??>))
-import Neodoc.ArgParser.Parsers.String (StringParserState)
-import Neodoc.ArgParser.Parsers.String as P
 
 data Mode = Usage | Descriptions
 
@@ -200,7 +199,7 @@ referenceRegex
 
 -- -- | Optimal: Typeclass-less bind instance
 lex :: Mode -> String -> Either SpecParseError (List PositionedToken)
-lex m input = profileS ("spec-parser::lex (" <> show m <> ")") \_->
+lex m input = profileS "spec-parser::lex" \_->
   -- perform a simple transformation to avoid 'manyTill' and safe some millis
   -- lexing. Hopefully this won't be necessary when purescript-parsing improves
   -- performance, a faster parsing library shows up or the purescript compiler
