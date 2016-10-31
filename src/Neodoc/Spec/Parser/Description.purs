@@ -20,7 +20,7 @@ import Control.MonadPlus (guard)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.List (
-  List(..), (:), many, some, head, length, filter, catMaybes, reverse,
+  List(..), (:), head, length, filter, catMaybes, reverse,
   singleton)
 
 import Neodoc.Parsing.Parser as P
@@ -92,7 +92,7 @@ parse toks = profileS "spec-parser::parse-desc" \_->
         , Just <<< Env     <$> P.tag "env"
         , P.anyToken $> Nothing
         ])
-    <* (void P.eof <|> void (some P.newline))
+    <* (void P.eof <|> void (P.some P.newline))
     where
       descEnd = do
         P.choice [
@@ -157,7 +157,7 @@ parse toks = profileS "spec-parser::parse-desc" \_->
       xs <- optsP `P.sepBy1` do  -- extra options: [, -f]
         P.optional do
           P.comma
-            *> many P.newline
+            *> P.many P.newline
             *> P.indented
 
       -- check integrity of the option-aliases

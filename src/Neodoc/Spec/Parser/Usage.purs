@@ -19,7 +19,7 @@ import Control.Lazy (defer)
 import Control.MonadPlus (guard)
 import Data.Either (Either)
 import Data.List (
-  List(..), many, some, singleton, length, modifyAt, (:), fromFoldable, filter
+  List(..), singleton, length, modifyAt, (:), fromFoldable, filter
 , reverse, null)
 import Data.List.Partial (head, tail) as PartialList
 import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
@@ -57,7 +57,7 @@ parse toks = profileS "spec-parser::parse-usage" \_->
     P.markIndent' startCol $ do
      (:|)
       <$> (layout name)
-      <*> P.many' do
+      <*> P.many do
             P.optional $ P.try do
               P.name >>= guard <<< (_ == "or")
               P.colon
@@ -88,15 +88,15 @@ parse toks = profileS "spec-parser::parse-usage" \_->
   layout :: String -> P.TokenParser (Maybe UsageLayout)
   layout name = do
     branches <- "Option, Positional, Command, Group or Reference elements" <??> do
-      (P.many' $ P.try $ P.moreIndented *> elem) `P.sepBy1` P.vbar
+      (P.many $ P.try $ P.moreIndented *> elem) `P.sepBy1` P.vbar
     eoa <- P.choice [
       P.try $ do
         maybeInParens do
           maybeInParens do
             P.doubleDash
-            P.many' elem
-          P.many' elem
-        P.many' elem
+            P.many elem
+          P.many elem
+        P.many elem
         P.return $ Just $ Elem EOA
     , (do
         P.eof <|> (P.lookAhead $ P.lessIndented <|> P.sameIndent)
@@ -181,7 +181,7 @@ parse toks = profileS "spec-parser::parse-usage" \_->
     branches <- P.between
                   (P.indented *> P.lsquare)
                   (P.rsquare)
-                  ((some elem) `P.sepBy1` P.vbar)
+                  ((P.some elem) `P.sepBy1` P.vbar)
 
     Group true
         <$> repetition
@@ -194,7 +194,7 @@ parse toks = profileS "spec-parser::parse-usage" \_->
     branches <- P.between
                   (P.indented *> P.lparen)
                   (P.rparen)
-                  ((some elem) `P.sepBy1` P.vbar)
+                  ((P.some elem) `P.sepBy1` P.vbar)
 
     Group false
         <$> repetition

@@ -4,7 +4,7 @@ import Prelude
 import Data.Foldable (foldl, class Foldable)
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
-import Data.List (List(..), (:), many, reverse)
+import Data.List (List(..), (:), reverse)
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Either (Either(..))
@@ -39,7 +39,7 @@ infix 3 asErrorMessage as <??>
 
 -- | Fail if the specified parser matches.
 notFollowedBy ::  ∀ e c s g i a. Parser e c s g i a -> Parser e c s g i Unit
-notFollowedBy p = try $ (try p *> fail "Negated parser succeeded") <|> pure unit
+notFollowedBy p = try $ (try p *> fail "Negated parser succeeded") <|> return unit
 
 -- | Parse a phrase, without modifying the consumed state or stream position.
 lookAhead ::  ∀ e c s g i a. Parser e c s g i a -> Parser e c s g i a
@@ -71,7 +71,7 @@ sepBy
    . Parser e c s g i a
   -> Parser e c s g i sep
   -> Parser e c s g i (List a)
-sepBy p sep = sepBy1 p sep <|> pure Nil
+sepBy p sep = sepBy1 p sep <|> return Nil
 
 -- | Parse phrases delimited by a separator, requiring at least one match.
 sepBy1
@@ -81,8 +81,8 @@ sepBy1
   -> Parser e c s g i (List a)
 sepBy1 p sep = do
   a  <- p
-  as <- many' $ sep *> p
-  pure (a : as)
+  as <- many $ sep *> p
+  return (a : as)
 
 -- | Parse several phrases until the specified terminator matches.
 manyTill
@@ -94,10 +94,21 @@ manyTill p end = go Nil
   where
   go acc = (end *> return acc) <|> (p >>= \v -> go (v:acc))
 
--- optimal: tail recursive many' implementation specialized for lists
-many' p = reverse <$> go Nil
+-- optimal: tail recursive `many` implementation specialized for lists
+many p = reverse <$> go Nil
   where go acc = do
           v <- option Nothing (Just <$> p)
           case v of
-            Nothing -> pure acc
+            Nothing -> return acc
             Just v  -> go (v:acc)
+
+-- optimal: tail recursive `some` implementation specialized for lists
+some p = reverse <$> do
+  x <- p
+  go (x:Nil)
+  where go acc = do
+          v <- option Nothing (Just <$> p)
+          case v of
+            Nothing -> return acc
+            Just v  -> go (v:acc)
+
