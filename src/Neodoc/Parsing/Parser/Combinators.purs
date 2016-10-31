@@ -4,11 +4,13 @@ import Prelude
 import Data.Array as A
 import Data.Foldable (foldl, class Foldable)
 import Data.Maybe (Maybe(..))
+import Data.String.Ext ((~~))
 import Data.Tuple.Nested ((/\))
 import Data.List (List(..), (:), reverse)
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Either (Either(..))
+import Unsafe.Coerce
 import Neodoc.Parsing.Parser
 
 option :: ∀ e c s g i a. a -> Parser e c s g i a -> Parser e c s g i a
@@ -102,6 +104,15 @@ many p = reverse <$> go Nil
           case v of
             Nothing -> return acc
             Just v  -> go (v:acc)
+
+-- optimal: tail recursive `many` implementation specialized for building
+-- strings
+manyChar p = go ""
+  where go acc = do
+          v <- option Nothing (Just <$> p)
+          case v of
+            Nothing -> return acc
+            Just (v :: Char) -> go (acc ~~ (unsafeCoerce v))
 
 -- optimal: tail recursive `some` implementation specialized for lists
 some p = reverse <$> do

@@ -130,14 +130,14 @@ parseDescriptionToken = defer \_-> P.choice [
   , P.char   ')'   $> RParen
   , P.char   ']'   $> RSquare
   , P.string "..." $> TripleDot
+  , P.eol $> Newline
+  , _reference
   , P.try _longOption
   , P.try _shortOption
   , AngleName <$> _angleName
   , maybeShoutName
   , P.try _tag
   , P.char '[' $> LSquare
-  , _reference
-  , P.eol $> Newline
   , Garbage <$> P.anyChar
   ]
   <* P.spaces -- skip only spaces ' ' and '\t'
@@ -155,11 +155,10 @@ maybeShoutName = do
             else Name n
 
 _anyName :: StringParser' String
-_anyName = defer \_-> do
-  foldMap String.singleton <$> do
-    (:)
-      <$> P.alphaNum
-      <*> P.many do
+_anyName = do
+    (~~)
+      <$> (String.singleton <$> P.alphaNum)
+      <*> P.manyChar do
             P.choice [
               identLetter
             , P.oneOf [ '-', '_', '/' ]
