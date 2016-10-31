@@ -1,6 +1,7 @@
 module Neodoc.Parsing.Parser.Combinators where
 
 import Prelude
+import Data.Array as A
 import Data.Foldable (foldl, class Foldable)
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))

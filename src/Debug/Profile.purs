@@ -18,6 +18,7 @@ profileA :: ∀ m a. (Monad m) => String -> (Unit -> m a) -> m a
 profileA msg f =
   if _ENABLE_PROFILING_
     then do
+      pure unit
       let t  = unsafePerformEff timerStart
       a <- f unit
       let t' = unsafePerformEff $ timerEnd t

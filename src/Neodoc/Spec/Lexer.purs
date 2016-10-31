@@ -3,6 +3,7 @@ module Neodoc.Spec.Lexer where
 import Prelude
 import Data.Array as A
 import Debug.Profile
+import Debug.Trace
 import Data.Pretty
 import Data.Bifunctor (lmap)
 import Data.NonEmpty (NonEmpty, (:|))
@@ -61,7 +62,7 @@ skipSpaces :: ∀ e c g. StringParser Unit
 skipSpaces = (do
     P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     skipSpaces
-  ) <|> pure unit
+  ) <|> P.return unit
 
 -- | Optimal: Translate [[<anything>-]options] to @anything
 -- | this saves us looking ahead repeatedly when parsing '['.
@@ -82,7 +83,8 @@ lex m input = profileS "spec-parser::lex" \_->
   let input' = case m of
                 Usage        -> Regex.replace referenceRegex "@$1" input
                 Descriptions -> input
-   in lmap (SpecParseError <<< (P.extractError id)) $
+   in do
+     lmap (SpecParseError <<< (P.extractError id)) $
         P.runParser unit { position: P.initialPos } unit input' (parseTokens m)
 
 lexDescs :: String -> Either SpecParseError (List PositionedToken)
@@ -98,48 +100,32 @@ parseTokens m =
                     Descriptions -> parseDescriptionToken
    in do
     skipSpaces
-    xs <- many' $ parsePositionedToken tokParser
+    xs <- P.many do
+      PositionedToken
+        <$> P.getPosition
+        <*> tokParser
     P.eof <|> void do
       i <- P.getInput
       P.fail $ "Unexpected input: " <> i
     pure xs
 
--- optimal: tail recursive many' implementation specialized for lists
-many' p = reverse <$> go Nil
-  where go acc = do
-          v <- P.option Nothing (Just <$> p)
-          case v of
-            Nothing -> pure acc
-            Just v  -> go (v:acc)
-
--- optimal: tail recursive many' implementation specialized for arrays
-manyA' p = A.fromFoldable <<< reverse <$> go Nil
-  where go acc = do
-          v <- P.option Nothing (Just <$> p)
-          case v of
-            Nothing -> pure acc
-            Just v  -> go (v : acc)
-
-parsePositionedToken :: StringParser Token -> StringParser PositionedToken
-parsePositionedToken p = PositionedToken <$> P.getPosition <*> p
-
 parseUsageToken :: StringParser Token
 parseUsageToken = P.choice [
-    P.char   '('   $> LParen
-  , P.char   ')'   $> RParen
-  , P.char   ']'   $> RSquare
-  , P.char   '|'   $> VBar
-  , P.char   ':'   $> Colon
-  , P.char   ','   $> Comma
-  , P.string "..." $> TripleDot
-  , P.char   '['   $> LSquare
-  , _reference
-  , P.try _longOption
-  , P.try _shortOption
-  , P.try _eoa
-  , _stdin
-  , AngleName <$> _angleName
-  , maybeShoutName
+    profileA "token: LParen"\_-> P.char   '('   $> LParen
+  , profileA "token: RParen"\_-> P.char   ')'   $> RParen
+  , profileA "token: RSquare"\_-> P.char   ']'   $> RSquare
+  , profileA "token: VBar"\_-> P.char   '|'   $> VBar
+  , profileA "token: Colon"\_-> P.char   ':'   $> Colon
+  , profileA "token: Comma"\_-> P.char   ','   $> Comma
+  , profileA "token: TripleDot"\_-> P.string "..." $> TripleDot
+  , profileA "token: LSquare"\_-> P.char   '['   $> LSquare
+  , profileA "token: ueference"\_-> _reference
+  , profileA "token: longOption"\_-> P.try _longOption
+  , profileA "token: shortOption"\_-> P.try _shortOption
+  , profileA "token: eoa"\_-> P.try _eoa
+  , profileA "token: stdin"\_-> _stdin
+  , profileA "token: angleName"\_-> AngleName <$> _angleName
+  , profileA "token: maybeShoutName"\_-> maybeShoutName
   ]
   <* skipSpaces -- skip spaces *AND* newlines
 
@@ -179,7 +165,7 @@ _anyName = do
   foldMap String.singleton <$> do
     (:)
       <$> P.alphaNum
-      <*> many' do
+      <*> P.many do
             P.choice [
               identLetter
             , P.oneOf [ '-', '_', '/' ]
@@ -216,7 +202,7 @@ _eoa = do
 _reference :: StringParser Token
 _reference = Reference <$> do
   P.char '@'
-  foldMap String.singleton <$> many' (P.noneOf [' ', '\n'])
+  foldMap String.singleton <$> P.many (P.noneOf [' ', '\n'])
 
 _tag :: StringParser Token
 _tag = P.between (P.char '[') (P.char ']') do
@@ -247,7 +233,7 @@ _shortOption = do
 
   P.char '-'
   x  <- validChar
-  xs <- manyA' validChar
+  xs <- A.fromFoldable <$> P.many validChar
 
   arg <- P.option Nothing $ P.choice [
 
@@ -290,7 +276,7 @@ _longOption = do
   name' <- foldMap String.singleton <$> do
     (:)
       <$> P.alphaNum
-      <*> (many' $ P.choice [
+      <*> (P.many $ P.choice [
             P.alphaNum
           , P.try $ P.char '.'
               <* (P.notFollowedBy $ P.string "..")

@@ -20,7 +20,6 @@ import Data.Foldable (for_, intercalate)
 import Control.Monad.Eff.Exception (error, throwException)
 import Data.String.Chalk as Chalk
 import Data.TemplateString.Unsafe ((<~>))
-import Text.Parsing.Parser as P
 import Data.Bifunctor (lmap, rmap)
 import Text.Wrap (dedent)
 import Partial.Unsafe

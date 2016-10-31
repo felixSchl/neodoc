@@ -12,7 +12,6 @@ import Control.Bind ((=<<))
 import Control.Monad.Eff.Exception (error, throwException)
 import Control.Monad.State.Trans (StateT(StateT))
 import Text.Wrap (dedent)
-import Text.Parsing.Parser as P
 import Test.Spec (describe, it)
 import Test.Support (vliftEff)
 import Test.Support.Desc as Desc
