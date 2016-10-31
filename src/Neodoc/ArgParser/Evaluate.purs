@@ -5,6 +5,7 @@ import Debug.Trace
 import Debug.Profile
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
+import Data.Optimize.Uncurried
 import Data.Pretty
 import Data.Newtype (unwrap)
 import Data.List (
@@ -18,6 +19,7 @@ import Data.Traversable (for)
 import Data.Foldable (class Foldable, maximumBy)
 import Data.Optimize.Uncurried
 import Control.Alt ((<|>))
+import Control.Lazy (defer)
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Partial.Unsafe
 
@@ -68,18 +70,13 @@ getEvaluationDepth (SuccessEvaluation (ParserCont _ s _ _) _) = s.depth
 evalParsers
   :: ∀ b a r
    . (Ord b)
-  => (a -> b)
-  -> List (ArgParser r a)
+  => Args2 (a -> b) (List (ArgParser r a))
   -> ArgParser r a
-evalParsers _ parsers | length parsers == 0
+evalParsers (Args2 _ parsers) | length parsers == 0
   = fail' $ internalError "no parsers to evaluate"
 
-evalParsers p parsers = do
-
-  config      <- getConfig
-  state       <- getState
-  globalState <- getGlobalState
-  input       <- getInput
+evalParsers (Args2 p parsers) = do
+  (ParseArgs config state globalState input) <- getParseState
 
   -- Run all parsers and collect their results for further evaluation
   let collected = parsers <#> \parser ->

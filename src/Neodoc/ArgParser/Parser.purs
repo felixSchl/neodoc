@@ -113,7 +113,7 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
         let branch' = toArgBranch options env descriptions branch
             branch'' = toParseBranch (NonEmpty.toList branch')
          in ArgParseResult (Just branch) <$>
-              parseBranch 0 true branch'' <* eof
+              parseBranch (Args3 0 true branch'') <* eof
 
       parsers' :: List (ArgParser r ArgParseResult)
       parsers' = parsers
@@ -129,7 +129,7 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
    in runParser $ Args5 { env, options, spec } initialState initialGlobalState tokens $
         let p = if null parsers'
                   then eof $> ArgParseResult Nothing Nil
-                  else evalParsers (byOrigin <<< getResult) parsers'
+                  else evalParsers (Args2 (byOrigin <<< getResult) parsers')
          in p `catch` \_ e ->
             let implicitFlags = helpFlags <> versionFlags
                 -- note: must re-set the cache since the running ids in this
@@ -175,19 +175,20 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
                     ) :| Nil
           branch'' = toParseBranch (NonEmpty.toList branch')
        in ArgParseResult (Just branch) <$>
-            parseBranch 0 true branch'' <* eof
+            parseBranch (Args3 0 true branch'') <* eof
     where
     toOption :: OptionAlias -> SolvedLayoutArg
     toOption a = Option a Nothing true
 
 parseBranch
   :: ∀ r
-   . Int
-  -> Boolean -- allow substitutions?
-  -> List ArgParseLayout
+   . Args3
+        Int
+        Boolean -- allow substitutions?
+        (List ArgParseLayout)
   -> ArgParser r (List KeyValue)
-parseBranch _ _ Nil = return Nil
-parseBranch l sub xs = do
+parseBranch (Args3 _ _ Nil) = return Nil
+parseBranch (Args3 l sub xs) = do
   { options } <- getConfig
   let xs' = if not options.laxPlacement
             then NEL.toList <$> groupBy (eq `on` _isFree) xs
@@ -542,7 +543,7 @@ parseLayout
   -> Boolean
   -> ArgParseLayout
   -> ArgParser r (List KeyValue)
-parseLayout l sub x = defer \_-> profileS "parse-layout" \_-> do
+parseLayout l sub x = do
  skipIf hasTerminated Nil do
   { options } <- getConfig
   go options x
@@ -556,8 +557,8 @@ parseLayout l sub x = defer \_-> profileS "parse-layout" \_-> do
   go opts (g@(ParseGroup _ _ _ r branches)) =
     let parsers = NonEmpty.toList branches <#> \branch ->
                     let args = NonEmpty.toList branch
-                     in parseBranch l true args
-        p = evalParsers byOrigin parsers
+                     in parseBranch (Args3 l true args)
+        p = evalParsers (Args2 byOrigin parsers)
      in do
       vs <- p
       if r && any (isFrom Origin.Argv <<< snd) vs
@@ -601,8 +602,7 @@ parseArg x = go x
   go (Solved.Stdin         ) = stdin
   go (Solved.EOA           ) = eoa <|> (return $ ArrayValue [])
   go (Solved.Option a  mA r) = do
-    input       <- getInput
-    { options } <- getConfig
+    (ParseArgs { options } _ _ input) <- getParseState
     case input of
       (PositionedToken token _ _) : _
         | case token of

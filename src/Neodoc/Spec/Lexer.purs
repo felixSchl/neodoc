@@ -105,40 +105,40 @@ parseTokens m =
 
 parseUsageToken :: StringParser' Token
 parseUsageToken = defer \_-> P.choice [
-    profileA "token: LParen"\_-> P.char   '('   $> LParen
-  , profileA "token: RParen"\_-> P.char   ')'   $> RParen
-  , profileA "token: RSquare"\_-> P.char   ']'   $> RSquare
-  , profileA "token: VBar"\_-> P.char   '|'   $> VBar
-  , profileA "token: Colon"\_-> P.char   ':'   $> Colon
-  , profileA "token: Comma"\_-> P.char   ','   $> Comma
-  , profileA "token: TripleDot"\_-> P.string "..." $> TripleDot
-  , profileA "token: LSquare"\_-> P.char   '['   $> LSquare
-  , profileA "token: ueference"\_-> _reference
-  , profileA "token: longOption"\_-> P.try _longOption
-  , profileA "token: shortOption"\_-> P.try _shortOption
-  , profileA "token: eoa"\_-> P.try _eoa
-  , profileA "token: stdin"\_-> _stdin
-  , profileA "token: angleName"\_-> AngleName <$> _angleName
-  , profileA "token: maybeShoutName"\_-> maybeShoutName
+    P.char   '('   $> LParen
+  , P.char   ')'   $> RParen
+  , P.char   ']'   $> RSquare
+  , P.char   '|'   $> VBar
+  , P.char   ':'   $> Colon
+  , P.char   ','   $> Comma
+  , P.string "..." $> TripleDot
+  , P.char   '['   $> LSquare
+  , _reference
+  , P.try _longOption
+  , P.try _shortOption
+  , P.try _eoa
+  , _stdin
+  , AngleName <$> _angleName
+  , maybeShoutName
   ]
   <* skipSpaces -- skip spaces *AND* newlines
 
 parseDescriptionToken :: StringParser' Token
 parseDescriptionToken = defer \_-> P.choice [
-    profileA "token: Comma"\_-> P.char   ','   $> Comma
-  , profileA "token: LParen" \_-> P.char   '('   $> LParen
-  , profileA "token: RParen" \_-> P.char   ')'   $> RParen
-  , profileA "token: RSquare" \_-> P.char   ']'   $> RSquare
-  , profileA "token: TripleDot" \_-> P.string "..." $> TripleDot
-  , profileA "token: EOL" \_-> P.eol $> Newline
-  , profileA "token: _reference" \_-> _reference
-  , profileA "token: _longOption" \_-> P.try _longOption
-  , profileA "token: _shortOption" \_-> P.try _shortOption
-  , profileA "token: _angleName" \_-> AngleName <$> _angleName
-  , profileA "token: maybeShoutName" \_-> maybeShoutName
-  , profileA "token: _tag" \_-> P.try _tag
-  , profileA "token: LSquare" \_-> P.char '[' $> LSquare
-  , profileA "token: Garbage" \_-> Garbage <$> P.anyChar
+    P.char   ','   $> Comma
+  , P.char   '('   $> LParen
+  , P.char   ')'   $> RParen
+  , P.char   ']'   $> RSquare
+  , P.string "..." $> TripleDot
+  , P.eol $> Newline
+  , _reference
+  , P.try _longOption
+  , P.try _shortOption
+  , AngleName <$> _angleName
+  , maybeShoutName
+  , P.try _tag
+  , P.char '[' $> LSquare
+  , Garbage <$> P.anyChar
   ]
   <* P.spaces -- skip only spaces ' ' and '\t'
 
@@ -208,7 +208,7 @@ _tag = P.between (P.char '[') (P.char ']') do
        in P.return (Tag x v)
 
 _angleName :: StringParser' String
-_angleName = defer \_-> do
+_angleName = do
   P.char '<'
   n <- do
     P.someChar $ P.choice [
