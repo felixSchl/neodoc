@@ -124,3 +124,14 @@ some p = reverse <$> do
             Nothing -> return acc
             Just v  -> go (v:acc)
 
+-- optimal: tail recursive `some` implementation specialized for building
+-- strings
+someChar p = do
+  c :: Char <- p
+  go (unsafeCoerce c)
+  where go acc = do
+          v <- option Nothing (Just <$> p)
+          case v of
+            Nothing -> return acc
+            Just (v :: Char) -> go (acc ~~ (unsafeCoerce v))
+

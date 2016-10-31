@@ -125,20 +125,20 @@ parseUsageToken = defer \_-> P.choice [
 
 parseDescriptionToken :: StringParser' Token
 parseDescriptionToken = defer \_-> P.choice [
-    P.char   ','   $> Comma
-  , P.char   '('   $> LParen
-  , P.char   ')'   $> RParen
-  , P.char   ']'   $> RSquare
-  , P.string "..." $> TripleDot
-  , P.eol $> Newline
-  , _reference
-  , P.try _longOption
-  , P.try _shortOption
-  , AngleName <$> _angleName
-  , maybeShoutName
-  , P.try _tag
-  , P.char '[' $> LSquare
-  , Garbage <$> P.anyChar
+    profileA "token: Comma"\_-> P.char   ','   $> Comma
+  , profileA "token: LParen" \_-> P.char   '('   $> LParen
+  , profileA "token: RParen" \_-> P.char   ')'   $> RParen
+  , profileA "token: RSquare" \_-> P.char   ']'   $> RSquare
+  , profileA "token: TripleDot" \_-> P.string "..." $> TripleDot
+  , profileA "token: EOL" \_-> P.eol $> Newline
+  , profileA "token: _reference" \_-> _reference
+  , profileA "token: _longOption" \_-> P.try _longOption
+  , profileA "token: _shortOption" \_-> P.try _shortOption
+  , profileA "token: _angleName" \_-> AngleName <$> _angleName
+  , profileA "token: maybeShoutName" \_-> maybeShoutName
+  , profileA "token: _tag" \_-> P.try _tag
+  , profileA "token: LSquare" \_-> P.char '[' $> LSquare
+  , profileA "token: Garbage" \_-> Garbage <$> P.anyChar
   ]
   <* P.spaces -- skip only spaces ' ' and '\t'
 
@@ -210,8 +210,8 @@ _tag = P.between (P.char '[') (P.char ']') do
 _angleName :: StringParser' String
 _angleName = defer \_-> do
   P.char '<'
-  n <- foldMap String.singleton <$> do
-    some $ P.choice [
+  n <- do
+    P.someChar $ P.choice [
       identLetter
       -- disallow swallowing new `<`s in order to avoid creating hard to trace
       -- errors for the user
@@ -228,24 +228,19 @@ _shortOption = defer \_-> do
   x  <- validChar
   xs <- A.fromFoldable <$> P.many validChar
 
-  arg <- P.option Nothing $ P.choice [
+  arg <- P.option Nothing $ Just <$> P.choice [
 
-    -- Case 1: -foo=BAR
-    Just <$> do
-      P.char '='
+    -- Case 1: -foo=BAR or Option[=ARG]
+    do
+      optional <- P.option false (P.char '[' $> true)
+      if optional then P.optional $ P.char '='
+                  else void $ P.char '='
       name <- P.choice [ _angleName, _anyName ]
-      P.return { name, optional: false }
+      when optional $ void $ P.char ']'
+      P.return { name, optional }
 
-    -- Case 2: Option[=ARG]
-  , Just <$> do
-      P.char '['
-      P.optional $ P.char '='
-      name <- P.choice [ _angleName, _anyName ]
-      P.char ']'
-      P.return { name, optional: true }
-
-    -- Case 3: Option<ARG>
-  , Just <$> do
+    -- Case 2: Option<ARG>
+  , do
       name <- _angleName
       P.return { name, optional: false }
   ]
@@ -253,11 +248,8 @@ _shortOption = defer \_-> do
   -- Ensure the argument is correctly bounded
   P.eof <|> (P.lookAhead $ P.choice [
     void $ white
-  , void $ P.char '|'
+  , void $ P.oneOf [']', ')', ',' {- desc-mode only -}, '|']
   , void $ P.string "..."
-  , void $ P.char ']'
-  , void $ P.char ')'
-  , void $ P.char ',' -- desc mode only
   ])
 
   P.return $ SOpt (x:|xs) arg
@@ -266,10 +258,9 @@ _longOption :: StringParser' Token
 _longOption = defer \_-> do
   P.string "--"
 
-  name' <- foldMap String.singleton <$> do
-    (:)
-      <$> P.alphaNum
-      <*> (P.many $ P.choice [
+  name' <- (~~)
+      <$> (String.singleton <$> P.alphaNum)
+      <*> (P.manyChar $ P.choice [
             P.alphaNum
           , P.try $ P.char '.'
               <* (P.notFollowedBy $ P.string "..")
@@ -277,35 +268,20 @@ _longOption = defer \_-> do
           , P.oneOf [ '-', '/' ] <* P.lookAhead P.alphaNum
           ])
 
-  arg <- P.option Nothing $ P.choice [
-
-    -- Case 1: OPTION=ARG
-    Just <$> do
-      P.char '='
-      n <- P.choice [ _angleName, _anyName ]
-      P.return  { name: n
-                , optional: false
-                }
-
-    -- Case 2: Option[=ARG]
-  , Just <$> do
-      P.char '['
-      P.optional $ P.char '='
-      n <- P.choice [ _angleName, _anyName ]
-      P.char ']'
-      P.return  { name:     n
-                , optional: true
-                }
-  ]
+  -- OPTION[=ARG] or OPTION=ARG
+  arg <- P.option Nothing $ Just <$> do
+    optional <- P.option false (P.char '[' $> true)
+    if optional then P.optional $ P.char '='
+                else void $ P.char '='
+    name <- P.choice [ _angleName, _anyName ]
+    when optional $ void $ P.char ']'
+    P.return { name, optional }
 
   -- Ensure the argument is correctly bounded
   P.eof <|> (P.lookAhead $ P.choice [
     void $ white
-  , void $ P.char '|'
+  , void $ P.oneOf [']', ')', ',' {- desc-mode only -}, '|']
   , void $ P.string "..."
-  , void $ P.char ']'
-  , void $ P.char ')'
-  , void $ P.char ',' -- desc mode only
   ])
 
   P.return $ LOpt name' arg
