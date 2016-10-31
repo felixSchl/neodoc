@@ -11,7 +11,7 @@ import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Either (Either(..))
 import Neodoc.Parsing.Parser
 import Neodoc.Parsing.Parser.Combinators
-import Text.Parsing.Parser.Pos (Position(..), updatePosString) as P
+import Neodoc.Parsing.Parser.Pos as P
 
 type StringParser e c g = Parser e c StringParserState g String
 type StringParserState = { position :: P.Position }

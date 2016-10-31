@@ -21,9 +21,7 @@ import Neodoc.Spec.ParserState as ParserState
 import Neodoc.Parsing.Parser as P
 import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
 import Neodoc.Parsing.Parser.Combinators as P
-
--- TODO: remove
-import Text.Parsing.Parser.Pos (Position(..)) as P
+import Neodoc.Parsing.Parser.Pos (Position(..)) as P
 
 -- | Return the next token's position w/o consuming anything
 nextTokPos :: TokenParser P.Position
@@ -42,7 +40,7 @@ markIndent p =
    in do
     x <- P.optionMaybe nextTokPos
     P.try $ case x of
-      Just (P.Position { column: tokCol }) -> do
+      Just (P.Position _ tokCol) -> do
         curCol <- ParserState.getIndentation <$> P.getState
         setIndent tokCol *> p <* setIndent curCol
       _ -> p
@@ -62,7 +60,7 @@ markIndent' level p =
 --
 checkIndentation :: (Int -> Int -> Boolean) -> TokenParser Unit
 checkIndentation rel = do
-  P.Position { column } <- nextTokPos
+  P.Position _ column <- nextTokPos
   current <- ParserState.getIndentation <$> P.getState
   guard (column `rel` current)
 

@@ -32,12 +32,7 @@ import Partial.Unsafe (unsafePartial)
 import Neodoc.Spec.Token
 import Neodoc.Spec.Error (SpecParseError(..))
 
--- XXX: remove these
-import Neodoc.Spec.Parser.Base as LEGACY
-import Text.Parsing.Parser as LEGACY
-import Text.Parsing.Parser.Combinators as LEGACY
-import Text.Parsing.Parser.Pos (Position, initialPos) as P
-
+import Neodoc.Parsing.Parser.Pos as P
 import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
 import Neodoc.Parsing.Parser.String (StringParserState)
 import Neodoc.Parsing.Parser.String as P

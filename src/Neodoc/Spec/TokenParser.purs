@@ -31,7 +31,6 @@ import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
 import Neodoc.Spec.Parser.Base as LEGACY
 import Text.Parsing.Parser as LEGACY
 import Text.Parsing.Parser.Combinators as LEGACY
-import Text.Parsing.Parser.Pos (Position, initialPos) as P
 
 -- | Parser that parses a stream of tokens
 type TokenParser a

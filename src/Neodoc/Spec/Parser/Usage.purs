@@ -27,9 +27,7 @@ import Data.Tuple (Tuple(Tuple), snd, fst)
 import Data.Tuple.Nested (tuple3)
 import Partial.Unsafe (unsafePartial)
 
--- XXX: remove this
-import Text.Parsing.Parser.Pos (Position(Position)) as P
-
+import Neodoc.Parsing.Parser.Pos as P
 import Neodoc.Data.OptionArgument
 import Neodoc.Parsing.Parser as P
 import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
@@ -51,7 +49,7 @@ parse
 parse toks = profileS "spec-parser::parse-usage" \_->
  lmap SpecParseError $ P.runTokenParser toks do
   -- Calculate and mark the original program indentation.
-  P.Position { column: startCol } <- P.nextTokPos <?> "Program name"
+  P.Position _ startCol <- P.nextTokPos <?> "Program name"
   name <- program
   layouts <- do
     P.markIndent' startCol $ do

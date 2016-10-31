@@ -30,7 +30,6 @@ import Node.FS (FS)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync as FS
 
-import Text.Parsing.Parser.Pos (initialPos) as P
 import Text.Parsing.Parser (runParser, runParserT) as P
 import Text.Parsing.Parser.Combinators (manyTill, optional, between, sepBy,
                                        try, choice, (<?>), option) as P
