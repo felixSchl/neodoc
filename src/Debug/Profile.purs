@@ -8,7 +8,6 @@ import Data.Newtype (unwrap)
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
 import Control.Monad.Eff.Unsafe
-import Text.Parsing.Parser (ParserT(..)) as P
 
 foreign import _ENABLE_PROFILING_ :: Boolean
 

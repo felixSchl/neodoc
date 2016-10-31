@@ -10,13 +10,6 @@ import Data.Foldable (intercalate)
 import Data.List (List())
 import Data.String (fromCharArray)
 import Data.Array as A
-import Text.Parsing.Parser.Pos (Position(..)) as P
-
--- XXX: remove these
-import Neodoc.Spec.Parser.Base as LEGACY
-import Text.Parsing.Parser as LEGACY
-import Text.Parsing.Parser.Combinators as LEGACY
-import Text.Parsing.Parser.Pos (Position, initialPos) as P
 
 import Neodoc.Value (Value)
 data Token

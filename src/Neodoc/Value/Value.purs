@@ -28,9 +28,6 @@ import Data.Foldable (foldMap)
 import Data.Traversable (for)
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
-import Text.Parsing.Parser (ParseError, runParser) as P
-import Text.Parsing.Parser.Combinators (between, choice, try, sepBy1, option) as P
-import Text.Parsing.Parser.String (noneOf, char, string, eof, satisfy) as P
 import Data.Array as A
 import Data.Int (toNumber, fromString) as Int
 import Data.String (singleton, toUpper, trim) as String
@@ -43,8 +40,14 @@ import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
 import Data.Foreign.Extra as F
-import Global (readFloat)
-import Neodoc.Spec.Parser.Base (digit)
+
+import Neodoc.Parsing.Parser.Pos as P
+import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
+import Neodoc.Parsing.Parser.String (StringParserState)
+import Neodoc.Parsing.Parser.String as P
+import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
+import Neodoc.Parsing.Parser.Combinators as P
+import Neodoc.Parsing.Parser as P
 
 data Value
   = StringValue String
@@ -201,6 +204,16 @@ read :: String  -- ^ the input
      -> Value
 read s split = either (const $ StringValue s) id (parse s split)
 
+-- | Parser that parses strings
+type StringParser a
+  = Parser
+      String
+      Unit
+      StringParserState
+      Unit
+      String
+      a
+
 -- | Parse a string into a value
 -- | Values can be comma *AND* space separated:
 -- |
@@ -209,10 +222,14 @@ read s split = either (const $ StringValue s) id (parse s split)
 -- | a  b, c -> [ a, b, c ]
 -- | a, b  c -> [ a, b, c ]
 -- |
-parse :: String  -- ^ the input
-      -> Boolean -- ^ allow splitting?
-      -> Either P.ParseError Value
-parse s split = P.runParser s $ if split then values else value <* P.eof
+parse
+  :: String  -- ^ the input
+  -> Boolean -- ^ allow splitting?
+  -> Either String Value
+parse s split =
+  let p = if split then values else value <* P.eof
+  in lmap (P.extractError id) $
+      P.runParser unit { position: P.initialPos } unit s p
 
   where
     values = do
@@ -229,18 +246,18 @@ parse s split = P.runParser s $ if split then values else value <* P.eof
       P.try value <|> do
         StringValue <$> do
           foldMap String.singleton <$> do
-            many $ P.try (P.noneOf [',', ' ', '\n'])
+            P.many $ P.try (P.noneOf [',', ' ', '\n'])
 
     value = P.choice $ P.try <$> [ bool, number, quoted ]
 
     number = do
       si <- P.option 1 (P.char '-' *> pure (-1))
-      xs <- foldMap String.singleton <$> some digit
+      xs <- foldMap String.singleton <$> P.some P.digit
       P.choice [
         FloatValue <<< ((Int.toNumber si) * _) <<< readFloat <$> do
           xss <- do
             P.char '.'
-            foldMap String.singleton <$> some digit
+            foldMap String.singleton <$> P.some P.digit
           pure $ xs <> "." <> xss
       , pure $ IntValue $ si * (unsafePartial $ fromJust $ Int.fromString xs)
       ]
@@ -257,8 +274,8 @@ parse s split = P.runParser s $ if split then values else value <* P.eof
     quoted = StringValue <$> do
       foldMap String.singleton <$> do
         P.choice [
-          P.between (P.char '"')  (P.char '"')  (many $ P.noneOf ['"'])
-        , P.between (P.char '\'') (P.char '\'') (many $ P.noneOf ['\''])
+          P.between (P.char '"')  (P.char '"')  (P.many $ P.noneOf ['"'])
+        , P.between (P.char '\'') (P.char '\'') (P.many $ P.noneOf ['\''])
         ]
 
 -- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.

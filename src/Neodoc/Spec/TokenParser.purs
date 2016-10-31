@@ -27,11 +27,6 @@ import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
 import Neodoc.Parsing.Parser as P
 import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
 
--- XXX: remove these
-import Neodoc.Spec.Parser.Base as LEGACY
-import Text.Parsing.Parser as LEGACY
-import Text.Parsing.Parser.Combinators as LEGACY
-
 -- | Parser that parses a stream of tokens
 type TokenParser a
   = Parser

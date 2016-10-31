@@ -6,7 +6,6 @@ import Data.Maybe (Maybe (..))
 import Data.Char as Char
 import Data.Pretty (class Pretty, pretty)
 import Data.String as String
-import Text.Parsing.Parser as P
 
 data NeodocError
   = ScanError String

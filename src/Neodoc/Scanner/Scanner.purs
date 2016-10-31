@@ -5,8 +5,6 @@ module Neodoc.Scanner (
 
 import Prelude
 import Data.Bifunctor (lmap)
-import Text.Parsing.Parser (ParseError) as P
-import Text.Parsing.Parser.Pos (initialPos) as P
 import Data.List (List(Nil), (:), fromFoldable, catMaybes)
 import Data.String.Regex as Regex
 import Data.String.Regex.Flags as Regex
