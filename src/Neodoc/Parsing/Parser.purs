@@ -163,6 +163,9 @@ throw e = Parser \a -> Step false a (Left e)
 -- Parser getters, setters, modifiers, ...
 --------------------------------------------------------------------------------
 
+getParseState :: ∀ e c s g i. Parser e c s g i (ParserArgs c s g i)
+getParseState = Parser \a -> Step false a (Right a)
+
 getConfig :: ∀ e c s g i. Parser e c s g i c
 getConfig = Parser \a -> Step false a (Right (getC a))
 

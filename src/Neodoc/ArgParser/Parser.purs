@@ -35,6 +35,7 @@ import Control.Alt ((<|>))
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Control.Monad.State
 import Control.Monad.State as State
+import Control.Lazy (defer)
 import Partial.Unsafe
 import Data.NonEmpty.Extra as NonEmpty
 
@@ -241,9 +242,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         (List KeyValue)       -- the output
     -> ArgParser r (List KeyValue)
   go (Args6 l' sub' req rep canRep out) = do
-    input       <- getInput
-    { options } <- getConfig
-    { depth }   <- getState
+    (ParseArgs { options } { depth } _ input) <- getParseState
 
     -- trace l' \i->
     --   "solve: req = " <> pretty req
@@ -543,7 +542,7 @@ parseLayout
   -> Boolean
   -> ArgParseLayout
   -> ArgParser r (List KeyValue)
-parseLayout l sub x = do
+parseLayout l sub x = defer \_-> profileS "parse-layout" \_-> do
  skipIf hasTerminated Nil do
   { options } <- getConfig
   go options x
