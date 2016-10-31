@@ -3,6 +3,7 @@ module Neodoc.Parsing.Parser where
 import Prelude
 import Data.Pretty
 import Data.Bifunctor (rmap)
+import Data.Optimize.Uncurried
 import Control.Lazy (class Lazy)
 import Control.MonadPlus (class MonadPlus, class MonadZero, class Alternative)
 import Control.Plus (class Plus, class Alt)
@@ -137,8 +138,8 @@ instance lazyParser :: Lazy (Parser e c s g i a) where
 
 instance monadZeroParser :: MonadZero (Parser e c s g i)
 
-runParser :: ∀ e c s g i a. c -> s -> g -> i -> Parser e c s g i a -> Either (ParseError e) a
-runParser c s g i p = case unParser p (ParseArgs c s g i) of (Step _ _ r) -> r
+runParser :: ∀ e c s g i a. Args5 c s g i (Parser e c s g i a) -> Either (ParseError e) a
+runParser (Args5 c s g i p) = case unParser p (ParseArgs c s g i) of (Step _ _ r) -> r
 
 --------------------------------------------------------------------------------
 -- Induced errors. The prime versions target the custom error type 'e'.

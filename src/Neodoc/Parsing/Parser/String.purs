@@ -13,11 +13,10 @@ import Neodoc.Parsing.Parser
 import Neodoc.Parsing.Parser.Combinators
 import Neodoc.Parsing.Parser.Pos as P
 
-type StringParser e c g = Parser e c StringParserState g String
-type StringParserState = { position :: P.Position }
+type StringParser e c g = Parser e c P.Position g String
 
 getPosition :: ∀ e c g. StringParser e c g P.Position
-getPosition = _.position <$> getState
+getPosition = getState
 
 eof :: ∀ e c g. StringParser e c g Unit
 eof = do
@@ -30,28 +29,29 @@ satisfy f = try do
   if f c then return c
          else fail $ "Character '" <> S.singleton c <> "' did not satisfy predicate"
 
--- | Match any character.
+foreign import getFirst :: String -> Char
+foreign import getRest :: String -> String
+
+-- | Match any character, optimized for perf.
 anyChar :: ∀ e c g. StringParser e c g Char
-anyChar = do
-  i <- getInput
-  case S.uncons i of
-    Nothing -> fail "Unexpected EOF"
-    Just { head, tail } -> Parser \a ->
-      let s = getS a
-          s' = s { position = P.updatePosString s.position (S.singleton head) }
-       in Step true (setI tail (setS s' a)) (Right head)
+anyChar = Parser \(a@(ParseArgs c s g i)) ->
+  case i of
+    "" -> Step false a (Left (error "Unexpected EOF"))
+    str ->
+      let head = getFirst str
+          tail = getRest str
+          s' = P.updatePosString s (S.singleton head)
+       in Step true (ParseArgs c s' g tail) (Right head)
 
 -- | Match the specified string.
 string :: ∀ e c g. String -> StringParser e c g String
-string str = do
-  i <- getInput
+string str = Parser \(a@(ParseArgs c s g i)) ->
   case S.indexOf (wrap str) i of
-    Just 0 -> Parser \a ->
-      let s = getS a
-          s' = s { position = P.updatePosString s.position str }
+    Just 0 ->
+      let s' = P.updatePosString s str
           i' = S.drop (S.length str) i
-       in Step true (setI i' (setS s a)) (Right str)
-    _ -> fail ("Expected " <> show str)
+       in Step true (ParseArgs c s' g i') (Right str)
+    _ -> Step false a (Left (error $ "Expected " <> show str))
 
 -- | Match the specified character
 char :: ∀ e c g. Char -> StringParser e c g Char

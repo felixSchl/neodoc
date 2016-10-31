@@ -125,7 +125,7 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
                 then pure $ ArgParseResult Nothing Nil <$ eof
                 else Nil
 
-   in runParser { env, options, spec } initialState initialGlobalState tokens $
+   in runParser $ Args5 { env, options, spec } initialState initialGlobalState tokens $
         let p = if null parsers'
                   then eof $> ArgParseResult Nothing Nil
                   else evalParsers (byOrigin <<< getResult) parsers'

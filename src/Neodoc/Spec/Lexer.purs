@@ -12,6 +12,7 @@ import Data.List as L
 import Data.Tuple.Nested ((/\))
 import Data.Monoid (mempty)
 import Data.Functor (($>))
+import Data.Optimize.Uncurried
 import Control.Alt ((<|>))
 import Control.Apply ((*>), (<*))
 import Control.Lazy (defer)
@@ -35,7 +36,7 @@ import Neodoc.Spec.Error (SpecParseError(..))
 
 import Neodoc.Parsing.Parser.Pos as P
 import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
-import Neodoc.Parsing.Parser.String (StringParserState)
+import Neodoc.Parsing.Parser.String (StringParser)
 import Neodoc.Parsing.Parser.String as P
 import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
 import Neodoc.Parsing.Parser.Combinators as P
@@ -48,17 +49,10 @@ instance showMode :: Show Mode where
   show Descriptions = "Descriptions"
 
 -- | Parser that parses strings
-type StringParser a
-  = Parser
-      String
-      Unit
-      StringParserState
-      Unit
-      String
-      a
+type StringParser' a = StringParser String Unit Unit a
 
 -- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
-skipSpaces :: ∀ e c g. StringParser Unit
+skipSpaces :: ∀ e c g. StringParser' Unit
 skipSpaces = (do
     P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     skipSpaces
@@ -85,7 +79,7 @@ lex m input = profileS "spec-parser::lex" \_->
                 Descriptions -> input
    in do
      lmap (SpecParseError <<< (P.extractError id)) $
-        P.runParser unit { position: P.initialPos } unit input' (parseTokens m)
+        P.runParser $ Args5 unit P.initialPos unit input' (parseTokens m)
 
 lexDescs :: String -> Either SpecParseError (List PositionedToken)
 lexDescs = lex Descriptions <<< trimDescSection
@@ -93,7 +87,7 @@ lexDescs = lex Descriptions <<< trimDescSection
 lexUsage :: String -> Either SpecParseError (List PositionedToken)
 lexUsage = lex Usage
 
-parseTokens :: Mode -> StringParser (L.List PositionedToken)
+parseTokens :: Mode -> StringParser' (L.List PositionedToken)
 parseTokens m =
   let tokParser = case m of
                     Usage        -> parseUsageToken
@@ -107,10 +101,10 @@ parseTokens m =
     P.eof <|> void do
       i <- P.getInput
       P.fail $ "Unexpected input: " <> i
-    pure xs
+    P.return xs
 
-parseUsageToken :: StringParser Token
-parseUsageToken = P.choice [
+parseUsageToken :: StringParser' Token
+parseUsageToken = defer \_-> P.choice [
     profileA "token: LParen"\_-> P.char   '('   $> LParen
   , profileA "token: RParen"\_-> P.char   ')'   $> RParen
   , profileA "token: RSquare"\_-> P.char   ']'   $> RSquare
@@ -129,8 +123,8 @@ parseUsageToken = P.choice [
   ]
   <* skipSpaces -- skip spaces *AND* newlines
 
-parseDescriptionToken :: StringParser Token
-parseDescriptionToken = P.choice [
+parseDescriptionToken :: StringParser' Token
+parseDescriptionToken = defer \_-> P.choice [
     P.char   ','   $> Comma
   , P.char   '('   $> LParen
   , P.char   ')'   $> RParen
@@ -153,15 +147,15 @@ maybeShoutNameRegex
   = unsafePartial $ fromRight $
       regex "[a-zA-Z]" (Regex.parseFlags "gi")
 
-maybeShoutName :: StringParser Token
+maybeShoutName :: StringParser' Token
 maybeShoutName = do
   n <- _anyName
-  pure if (String.toUpper n == n && Regex.test maybeShoutNameRegex n)
-          then ShoutName n
-          else Name n
+  P.return if (String.toUpper n == n && Regex.test maybeShoutNameRegex n)
+            then ShoutName n
+            else Name n
 
-_anyName :: StringParser String
-_anyName = do
+_anyName :: StringParser' String
+_anyName = defer \_-> do
   foldMap String.singleton <$> do
     (:)
       <$> P.alphaNum
@@ -172,11 +166,11 @@ _anyName = do
             , P.try $ P.char '.' <* (P.notFollowedBy $ P.string "..")
           ]
 
-white :: StringParser Unit
+white :: StringParser' Unit
 white = void $ P.oneOf [ '\n', '\r', ' ', '\t' ]
 
-_stdin :: StringParser Token
-_stdin = do
+_stdin :: StringParser' Token
+_stdin = defer \_-> do
   P.char '-'
   -- Ensure the argument is correctly bounded
   P.eof <|> (P.lookAhead $ P.choice [
@@ -186,10 +180,10 @@ _stdin = do
   , void $ P.char ')'
   , void $ P.string "..."
   ])
-  pure Dash
+  P.return Dash
 
-_eoa :: StringParser Token
-_eoa = do
+_eoa :: StringParser' Token
+_eoa = defer \_-> do
   P.string "--"
   -- Ensure the argument is correctly bounded
   P.eof <|> (P.lookAhead $ P.choice [
@@ -197,14 +191,14 @@ _eoa = do
   , void $ P.char ']'
   , void $ P.char ')'
   ])
-  pure DoubleDash
+  P.return DoubleDash
 
-_reference :: StringParser Token
+_reference :: StringParser' Token
 _reference = Reference <$> do
   P.char '@'
   foldMap String.singleton <$> P.many (P.noneOf [' ', '\n'])
 
-_tag :: StringParser Token
+_tag :: StringParser' Token
 _tag = P.between (P.char '[') (P.char ']') do
   s <- trim <<< foldMap String.singleton <$> some (P.noneOf [']'])
   case A.uncons (String.split (Pattern ":") s) of
@@ -212,10 +206,10 @@ _tag = P.between (P.char '[') (P.char ']') do
     Just { head: _, tail: xs } | A.length xs == 0 ->  P.fail "Expected label"
     Just { head: x, tail: xs } ->
       let v = trim (String.joinWith ":" xs)
-       in pure (Tag x v)
+       in P.return (Tag x v)
 
-_angleName :: StringParser String
-_angleName = do
+_angleName :: StringParser' String
+_angleName = defer \_-> do
   P.char '<'
   n <- foldMap String.singleton <$> do
     some $ P.choice [
@@ -225,10 +219,10 @@ _angleName = do
     , P.noneOf [ '<', '>' ]
     ]
   P.char '>'
-  pure $ "<" ~~ n ~~ ">"
+  P.return $ "<" ~~ n ~~ ">"
 
-_shortOption :: StringParser Token
-_shortOption = do
+_shortOption :: StringParser' Token
+_shortOption = defer \_-> do
   let validChar = P.alphaNum <|> P.oneOf [ '?' ]
 
   P.char '-'
@@ -241,7 +235,7 @@ _shortOption = do
     Just <$> do
       P.char '='
       name <- P.choice [ _angleName, _anyName ]
-      pure  { name, optional: false }
+      P.return { name, optional: false }
 
     -- Case 2: Option[=ARG]
   , Just <$> do
@@ -249,12 +243,12 @@ _shortOption = do
       P.optional $ P.char '='
       name <- P.choice [ _angleName, _anyName ]
       P.char ']'
-      pure  { name, optional: true }
+      P.return { name, optional: true }
 
     -- Case 3: Option<ARG>
   , Just <$> do
       name <- _angleName
-      pure { name, optional: false }
+      P.return { name, optional: false }
   ]
 
   -- Ensure the argument is correctly bounded
@@ -267,10 +261,10 @@ _shortOption = do
   , void $ P.char ',' -- desc mode only
   ])
 
-  pure $ SOpt (x:|xs) arg
+  P.return $ SOpt (x:|xs) arg
 
-_longOption :: StringParser Token
-_longOption = do
+_longOption :: StringParser' Token
+_longOption = defer \_-> do
   P.string "--"
 
   name' <- foldMap String.singleton <$> do
@@ -290,9 +284,9 @@ _longOption = do
     Just <$> do
       P.char '='
       n <- P.choice [ _angleName, _anyName ]
-      pure  { name: n
-            , optional: false
-            }
+      P.return  { name: n
+                , optional: false
+                }
 
     -- Case 2: Option[=ARG]
   , Just <$> do
@@ -300,9 +294,9 @@ _longOption = do
       P.optional $ P.char '='
       n <- P.choice [ _angleName, _anyName ]
       P.char ']'
-      pure  { name:     n
-            , optional: true
-            }
+      P.return  { name:     n
+                , optional: true
+                }
   ]
 
   -- Ensure the argument is correctly bounded
@@ -315,15 +309,15 @@ _longOption = do
   , void $ P.char ',' -- desc mode only
   ])
 
-  pure $ LOpt name' arg
+  P.return $ LOpt name' arg
 
-identStart :: StringParser Char
+identStart :: StringParser' Char
 identStart = P.alpha
 
-identLetter :: StringParser Char
+identLetter :: StringParser' Char
 identLetter = P.alphaNum <|> P.oneOf ['_', '-']
 
-flag :: StringParser Char
+flag :: StringParser' Char
 flag = P.lowerAlphaNum
 
 foreign import trimDescSection :: String -> String

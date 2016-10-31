@@ -16,6 +16,7 @@ import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for)
 import Data.Foldable (class Foldable, maximumBy)
+import Data.Optimize.Uncurried
 import Control.Alt ((<|>))
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Partial.Unsafe
@@ -82,7 +83,7 @@ evalParsers p parsers = do
 
   -- Run all parsers and collect their results for further evaluation
   let collected = parsers <#> \parser ->
-        runParser config state globalState input $ Parser \a ->
+        runParser $ Args5 config state globalState input $ Parser \a ->
           case unParser parser a of
             Step b' a'@(ParseArgs c' s' g' i') result ->
               let cont = ParserCont c' s' g' i'
@@ -168,7 +169,7 @@ fork parser = do
   state       <- getState
   globalState <- getGlobalState
   input       <- getInput
-  let result = runParser config state globalState input $ Parser \a ->
+  let result = runParser $ Args5 config state globalState input $ Parser \a ->
         case unParser parser a of
           Step b' a' result ->
           --  TODO: use tuple in `ParserCont`

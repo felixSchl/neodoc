@@ -12,6 +12,7 @@ import Data.String.Ext ((^=), (~~))
 import Data.Functor (($>))
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty as NonEmpty
+import Data.Optimize.Uncurried
 import Control.Monad.State (StateT(..), State(..), evalState)
 import Control.Monad.Except (ExceptT(..), throwError)
 import Control.MonadPlus (guard)
@@ -43,7 +44,7 @@ runTokenParser
   -> TokenParser a
   -> Either String a
 runTokenParser s p = lmap (P.extractError id) do
-  P.runParser unit ParserState.initialState unit s p
+  P.runParser $ Args5 unit ParserState.initialState unit s p
 
 token :: ∀ a. (Token -> Maybe a) -> TokenParser a
 token test = Parser \(args@(ParseArgs _ _ _ toks)) ->

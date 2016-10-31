@@ -8,6 +8,7 @@ import Debug.Trace
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Bifunctor (lmap)
+import Data.Optimize.Uncurried
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
 import Data.List (List(..), (:), singleton, many, fromFoldable, some, toUnfoldable)
@@ -16,7 +17,7 @@ import Data.Traversable (foldMap)
 import Data.Foldable (elem)
 import Neodoc.Parsing.Parser as P
 import Neodoc.Parsing.Parser (Parser)
-import Neodoc.Parsing.Parser.String (StringParserState)
+import Neodoc.Parsing.Parser.String (StringParser)
 import Neodoc.Parsing.Parser.Combinators as P
 import Neodoc.Parsing.Parser.Pos as P
 import Neodoc.Parsing.Parser.String as P
@@ -32,19 +33,12 @@ type Options r = {
 }
 
 -- | Parser that parses strings
-type StringParser a
-  = Parser
-      String
-      Unit
-      StringParserState
-      Unit
-      String
-      a
+type StringParser' a = StringParser String Unit Unit a
 
 -- | Parse a single token from the ARGV stream.
 -- | Because each item on the ARGV stream is a a string itself, apply a parser
 -- | to each item and derive a token.
-parseToken :: StringParser Token
+parseToken :: StringParser' Token
 parseToken = do
   P.choice $ P.try <$> [
     lopt  <* P.eof
@@ -61,18 +55,18 @@ parseToken = do
     illegalSOptChar :: Array Char
     illegalSOptChar = '-' A.: illegalOptChar
 
-    stdin :: StringParser Token
+    stdin :: StringParser' Token
     stdin = do
       P.char '-'
       pure Stdin
 
-    eoa :: StringParser Token
+    eoa :: StringParser' Token
     eoa = do
       P.string "--"
       pure $ EOA empty
 
     -- | Parse a short option
-    sopt :: StringParser Token
+    sopt :: StringParser' Token
     sopt = do
       P.char '-'
       x   <- P.noneOf illegalSOptChar
@@ -81,7 +75,7 @@ parseToken = do
       pure $ SOpt x xs arg
 
     -- | Parse a long option
-    lopt :: StringParser Token
+    lopt :: StringParser' Token
     lopt = do
       P.string "--"
       xs <- foldMap String.singleton <$> do
@@ -90,7 +84,7 @@ parseToken = do
       pure $ LOpt xs arg
 
     -- | Parse a literal
-    lit :: StringParser Token
+    lit :: StringParser' Token
     lit = Lit <<< foldMap String.singleton <$> do
       many P.anyChar
 
@@ -112,7 +106,7 @@ lex xs options = lmap (P.extractError id) $ go xs 1
       let toEOA l = Right
             $ singleton
             $ PositionedToken (EOA (StringValue <$> xs)) x n
-      tok <- P.runParser unit { position: P.initialPos } unit x parseToken
+      tok <- P.runParser (Args5 unit P.initialPos unit x parseToken)
       case tok of
         (EOA _) -> toEOA "--"
         otherwise -> do

@@ -17,6 +17,7 @@ module Neodoc.Value (
 import Prelude
 import Global
 import Data.Generic
+import Data.Optimize.Uncurried
 import Data.Int (toNumber, fromNumber)
 import Data.Bifunctor (lmap)
 import Data.Array as Array
@@ -43,7 +44,7 @@ import Data.Foreign.Extra as F
 
 import Neodoc.Parsing.Parser.Pos as P
 import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
-import Neodoc.Parsing.Parser.String (StringParserState)
+import Neodoc.Parsing.Parser.String (StringParser)
 import Neodoc.Parsing.Parser.String as P
 import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
 import Neodoc.Parsing.Parser.Combinators as P
@@ -205,14 +206,7 @@ read :: String  -- ^ the input
 read s split = either (const $ StringValue s) id (parse s split)
 
 -- | Parser that parses strings
-type StringParser a
-  = Parser
-      String
-      Unit
-      StringParserState
-      Unit
-      String
-      a
+type StringParser' a = StringParser String Unit Unit a
 
 -- | Parse a string into a value
 -- | Values can be comma *AND* space separated:
@@ -229,7 +223,7 @@ parse
 parse s split =
   let p = if split then values else value <* P.eof
   in lmap (P.extractError id) $
-      P.runParser unit { position: P.initialPos } unit s p
+      P.runParser (Args5 unit P.initialPos unit s p)
 
   where
     values = do
