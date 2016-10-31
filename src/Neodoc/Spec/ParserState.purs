@@ -6,11 +6,11 @@ type Line = Int
 type Indentation = Int
 data ParserState = ParserState Indentation Line
 
-setIndentation :: ParserState -> Indentation -> ParserState
-setIndentation (ParserState _ l) i = ParserState i l
+setIndentation :: Indentation -> ParserState -> ParserState
+setIndentation i (ParserState _ l) = ParserState i l
 
-setLine :: ParserState -> Line -> ParserState
-setLine (ParserState i _) l = ParserState i l
+setLine :: Line -> ParserState -> ParserState
+setLine l (ParserState i _) = ParserState i l
 
 getLine :: ParserState -> Line
 getLine (ParserState _ l) = l

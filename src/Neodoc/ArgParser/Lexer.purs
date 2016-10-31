@@ -21,7 +21,6 @@ import Data.Array as A
 import Control.Plus (empty)
 
 import Neodoc.ArgParser.Token (PositionedToken(..), Token(..))
-import Neodoc.Spec.Parser.Base (space, alphaNum)
 import Neodoc.Value (Value(..))
 
 type Options r = {

@@ -135,6 +135,8 @@ instance alternativeParser :: Alternative (Parser e c s g i)
 instance lazyParser :: Lazy (Parser e c s g i a) where
   defer f = Parser \args -> unParser (f unit) args
 
+instance monadZeroParser :: MonadZero (Parser e c s g i)
+
 runParser :: ∀ e c s g i a. c -> s -> g -> i -> Parser e c s g i a -> Either (ParseError e) a
 runParser c s g i p = case unParser p (ParseArgs c s g i) of (Step _ _ r) -> r
 

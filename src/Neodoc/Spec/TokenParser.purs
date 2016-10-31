@@ -163,11 +163,3 @@ shoutName = "NAME" <??> token go
   where
     go (ShoutName n) = Just n
     go _             = Nothing
-
--- | Return the next token's position w/o consuming anything
-nextTokPos :: TokenParser P.Position
-nextTokPos = do
-  toks <- P.getInput
-  case toks of
-    (PositionedToken pos _):xs -> pure pos
-    _                          -> P.fail "Expected token, met EOF"

@@ -6,6 +6,7 @@ import Prelude
 import Debug.Trace
 import Debug.Profile
 import Data.Pretty
+import Data.Bifunctor (lmap)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty.Extra as NonEmpty
 import Neodoc.Data.Layout
@@ -25,23 +26,18 @@ import Data.Maybe (fromMaybe, Maybe(..), maybe, isNothing)
 import Data.Tuple (Tuple(Tuple), snd, fst)
 import Data.Tuple.Nested (tuple3)
 import Partial.Unsafe (unsafePartial)
-import Text.Parsing.Parser (ParseError, fail, fatal, consume) as P
-import Text.Parsing.Parser.Combinators (
-  try, optional, choice, sepBy1, between,
-  optionMaybe, lookAhead, option
-  ) as P
-import Text.Parsing.Parser.Combinators ((<?>), (<??>))
+
+-- XXX: remove this
 import Text.Parsing.Parser.Pos (Position(Position)) as P
 
 import Neodoc.Data.OptionArgument
-import Neodoc.Spec.Parser.Base (getInput)
-import Neodoc.Spec.Lexer as L
-import Neodoc.Spec.Token as L
-import Neodoc.Spec.TokenParser as L
-import Neodoc.Spec.Parser.Combinators (
-  markIndent', markLine, indented,
-  sameIndent, lessIndented, moreIndented
-)
+import Neodoc.Parsing.Parser as P
+import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
+import Neodoc.Parsing.Parser.Combinators as P
+import Neodoc.Spec.Error
+import Neodoc.Spec.Token as P
+import Neodoc.Spec.TokenParser as P
+import Neodoc.Spec.Parser.Combinators as P
 
 type Branch = NonEmpty List UsageLayout
 type UsageParseResult = {
@@ -50,20 +46,21 @@ type UsageParseResult = {
 }
 
 parse
-  :: List L.PositionedToken
-  -> Either P.ParseError UsageParseResult
-parse toks = profileS "spec-parser::parse-usage" \_-> L.runTokenParser toks do
+  :: List P.PositionedToken
+  -> Either SpecParseError UsageParseResult
+parse toks = profileS "spec-parser::parse-usage" \_->
+ lmap SpecParseError $ P.runTokenParser toks do
   -- Calculate and mark the original program indentation.
-  P.Position { column: startCol } <- L.nextTokPos <?> "Program name"
-  name    <- program
-  layouts <- markLine do
-    markIndent' startCol $ do
+  P.Position { column: startCol } <- P.nextTokPos <?> "Program name"
+  name <- program
+  layouts <- do
+    P.markIndent' startCol $ do
      (:|)
       <$> (layout name)
-      <*> many' do
+      <*> P.many' do
             P.optional $ P.try do
-              L.name >>= guard <<< (_ == "or")
-              L.colon
+              P.name >>= guard <<< (_ == "or")
+              P.colon
             name' <- program
             if name /= name'
                then do
@@ -73,9 +70,9 @@ parse toks = profileS "spec-parser::parse-usage" \_-> L.runTokenParser toks do
                           <> ", but got \"" <> name' <> "\""
                else layout name
 
-  L.eof <?> "End of usage section"
+  P.eof <?> "End of usage section"
 
-  pure {
+  P.return {
     program: name
   , layouts:
       layouts <#> case _ of
@@ -85,25 +82,25 @@ parse toks = profileS "spec-parser::parse-usage" \_-> L.runTokenParser toks do
   }
 
   where
-  program :: L.TokenParser String
-  program = "Program name" <??> L.name
+  program :: P.TokenParser String
+  program = "Program name" <??> P.name
 
-  layout :: String -> L.TokenParser (Maybe UsageLayout)
+  layout :: String -> P.TokenParser (Maybe UsageLayout)
   layout name = do
     branches <- "Option, Positional, Command, Group or Reference elements" <??> do
-      (many' $ P.try $ moreIndented *> elem) `P.sepBy1` L.vbar
+      (P.many' $ P.try $ P.moreIndented *> elem) `P.sepBy1` P.vbar
     eoa <- P.choice [
       P.try $ do
         maybeInParens do
           maybeInParens do
-            L.doubleDash
-            many' elem
-          many' elem
-        many' elem
-        pure $ Just $ Elem EOA
+            P.doubleDash
+            P.many' elem
+          P.many' elem
+        P.many' elem
+        P.return $ Just $ Elem EOA
     , (do
-        L.eof <|> (P.lookAhead $ lessIndented <|> sameIndent)
-        pure Nothing
+        P.eof <|> (P.lookAhead $ P.lessIndented <|> P.sameIndent)
+        P.return Nothing
       )
       -- XXX: We could show the last token that failed to be consumed, here
       <?> "End of usage line"
@@ -116,53 +113,53 @@ parse toks = profileS "spec-parser::parse-usage" \_-> L.runTokenParser toks do
 
         branches'' = filter (not <<< null) branches'
 
-    pure $ case branches'' of
+    P.return case branches'' of
       Nil -> Nothing
-      _ -> pure do
+      _   -> Just do
         Group
           false -- not optional
           false -- not repeatable
           (unsafePartial $ listToNonEmpty $ listToNonEmpty <$> branches'')
 
-  command :: L.TokenParser UsageLayoutArg
+  command :: P.TokenParser UsageLayoutArg
   command = Command
-    <$> L.name
+    <$> P.name
     <*> repetition
 
-  positional :: L.TokenParser UsageLayoutArg
+  positional :: P.TokenParser UsageLayoutArg
   positional = Positional
-    <$> (L.shoutName <|> L.angleName)
+    <$> (P.shoutName <|> P.angleName)
     <*> repetition
 
-  stdin :: L.TokenParser UsageLayoutArg
-  stdin = L.dash *> pure Stdin
+  stdin :: P.TokenParser UsageLayoutArg
+  stdin = P.dash *> P.return Stdin
 
-  reference :: L.TokenParser UsageLayoutArg
-  reference = Reference <$> L.reference
+  reference :: P.TokenParser UsageLayoutArg
+  reference = Reference <$> P.reference
 
-  longOption :: L.TokenParser UsageLayoutArg
+  longOption :: P.TokenParser UsageLayoutArg
   longOption = do
-    { name, arg } <- L.lopt
+    { name, arg } <- P.lopt
     let arg' = do
           { name, optional } <- arg
-          pure (OptionArgument name optional)
+          Just (OptionArgument name optional)
     Option name arg' <$> repetition
 
-  shortOption :: L.TokenParser UsageLayoutArg
+  shortOption :: P.TokenParser UsageLayoutArg
   shortOption = do
-    { chars, arg } <- L.sopt
+    { chars, arg } <- P.sopt
     let arg' = do
           { name, optional } <- arg
-          pure (OptionArgument name optional)
+          Just (OptionArgument name optional)
     OptionStack chars arg' <$> repetition
 
-  option :: L.TokenParser UsageLayoutArg
+  option :: P.TokenParser UsageLayoutArg
   option = longOption <|> shortOption
 
-  repetition :: L.TokenParser Boolean
-  repetition = P.option false (indented *> L.tripleDot $> true)
+  repetition :: P.TokenParser Boolean
+  repetition = P.option false (P.indented *> P.tripleDot $> true)
 
-  elem :: L.TokenParser UsageLayout
+  elem :: P.TokenParser UsageLayout
   elem = "Option, Positional, Command, Group or Reference" <??>
     (P.choice
       [ Elem <$> positional
@@ -173,53 +170,44 @@ parse toks = profileS "spec-parser::parse-usage" \_-> L.runTokenParser toks do
       , defer \_ -> group
       ])
 
-  group :: L.TokenParser UsageLayout
+  group :: P.TokenParser UsageLayout
   group = defer \_ -> P.choice [ reqGroup , optGroup ]
 
   listToNonEmpty :: ∀ a. Partial => List a -> NonEmpty List a
   listToNonEmpty (a : as) = a :| as
 
-  optGroup :: L.TokenParser UsageLayout
+  optGroup :: P.TokenParser UsageLayout
   optGroup = defer \_ -> do
     branches <- P.between
-                  (indented *> L.lsquare)
-                  (L.rsquare)
-                  ((some elem) `P.sepBy1` L.vbar)
+                  (P.indented *> P.lsquare)
+                  (P.rsquare)
+                  ((some elem) `P.sepBy1` P.vbar)
 
     Group true
         <$> repetition
         -- note: this can be unsafe because of `sepBy1` and `some`
-        <*> (pure $ unsafePartial
-                $ listToNonEmpty $ listToNonEmpty <$> branches)
+        <*> (P.return $ unsafePartial
+                      $ listToNonEmpty $ listToNonEmpty <$> branches)
 
-  reqGroup :: L.TokenParser UsageLayout
+  reqGroup :: P.TokenParser UsageLayout
   reqGroup = defer \_ -> do
     branches <- P.between
-                  (indented *> L.lparen)
-                  (L.rparen)
-                  ((some elem) `P.sepBy1` L.vbar)
+                  (P.indented *> P.lparen)
+                  (P.rparen)
+                  ((some elem) `P.sepBy1` P.vbar)
 
     Group false
         <$> repetition
         -- note: this can be unsafe because of `sepBy1` and `some`
-        <*> (pure $ unsafePartial
-                $ listToNonEmpty $ listToNonEmpty <$> branches)
+        <*> (P.return $ unsafePartial
+                      $ listToNonEmpty $ listToNonEmpty <$> branches)
 
-  maybeInParens :: ∀ a. L.TokenParser a -> L.TokenParser a
+  maybeInParens :: ∀ a. P.TokenParser a -> P.TokenParser a
   maybeInParens p = do
-    Tuple close v <- moreIndented *> do
+    Tuple close v <- P.moreIndented *> do
       Tuple
-        <$> (P.optionMaybe $ P.choice [ L.lparen  $> L.rparen
-                                      , L.lsquare $> L.rsquare ])
+        <$> (P.optionMaybe $ P.choice [ P.lparen  $> P.rparen
+                                      , P.lsquare $> P.rsquare ])
         <*> p
-    fromMaybe (pure unit) close
-    pure v
-
--- optimal: tail recursive many' implementation specialized for lists
-many' p = reverse <$> go Nil
-  where go acc = do
-          v <- P.option Nothing (Just <$> p)
-          case v of
-            Nothing -> pure acc
-            Just v  -> go (v:acc)
-
+    fromMaybe (P.return unit) close
+    P.return v

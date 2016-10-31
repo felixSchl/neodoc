@@ -4,6 +4,7 @@ import Prelude
 import Debug.Profile
 import Debug.Trace
 import Data.Pretty
+import Data.Bifunctor (lmap)
 import Data.Tuple.Nested ((/\))
 import Data.Tuple (swap) as Tuple
 import Data.NonEmpty ((:|))
@@ -22,12 +23,13 @@ import Data.List (
   List(..), (:), many, some, head, length, filter, catMaybes, reverse,
   singleton)
 
-import Text.Parsing.Parser as P
-import Text.Parsing.Parser.Combinators as P
-
-import Neodoc.Spec.Lexer as L
-import Neodoc.Spec.Token as L
-import Neodoc.Spec.TokenParser as L
+import Neodoc.Parsing.Parser as P
+import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
+import Neodoc.Parsing.Parser.Combinators as P
+import Neodoc.Spec.Error
+import Neodoc.Spec.Token as P
+import Neodoc.Spec.TokenParser as P
+import Neodoc.Spec.Parser.Combinators as P
 
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(Nothing, Just), isJust, isNothing, maybe, fromMaybe)
@@ -39,8 +41,6 @@ import Partial.Unsafe
 import Neodoc.Value
 import Neodoc.Value as Value
 import Neodoc.Spec.Lexer as L
-import Neodoc.Spec.Parser.Base (getInput)
-import Neodoc.Spec.Parser.Combinators
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.OptionAlias (Aliases)
 import Neodoc.Data.OptionArgument
@@ -54,11 +54,14 @@ instance showContent :: Show Content where
   show (Default s) = "Default " <> show s
   show (Env s) = "Env " <> show s
 
-parse :: (List L.PositionedToken) -> Either P.ParseError (List Description)
-parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
-  markIndent do
+parse
+  :: List P.PositionedToken
+  -> Either SpecParseError (List Description)
+parse toks = profileS "spec-parser::parse-desc" \_->
+ lmap SpecParseError $ P.runTokenParser toks do
+  P.markIndent do
     reverse <$> go Nil
-    <* L.eof
+    <* P.eof
 
   where
   go vs = do
@@ -71,48 +74,48 @@ parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
         , pure vs
         ]
 
-  anyName :: L.TokenParser String
-  anyName = L.angleName <|> L.shoutName <|> L.name
+  anyName :: P.TokenParser String
+  anyName = P.angleName <|> P.shoutName <|> P.name
 
-  desc :: L.TokenParser Description
+  desc :: P.TokenParser Description
   desc = defer \_-> "--option or <positional> description" P.<??> do
           P.choice $  [ optionDesc
                       , positionalsDesc
                       ]
 
-  descContent :: Boolean -> L.TokenParser (List Content)
+  descContent :: Boolean -> P.TokenParser (List Content)
   descContent toplevel = do
-    markIndent do
+    P.markIndent do
       catMaybes <$> (flip P.manyTill descEnd do
         P.choice $ P.try <$> [
-          Just <<< Default <$> L.tag "default"
-        , Just <<< Env     <$> L.tag "env"
-        , L.anyToken $> Nothing
+          Just <<< Default <$> P.tag "default"
+        , Just <<< Env     <$> P.tag "env"
+        , P.anyToken $> Nothing
         ])
-    <* (void L.eof <|> void (some L.newline))
+    <* (void P.eof <|> void (some P.newline))
     where
       descEnd = do
         P.choice [
-          L.eof
+          P.eof
         , void $ P.lookAhead do
-            L.newline
-            when (not toplevel) lessIndented
+            P.newline
+            when (not toplevel) P.lessIndented
             P.choice [
-              void L.sopt
-            , void L.lopt
-            , void L.angleName
-            , void L.shoutName
+              void P.sopt
+            , void P.lopt
+            , void P.angleName
+            , void P.shoutName
             ]
         ]
 
-  positionalsDesc :: L.TokenParser Description
+  positionalsDesc :: P.TokenParser Description
   positionalsDesc = do
-    L.angleName <|> L.shoutName
-    P.option false $ L.tripleDot $> true
+    P.angleName <|> P.shoutName
+    P.option false $ P.tripleDot $> true
     descContent false
     pure CommandDescription
 
-  optionDesc :: L.TokenParser Description
+  optionDesc :: P.TokenParser Description
   optionDesc = do
     { aliases, arg, repeatable } <- opt
     description <- descContent false
@@ -148,14 +151,14 @@ parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
 
     where
 
-    opt :: L.TokenParser _
+    opt :: P.TokenParser _
     opt = do
       let optsP = "option" P.<??> P.choice [ P.try short, long ]
       xs <- optsP `P.sepBy1` do  -- extra options: [, -f]
         P.optional do
-          L.comma
-            *> many L.newline
-            *> indented
+          P.comma
+            *> many P.newline
+            *> P.indented
 
       -- check integrity of the option-aliases
       aliases <- foldl (\acc next -> do
@@ -202,10 +205,10 @@ parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
         = (if o then "[" else "") <> n <> (if o then "]" else "")
 
 
-    short :: L.TokenParser _
+    short :: P.TokenParser _
     short = do
       { flag, arg } <- do
-        { chars: c :| cs, arg } <- L.sopt
+        { chars: c :| cs, arg } <- P.sopt
         (guard $ A.length cs == 0) P.<?> "No stacked options"
         pure { flag: c, arg: arg }
 
@@ -215,17 +218,17 @@ parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
       arg <- maybe
               (P.optionMaybe do
                 c <- P.optionMaybe $ P.choice [
-                      L.lparen  $> (L.rparen  $> false)
-                    , L.lsquare $> (L.rsquare $> true)
+                      P.lparen  $> (P.rparen  $> false)
+                    , P.lsquare $> (P.rsquare $> true)
                     ]
-                name <- L.shoutName <|> L.angleName
+                name <- P.shoutName <|> P.angleName
                 optional <- fromMaybe (pure false) c
                 pure { name, optional }
               )
               (pure <<< Just)
               arg
 
-      repeatable <- P.option false $ L.tripleDot $> true
+      repeatable <- P.option false $ P.tripleDot $> true
 
       pure {
         alias: OptionAlias.Short flag
@@ -233,9 +236,9 @@ parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
       , repeatable
       }
 
-    long :: L.TokenParser _
+    long :: P.TokenParser _
     long = do
-      { name, arg } <- L.lopt
+      { name, arg } <- P.lopt
 
       -- Grab the adjacent positional-looking argument
       -- in case the token did not have an explicit
@@ -243,17 +246,17 @@ parse = profileS "spec-parser::parse-desc" \_-> flip L.runTokenParser do
       arg' <- maybe
               (P.optionMaybe do
                 c <- P.optionMaybe (P.choice [
-                      L.lparen  $> (L.rparen  $> false)
-                    , L.lsquare $> (L.rsquare $> true)
+                      P.lparen  $> (P.rparen  $> false)
+                    , P.lsquare $> (P.rsquare $> true)
                     ])
-                n <- L.shoutName <|> L.angleName
+                n <- P.shoutName <|> P.angleName
                 optional <- fromMaybe (pure false) c
                 pure { name: n, optional: optional }
               )
               (pure <<< Just)
               arg
 
-      repeatable <- P.option false $ L.tripleDot $> true
+      repeatable <- P.option false $ P.tripleDot $> true
 
       pure {
         alias: OptionAlias.Long name
