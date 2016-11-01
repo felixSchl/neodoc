@@ -96,11 +96,20 @@ initialGlobalState = {
 , argCache: Map.empty
 }
 
+-- An artificial argument to be injected to capture any unknown options
 _UNKNOWN_ARG :: Arg
 _UNKNOWN_ARG =
   let arg = Solved.Command "?" true
       key = toArgKey arg
    in Arg (-1) arg key Nothing true
+
+-- An artificial argument to be injected to capture any '--', regardless
+-- of whether it occurs in the spec or not
+_EOA :: Arg
+_EOA =
+  let arg = Solved.EOA
+      key = toArgKey arg
+   in Arg (-2) arg key Nothing true
 
 parse
   :: ∀ r
@@ -126,7 +135,9 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
             -- inject the pseudo argument to collect unknown options into layout
             -- so that the value reduction will work.
             let outBranch = if options.allowUnknown
-                  then NonEmpty.cons (Elem $ Arg.getArg _UNKNOWN_ARG) branch
+                  then NonEmpty.append (Elem <<< Arg.getArg <$> do
+                    _UNKNOWN_ARG :| _EOA : Nil
+                  ) branch
                   else branch
 
             return $ ArgParseResult (Just outBranch) (vs <> vs')
@@ -180,10 +191,17 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
                     -- consider positional and therefore reject
                     let ukPs = filter (isPosTok <<< unIsKnown) uks
                      in if null ukPs
-                          then return (Tuple _UNKNOWN_ARG <<< RichValue.from Origin.Argv
-                                                          <<< StringValue
-                                                          <<< getSource
-                                                          <<< unIsKnown <$> uks)
+                          then return $ uks <#> unIsKnown >>>
+                                \(pTok@(PositionedToken tok _ _)) ->
+                                  case tok of
+                                    Token.EOA xs ->
+                                      let v = ArrayValue $ Array.fromFoldable xs
+                                          rv = RichValue.from Origin.Argv v
+                                       in _EOA /\ rv
+                                    _ ->
+                                      let v = StringValue $ Token.getSource pTok
+                                          rv = RichValue.from Origin.Argv v
+                                       in _UNKNOWN_ARG /\ rv
                           else fail' $ unexpectedInputError Nil ukPs
                   else fail' $ unexpectedInputError Nil kToks
           else fail' $ unexpectedInputError Nil kToks
@@ -195,7 +213,10 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
   emptyBranch = do
     { options } <- getConfig
     let mBranch = if options.allowUnknown
-                    then Just ((Elem $ Arg.getArg _UNKNOWN_ARG):|Nil)
+                    then Just $
+                      (Elem $ Arg.getArg _UNKNOWN_ARG)
+                        :| (Elem $ Arg.getArg _EOA)
+                        : Nil
                     else Nothing
     ArgParseResult mBranch <$> eof
 

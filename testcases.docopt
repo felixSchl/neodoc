@@ -3571,6 +3571,21 @@ $ prog/lu foo -acb
 $ prog/lu foo -acb bar
 "unknown command bar"
 
+$ prog/lu foo -acb bar --foo
+"unknown command bar"
+
+$ prog/lu foo -acb bar --foo qux
+"unknown command bar"
+
+$ prog/lu foo -acb -- qux
+{"-a": true, "?": ["-cb"], "foo": true, "--": ["qux"]}
+
+$ prog/lu foo -acb -- qux bar
+{"-a": true, "?": ["-cb"], "foo": true, "--": ["qux", "bar"]}
+
+$ prog/lu foo -acb bar - qux
+"unknown command bar"
+
 # This is a tricky one: '-a' is known and gets consumed, but since it does not
 # take an argument it leaves a '-cb' on the input. Then, '-c' is not known, so
 # we consume the entire token: '-cb', resulting in a missing '-b'.
@@ -3580,9 +3595,24 @@ $ prog/lur foo -acb
 $ prog/lur foo -ac -b
 {"-a": true, "-b": true, "?": ["-c"], "foo": true}
 
+#
+# ensure '--' is treated correctly when inserted implicitly due to the /u flag
+# (opts.allowUnknown), while also being mentioned explicitly. '--' always
+# collects into an array, so a duplicate _should_ not matter.
+#
+r"""
+usage: p [-b [-a]] foo -- args...
+"""
+
+$ prog/lu foo -acb -- qux
+{"-a": true, "?": ["-cb"], "foo": true, "--": ["qux"]}
+
+$ prog/lu foo -acb -- qux bar
+{"-a": true, "?": ["-cb"], "foo": true, "--": ["qux", "bar"]}
+
 r"""
 usage: p ship new <name>...
 """
 
-$ prog/u ship new --fast foo
+$ prog/luRrps ship new --fast foo
 {"<name>": ["foo"], "new": true, "ship": true, "?": ["--fast"]}
