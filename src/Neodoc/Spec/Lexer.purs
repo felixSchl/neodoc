@@ -69,7 +69,7 @@ referenceRegex
 
 -- -- | Optimal: Typeclass-less bind instance
 lex :: Mode -> String -> Either SpecParseError (List PositionedToken)
-lex m input = profileS "spec-parser::lex" \_->
+lex m input =
   -- perform a simple transformation to avoid 'manyTill' and safe some millis
   -- lexing. Hopefully this won't be necessary when purescript-parsing improves
   -- performance, a faster parsing library shows up or the purescript compiler

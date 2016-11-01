@@ -217,7 +217,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
       --
       -- this implementation is simple and favours the first description to
       -- yield a hit.
-      trySubsume = profileS "trySubsume" \_-> do
+      trySubsume = do
         let fs  = S.fromCharArray $ c `Array.cons` cs
         -- XXX: Purescript is not lazy, so this is too expensive.
         --      We could just stop at the first `Just` value.

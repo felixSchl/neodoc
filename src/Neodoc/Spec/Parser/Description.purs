@@ -57,7 +57,7 @@ instance showContent :: Show Content where
 parse
   :: List P.PositionedToken
   -> Either SpecParseError (List Description)
-parse toks = profileS "spec-parser::parse-desc" \_->
+parse toks =
  lmap SpecParseError $ P.runTokenParser toks do
   P.markIndent do
     reverse <$> go Nil

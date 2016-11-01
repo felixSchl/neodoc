@@ -46,7 +46,7 @@ type UsageParseResult = {
 parse
   :: List P.PositionedToken
   -> Either SpecParseError UsageParseResult
-parse toks = profileS "spec-parser::parse-usage" \_->
+parse toks =
  lmap SpecParseError $ P.runTokenParser toks do
   -- Calculate and mark the original program indentation.
   P.Position _ startCol <- P.nextTokPos <?> "Program name"

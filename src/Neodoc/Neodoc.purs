@@ -201,7 +201,7 @@ _run input (NeodocOptions opts) = do
     either pure parseHelpText input
 
   -- 2. solve the spec
-  spec@(Spec { descriptions }) <- profileS "::solve" \_-> runNeodocError' do
+  spec@(Spec { descriptions }) <- runNeodocError' do
     let fromJSCallback
           :: ∀ a
            . (Pretty a)
@@ -228,7 +228,7 @@ _run input (NeodocOptions opts) = do
 
   -- 3. run the arg parser agains the spec and user input
   output <- runNeodocError' do
-    ArgParseResult mBranch vs <- profileS "::arg-parser" \_-> do
+    ArgParseResult mBranch vs <- do
       Error.capture do
         ArgParser.run spec {
             optionsFirst:      opts.optionsFirst
@@ -310,12 +310,12 @@ _runPure input (NeodocOptions opts) mVer = do
     either pure parseHelpText input
 
   -- 2. solve the spec
-  spec@(Spec { descriptions }) <- profileS "::solve" \_-> do
+  spec@(Spec { descriptions }) <- do
     Error.capture do
       Solver.solve { smartOptions: opts.smartOptions } inputSpec
 
   -- 3. run the arg parser agains the spec and user input
-  ArgParseResult mBranch vs <- profileS "::arg-parser" \_-> do
+  ArgParseResult mBranch vs <- do
     Error.capture do
       ArgParser.run spec {
           optionsFirst:      opts.optionsFirst
@@ -327,8 +327,7 @@ _runPure input (NeodocOptions opts) mVer = do
         , versionFlags:      fromFoldable opts.versionFlags
         } env argv
 
-  let output = profileS "::reduce-values" \_->
-                Evaluate.reduce env descriptions mBranch vs
+  let output = Evaluate.reduce env descriptions mBranch vs
 
   if output `has` (pretty <$> opts.helpFlags)
     then pure (HelpOutput output (trimHelp helpText))
@@ -359,16 +358,16 @@ parseHelpText
   -> Either NeodocError (Spec UsageLayout)
 parseHelpText help = do
   -- scan the input text
-  { originalUsage, usage, options } <- profileS "::scan" \_-> Error.capture do
+  { originalUsage, usage, options } <- Error.capture do
     Scanner.scan $ dedent help
 
   -- lex/parse the usage section
-  { program, layouts } <- profileS "::parse/lex usage" \_-> do
+  { program, layouts } <- do
     toks <- Error.capture $ Lexer.lexUsage usage
     Error.capture $ Spec.parseUsage toks
 
   -- lex/parse the description section(s)
-  descriptions <- concat <$> for options \description -> profileS "::parse/lex desc" \_-> do
+  descriptions <- concat <$> for options \description -> do
     toks <- Error.capture $ Lexer.lexDescs description
     Error.capture $ Spec.parseDescription toks
 
