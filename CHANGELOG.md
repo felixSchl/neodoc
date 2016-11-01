@@ -3,7 +3,7 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
-## [1.2.0] - 2016-10-31
+## [1.2.0] - TBA
 
 This release focused mostly on performance. While performance is drastically
 improved with this release, it won't be the end of things in a continous effort
