@@ -12,6 +12,7 @@ import Prelude
 import Data.Function.Uncurried (runFn2, Fn2)
 import Data.Maybe (maybe)
 import Data.String as Str
+import Data.String (Pattern(..))
 import Data.Function (on)
 
 upperCaseEq :: String -> String -> Boolean
@@ -24,12 +25,12 @@ infixl 9 notUpperCaseEq as ^/=
 
 startsWith :: String -> String -> Boolean
 startsWith needle haystack = maybe false id do
-  ix <- Str.indexOf needle haystack
+  ix <- Str.indexOf (Pattern needle) haystack
   pure $ ix == 0
 
 endsWith :: String -> String -> Boolean
 endsWith needle haystack = maybe false id do
-  ix <- Str.lastIndexOf needle haystack
+  ix <- Str.lastIndexOf (Pattern needle) haystack
   pure $ ix == (Str.length haystack - Str.length needle)
 
 foreign import concatImpl :: Fn2 String String String

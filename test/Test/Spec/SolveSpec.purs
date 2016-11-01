@@ -17,7 +17,6 @@ import Data.Array as A
 import Data.Maybe (Maybe(..), maybe)
 import Data.NonEmpty ((:|))
 import Data.String as S
-import Text.Parsing.Parser (ParseError(..)) as P
 
 import Test.Assert (assert)
 import Test.Spec (describe, it)

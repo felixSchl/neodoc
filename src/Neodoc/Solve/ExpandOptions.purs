@@ -10,8 +10,11 @@ module Neodoc.Solve.ExpandOptions (
 , ExpandedOptionsLayoutArg (..)
 ) where
 
+import Data.Optimize.Uncurried
 import Prelude
 import Debug.Trace
+import Debug.Profile
+import Data.Tuple.Nested ((/\))
 import Data.List (
   List(Nil), (:), filter, last, init, singleton, fromFoldable, mapMaybe
 , catMaybes, head)
@@ -29,6 +32,7 @@ import Data.Either (Either(..), either)
 import Data.Traversable (for, traverse)
 import Data.Foldable (any)
 import Data.String as S
+import Data.String (Pattern(..))
 import Data.String.Unsafe as US
 import Data.String.Ext (endsWith)
 import Data.NonEmpty (NonEmpty, (:|))
@@ -36,9 +40,6 @@ import Data.NonEmpty.Extra as NonEmpty
 import Data.NonEmpty (singleton) as NonEmpty
 import Control.MonadPlus (guard)
 import Control.Extend (duplicate)
-import Control.Monad.Trans (lift)
-import Control.Monad.Maybe.Trans (runMaybeT, MaybeT(..))
-import Control.Monad.Except.Trans (runExceptT, ExceptT)
 import Neodoc.Spec
 import Neodoc.Spec as Spec
 import Neodoc.OptionAlias as OptionAlias
@@ -74,7 +75,7 @@ expandOptions
   -> Either SolveError (Spec ExpandedOptionsLayout)
 expandOptions (Spec (spec@{ layouts, descriptions })) = do
   layouts' <- for layouts (traverse preSolveBranch)
-  pure (Spec $ spec { layouts = layouts' })
+  Right (Spec $ spec { layouts = layouts' })
 
   where
   preSolveBranch
@@ -87,8 +88,8 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
     -> Maybe UsageLayout
     -> Either SolveError (Tuple (NonEmpty List ExpandedOptionsLayout) (Maybe UsageLayout))
   preSolveAdjacent layout mAdjLayout =
-    let _return xs = pure (xs /\ mAdjLayout)
-        _slurp  xs = pure (xs /\ Nothing)
+    let _return xs = Right (xs /\ mAdjLayout)
+        _slurp  xs = Right (xs /\ Nothing)
         mAdjArg    = mAdjLayout >>= case _ of
                       Group _ _ _ -> Nothing
                       Elem  x     -> Just x
@@ -105,16 +106,17 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
               solved      = solvedM  <<< NonEmpty.singleton
               slurped     = slurpedM <<< NonEmpty.singleton
           in case x of
-            Usage.Command    n b       -> solved $ Solved.Command    n b
-            Usage.Positional n b       -> solved $ Solved.Positional n b
-            Usage.EOA                  -> solved Solved.EOA
-            Usage.Stdin                -> solved Solved.Stdin
-            Usage.Reference n          -> return (ReferenceArg n)
-            Usage.Option n arg r       -> preSolveOption mAdjLayout slurped solved n arg r
-            Usage.OptionStack cs arg r -> preSolveOptionStack mAdjLayout slurpedM solvedM cs arg r
+            Usage.Command    n b -> solved $ Solved.Command    n b
+            Usage.Positional n b -> solved $ Solved.Positional n b
+            Usage.EOA            -> solved Solved.EOA
+            Usage.Stdin          -> solved Solved.Stdin
+            Usage.Reference n    -> return (ReferenceArg n)
+            Usage.Option n arg r -> preSolveOption (Args6 mAdjLayout slurped solved n arg r)
+            Usage.OptionStack cs@(x:|xs) arg r ->
+              preSolveOptionStack (Args6 mAdjLayout slurpedM solvedM cs arg r)
 
     where
-    preSolveOption mAdjLayout slurped solved n mArg r = do
+    preSolveOption (Args6 mAdjLayout slurped solved n mArg r) = do
       mDescription <- lookupValidDescription
       case mArg of
         Just (OptionArgument aN aO) ->
@@ -142,17 +144,17 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                   guard (not r)
                   adjLayout <- mAdjLayout
                   case adjLayout of
-                    Elem (Usage.Positional n r) -> pure (r /\ n /\ false)
-                    Elem (Usage.Command    n r) -> pure (r /\ n /\ false)
+                    Elem (Usage.Positional n r) -> Just (r /\ n /\ false)
+                    Elem (Usage.Command    n r) -> Just (r /\ n /\ false)
                     Group o r ((x :| Nil) :| Nil) -> case x of
-                      Elem (Usage.Positional n r') -> pure ((r || r') /\ n /\ o)
-                      Elem (Usage.Command    n r') -> pure ((r || r') /\ n /\ o)
+                      Elem (Usage.Positional n r') -> Just ((r || r') /\ n /\ o)
+                      Elem (Usage.Command    n r') -> Just ((r || r') /\ n /\ o)
                       _ -> Nothing
                     _ -> Nothing
             _ -> solved $ Solved.Option (OptionAlias.Long n) Nothing r
 
       where
-      guardArgNames aN aN' | aN ^=^ aN' = pure true
+      guardArgNames aN aN' | aN ^=^ aN' = Right true
       guardArgNames aN aN' = fail
         $ "Arguments mismatch for option --" <> n <> ": "
             <> show aN <> " and " <> show aN'
@@ -161,8 +163,8 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
       lookupValidDescription =
         let matches = filter isMatch descriptions
          in case matches of
-              Nil -> pure Nothing
-              (OptionDescription _ r a _ _) : Nil -> pure (Just (r /\ a))
+              Nil -> Right Nothing
+              (OptionDescription _ r a _ _) : Nil -> Right (Just (r /\ a))
               _ -> fail $ "Multiple option descriptions for "
                               <> "option --" <> n
         where
@@ -172,11 +174,11 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
               _                   -> false
         isMatch _ = false
 
-    preSolveOptionStack mAdjLayout slurped solved (css@(c :| cs)) mArg r = do
+    preSolveOptionStack (Args6 mAdjLayout slurped solved (css@(c :| cs)) mArg r) = do
       -- transform: the last stacked char is the one to receive the explicit
       -- argument binding. the rest will be w/o any binding at all.
       -- ex: -abcdef=foo -> -a -b -c -d -e -f=foo
-      h :| ts <- pure case (Array.last cs) /\ (Array.init cs) of
+      h :| ts <- Right case (Array.last cs) /\ (Array.init cs) of
         Just t /\ Just i -> t :| c `Array.cons` i
         _                -> c :| []
 
@@ -185,7 +187,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
           lookupValidDescription true h
           leading <- fromFoldable <$> for ts \t -> do
             lookupValidDescription false t
-            pure $ Solved.Option
+            Right $ Solved.Option
                     (OptionAlias.Short t)
                     Nothing
                     r
@@ -200,7 +202,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
         -- however, a binding might result from either subsumption of the
         -- option's own characters or from an adjacent argument where possible.
         -- this implementation prefers subsumption over slurping.
-        Nothing -> trySubsume <|> trySlurp h ts
+        Nothing -> trySubsume <|> trySlurp (Args2 h ts)
 
       where
       -- try to subsume the option stack by iterating over it, checking for each
@@ -215,14 +217,14 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
       --
       -- this implementation is simple and favours the first description to
       -- yield a hit.
-      trySubsume = do
+      trySubsume = profileS "trySubsume" \_-> do
         let fs  = S.fromCharArray $ c `Array.cons` cs
         -- XXX: Purescript is not lazy, so this is too expensive.
         --      We could just stop at the first `Just` value.
         match <- head <<< catMaybes <$> for descriptions case _ of
           OptionDescription aliases _ (Just (OptionArgument aN aO)) _ _ -> do
             head <<< catMaybes <<< NonEmpty.toList <$> for aliases case _ of
-              OptionAlias.Short f -> pure do
+              OptionAlias.Short f -> Right do
                 -- the haystack needs to be modified, such that the
                 -- the last (length a.name) characters are uppercased
                 -- and hence compared case INSENSITIVELY.
@@ -243,30 +245,30 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
 
                 -- all of the remaining options must pass the
                 -- `lookupValidDescription` check, otherwise we bail out.
-                rest <- either (const Nothing) (pure <<< id) do
+                rest <- either (const Nothing) (Just <<< id) do
                   fromFoldable <$> for rest \c -> do
                     lookupValidDescription false c
                     -- set the same repeatability flag for each stacked option
                     -- as indicated by trailing option.
-                    pure $ Solved.Option (OptionAlias.Short c)
-                                         Nothing
-                                         r
-                pure $ rest /\ out
-              _ -> pure Nothing
-          _ -> pure Nothing
+                    Right $ Solved.Option (OptionAlias.Short c)
+                                          Nothing
+                                          r
+                Just $ rest /\ out
+              _ -> Right Nothing
+          _ -> Right Nothing
         case match of
           Nothing -> fail "No description subsumed option"
           Just (rest /\ out) -> solved case rest of
             o : os -> o   :| os <> singleton out
             Nil    -> out :| Nil
 
-      trySlurp h ts = do
+      trySlurp (Args2 h ts) = do
         mDesc <- lookupValidDescription true h
         leading <- fromFoldable <$> for ts \t -> do
           lookupValidDescription false t
           -- note: return a function to override the stacked option's
           -- repeatability later.
-          pure $ \r' -> Solved.Option (OptionAlias.Short t) Nothing (r || r')
+          Right $ \r' -> Solved.Option (OptionAlias.Short t) Nothing (r || r')
         case mDesc of
           Just (_ /\ (descArg@(Just (OptionArgument aN' aO')))) -> do
             maybe'
@@ -296,11 +298,11 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                 guard (not r)
                 adjLayout <- mAdjLayout
                 case adjLayout of
-                  Elem (Usage.Positional n r) -> pure (r /\ n /\ false)
-                  Elem (Usage.Command    n r) -> pure (r /\ n /\ false)
+                  Elem (Usage.Positional n r) -> Just (r /\ n /\ false)
+                  Elem (Usage.Command    n r) -> Just (r /\ n /\ false)
                   Group o r ((x :| Nil) :| Nil) -> case x of
-                    Elem (Usage.Positional n r') -> pure ((r || r') /\ n /\ o)
-                    Elem (Usage.Command    n r') -> pure ((r || r') /\ n /\ o)
+                    Elem (Usage.Positional n r') -> Just ((r || r') /\ n /\ o)
+                    Elem (Usage.Command    n r') -> Just ((r || r') /\ n /\ o)
                     _ -> Nothing
                   _ -> Nothing
           _ ->
@@ -311,7 +313,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                   Nil    -> opt :| Nil
 
         where
-        guardArgNames aN aN' | aN ^=^ aN' = pure true
+        guardArgNames aN aN' | aN ^=^ aN' = Right true
         guardArgNames aN aN' = fail
           $ "Arguments mismatch for option -" <> S.singleton c <> ": "
               <> show aN <> " and " <> show aN'
@@ -323,15 +325,15 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
       lookupValidDescription isTrailing c =
         let matches = filter isMatch descriptions
          in case matches of
-              Nil -> pure Nothing
+              Nil -> Right Nothing
               (OptionDescription _ r (Just a) _ _) : Nil ->
                 if isTrailing
-                  then pure (Just (r /\ (Just a)))
+                  then Right (Just (r /\ (Just a)))
                   else fail
                     $ "Stacked option -" <> S.singleton c
                         <> " may not specify arguments"
               (OptionDescription _ r Nothing _ _) : Nil ->
-                pure (Just (r /\ Nothing))
+                Right (Just (r /\ Nothing))
               _ -> fail $ "Multiple option descriptions for option -" <> S.singleton c
         where
         isMatch (OptionDescription aliases _ _ _ _)
@@ -347,7 +349,7 @@ infixl 9 posArgsEq as ^=^
 stripAngles :: String -> String
 stripAngles = stripPrefix <<< stripSuffix
   where
-  stripPrefix s = fromMaybe s (S.stripPrefix "<" s)
-  stripSuffix s = fromMaybe s (S.stripSuffix ">" s)
+  stripPrefix s = fromMaybe s (S.stripPrefix (Pattern "<") s)
+  stripSuffix s = fromMaybe s (S.stripSuffix (Pattern ">") s)
 
 

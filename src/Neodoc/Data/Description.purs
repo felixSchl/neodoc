@@ -9,6 +9,7 @@ import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (intercalate)
+import Data.List.NonEmpty as NEL
 import Data.Pretty (class Pretty, pretty)
 import Data.Foreign (F)
 import Data.Foreign as F
@@ -18,6 +19,7 @@ import Data.Foreign.Index ((!))
 import Data.Foreign.Class
 import Data.Foreign.Extra as F
 import Data.String as String
+import Control.Monad.Error.Class (catchError)
 import Neodoc.Value
 import Neodoc.OptionAlias (Aliases)
 import Neodoc.Data.OptionArgument (OptionArgument)
@@ -50,12 +52,12 @@ instance isForeignDescription :: IsForeign Description where
         <*> F.readPropMaybe "argument" v
         <*> F.readPropMaybe "default" v
         <*> F.readPropMaybe "env" v
-      _ -> Left $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
+      _ -> F.fail $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
     where
     readAliases v =
-      lmap (F.errorAt "aliases") do
-        F.readNonemptyList =<< v ! "aliases"
+      catchError (F.readNonemptyList =<< v ! "aliases") \es ->
+        F.fail $ F.errorAt "aliases" $ NEL.head es
 
 instance asForeignDescription :: AsForeign Description where
   write CommandDescription = F.toForeign { type: "COMMAND"  }

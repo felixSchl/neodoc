@@ -6,6 +6,7 @@ import Data.String as String
 import Data.Pretty
 import Data.List (List)
 import Data.List.Lazy as LL
+import Neodoc.Parsing.Parser
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Token
 
@@ -56,7 +57,7 @@ traceBracket l label p = do
       <> " (new input: " <> pretty input' <> ")"
   pure output
 
-stateLabel :: ParseState -> GlobalParseState -> String
+stateLabel :: ArgParseState -> GlobalArgParseState -> String
 stateLabel { hasTerminated, depth } { deepestError } =
   (if hasTerminated then "✓" else "·")
   -- <> "(" <> show depth <> ")"

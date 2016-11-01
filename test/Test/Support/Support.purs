@@ -10,7 +10,7 @@ import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff(), liftEff')
 import Control.Monad.Eff
-import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
+import Control.Monad.Eff.Unsafe (unsafeCoerceEff)
 import Control.Monad.Eff.Exception (error, throwException, EXCEPTION(),
                                     catchException, Error())
 import Data.Either (Either(..), either)
@@ -55,7 +55,7 @@ shouldEqual = flip assertEqual
 assertThrows :: ∀ e a. (Error -> Boolean)
              -> Eff (err :: EXCEPTION | e) Unit -> Assertion e
 assertThrows p m = do
-  r <- unsafeInterleaveEff $ catchException (pure <<< pure) (Nothing <$ m)
+  r <- unsafeCoerceEff $ catchException (pure <<< pure) (Nothing <$ m)
   case r of
        Nothing -> throwException (error "Missing exception")
        Just  e ->

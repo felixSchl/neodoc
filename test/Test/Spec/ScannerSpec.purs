@@ -16,7 +16,6 @@ import Data.Maybe (Maybe(..), fromJust)
 import Data.String.Chalk as Chalk
 import Data.String.Ext as String
 import Data.String.Yarn (replicate) as String
-import Text.Parsing.Parser (ParseError(..))
 import Data.String.Regex as Regex
 import Data.String.Regex (regex, Regex())
 import Data.String as String
@@ -108,9 +107,6 @@ scannerSpec = \_ ->
         scan "" `shouldFailWith` "No usage section found!"
 
 scan = lmap pretty <<< Scanner.scan <<< dedent
-
-getMessage :: ParseError -> String
-getMessage (ParseError m _ _) = m
 
 shouldFailWith :: ∀ a. Either String a -> String -> Eff _ Unit
 shouldFailWith ea msg = case ea of

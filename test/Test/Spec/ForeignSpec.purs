@@ -4,6 +4,7 @@ import Prelude
 import Debug.Trace
 import Data.Foreign (toForeign)
 import Data.Foreign.Extra as F
+import Data.Newtype (unwrap)
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)
@@ -19,13 +20,15 @@ import Data.Foldable (intercalate, for_)
 import Text.Wrap (dedent)
 import Data.Maybe (Maybe(..), fromMaybe, fromJust)
 import Data.List (List(..), (:), many, toUnfoldable)
+import Data.List.NonEmpty as NEL
 import Test.Spec (Spec(), describe, it)
 import Data.String as String
 import Test.Support (vliftEff)
 import Partial.Unsafe (unsafePartial)
 import Unsafe.Coerce (unsafeCoerce)
 import Control.Apply ((*>), (<*))
-import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
+import Control.Monad.Eff.Unsafe (unsafeCoerceEff)
+import Control.Monad.Except (runExcept)
 import Data.Array as A
 import Data.Foreign.Class as F
 import Data.Array.Partial as AU
@@ -71,13 +74,15 @@ foreignSpec tests = describe "Crossing JS/purescript" do
             -- we could use `specToForeign` on the ouput above, but this -
             -- albeit slower - gives more confidence that everything's
             -- alright.
-            input <- unsafeInterleaveEff do
+            input <- unsafeCoerceEff do
               runFn1 Neodoc.parseHelpTextJS helpText
 
             let result = fromEmptyableSpec <$> F.read input
 
-            case result of
-              Left e -> throwException $ error $ F.prettyForeignError e
+            case runExcept result of
+              Left es ->
+                let e = NEL.head es
+                 in throwException $ error $ F.prettyForeignError e
               Right output -> do
                 if output /= expected
                   -- XXX: Would be cool to get some sort of diffing in here.

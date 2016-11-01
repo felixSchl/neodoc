@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build:src": "shx mkdir -p dist && pulp build --to dist/neodoc.purs.js --skip-entry-point --optimise -m Neodoc && shx echo \"module.exports = PS;\" >> dist/neodoc.purs.js",
-    "build:lib": "babel lib --out-dir dist",
+    "build:lib": "babel lib --out-dir dist && node scripts/optimize.js",
     "build:example": "pulp build -I example-purs --to output/example.js",
     "prerun:example": "npm run -s build:example",
     "run:example": "NODE_PATH=output node ./output/example.js",
@@ -27,6 +27,8 @@
     "clean": "git stash && git clean -fdX",
     "prerelease": "npm run -s clean && npm install && npm run -s deps && npm test",
     "release": "npm version",
+    "preprof": "npm run -s build",
+    "prof": "./scripts/prof",
     "postrelease": "git push --tags && npm publish"
   },
   "repository": {
@@ -57,11 +59,12 @@
     "bower": "^1.7.7",
     "chai": "^3.5.0",
     "chalk": "^1.1.3",
+    "google-closure-compiler-js": "^20161024.0.0",
     "js-schema": "^1.0.1",
     "lodash": "^4.12.0",
     "mocha": "^2.4.5",
     "pulp": "^9.0.0",
-    "purescript": "^0.9.0",
+    "purescript": "~0.10.1",
     "shelljs": "^0.7.0",
     "shx": "^0.1.2",
     "string-argv": "0.0.2",

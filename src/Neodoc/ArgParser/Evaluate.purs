@@ -5,7 +5,9 @@ import Debug.Trace
 import Debug.Profile
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
+import Data.Optimize.Uncurried
 import Data.Pretty
+import Data.Newtype (unwrap)
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
 , null, length, reverse)
@@ -15,7 +17,9 @@ import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for)
 import Data.Foldable (class Foldable, maximumBy)
+import Data.Optimize.Uncurried
 import Control.Alt ((<|>))
+import Control.Lazy (defer)
 import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Partial.Unsafe
 
@@ -26,6 +30,7 @@ import Neodoc.Data.Layout
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
 import Neodoc.Data.Chunk
+import Neodoc.Parsing.Parser
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
@@ -55,7 +60,7 @@ isSuccessEvaluation :: ∀ c s g i e a. Evaluation c s g i e a -> Boolean
 isSuccessEvaluation (SuccessEvaluation _ _) = true
 isSuccessEvaluation _ = false
 
-getEvaluationDepth :: ∀ c g i e a. Evaluation c ParseState g i e a -> Int
+getEvaluationDepth :: ∀ c g i e a. Evaluation c ArgParseState g i e a -> Int
 getEvaluationDepth (ErrorEvaluation (ParserCont _ s _ _) _) = s.depth
 getEvaluationDepth (SuccessEvaluation (ParserCont _ s _ _) _) = s.depth
 
@@ -65,24 +70,19 @@ getEvaluationDepth (SuccessEvaluation (ParserCont _ s _ _) _) = s.depth
 evalParsers
   :: ∀ b a r
    . (Ord b)
-  => (a -> b)
-  -> List (ArgParser r a)
+  => Args2 (a -> b) (List (ArgParser r a))
   -> ArgParser r a
-evalParsers _ parsers | length parsers == 0
+evalParsers (Args2 _ parsers) | length parsers == 0
   = fail' $ internalError "no parsers to evaluate"
 
-evalParsers p parsers = do
-
-  config      <- getConfig
-  state       <- getState
-  globalState <- getGlobalState
-  input       <- getInput
+evalParsers (Args2 p parsers) = do
+  (ParseArgs config state globalState input) <- getParseState
 
   -- Run all parsers and collect their results for further evaluation
   let collected = parsers <#> \parser ->
-        runParser config state globalState input $ Parser \a ->
+        runParser $ Args5 config state globalState input $ Parser \a ->
           case unParser parser a of
-            Step b' a'@(c' /\ s' /\ g' /\ i') result ->
+            Step b' a'@(ParseArgs c' s' g' i') result ->
               let cont = ParserCont c' s' g' i'
                in Step b' a' case result of
                   Left  (err@(ParseError true _)) -> Left err
@@ -113,11 +113,11 @@ evalParsers p parsers = do
   -- match", take a pick.
   case bestSuccess of
     Just (SuccessEvaluation (ParserCont c s g i) val) -> do
-      applyResults results $ Parser \_ -> Step true (c /\ s /\ g /\ i) (Right val)
+      applyResults results $ Parser \_ -> Step true (ParseArgs c s g i) (Right val)
     _ -> case deepestErrors of
-      Just errors -> case errors of
-        (ErrorEvaluation (ParserCont c s g i) e):es | null es || not (null input) -> do
-          applyResults results $ Parser \_ -> Step false (c /\ s /\ g /\ i) (Right unit)
+      Just errors -> case unwrap errors of
+        (ErrorEvaluation (ParserCont c s g i) e) :| es | null es || not (null input) -> do
+          applyResults results $ Parser \_ -> Step false (ParseArgs c s g i) (Right unit)
           { depth        } <- getState
           { deepestError } <- getGlobalState
           case deepestError of
@@ -145,8 +145,8 @@ evalParsers p parsers = do
     pure out
 
 type Cont r = ParserCont (ParseConfig r)
-                          ParseState
-                          GlobalParseState
+                          ArgParseState
+                          GlobalArgParseState
                           (List PositionedToken)
 
 {-
@@ -166,7 +166,7 @@ fork parser = do
   state       <- getState
   globalState <- getGlobalState
   input       <- getInput
-  let result = runParser config state globalState input $ Parser \a ->
+  let result = runParser $ Args5 config state globalState input $ Parser \a ->
         case unParser parser a of
           Step b' a' result ->
           --  TODO: use tuple in `ParserCont`
@@ -187,4 +187,4 @@ resume
   :: ∀ r a
    . (Tuple (Cont r) a)
   -> ArgParser r a
-resume ((ParserCont c s g i) /\ v) = Parser \_ -> Step true (c /\ s /\ g /\ i) (Right v)
+resume ((ParserCont c s g i) /\ v) = Parser \_ -> Step true (ParseArgs c s g i) (Right v)

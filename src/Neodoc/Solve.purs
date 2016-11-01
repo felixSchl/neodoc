@@ -2,6 +2,7 @@ module Neodoc.Solve where
 
 import Prelude
 import Debug.Trace
+import Debug.Profile
 import Neodoc.Spec
 import Neodoc.Data.UsageLayout
 import Neodoc.Data.SolvedLayout
@@ -30,13 +31,20 @@ solve'
   -> List (Spec SolvedLayout -> Either SolveError (Spec SolvedLayout))
   -> Spec UsageLayout
   -> Either SolveError (Spec SolvedLayout)
-solve' { smartOptions } usageTs solvedTs =
-      (if smartOptions then Solve.smartOptions else pure)
-  >=> flip (List.foldM (#)) usageTs
-  >=> Solve.expandOptions
-  >=> Solve.expandReferences
-  >=> Solve.canonicalise
-  >=> flip (List.foldM (#)) solvedTs
+solve' { smartOptions } usageTs solvedTs y = do
+  --     (if smartOptions then Solve.smartOptions else pure)
+  -- >=> flip (List.foldM (#)) usageTs
+  -- >=> (profileS "solve::expand" \_-> Solve.expandOptions)
+  -- >=> (profileS "solve::refs" \_-> Solve.expandReferences)
+  -- >=> (profileS "solve::canon" \_-> Solve.canonicalise)
+  -- >=> flip (List.foldM (#)) solvedTs
+
+  y' <- (profileS "solve::smart opts" \_-> (if smartOptions then Solve.smartOptions else pure) y)
+  x  <- (profileS "solve::usageTs" \_-> flip (List.foldM (#)) usageTs y')
+  x' <- (profileS "solve::expand" \_-> Solve.expandOptions x)
+  x'' <- (profileS "solve::refs" \_-> Solve.expandReferences x')
+  x''' <- (profileS "solve::canon" \_-> Solve.canonicalise x'')
+  (profileS "solve::solvedTs" \_-> flip (List.foldM (#)) solvedTs x''')
 
 solve
   :: ∀ r

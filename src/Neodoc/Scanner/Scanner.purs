@@ -5,10 +5,9 @@ module Neodoc.Scanner (
 
 import Prelude
 import Data.Bifunctor (lmap)
-import Text.Parsing.Parser (ParseError(ParseError)) as P
-import Text.Parsing.Parser.Pos (initialPos) as P
 import Data.List (List(Nil), (:), fromFoldable, catMaybes)
 import Data.String.Regex as Regex
+import Data.String.Regex.Flags as Regex
 import Data.String.Regex (regex, Regex())
 import Data.String (length, trim) as String
 import Data.String.Yarn (replicate) as String
@@ -27,9 +26,9 @@ type Scan = {
 scan :: String -> Either ScanError Scan
 scan text = lmap ScanError do
   u <- case sections "usage" of
-              Nil   -> fail "No usage section found!"
+              Nil   -> Left "No usage section found!"
               x:Nil -> pure x
-              _     -> fail "Multiple usage sections found!"
+              _     -> Left "Multiple usage sections found!"
 
   pure {
     usage:         fixSection u
@@ -38,7 +37,6 @@ scan text = lmap ScanError do
   }
 
   where
-    fail msg = Left $ P.ParseError msg P.initialPos true
     sections n = maybe Nil
                        (catMaybes <<< fromFoldable)
                        (Regex.match (section n) text)

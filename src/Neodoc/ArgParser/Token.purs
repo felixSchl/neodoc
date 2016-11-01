@@ -10,7 +10,6 @@ import Data.Foldable (intercalate)
 import Data.List (List())
 import Data.String (fromCharArray)
 import Data.Array as A
-import Text.Parsing.Parser.Pos (Position(..)) as P
 
 import Neodoc.Value (Value)
 data Token

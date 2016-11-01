@@ -13,7 +13,7 @@ import Data.Int as Int
 import Data.String as String
 import Data.StrMap as StrMap
 import Data.String.Argv as Argv
-import Data.String (fromCharArray)
+import Data.String (fromCharArray, Pattern(..))
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), fromMaybe, fromJust)
 import Data.Tuple (Tuple(..))
@@ -30,8 +30,7 @@ import Node.FS (FS)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync as FS
 
-import Text.Parsing.Parser.Pos (initialPos) as P
-import Text.Parsing.Parser (runParser, runParserT, PState(..)) as P
+import Text.Parsing.Parser (runParser, runParserT) as P
 import Text.Parsing.Parser.Combinators (manyTill, optional, between, sepBy,
                                        try, choice, (<?>), option) as P
 import Text.Parsing.Parser.String (eof, string, anyChar, skipSpaces,
@@ -64,11 +63,11 @@ type Flags = {
 
 parseFlags :: String -> Flags
 parseFlags s = {
-  optionsFirst:      String.contains "p" s
-, smartOptions:      String.contains "s" s
-, requireFlags:      String.contains "r" s
-, laxPlacement:      String.contains "l" s
-, repeatableOptions: String.contains "R" s
+  optionsFirst:      String.contains (Pattern "p") s
+, smartOptions:      String.contains (Pattern "s") s
+, requireFlags:      String.contains (Pattern "r") s
+, laxPlacement:      String.contains (Pattern "l") s
+, repeatableOptions: String.contains (Pattern "R") s
 }
 
 renderFlags :: Flags -> String
@@ -85,7 +84,7 @@ readTests filepath = do
   f <- FS.readTextFile UTF8 filepath
   runEitherEff
     $ runTrampoline
-      $ P.runParserT (P.PState f P.initialPos) do
+      $ P.runParserT f do
           many kase <* P.eof
 
   where

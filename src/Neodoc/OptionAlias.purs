@@ -10,7 +10,7 @@ module Neodoc.OptionAlias (
 
 import Prelude
 import Data.String as String
-import Data.Bifunctor (lmap)
+import Data.Bifunctor (lmap, bimap)
 import Data.Maybe (Maybe(..))
 import Data.List (List(Nil), (:))
 import Data.Either (Either(..))
@@ -40,7 +40,9 @@ instance showOptionAlias :: Show OptionAlias where
 instance isForeignOptionAlias :: IsForeign OptionAlias where
   read v = do
     s :: String <- read v
-    lmap F.JSONError (fromString s)
+    case fromString s of
+      Left  msg -> F.fail $ F.JSONError msg
+      Right s   -> pure s
 
 fromString :: String -> Either String OptionAlias
 fromString s = case String.uncons s of

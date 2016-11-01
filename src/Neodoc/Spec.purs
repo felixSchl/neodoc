@@ -2,6 +2,7 @@ module Neodoc.Spec where
 
 import Prelude
 import Data.List (List(..), (:), null, fromFoldable, catMaybes)
+import Data.List.NonEmpty as NEL
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Array as Array
@@ -51,12 +52,12 @@ instance isForeignOptionAlias :: (IsForeign a) => IsForeign (Spec a) where
         x:xs -> pure $ x :| xs
         Nil  -> pure $ Nil :| Nil
 
-    readToplevel i v = lmap (F.ErrorAtIndex i) do
+    readToplevel i v = F.errorAtIndex i do
       xs :: Array Foreign <- F.read v
       catMaybes <<< fromFoldable <$>
         sequence (Array.zipWith readBranch (zero .. (Array.length xs)) xs)
 
-    readBranch i v = lmap (F.ErrorAtIndex i) do
+    readBranch i v = F.errorAtIndex i do
       xs :: Array a <- F.read v
       pure case fromFoldable xs of
         x:xs -> Just $ x :| xs

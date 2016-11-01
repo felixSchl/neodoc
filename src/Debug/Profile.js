@@ -5,6 +5,9 @@
 
 var _timers = {};
 
+exports._ENABLE_PROFILING_ = process.env['NEODOC_ENABLE_PROFILE'] == '1' ||
+                              process.env['NEODOC_ENABLE_PROFILE'] == 'true';
+
 exports.timerStart = function () {
   return process.hrtime();
 }
