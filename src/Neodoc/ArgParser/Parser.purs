@@ -168,17 +168,28 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
           return if isKnown
             then known pTok
             else unknown pTok
+
+        -- deal with unkown options matched after the pattern has ended.
         if options.allowUnknown
           then
             let ks = filter isKnown kToks
                 uks = filter isUnknown kToks
-             in case ks of
-                  _:_ -> fail' $ unexpectedInputError Nil kToks
-                  Nil -> pure (Tuple _UNKNOWN_ARG <<< RichValue.from Origin.Argv
-                                                  <<< StringValue
-                                                  <<< getSource
-                                                  <<< unIsKnown <$> uks)
+             in if null ks
+                  then
+                    -- check the list of unknown tokens for literals which we
+                    -- consider positional and therefore reject
+                    let ukPs = filter (isPosTok <<< unIsKnown) uks
+                     in if null ukPs
+                          then return (Tuple _UNKNOWN_ARG <<< RichValue.from Origin.Argv
+                                                          <<< StringValue
+                                                          <<< getSource
+                                                          <<< unIsKnown <$> uks)
+                          else fail' $ unexpectedInputError Nil ukPs
+                  else fail' $ unexpectedInputError Nil kToks
           else fail' $ unexpectedInputError Nil kToks
+    where isPosTok (PositionedToken tok _ _) = case tok of
+                                                  Lit _ -> true
+                                                  _     -> false
 
   emptyBranch :: ArgParser r ArgParseResult
   emptyBranch = do
@@ -805,10 +816,9 @@ isKnownToken'
    . Token
   -> ArgParser r Boolean
 isKnownToken' tok = do
-  { spec } <- getConfig
-  { isKnownCache } <- getGlobalState
+  (ParseArgs { spec } _ { isKnownCache } _) <- getParseState
   case Map.lookup tok isKnownCache of
-    Just b -> pure b
+    Just b -> return b
     Nothing ->
       let isKnown = isKnownToken spec tok
        in isKnown <$ modifyGlobalState \s -> s {

@@ -3568,6 +3568,9 @@ $ prog/u -acb foo
 $ prog/lu foo -acb
 {"-a": true, "?": ["-cb"], "foo": true}
 
+$ prog/lu foo -acb bar
+"unknown command bar"
+
 # This is a tricky one: '-a' is known and gets consumed, but since it does not
 # take an argument it leaves a '-cb' on the input. Then, '-c' is not known, so
 # we consume the entire token: '-cb', resulting in a missing '-b'.
