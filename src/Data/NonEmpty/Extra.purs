@@ -21,6 +21,14 @@ append
   -> NonEmpty f a
 append (x :| xs) (y :| ys) = x :| xs <> pure y <> ys
 
+cons
+  :: ∀ f a
+   . (Semigroup (f a), Applicative f)
+  => a
+  -> NonEmpty f a
+  -> NonEmpty f a
+cons x (y:|ys) = x :| pure y <> ys
+
 toList
   :: ∀ a
    . NonEmpty List a

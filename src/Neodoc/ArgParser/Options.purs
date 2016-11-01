@@ -14,6 +14,7 @@ type Options r = {
 , repeatableOptions :: Boolean
 , helpFlags         :: List OptionAlias
 , versionFlags      :: List OptionAlias
+, allowUnknown      :: Boolean
   | r
 }
 

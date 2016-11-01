@@ -2,6 +2,7 @@ module Neodoc.ArgParser.Parser where
 
 import Prelude
 import Debug.Trace hiding (trace)
+import Debug.Trace (trace) as Debug
 import Debug.Profile
 import Data.Generic
 import Data.Newtype (unwrap)
@@ -95,6 +96,21 @@ initialGlobalState = {
 , argCache: Map.empty
 }
 
+-- An artificial argument to be injected to capture any unknown options
+_UNKNOWN_ARG :: Arg
+_UNKNOWN_ARG =
+  let arg = Solved.Command "?" true
+      key = toArgKey arg
+   in Arg (-1) arg key Nothing true
+
+-- An artificial argument to be injected to capture any '--', regardless
+-- of whether it occurs in the spec or not
+_EOA :: Arg
+_EOA =
+  let arg = Solved.EOA
+      key = toArgKey arg
+   in Arg (-2) arg key Nothing true
+
 parse
   :: ∀ r
    . Spec SolvedLayout
@@ -112,8 +128,19 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
       parsers = toplevels <#> \branch ->
         let branch' = toArgBranch options env descriptions branch
             branch'' = toParseBranch (NonEmpty.toList branch')
-         in ArgParseResult (Just branch) <$>
-              parseBranch (Args3 0 true branch'') <* eof
+         in do
+            vs  <- parseBranch (Args3 0 true branch'')
+            vs' <- eof
+
+            -- inject the pseudo argument to collect unknown options into layout
+            -- so that the value reduction will work.
+            let outBranch = if options.allowUnknown
+                  then NonEmpty.append (Elem <<< Arg.getArg <$> do
+                    _UNKNOWN_ARG :| _EOA : Nil
+                  ) branch
+                  else branch
+
+            return $ ArgParseResult (Just outBranch) (vs <> vs')
 
       parsers' :: List (ArgParser r ArgParseResult)
       parsers' = parsers
@@ -122,13 +149,11 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
           --       or: prog
           -- then we consolidate those into a single, artificial
           -- parse whose only requirement is that there be no input.
-          <> if hasEmpty
-                then pure $ ArgParseResult Nothing Nil <$ eof
-                else Nil
+          <> if hasEmpty then singleton emptyBranch else Nil
 
    in runParser $ Args5 { env, options, spec } initialState initialGlobalState tokens $
         let p = if null parsers'
-                  then eof $> ArgParseResult Nothing Nil
+                  then emptyBranch
                   else evalParsers (Args2 (byOrigin <<< getResult) parsers')
          in p `catch` \_ e ->
             let implicitFlags = helpFlags <> versionFlags
@@ -141,18 +166,59 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
                   _              -> throw e
 
   where
-  eof :: ∀ r. ArgParser r Unit
+
+  eof :: ∀ r. ArgParser r (List KeyValue)
   eof = do
     input <- getInput
     case input of
-      Nil  -> return unit
+      Nil  -> pure Nil
       toks -> do
+        { options } <- getConfig
         kToks <- for toks \(pTok@(PositionedToken tok _ _)) -> do
           isKnown <- isKnownToken' tok
           return if isKnown
             then known pTok
             else unknown pTok
-        fail' $ unexpectedInputError Nil kToks
+
+        -- deal with unkown options matched after the pattern has ended.
+        if options.allowUnknown
+          then
+            let ks = filter isKnown kToks
+                uks = filter isUnknown kToks
+             in if null ks
+                  then
+                    -- check the list of unknown tokens for literals which we
+                    -- consider positional and therefore reject
+                    let ukPs = filter (isPosTok <<< unIsKnown) uks
+                     in if null ukPs
+                          then return $ uks <#> unIsKnown >>>
+                                \(pTok@(PositionedToken tok _ _)) ->
+                                  case tok of
+                                    Token.EOA xs ->
+                                      let v = ArrayValue $ Array.fromFoldable xs
+                                          rv = RichValue.from Origin.Argv v
+                                       in _EOA /\ rv
+                                    _ ->
+                                      let v = StringValue $ Token.getSource pTok
+                                          rv = RichValue.from Origin.Argv v
+                                       in _UNKNOWN_ARG /\ rv
+                          else fail' $ unexpectedInputError Nil ukPs
+                  else fail' $ unexpectedInputError Nil kToks
+          else fail' $ unexpectedInputError Nil kToks
+    where isPosTok (PositionedToken tok _ _) = case tok of
+                                                  Lit _ -> true
+                                                  _     -> false
+
+  emptyBranch :: ArgParser r ArgParseResult
+  emptyBranch = do
+    { options } <- getConfig
+    let mBranch = if options.allowUnknown
+                    then Just $
+                      (Elem $ Arg.getArg _UNKNOWN_ARG)
+                        :| (Elem $ Arg.getArg _EOA)
+                        : Nil
+                    else Nothing
+    ArgParseResult mBranch <$> eof
 
   -- create an implicit top-level to make "-h/--help" and "--version" "just
   -- work". The idea is to remove the empty fallback for '--help' and
@@ -193,7 +259,15 @@ parseBranch (Args3 l sub xs) = do
   let xs' = if not options.laxPlacement
             then NEL.toList <$> groupBy (eq `on` _isFree) xs
             else singleton xs
-  concat <$> for xs' (\x -> solve $ Args4 l options.repeatableOptions sub x)
+  concat <$> for xs' \x ->
+    let p = solve $ Args4 l options.repeatableOptions sub x
+     in if options.allowUnknown
+          then do
+            vs  <- many unknownOption
+            vs' <- p
+            pure $ vs <> vs'
+          else p
+
   where
   _isFree :: ArgParseLayout -> Boolean
   _isFree (ParseGroup _ f _ _ _) = f
@@ -245,13 +319,15 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
   go (Args6 l' sub' req rep canRep out) = do
     (ParseArgs { options } { depth } _ input) <- getParseState
 
+    unknowns <- if options.allowUnknown then many unknownOption else pure Nil
+
     -- trace l' \i->
     --   "solve: req = " <> pretty req
     --     <> ", rep = " <> pretty rep
     --     <> ", sub = " <> show sub
     --     <> ", out = " <> pretty out
+    --     <> ", ? = "   <> pretty unknowns
     --     <> ", i = "   <> pretty i
-
 
     -- 1. try making a match for any arg in `req` w/o allowing substitutions.
     --    if we make a match, we proceed *and never look back*. If we do not
@@ -270,7 +346,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         -- trace l' \i-> "solve: matched on argv: " <> pretty kvs <> ", i = " <> pretty i
         let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
             rep' = nub ((maybe Nil singleton mNewRep) <> rep <> rRep)
-        go (Args6 (l' + 1) sub' req' rep' true (out <> kvs))
+        go (Args6 (l' + 1) sub' req' rep' true (out <> unknowns <> kvs))
       _ -> do
         -- 2. if we did not manage to make a single `req` parse, we ought to try
         --    if any of our args in `rep` is now able to parse. We consume at
@@ -300,8 +376,8 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
             let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
                 rep'' = nub ((maybe Nil singleton mNewRep') <> rep' <> rRep)
             if any (isFrom Origin.Argv <<< snd) kvs
-              then go (Args6 (l' + 1) sub' req rep'' true (out <> kvs))
-              else go (Args6 (l' + 1) sub' req rep'' false (out <> kvs))
+              then go (Args6 (l' + 1) sub' req rep'' true (out <> unknowns <> kvs))
+              else go (Args6 (l' + 1) sub' req rep'' false (out <> unknowns <> kvs))
           -- 3. If we still did not manage to make a match, things aren't
           --    looking too great. It's time for drastic measures. If the parent
           --    is allowing us to, we repeat this above, but allow substitutions
@@ -313,7 +389,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
             case req' of
               Nil -> do
                 -- trace l' \i -> "solve: empty req' after rep. done. i = " <> pretty i
-                return out
+                return $ out <> unknowns
               _:_ | sub ->
                 let
                   exhaust
@@ -336,7 +412,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
                       else exhaust req''' (out' <> kVs'')
                  in do
                   -- trace l' \i-> "solve: trying via sub, i = " <> pretty i
-                  exhaust req' out
+                  exhaust req' (out <> unknowns)
               xs -> do
                 -- trace l' \_-> "solve: failed to match: " <> pretty xs
                 fail "..." -- XXX: throw proper error here
@@ -351,7 +427,9 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
      in ParseElem (Arg.getId x) isFree x
 
   _isRepeatable :: Arg -> Boolean
-  _isRepeatable x = Arg.isArgRepeatable x || (repOpts && Arg.isOption x)
+  -- note: The `>=0` is to avoid injected arguments (i.e. opts.allowUnknown)
+  _isRepeatable x | Arg.getId x >= 0 = Arg.isArgRepeatable x || (repOpts && Arg.isOption x)
+  _isRepeatable _ = false
 
   {-
     Try to make a match from any of the input layouts.
@@ -372,7 +450,8 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
     Here, consumption w/o substitutions is a dead end, since `[-b -c]` won't be
     able to match (it requires either `-b -c` or `-c -b`). Hence, we *must*
     use subsitutions to yield a match. But which argument should be substituted?
-    We select the most eligble argument by see
+    We select the most eligble argument by seeing how many of argv it can
+    consume.
   -}
   match a@(Args3 l sub xs) = {-cachedMatch (getId <$> xs) sub $-} match' a
   match'
@@ -546,7 +625,9 @@ parseLayout
 parseLayout l sub x = do
  skipIf hasTerminated Nil do
   { options } <- getConfig
-  go options x
+  vs  <- if  options.allowUnknown then many unknownOption else pure Nil
+  vs' <- go options x
+  pure $ vs <> vs'
   where
    -- Terminate at singleton groups that house only positionals.
   go options x | options.optionsFirst && isJust (termAs x)
@@ -731,6 +812,23 @@ termAs x = go x
   go (ParseElem _ _ x@(Arg _ (Solved.Positional _ r) _ _ _)) | r = Just x
   go _ = Nothing
 
+unknownOption :: ∀ r. ArgParser r KeyValue
+unknownOption = do
+  i <- getInput
+  case i of
+    (PositionedToken tok source _):toks |
+      case tok of
+        LOpt _ _ -> true
+        SOpt _ _ _ -> true
+        _ -> false -> do
+      isKnown <- isKnownToken' tok
+      if isKnown
+        then fail "expected unknown option"
+        else setInput toks
+          *> modifyDepth (_ + 1)
+          $> (_UNKNOWN_ARG /\ RichValue.from Origin.Argv (StringValue source))
+    _ -> fail "expected unknown option"
+
 {-
   Cached lookup if a token is known or not
 -}
@@ -739,10 +837,9 @@ isKnownToken'
    . Token
   -> ArgParser r Boolean
 isKnownToken' tok = do
-  { spec } <- getConfig
-  { isKnownCache } <- getGlobalState
+  (ParseArgs { spec } _ { isKnownCache } _) <- getParseState
   case Map.lookup tok isKnownCache of
-    Just b -> pure b
+    Just b -> return b
     Nothing ->
       let isKnown = isKnownToken spec tok
        in isKnown <$ modifyGlobalState \s -> s {
@@ -777,15 +874,3 @@ isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInL
       test (Token.EOA _)      (Solved.EOA)          = true
       test (Token.Stdin)      (Solved.Stdin)        = true
       test _ _ = false
-
-{-
-  Pre-emptively determine if a branch can match the empty input.
--}
-canMatchEmptyInput
-  :: NonEmpty List ArgLayout
-  -> Boolean
-canMatchEmptyInput xs = any go xs
-  where go (Group o _ xs) = if o then true
-                                 else all canMatchEmptyInput xs
-        go (Elem x) = isJust $ getFallback x
-
