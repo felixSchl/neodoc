@@ -3,6 +3,30 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
+## [1.2.0] - 2016-10-31
+
+This release focused mostly on performance. While performance is drastically
+improved with this release, it won't be the end of things in a continous effort
+to get neodoc as snappy as possible, while retaining it's strong parsing
+capabilities and feature set.
+
+### Changes
+
+* Update to purescript 0.10.x
+* Improve overall performance [#81]
+    * To give an idea, the uglify example now runs about 140ms faster than
+      before!
+    * Optimize large parts of the code-base (lexer, solver, arg-parser)
+    * Pre-trim descriptions section to speed up descriptions lexing
+    * Let go of purescript-parsing, use own parser everywhere
+    * Avoid partial function application where feasible, especially if function
+      takes many arguments.
+    * Optimize many parser combinators to work especially well with chars
+    * Run the compiled output through the closure compiler to bring down require
+      times. This comes at the cost of readable output, but provides a rough
+      20ms boost requiring neodoc, which is now around 50ms on the machines I
+      tested on. Still not ideal, maybe we can shed more bloat.
+
 ## [1.1.0] - 2016-10-22
 
 ### Fix
@@ -11,7 +35,7 @@
 
 ### Changes
 
-* Imrpove special flags behavior with `opts.dontExit`. Instead of just returning
+* Improve special flags behavior with `opts.dontExit`. Instead of just returning
   a string, return the output and add a special key `.help` for `opts.helpFlags`
   and `.version` for `opts.versionFlags`, respectively.
 * Allow dots in option names
@@ -573,6 +597,7 @@ section &mdash; let it fail at the lexing stage.
 
 [@matthewmueller]: https://github.com/matthewmueller
 
+[#81]: https://github.com/felixSchl/neodoc/issues/81
 [#80]: https://github.com/felixSchl/neodoc/issues/80
 [#79]: https://github.com/felixSchl/neodoc/issues/79
 [#78]: https://github.com/felixSchl/neodoc/issues/78
@@ -654,6 +679,7 @@ section &mdash; let it fail at the lexing stage.
 [#2]: https://github.com/felixSchl/neodoc/issues/2
 [#1]: https://github.com/felixSchl/neodoc/issues/1
 
+[1.2.0]: https://github.com/felixschl/neodoc/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/felixschl/neodoc/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/felixschl/neodoc/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/felixschl/neodoc/compare/v1.0.0...v1.0.1
