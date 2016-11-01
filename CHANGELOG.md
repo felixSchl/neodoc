@@ -3,6 +3,16 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
+## [1.3.0] - 2016-11-02
+
+### New features
+
+* It is now possible to capture any unknown options, while still validating
+  known options and positional/command arguments. With `opts.allowUnknown`
+  toggled on, any unknown options are collected into a special key "?" in the
+  output mapping. Note that, unknown input is collected "verbatim", i.e. as it
+  was passed on the command line. This closes [#42].
+
 ## [1.2.0] - 2016-10-31
 
 This release focused mostly on performance. While performance is drastically
