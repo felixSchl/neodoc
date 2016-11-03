@@ -325,7 +325,7 @@ argParserSpec = \_ -> describe "The parser generator" do
             , "-o"       :> V.str "bar" ]
           -- group should NOT be interchangable if it contains non-options:
         , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-            "unexpected option -o"
+            "expected (-iFILE <env>), but got -o"
         ]
 
     , test

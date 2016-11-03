@@ -474,7 +474,14 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
       --   <> ", sub = " <> show sub
       --   <> ", i = " <> pretty i
       if _isFixed x && locked
-        then go' (Args5 errs true xs (x:ys) matched)
+        then do
+          -- trace l \i-> "match: skip fixed because locked"
+          --   <> " x = " <> pretty x
+          --   <> ", xs = " <> pretty xs
+          --   <> ", ys = " <> pretty ys
+          --   <> ", sub = " <> show sub
+          --   <> ", i = " <> pretty i
+          go' (Args5 errs true xs (x:ys) matched)
         else do
           let sub' = sub && not locked
           cvs <- fork $ parseLayout (l + 1) sub' x
@@ -485,7 +492,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
           --   <> ", vs = " <> pretty (snd cvs)
           --   <> ", locked = " <> show locked
           --   <> ", sub = " <> show sub
-          --   <> ", i = " <> pretty i
+          -- <> ", i = " <> pretty i
           go' (Args5 errs (locked || _isFixed x) xs ys ((x /\ cvs) : matched))
     ) `catch` \{ depth } e -> do
       let errs' = case errs of
@@ -542,8 +549,8 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
 
         zs | changed -> go' (Args5 errs false zs Nil Nil)
 
-        z:zs -> do
-          -- trace l \i' -> "match: failed!" <> pretty (z:zs) <> ", i = " <> pretty i'
+        zss@(z:zs) -> do
+          -- trace l \i' -> "match: failed!" <> pretty zss <> ", i = " <> pretty i'
           i <- getInput
           { depth } <- getState
           case errs of
@@ -552,7 +559,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
               throw e
             _ -> case i of
               Nil ->
-                let c = toSimpleBranch (z:zs)
+                let c = toSimpleBranch zss
                     e = missingArgumentsError (unsafePartial $ NonEmpty.fromList' c)
                 in setErrorAtDepth depth e *> fail' e
               _ -> do
@@ -561,7 +568,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
                   return if isKnown
                     then known pTok
                     else unknown pTok
-                let e = unexpectedInputError (toSimpleBranch zs) kToks
+                let e = unexpectedInputError (toSimpleBranch zss) kToks
                 setErrorAtDepth depth e *> fail' e
 
     {-
@@ -586,7 +593,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         -- re-sort the remaining elements (XXX: could this be skipped?)
         return (Args4 vs (sortBy (compare `on` getId) $ xs' <> ys) locked rep)
 
-  dropFirst f xs = go' xs Nil
+  dropFirst f xs = lmap reverse $ go' xs Nil
     where go' Nil out = out /\ false
           go' (x:xs) out = if f x then (xs <> out) /\ true else go' xs (x:out)
 

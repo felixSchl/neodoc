@@ -3595,11 +3595,9 @@ $ prog/lur foo -acb
 $ prog/lur foo -ac -b
 {"-a": true, "-b": true, "?": ["-c"], "foo": true}
 
-#
 # ensure '--' is treated correctly when inserted implicitly due to the /u flag
 # (opts.allowUnknown), while also being mentioned explicitly. '--' always
 # collects into an array, so a duplicate _should_ not matter.
-#
 r"""
 usage: p [-b [-a]] foo -- args...
 """
@@ -3616,3 +3614,11 @@ usage: p ship new <name>...
 
 $ prog/luRrps ship new --fast foo
 {"<name>": ["foo"], "new": true, "ship": true, "?": ["--fast"]}
+
+# fix error message on adjacent positionals
+r"""
+usage: p <a> <b>
+"""
+
+$ prog
+"missing <a>"
