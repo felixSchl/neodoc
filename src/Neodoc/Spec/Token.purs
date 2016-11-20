@@ -27,6 +27,8 @@ type OptionArgument = {
 , optional :: Boolean
 }
 
+type IsNegated = Boolean
+
 data Token
   = LParen
   | RParen
@@ -39,8 +41,8 @@ data Token
   | Newline
   | TripleDot
   | Reference String
-  | LOpt String (Maybe OptionArgument)
-  | SOpt (NonEmpty Array Char) (Maybe OptionArgument)
+  | LOpt String IsNegated (Maybe OptionArgument)
+  | SOpt (NonEmpty Array Char) IsNegated (Maybe OptionArgument)
   | Tag String String
   | Name String
   | ShoutName String
@@ -69,14 +71,16 @@ instance prettyToken :: Pretty Token where
   pretty (Name      n) = "Name "      <> show n
   pretty (ShoutName n) = "ShoutName " <> show n
   pretty (AngleName n) = "AngleName " <> show n
-  pretty (LOpt n arg)  = "--" <> n <> arg'
-    where arg' = fromMaybe "" do
+  pretty (LOpt n neg arg)  = sign <> n <> arg'
+    where sign = if neg then "--[no-]" else "--"
+          arg' = fromMaybe "" do
                   arg <#> \a ->
                     if a.optional then "[" else ""
                       <> a.name
                       <> if a.optional then "]" else ""
-  pretty (SOpt (c :| cs) arg) = "-" <> n <> arg'
-    where n = fromCharArray $ A.cons c cs
+  pretty (SOpt (c :| cs) neg arg) = sign <> n <> arg'
+    where sign = if neg then "+" else "-"
+          n = fromCharArray $ A.cons c cs
           arg' = fromMaybe "" do
                   arg <#> \a ->
                     if a.optional then "[" else ""
@@ -96,18 +100,17 @@ instance eqToken :: Eq Token where
   eq TripleDot         TripleDot          = true
   eq Newline           Newline            = true
   eq (Reference r)     (Reference r')     = r == r'
-  eq (LOpt n arg)      (LOpt n' arg')
-    = (n == n')
-    && ((isNothing arg && isNothing arg')
+  eq (LOpt n neg arg)  (LOpt n' neg' arg')
+    = (n == n') && (neg == neg') && ((isNothing arg && isNothing arg')
         || (fromMaybe false do
               a  <- arg
               a' <- arg'
               pure $ (a.name == a'.name)
                   && (a.optional == a'.optional)
             ))
-  eq (SOpt (c:|cs) arg) (SOpt (c':|cs') arg')
-    = (c == c') && (cs == cs')
-    && ((isNothing arg && isNothing arg')
+  eq (SOpt (c:|cs) neg arg) (SOpt (c':|cs') neg' arg')
+    = (c == c') && (cs == cs') && (neg == neg') &&
+      ((isNothing arg && isNothing arg')
         || (fromMaybe false do
               a  <- arg
               a' <- arg'

@@ -114,19 +114,21 @@ garbage = "garbage" <??> token go
     go _           = Nothing
 
 lopt :: TokenParser { name :: String
+                    , neg  :: Boolean
                     , arg  :: Maybe OptionArgument
                     }
 lopt = "long-option" <??> token go
   where
-    go (LOpt n a) = Just { name: n, arg: a }
+    go (LOpt name neg arg) = Just { name, neg, arg }
     go _          = Nothing
 
 sopt :: TokenParser { chars :: NonEmpty Array Char
+                    , neg   :: Boolean
                     , arg   :: Maybe OptionArgument
                     }
 sopt = "short-option" <??> token go
   where
-    go (SOpt cs a) = Just { chars: cs , arg: a }
+    go (SOpt chars neg arg) = Just { chars, neg, arg }
     go _ = Nothing
 
 name :: TokenParser String

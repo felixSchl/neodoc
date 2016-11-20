@@ -224,7 +224,7 @@ _shortOption :: StringParser' Token
 _shortOption = defer \_-> do
   let validChar = P.alphaNum <|> P.oneOf [ '?' ]
 
-  P.char '-'
+  neg <- P.choice [ P.char '-' $> false, P.char '+' $> true ]
   x  <- validChar
   xs <- A.fromFoldable <$> P.many validChar
 
@@ -252,11 +252,16 @@ _shortOption = defer \_-> do
   , void $ P.string "..."
   ])
 
-  P.return $ SOpt (x:|xs) arg
+  P.return $ SOpt (x:|xs) neg arg
 
 _longOption :: StringParser' Token
 _longOption = defer \_-> do
   P.string "--"
+
+  neg <- P.choice [
+    P.string "[no-]" $> true
+  , pure false
+  ]
 
   name' <- (~~)
       <$> (String.singleton <$> P.alphaNum)
@@ -284,7 +289,7 @@ _longOption = defer \_-> do
   , void $ P.string "..."
   ])
 
-  P.return $ LOpt name' arg
+  P.return $ LOpt name' neg arg
 
 identStart :: StringParser' Char
 identStart = P.alpha
