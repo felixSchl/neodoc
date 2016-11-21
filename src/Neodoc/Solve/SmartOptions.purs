@@ -69,13 +69,13 @@ smartOptions (Spec (spec@{ layouts, descriptions })) = do
           _ -> Nothing
 
         opt <- case x of
-          (Elem (Usage.Option n Nothing r)) ->
-            let hasDescription = not (null $ findDescriptions (OptionAlias.Long n false {- TODO: use UsageLayout's neg -}))
+          (Elem (Usage.Option n neg Nothing r)) ->
+            let hasDescription = not (null $ findDescriptions (OptionAlias.Long n neg))
              in if hasDescription
                 then Nothing
-                else Just $ Option n (Just arg) (r || argR)
+                else Just $ Option n neg (Just arg) (r || argR)
 
-          (Elem (Usage.OptionStack (c :| cs) Nothing r)) ->
+          (Elem (Usage.OptionStack (c :| cs) neg Nothing r)) ->
 
             -- transform: the last stacked char is the one to receive the explicit
             -- argument binding. the rest will be w/o any binding at all.
@@ -83,10 +83,10 @@ smartOptions (Spec (spec@{ layouts, descriptions })) = do
             let h = case (Array.last cs) /\ (Array.init cs) of
                       Just t /\ Just i -> t
                       _                -> c
-                hasDescription = not (null $ findDescriptions (OptionAlias.Short h false {- TODO: use UsageLayout's neg -}))
+                hasDescription = not (null $ findDescriptions (OptionAlias.Short h neg))
              in if hasDescription
                 then Nothing
-                else Just $ OptionStack (c :| cs) (Just arg) (r || argR)
+                else Just $ OptionStack (c :| cs) neg (Just arg) (r || argR)
           _ -> Nothing
 
         pure $ (Elem opt) :| Nil

@@ -141,7 +141,7 @@ parse toks =
     let arg' = do
           { name, optional } <- arg
           Just (OptionArgument name optional)
-    Option name arg' <$> repetition
+    Option name neg arg' <$> repetition
 
   shortOption :: P.TokenParser UsageLayoutArg
   shortOption = do
@@ -149,7 +149,7 @@ parse toks =
     let arg' = do
           { name, optional } <- arg
           Just (OptionArgument name optional)
-    OptionStack chars arg' <$> repetition
+    OptionStack chars neg arg' <$> repetition
 
   option :: P.TokenParser UsageLayoutArg
   option = longOption <|> shortOption

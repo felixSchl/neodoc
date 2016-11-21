@@ -42,12 +42,12 @@ po' n r   = Elem $ U.Positional n r
 po n      = po' n false
 poR n     = po' n true
 
-sopt'  f fs a r = Elem $ U.OptionStack (f:|fs) a r
+sopt'  f fs a r = Elem $ U.OptionStack (f:|fs) false a r
 sopt   f fs a   = sopt' f fs (pure a) false
 sopt_  f fs     = sopt' f fs Nothing false
 soptR  f fs a   = sopt' f fs (pure a) true
 soptR_ f fs     = sopt' f fs Nothing true
-lopt'  n    a r = Elem $ U.Option n a r
+lopt'  n    a r = Elem $ U.Option n false a r
 lopt   n    a   = lopt' n (pure a) false
 lopt_  n        = lopt' n Nothing false
 loptR  n    a   = lopt' n (pure a) true

@@ -46,12 +46,12 @@ import Partial.Unsafe
 -- | For example: `-abc` expands to `-a -b -c`, which is valid input.
 usageToSolved :: Partial => UsageLayout -> SolvedLayout
 usageToSolved layout = layout <#> case _ of
-  Usage.Command     n r        -> Solved.Command    n r
-  Usage.Positional  n r        -> Solved.Positional n r
-  Usage.Option      n a r      -> Solved.Option (OptionAlias.Long n false {-TODO: Use UsageLayout's negativity-}) a r
-  Usage.OptionStack (c:|_) a r -> Solved.Option (OptionAlias.Short c false {-TODO: Use UsageLayout's negativity-}) a r
-  Usage.EOA                    -> Solved.EOA
-  Usage.Stdin                  -> Solved.Stdin
+  Usage.Command     n r            -> Solved.Command    n r
+  Usage.Positional  n r            -> Solved.Positional n r
+  Usage.Option      n neg a r      -> Solved.Option (OptionAlias.Long n neg) a r
+  Usage.OptionStack (c:|_) neg a r -> Solved.Option (OptionAlias.Short c neg) a r
+  Usage.EOA                        -> Solved.EOA
+  Usage.Stdin                      -> Solved.Stdin
 
 type Error = String
 type Result = String

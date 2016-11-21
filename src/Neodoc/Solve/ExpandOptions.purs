@@ -111,9 +111,9 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
             Usage.EOA            -> solved Solved.EOA
             Usage.Stdin          -> solved Solved.Stdin
             Usage.Reference n    -> return (ReferenceArg n)
-            Usage.Option n arg r -> preSolveOption (Args7 mAdjLayout slurped solved n false {- TODO: use opts' `neg` -} arg r)
-            Usage.OptionStack cs@(x:|xs) arg r ->
-              preSolveOptionStack (Args7 mAdjLayout slurpedM solvedM cs false {- TODO: use opts' `neg` -} arg r)
+            Usage.Option n neg arg r -> preSolveOption (Args7 mAdjLayout slurped solved n neg arg r)
+            Usage.OptionStack cs@(x:|xs) neg arg r ->
+              preSolveOptionStack (Args7 mAdjLayout slurpedM solvedM cs neg arg r)
 
     where
     preSolveOption (Args7 mAdjLayout slurped solved n isNeg mArg r) = do

@@ -25,11 +25,13 @@ import Neodoc.Data.OptionArgument
 
 -- This type can be specialized for elements of a usage section
 type UsageLayout = Layout UsageLayoutArg
+type IsRepeatable = Boolean
+type IsNegative = Boolean
 data UsageLayoutArg
   = Command     String Boolean
   | Positional  String Boolean
-  | Option      String (Maybe OptionArgument) Boolean
-  | OptionStack (NonEmpty Array Char) (Maybe OptionArgument) Boolean
+  | Option      String IsNegative (Maybe OptionArgument) IsRepeatable
+  | OptionStack (NonEmpty Array Char) IsNegative (Maybe OptionArgument) IsRepeatable
   | EOA
   | Stdin
   | Reference String
@@ -53,15 +55,17 @@ instance asForeignUsageLayoutArg :: AsForeign UsageLayoutArg where
     , name: F.write n
     , repeatable: F.write r
     }
-  write (Option n mArg r) = F.toForeign {
+  write (Option n neg mArg r) = F.toForeign {
       type: "Option"
     , name: F.write n
+    , negative: F.write neg
     , argument: maybe F.undefined F.write mArg
     , repeatable: F.write r
     }
-  write (OptionStack cs mArg r) = F.toForeign {
+  write (OptionStack cs neg mArg r) = F.toForeign {
       type: "OptionStack"
     , chars: F.write $ Array.fromFoldable cs
+    , negative: F.write neg
     , argument: maybe F.undefined F.write mArg
     , repeatable: F.write r
     }
@@ -93,11 +97,13 @@ instance isForeignUsageLayoutArg :: IsForeign UsageLayoutArg where
       "OPTION" ->
         Option
           <$> F.readProp "name" v
+          <*> F.readProp "negative" v
           <*> F.readPropMaybe "argument" v
           <*> F.readProp "repeatable" v
       "OPTIONSTACK" ->
         OptionStack
           <$> readOptionStack v
+          <*> F.readProp "negative" v
           <*> F.readPropMaybe "argument" v
           <*> F.readProp "repeatable" v
       _ -> F.fail $ F.errorAt "type" $ F.JSONError $ "unknown type: " <> typ
@@ -115,14 +121,16 @@ instance prettyUsageLayoutArg :: Pretty UsageLayoutArg where
     go EOA = "--"
     go Stdin = "-"
     go (Reference n) = "[" <> n <> "]"
-    go (Option n ma r)
-      = "--"
+    go (Option n neg ma r)
+      = sign
       <> n
       <> maybe "" (("=" <> _) <<< pretty) ma
       <> rep r
-    go (OptionStack cs ma r)
-      = "-"
+      where sign = if neg then "--no-" else "--"
+    go (OptionStack cs neg ma r)
+      = sign
       <> intercalate "" (String.singleton <$> cs)
       <> maybe "" (("=" <> _) <<< pretty) ma
       <> rep r
+      where sign = if neg then "+" else "-"
     rep r = if r then "..." else ""
