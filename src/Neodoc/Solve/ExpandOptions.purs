@@ -129,11 +129,11 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
               maybe
                 (if not aO'
                   then fail $ "Option-Argument specified in options-section missing"
-                              <> pretty alias
+                              <> " " <> pretty alias
                   else solved $ Solved.Option alias descArg r
                 )
                 (\(adjR /\ adjN /\ adjO) -> do
-                  guardArgNames adjN aN'
+                  guardArgNames alias adjN aN'
                   slurped $ Solved.Option
                     alias
                     (Just $ OptionArgument adjN adjO)
@@ -152,9 +152,9 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
             _ -> solved $ Solved.Option alias Nothing r
 
       where
-      guardArgNames aN aN' | aN ^=^ aN' = Right true
-      guardArgNames aN aN' = fail
-        $ "Arguments mismatch for option --" <> n <> ": "
+      guardArgNames _ aN aN' | aN ^=^ aN' = Right true
+      guardArgNames alias aN aN' = fail
+        $ "Arguments mismatch for option " <> pretty alias <> ": "
             <> show aN <> " and " <> show aN'
 
       lookupValidDescription :: Either SolveError (Maybe (Tuple Boolean (Maybe OptionArgument)))
@@ -269,7 +269,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
               (\_->
                 if not aO' then
                   fail $ "Option-Argument specified in options-section missing"
-                        <> pretty (mkAlias h)
+                        <> " " <> pretty (mkAlias h)
                 else
                   let leading' = (_ $ false) <$> leading
                       opt = Solved.Option (mkAlias h) descArg r
@@ -278,7 +278,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                         Nil    -> opt :| Nil
               )
               (\(adjR /\ adjN /\ adjO) -> do
-                guardArgNames adjN aN'
+                guardArgNames mkAlias adjN aN'
                 let
                   leading' = (_ $ adjR) <$> leading
                   opt = Solved.Option (mkAlias h)
@@ -307,9 +307,9 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                   Nil    -> opt :| Nil
 
         where
-        guardArgNames aN aN' | aN ^=^ aN' = Right true
-        guardArgNames aN aN' = fail
-          $ "Arguments mismatch for option -" <> S.singleton c <> ": "
+        guardArgNames _ aN aN' | aN ^=^ aN' = Right true
+        guardArgNames mkAlias aN aN' = fail
+          $ "Arguments mismatch for option " <> (pretty $ mkAlias c) <> ": "
               <> show aN <> " and " <> show aN'
 
       lookupValidDescription
