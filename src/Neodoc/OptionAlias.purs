@@ -6,6 +6,8 @@ module Neodoc.OptionAlias (
   , toAliasList
   , fromString
   , IsNegative
+  , isNegative
+  , setNegative
   , module NonEmpty
   ) where
 
@@ -75,6 +77,14 @@ instance prettyOptionAlias :: Pretty OptionAlias where
     where sign = if neg then "+" else "-"
   pretty (Long  n neg) = sign <> n
     where sign = if neg then "--no-" else "--"
+
+isNegative :: OptionAlias -> Boolean
+isNegative (Long _ neg) = neg
+isNegative (Short _ neg) = neg
+
+setNegative :: Boolean -> OptionAlias -> OptionAlias
+setNegative neg (Long n _) = Long n neg
+setNegative neg (Short c _) = Short c neg
 
 isLong :: OptionAlias -> Boolean
 isLong (Long _ _) = true

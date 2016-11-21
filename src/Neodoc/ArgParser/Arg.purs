@@ -9,6 +9,7 @@ import Data.Pretty
 import Neodoc.Data.Layout
 import Neodoc.Value.RichValue
 import Neodoc.ArgKey
+import Neodoc.ArgKey.Class (toArgKey)
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
 
@@ -44,6 +45,9 @@ instance eqArg :: Eq Arg where
 
 getArg :: Arg -> SolvedLayoutArg
 getArg (Arg _ x _ _ _) = x
+
+setArg :: SolvedLayoutArg -> Arg -> Arg
+setArg x (Arg i _ k mV o) = Arg i x (toArgKey x) mV o
 
 getArgKey :: Arg -> ArgKey
 getArgKey (Arg _ _ k _ _) = k

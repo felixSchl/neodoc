@@ -5,6 +5,7 @@ import Data.Generic
 import Data.Pretty (class Pretty, pretty)
 import Data.String as String
 import Neodoc.OptionAlias (OptionAlias)
+import Neodoc.OptionAlias as OptionAlias
 
 data ArgKey
   = PositionalKey String
@@ -34,3 +35,7 @@ instance prettyArgKey :: Pretty ArgKey where
   pretty (OptionKey     a) = pretty a
   pretty (EOAKey         ) = "--"
   pretty (StdinKey       ) = "-"
+
+isNegative :: ArgKey -> Boolean
+isNegative (OptionKey a) = OptionAlias.isNegative a
+isNegative _             = false

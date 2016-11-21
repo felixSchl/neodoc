@@ -67,16 +67,16 @@ token name test = Parser \a ->
 
 type CanRepeat = Boolean
 type CanTerminate = Boolean
-data OptRes = OptRes Value CanTerminate CanRepeat
+type IsNegative = Boolean
+data OptRes = OptRes Value CanTerminate CanRepeat IsNegative
 
 longOption
   :: ∀ r
    . Boolean -- ^ does this option attempt to terminate the parse?
-  -> (Tuple String  -- ^ name of the option w/o leading dashes, i.e.: '--foo' => "foo"
-            OptionAlias.IsNegative)
+  -> String  -- ^ name of the option w/o leading dashes, i.e.: '--foo' => "foo"
   -> (Maybe OptionArgument)
   -> ArgParser r OptRes
-longOption term (n /\ neg) mArg = do
+longOption term n mArg = do
   input <- getInput
   case input of
     (PositionedToken token _ _):xs ->
@@ -93,11 +93,13 @@ longOption term (n /\ neg) mArg = do
           then
             -- remove the consumed arg from the input, if necessary
             let val = ArrayValue $ maybe [] (A.singleton <<< StringValue) result.rawValue
-             in OptRes val true false
+             in OptRes val true false (result.neg)
           else
             -- remove the consumed arg from the input, if necessary
-            let val = maybe (BoolValue true) (flip Value.read false) result.rawValue
-             in OptRes val true $ not result.explicitArg
+            let val = maybe (BoolValue (not result.neg))
+                            (flip Value.read false)
+                            result.rawValue
+             in OptRes val true (not result.explicitArg) (result.neg)
 
     _ -> fail "Expected token, met EOF" -- XXX: improve message
 
@@ -109,26 +111,29 @@ longOption term (n /\ neg) mArg = do
   -- Note that the option may *NOT* have an explicitly assigned
   -- option-argument. Finally, let the caller do the actual termination
   -- (updating parser state / consuming all input)
-  go (LOpt n' _ Nothing) _ | (n' == n) && term
+  go (LOpt n' neg Nothing) _ | (n' == n) && term
     = pure { rawValue:       Nothing
            , hasConsumedArg: false
            , explicitArg:    false
+           , neg
            }
 
   -- case 1:
   -- The name is an exact match
-  go (LOpt n' _ v) atok | (not isFlag) && (n' == n)
+  go (LOpt n' neg v) atok | (not isFlag) && (n' == n)
     = case v of
         Just s ->
           pure  { rawValue:       Just s
                 , hasConsumedArg: false
                 , explicitArg:    true
+                , neg
                 }
         _  -> case atok of
           Just (Lit s) ->
             pure  { rawValue:       Just s
                   , hasConsumedArg: true
                   , explicitArg:    false
+                  , neg
                   }
           _ ->
             let argIsOptional = maybe true isOptionArgumentOptional mArg
@@ -136,28 +141,31 @@ longOption term (n /\ neg) mArg = do
                 then pure { rawValue:       Nothing
                           , hasConsumedArg: false
                           , explicitArg:    false
+                          , neg
                           }
                 else fatal' $ optionRequiresArgumentError (OptionAlias.Long n neg)
 
   -- case 2:
   -- The name is an exact match and takes no argument
-  go (LOpt n' _ v) _ | isFlag && (n' == n)
+  go (LOpt n' neg v) _ | isFlag && (n' == n)
     = case v of
         Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Long n neg)
         Nothing -> pure { rawValue:       Nothing
                         , hasConsumedArg: false
                         , explicitArg:    false
+                        , neg
                         }
 
   -- case 3:
   -- The name is a substring of the input and no explicit argument has been
   -- provdided.
-  go (LOpt n' _ Nothing) _ | not isFlag
+  go (LOpt n' neg Nothing) _ | not isFlag
     = case stripPrefix (Pattern n) n' of
         Just s ->
           pure  { rawValue:        Just s
                 , hasConsumedArg: false
                 , explicitArg:    false
+                , neg
                 }
         _ -> fail "Invalid substring"
 
@@ -166,11 +174,10 @@ longOption term (n /\ neg) mArg = do
 shortOption
   :: ∀ r
    . Boolean -- ^ does this option attempt to terminate the parse?
-  -> (Tuple Char -- ^ flag of the option w/o leading dash, i.e.: '-f' => "f"
-            OptionAlias.IsNegative)
+  -> Char    -- ^ flag of the option w/o leading dash, i.e.: '-f' => "f"
   -> (Maybe OptionArgument)
   -> ArgParser r OptRes
-shortOption term (f /\ neg) mArg = do
+shortOption term f mArg = do
   input <- getInput
   case input of
     (PositionedToken token source sourcePos):xs ->
@@ -191,9 +198,10 @@ shortOption term (f /\ neg) mArg = do
                             _:xs' | result.hasConsumedArg -> xs'
                             _ -> xs
              in setInput newInput $> do
-                  OptRes val true false
+                  OptRes val true false (result.neg)
           else
-            let newSource = (if neg then "+" else "-") <> String.drop 2 source
+            let newSource = (if result.neg then "+" else "-")
+                              <> String.drop 2 source
                 pushed = maybe empty
                           (\tok -> singleton $ PositionedToken tok newSource sourcePos)
                           result.remainder
@@ -208,10 +216,12 @@ shortOption term (f /\ neg) mArg = do
                           then rest <#> \(PositionedToken tok source sourcePos) ->
                                 PositionedToken tok source (sourcePos + nPushed)
                           else rest
-                val = maybe (BoolValue true) (flip Value.read false) result.rawValue
+                val = maybe (BoolValue (not result.neg))
+                            (flip Value.read false)
+                            result.rawValue
                 newInput = pushed <> rest'
              in setInput newInput $> do
-                  OptRes val false $ not result.explicitArg
+                  OptRes val false (not result.explicitArg) (result.neg)
 
     _ -> fail "Expected token, met EOF" -- XXX: improve message
 
@@ -221,13 +231,14 @@ shortOption term (f /\ neg) mArg = do
   -- case 1:
   -- The leading flag matches, there are no stacked options, and an explicit
   -- argument may have been passed.
-  go (SOpt f' xs _ v) atok | (f' == f) && (not isFlag) && (A.null xs)
+  go (SOpt f' xs neg v) atok | (f' == f) && (not isFlag) && (A.null xs)
     = case v of
         Just s ->
           pure { rawValue:       Just s
                 , remainder:      Nothing
                 , hasConsumedArg: false
                 , explicitArg:    true
+                , neg
                 }
         otherwise -> case atok of
           Just (Lit s) ->
@@ -235,6 +246,7 @@ shortOption term (f /\ neg) mArg = do
                   , remainder:      Nothing
                   , hasConsumedArg: true
                   , explicitArg:    false
+                  , neg
                   }
           otherwise ->
             let argIsOptional = maybe true isOptionArgumentOptional mArg
@@ -243,13 +255,14 @@ shortOption term (f /\ neg) mArg = do
                           , remainder:      Nothing
                           , hasConsumedArg: false
                           , explicitArg:    false
+                          , neg
                           }
                 else fatal' $ optionRequiresArgumentError (OptionAlias.Short f neg)
 
   -- case 2:
   -- The leading flag matches, there are stacked options, a explicit
   -- argument may have been passed and the option takes an argument.
-  go (SOpt f' xs _ v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
+  go (SOpt f' xs neg v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
     -- note: we put the '=' back on. this assumes that explicit arguments will
     --       *always* be bound with a '='.
     = let arg = fromCharArray xs <> maybe "" ("=" <> _) v
@@ -257,6 +270,7 @@ shortOption term (f /\ neg) mArg = do
                 , remainder:      Nothing
                 , hasConsumedArg: false
                 , explicitArg:    isJust v
+                , neg
                 }
 
   -- case 3:
@@ -270,18 +284,20 @@ shortOption term (f /\ neg) mArg = do
                                          (unsafePartial $ AU.tail xs)
                                          neg
                                          v)
+            , neg
             }
 
   -- case 4:
   -- The leading flag matches, there are no stacked options and the option
   -- takes no argument - total consumption!
-  go (SOpt f' xs _ v) _ | (f' == f) && (isFlag) && (A.null xs)
+  go (SOpt f' xs neg v) _ | (f' == f) && (isFlag) && (A.null xs)
     = case v of
         Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Short f' neg)
         Nothing -> pure { rawValue:       Nothing
                         , remainder:      Nothing
                         , hasConsumedArg: false
                         , explicitArg:    false
+                        , neg
                         }
 
   go a _ = fail $ "Invalid token: " <> pretty a

@@ -46,14 +46,14 @@ toKey (x /\ mDesc) = Key (Set.fromFoldable $ go x)
       _ -> Nothing
   go _ = singleton $ toArgKey x
 
-
 instance showKey :: (Show a) => Show Key where
   show (Key keys) = "Key " <> show keys
 
 instance prettyKey :: (Pretty a) => Pretty Key where
   pretty (Key keys) = pretty $ fromFoldable keys
 
--- | Derive a strin based key
+-- | Derive a string based key
+-- | note: this *always* yields the positive version of an option.
 toStrKeys :: Key -> List String
 toStrKeys (Key keys) = go <$> (fromFoldable keys)
   where
@@ -61,7 +61,5 @@ toStrKeys (Key keys) = go <$> (fromFoldable keys)
     go (CommandKey    n) = n
     go EOAKey            = "--"
     go StdinKey          = "-"
-    go (OptionKey  (OptionAlias.Long n neg))  = sign <> n
-      where sign = if neg then "--no-" else "--"
-    go (OptionKey  (OptionAlias.Short c neg)) = sign <> String.singleton c
-      where sign = if neg then "+" else "-"
+    go (OptionKey  (OptionAlias.Long n neg)) = "--" <> n
+    go (OptionKey  (OptionAlias.Short c neg)) = "-" <> String.singleton c

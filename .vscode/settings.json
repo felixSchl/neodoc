@@ -1,5 +1,18 @@
 {
     "purescript.addNpmPath": true,
     "editor.tabSize": 2,
-    "editor.rulers": [80,120]
+    "editor.rulers": [80,120],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "node_modules": true,
+        "output": true,
+        "bower_components": true,
+        "package": true,
+        "dist": true,
+        ".pulp-cache": true,
+        "*.tgz": true
+    }
 }

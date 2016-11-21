@@ -13,7 +13,7 @@ import Data.List (
 import Data.Array as Array
 import Data.Optimize.Uncurried
 import Data.List.Partial as LU
-import Data.Bifunctor (lmap)
+import Data.Bifunctor (lmap, rmap)
 import Data.Set as Set
 import Data.List.Lazy (take, repeat, toUnfoldable) as LL
 import Data.List.Partial as LU
@@ -663,18 +663,17 @@ parseLayout l sub x = do
   go opts (ParseElem _ _ x) =
     let arg = Arg.getArg x
         fromArgv = do
-          RichValue.from Origin.Argv <$> do
-            {-cachedArg (Arg.getId x) $-}
-              parseArg arg
+          arg' /\ v <- parseArg arg
+          return $ Arg.setArg arg' x /\ RichValue.from Origin.Argv v
           <* modifyDepth (_ + 1)
      in do
       if sub
-        then singleton <<< Tuple x <$> case Arg.getFallback x of
-              Just v -> fromArgv <|> return v
+        then singleton <$> case Arg.getFallback x of
+              Just v -> fromArgv <|> return (Tuple x v)
               _      -> fromArgv
         else
           let nTimes = if Arg.isArgRepeatable x then some else liftM1 singleton
-           in nTimes $ Tuple x <$> fromArgv
+           in nTimes fromArgv
 
 {-
   Parse a single argument. We do not substitute and ignore repetitions.
@@ -682,14 +681,16 @@ parseLayout l sub x = do
 parseArg
   :: ∀ r
    . SolvedLayoutArg
-  -> ArgParser r Value
+  -> ArgParser r (Tuple SolvedLayoutArg Value)
 parseArg x = go x
   where
-  go (Solved.Positional n _) = positional n n
-  go (Solved.Command    n _) = command    n n
-  go (Solved.Stdin         ) = stdin
-  go (Solved.EOA           ) = eoa <|> (return $ ArrayValue [])
+  asIs = Tuple x
+  go (Solved.Positional n _) = asIs <$> positional n n
+  go (Solved.Command    n _) = asIs <$> command    n n
+  go (Solved.Stdin         ) = asIs <$> stdin
+  go (Solved.EOA           ) = asIs <$> (eoa <|> (return $ ArrayValue []))
   go (Solved.Option a  mA r) = do
+    let return' neg = Tuple (Solved.Option (OptionAlias.setNegative neg a) mA r)
     (ParseArgs { options } _ _ input) <- getParseState
     case input of
       (PositionedToken token _ _) : _
@@ -706,21 +707,21 @@ parseArg x = go x
               _ -> fail' $ internalError "invalid option description"
           let
             ns = NonEmpty.toList $ aliases <#> case _ of
-                  OptionAlias.Short f neg -> Left  $ f /\ neg
-                  OptionAlias.Long  n neg -> Right $ n /\ neg
+                  OptionAlias.Short f _ -> Left  $ f
+                  OptionAlias.Long  n _ -> Right $ n
             longAliases = mrights ns
             shortAliases = mlefts ns
 
             term = any (_ `elem` options.stopAt) $ aliases <#> case _ of
                       OptionAlias.Short s neg ->
-                        let sign = if neg then "+" else "-"
+                        let sign = "-"
                          in sign <> String.singleton s
                       OptionAlias.Long n neg ->
-                        let sign = if neg then "--no-" else "--"
+                        let sign = "--"
                          in sign <> n
 
           -- note: safe to be unsafe because of pattern match above
-          OptRes v canTerm canRepeat <- unsafePartial case token of
+          OptRes v canTerm canRepeat isNeg <- unsafePartial case token of
             LOpt _ _ _ ->
               case longAliases of
                 Nil -> fail "Option has no long alias"
@@ -733,16 +734,16 @@ parseArg x = go x
                         shortOption term alias mA
 
           -- try terminating at this option
-          if term && canTerm
-              then do
-                vs <- terminate x
-                return (ArrayValue (Value.intoArray v <> Value.intoArray vs))
-              else do
-                if isJust mA && r && canRepeat
-                    then do
-                      vs <- Array.many optionArgument
-                      return (ArrayValue (Value.intoArray v <> vs))
-                    else return v
+          return' isNeg <$> if term && canTerm
+            then do
+              vs <- terminate x
+              return (ArrayValue (Value.intoArray v <> Value.intoArray vs))
+            else do
+              if isJust mA && r && canRepeat
+                  then do
+                    vs <- Array.many optionArgument
+                    return (ArrayValue (Value.intoArray v <> vs))
+                  else return v
       _ -> fail "Expected long or short option"
 
 {-

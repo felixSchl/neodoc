@@ -3631,9 +3631,49 @@ $ prog
 #
 # Changes:
 #       * Incompat FFI change to UsageLayout
+
 r"""
-usage: p +f
+usage: p -f...
+options:
+ -f, +f  ...foo
 """
+
+$ prog +f -f +f +f -f -f
+{"-f": 2}
+
+$ prog +f -f +f +f
+{"-f": 0}
+
+r"""
+usage: p -f
+options:
+ -f, +f
+"""
+
+$ prog -f
+{"-f": true}
 
 $ prog +f
 {"-f": false}
+
+$ prog/R -f +f
+{"-f": false}
+
+$ prog/R -f +f -f -f +f
+{"-f": false}
+
+r"""
+usage: p --foo
+"""
+
+$ prog --no-foo
+{"--foo": false}
+
+r"""
+usage: p -f
+options:
+ -f, --[no-]foo
+"""
+
+$ prog --no-foo
+{"-f": false, "--foo": false}
