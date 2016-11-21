@@ -12,9 +12,10 @@ import Data.String (fromCharArray)
 import Data.Array as A
 
 import Neodoc.Value (Value)
+type IsNegated = Boolean
 data Token
-  = LOpt String (Maybe String)
-  | SOpt Char (Array Char) (Maybe String)
+  = LOpt String IsNegated (Maybe String)
+  | SOpt Char (Array Char) IsNegated (Maybe String)
   | EOA (List Value)
   | Stdin
   | Lit String
@@ -30,10 +31,12 @@ instance prettyToken :: Pretty Token where
   pretty (Stdin) = "-"
   pretty (EOA xs) = "-- " <> intercalate " " (pretty <$> xs)
   pretty (Lit s) = s
-  pretty (LOpt n a) = "--" <> n <> arg
-    where arg = maybe "" ("=" <> _) a
-  pretty (SOpt n s a) = "-"  <> (fromCharArray (A.cons n s)) <> arg
-    where arg = maybe "" ("=" <> _) a
+  pretty (LOpt n neg a) = sign <> n <> arg
+    where sign = if neg then "--no-" else "--"
+          arg = maybe "" ("=" <> _) a
+  pretty (SOpt n s neg a) = sign <> (fromCharArray (A.cons n s)) <> arg
+    where sign = if neg then "+" else "-"
+          arg = maybe "" ("=" <> _) a
 
 data PositionedToken = PositionedToken Token String Int
 

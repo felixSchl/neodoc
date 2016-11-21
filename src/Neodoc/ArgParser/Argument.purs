@@ -108,7 +108,7 @@ longOption term n mArg = do
   -- Note that the option may *NOT* have an explicitly assigned
   -- option-argument. Finally, let the caller do the actual termination
   -- (updating parser state / consuming all input)
-  go (LOpt n' Nothing) _ | (n' == n) && term
+  go (LOpt n' _ Nothing) _ | (n' == n) && term
     = pure { rawValue:       Nothing
            , hasConsumedArg: false
            , explicitArg:    false
@@ -116,7 +116,7 @@ longOption term n mArg = do
 
   -- case 1:
   -- The name is an exact match
-  go (LOpt n' v) atok | (not isFlag) && (n' == n)
+  go (LOpt n' _ v) atok | (not isFlag) && (n' == n)
     = case v of
         Just s ->
           pure  { rawValue:       Just s
@@ -140,7 +140,7 @@ longOption term n mArg = do
 
   -- case 2:
   -- The name is an exact match and takes no argument
-  go (LOpt n' v) _ | isFlag && (n' == n)
+  go (LOpt n' _ v) _ | isFlag && (n' == n)
     = case v of
         Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Long n)
         Nothing -> pure { rawValue:       Nothing
@@ -151,10 +151,10 @@ longOption term n mArg = do
   -- case 3:
   -- The name is a substring of the input and no explicit argument has been
   -- provdided.
-  go (LOpt n' Nothing) _ | not isFlag
+  go (LOpt n' _ Nothing) _ | not isFlag
     = case stripPrefix (Pattern n) n' of
         Just s ->
-          pure { rawValue:        Just s
+          pure  { rawValue:        Just s
                 , hasConsumedArg: false
                 , explicitArg:    false
                 }
@@ -219,7 +219,7 @@ shortOption term f mArg = do
   -- case 1:
   -- The leading flag matches, there are no stacked options, and an explicit
   -- argument may have been passed.
-  go (SOpt f' xs v) atok | (f' == f) && (not isFlag) && (A.null xs)
+  go (SOpt f' xs _ v) atok | (f' == f) && (not isFlag) && (A.null xs)
     = case v of
         Just s ->
           pure { rawValue:       Just s
@@ -247,7 +247,7 @@ shortOption term f mArg = do
   -- case 2:
   -- The leading flag matches, there are stacked options, a explicit
   -- argument may have been passed and the option takes an argument.
-  go (SOpt f' xs v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
+  go (SOpt f' xs _ v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
     -- note: we put the '=' back on. this assumes that explicit arguments will
     --       *always* be bound with a '='.
     = let arg = fromCharArray xs <> maybe "" ("=" <> _) v
@@ -260,19 +260,20 @@ shortOption term f mArg = do
   -- case 3:
   -- The leading flag matches, there are stacked options, the option takes
   -- no argument and an explicit argument has not been provided.
-  go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
+  go (SOpt f' xs neg v) _ | (f' == f) && (isFlag) && (not $ A.null xs)
     = pure  { rawValue:       Nothing
             , hasConsumedArg: false
             , explicitArg:    isJust v
             , remainder:      pure (SOpt (unsafePartial $ AU.head xs)
-                                        (unsafePartial $ AU.tail xs)
-                                        v)
+                                         (unsafePartial $ AU.tail xs)
+                                         neg
+                                         v)
             }
 
   -- case 4:
   -- The leading flag matches, there are no stacked options and the option
   -- takes no argument - total consumption!
-  go (SOpt f' xs v) _ | (f' == f) && (isFlag) && (A.null xs)
+  go (SOpt f' xs _ v) _ | (f' == f) && (isFlag) && (A.null xs)
     = case v of
         Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Short f')
         Nothing -> pure { rawValue:       Nothing

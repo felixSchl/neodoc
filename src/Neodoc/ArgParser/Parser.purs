@@ -694,9 +694,9 @@ parseArg x = go x
     case input of
       (PositionedToken token _ _) : _
         | case token of
-            LOpt _ _   -> true
-            SOpt _ _ _ -> true
-            _          -> false
+            LOpt _ _ _   -> true
+            SOpt _ _ _ _ -> true
+            _            -> false
         -> do
           aliases /\ def /\ env <- do
             description <- lookupDescription' a
@@ -716,12 +716,12 @@ parseArg x = go x
 
           -- note: safe to be unsafe because of pattern match above
           OptRes v canTerm canRepeat <- unsafePartial case token of
-            LOpt _ _ ->
+            LOpt _ _ _ ->
               case longAliases of
                 Nil -> fail "Option has no long alias"
                 _   -> choice $ longAliases <#> \alias -> try do
                         longOption term alias mA
-            SOpt _ _ _ ->
+            SOpt _ _ _ _ ->
               case shortAliases of
                 Nil -> fail "Option has no short alias"
                 _   -> choice $ shortAliases <#> \alias -> try do
@@ -825,8 +825,8 @@ unknownOption = do
   case i of
     (PositionedToken tok source _):toks |
       case tok of
-        LOpt _ _ -> true
-        SOpt _ _ _ -> true
+        LOpt _ _ _ -> true
+        SOpt _ _ _ _ -> true
         _ -> false -> do
       isKnown <- isKnownToken' tok
       if isKnown
@@ -866,8 +866,8 @@ isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInL
     where
     matchesDesc (OptionDescription as _ _ _ _) = test tok
       where
-      test (Token.LOpt n _)   = elem (OptionAlias.Long n) as
-      test (Token.SOpt s _ _) = elem (OptionAlias.Short s) as
+      test (Token.LOpt n _ _)   = elem (OptionAlias.Long n) as
+      test (Token.SOpt s _ _ _) = elem (OptionAlias.Short s) as
       test _ = false
     matchesDesc _ = false
   occuresInLayouts = any (any (any matchesLayout)) layouts
@@ -875,9 +875,9 @@ isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInL
     matchesLayout (Group _ _ xs) = any (any matchesLayout) xs
     matchesLayout (Elem x) = test tok x
       where
-      test (Token.LOpt n _)   (Solved.Option a _ _) = OptionAlias.Long n == a
-      test (Token.SOpt s _ _) (Solved.Option a _ _) = OptionAlias.Short s == a
-      test (Token.Lit n)      (Solved.Command n' _) = n == n'
-      test (Token.EOA _)      (Solved.EOA)          = true
-      test (Token.Stdin)      (Solved.Stdin)        = true
+      test (Token.LOpt n _ _)   (Solved.Option a _ _) = OptionAlias.Long n == a
+      test (Token.SOpt s _ _ _) (Solved.Option a _ _) = OptionAlias.Short s == a
+      test (Token.Lit n)        (Solved.Command n' _) = n == n'
+      test (Token.EOA _)        (Solved.EOA)          = true
+      test (Token.Stdin)        (Solved.Stdin)        = true
       test _ _ = false

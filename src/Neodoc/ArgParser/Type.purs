@@ -125,11 +125,11 @@ data ArgParseError
 tokLabel :: PositionedToken -> String
 tokLabel (PositionedToken token source _) = go token
   where
-  go (Token.LOpt _ _)   = "option " <> source
-  go (Token.SOpt _ _ _) = "option " <> source
-  go (Token.EOA _)      = "option --"
-  go Token.Stdin        = "option -"
-  go (Token.Lit _)      = "command " <> source
+  go (Token.LOpt _ _ _)   = "option " <> source
+  go (Token.SOpt _ _ _ _) = "option " <> source
+  go (Token.EOA _)        = "option --"
+  go Token.Stdin          = "option -"
+  go (Token.Lit _)        = "command " <> source
 
 optionTakesNoArgumentError a = OptionTakesNoArgumentError a $ defer \_ ->
   "option takes no argument: " <> pretty a

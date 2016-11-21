@@ -68,20 +68,21 @@ parseToken = do
     -- | Parse a short option
     sopt :: StringParser' Token
     sopt = do
-      P.char '-'
+      neg <- P.choice [ P.char '-' $> false, P.char '+' $> true ]
       x   <- P.noneOf illegalSOptChar
       xs  <- A.many $ P.noneOf illegalOptChar -- re-allow '-'s
       arg <- P.optionMaybe arg
-      pure $ SOpt x xs arg
+      pure $ SOpt x xs neg arg
 
     -- | Parse a long option
     lopt :: StringParser' Token
     lopt = do
       P.string "--"
+      neg <- P.choice [ P.string "no-" $> true, pure false ]
       xs <- foldMap String.singleton <$> do
         some $ P.noneOf illegalOptChar
       arg <- P.optionMaybe arg
-      pure $ LOpt xs arg
+      pure $ LOpt xs neg arg
 
     -- | Parse a literal
     lit :: StringParser' Token
