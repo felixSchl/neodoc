@@ -72,10 +72,11 @@ data OptRes = OptRes Value CanTerminate CanRepeat
 longOption
   :: ∀ r
    . Boolean -- ^ does this option attempt to terminate the parse?
-  -> String  -- ^ name of the option w/o leading dashes, i.e.: '--foo' => "foo"
+  -> (Tuple String  -- ^ name of the option w/o leading dashes, i.e.: '--foo' => "foo"
+            OptionAlias.IsNegative)
   -> (Maybe OptionArgument)
   -> ArgParser r OptRes
-longOption term n mArg = do
+longOption term (n /\ neg) mArg = do
   input <- getInput
   case input of
     (PositionedToken token _ _):xs ->
@@ -136,13 +137,13 @@ longOption term n mArg = do
                           , hasConsumedArg: false
                           , explicitArg:    false
                           }
-                else fatal' $ optionRequiresArgumentError (OptionAlias.Long n)
+                else fatal' $ optionRequiresArgumentError (OptionAlias.Long n neg)
 
   -- case 2:
   -- The name is an exact match and takes no argument
   go (LOpt n' _ v) _ | isFlag && (n' == n)
     = case v of
-        Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Long n)
+        Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Long n neg)
         Nothing -> pure { rawValue:       Nothing
                         , hasConsumedArg: false
                         , explicitArg:    false
@@ -165,10 +166,11 @@ longOption term n mArg = do
 shortOption
   :: ∀ r
    . Boolean -- ^ does this option attempt to terminate the parse?
-  -> Char    -- ^ flag of the option w/o leading dash, i.e.: '-f' => "f"
+  -> (Tuple Char -- ^ flag of the option w/o leading dash, i.e.: '-f' => "f"
+            OptionAlias.IsNegative)
   -> (Maybe OptionArgument)
   -> ArgParser r OptRes
-shortOption term f mArg = do
+shortOption term (f /\ neg) mArg = do
   input <- getInput
   case input of
     (PositionedToken token source sourcePos):xs ->
@@ -242,7 +244,7 @@ shortOption term f mArg = do
                           , hasConsumedArg: false
                           , explicitArg:    false
                           }
-                else fatal' $ optionRequiresArgumentError (OptionAlias.Short f)
+                else fatal' $ optionRequiresArgumentError (OptionAlias.Short f neg)
 
   -- case 2:
   -- The leading flag matches, there are stacked options, a explicit
@@ -275,7 +277,7 @@ shortOption term f mArg = do
   -- takes no argument - total consumption!
   go (SOpt f' xs _ v) _ | (f' == f) && (isFlag) && (A.null xs)
     = case v of
-        Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Short f')
+        Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Short f' neg)
         Nothing -> pure { rawValue:       Nothing
                         , remainder:      Nothing
                         , hasConsumedArg: false

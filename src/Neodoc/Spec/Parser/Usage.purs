@@ -137,7 +137,7 @@ parse toks =
 
   longOption :: P.TokenParser UsageLayoutArg
   longOption = do
-    { name, arg } <- P.lopt
+    { name, neg, arg } <- P.lopt
     let arg' = do
           { name, optional } <- arg
           Just (OptionArgument name optional)
@@ -145,7 +145,7 @@ parse toks =
 
   shortOption :: P.TokenParser UsageLayoutArg
   shortOption = do
-    { chars, arg } <- P.sopt
+    { chars, neg, arg } <- P.sopt
     let arg' = do
           { name, optional } <- arg
           Just (OptionArgument name optional)

@@ -57,9 +57,11 @@ instance prettyKey :: (Pretty a) => Pretty Key where
 toStrKeys :: Key -> List String
 toStrKeys (Key keys) = go <$> (fromFoldable keys)
   where
-    go (PositionalKey n)                  = n
-    go (CommandKey    n)                  = n
-    go (OptionKey  (OptionAlias.Long n))  = "--" <> n
-    go (OptionKey  (OptionAlias.Short c)) = "-"  <> String.singleton c
-    go EOAKey                             = "--"
-    go StdinKey                           = "-"
+    go (PositionalKey n) = n
+    go (CommandKey    n) = n
+    go EOAKey            = "--"
+    go StdinKey          = "-"
+    go (OptionKey  (OptionAlias.Long n neg))  = sign <> n
+      where sign = if neg then "--no-" else "--"
+    go (OptionKey  (OptionAlias.Short c neg)) = sign <> String.singleton c
+      where sign = if neg then "+" else "-"

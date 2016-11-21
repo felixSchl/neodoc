@@ -70,7 +70,7 @@ smartOptions (Spec (spec@{ layouts, descriptions })) = do
 
         opt <- case x of
           (Elem (Usage.Option n Nothing r)) ->
-            let hasDescription = not (null $ findDescriptions (OptionAlias.Long n))
+            let hasDescription = not (null $ findDescriptions (OptionAlias.Long n false {- TODO: use UsageLayout's neg -}))
              in if hasDescription
                 then Nothing
                 else Just $ Option n (Just arg) (r || argR)
@@ -83,7 +83,7 @@ smartOptions (Spec (spec@{ layouts, descriptions })) = do
             let h = case (Array.last cs) /\ (Array.init cs) of
                       Just t /\ Just i -> t
                       _                -> c
-                hasDescription = not (null $ findDescriptions (OptionAlias.Short h))
+                hasDescription = not (null $ findDescriptions (OptionAlias.Short h false {- TODO: use UsageLayout's neg -}))
              in if hasDescription
                 then Nothing
                 else Just $ OptionStack (c :| cs) (Just arg) (r || argR)

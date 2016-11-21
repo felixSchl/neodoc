@@ -706,13 +706,18 @@ parseArg x = go x
               _ -> fail' $ internalError "invalid option description"
           let
             ns = NonEmpty.toList $ aliases <#> case _ of
-                  OptionAlias.Short f -> Left  f
-                  OptionAlias.Long  n -> Right n
+                  OptionAlias.Short f neg -> Left  $ f /\ neg
+                  OptionAlias.Long  n neg -> Right $ n /\ neg
             longAliases = mrights ns
             shortAliases = mlefts ns
+
             term = any (_ `elem` options.stopAt) $ aliases <#> case _ of
-                      OptionAlias.Short s -> "-"  <> String.singleton s
-                      OptionAlias.Long  n -> "--" <> n
+                      OptionAlias.Short s neg ->
+                        let sign = if neg then "+" else "-"
+                         in sign <> String.singleton s
+                      OptionAlias.Long n neg ->
+                        let sign = if neg then "--no-" else "--"
+                         in sign <> n
 
           -- note: safe to be unsafe because of pattern match above
           OptRes v canTerm canRepeat <- unsafePartial case token of
@@ -866,8 +871,8 @@ isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInL
     where
     matchesDesc (OptionDescription as _ _ _ _) = test tok
       where
-      test (Token.LOpt n _ _)   = elem (OptionAlias.Long n) as
-      test (Token.SOpt s _ _ _) = elem (OptionAlias.Short s) as
+      test (Token.LOpt n neg _)   = elem (OptionAlias.Long n neg) as
+      test (Token.SOpt s _ neg _) = elem (OptionAlias.Short s neg) as
       test _ = false
     matchesDesc _ = false
   occuresInLayouts = any (any (any matchesLayout)) layouts
@@ -875,8 +880,8 @@ isKnownToken (Spec { layouts, descriptions }) tok = occuresInDescs || occuresInL
     matchesLayout (Group _ _ xs) = any (any matchesLayout) xs
     matchesLayout (Elem x) = test tok x
       where
-      test (Token.LOpt n _ _)   (Solved.Option a _ _) = OptionAlias.Long n == a
-      test (Token.SOpt s _ _ _) (Solved.Option a _ _) = OptionAlias.Short s == a
+      test (Token.LOpt n _ _)   (Solved.Option (OptionAlias.Long n' _) _ _) = n == n'
+      test (Token.SOpt s _ _ _) (Solved.Option (OptionAlias.Short s' _) _ _) = s == s'
       test (Token.Lit n)        (Solved.Command n' _) = n == n'
       test (Token.EOA _)        (Solved.EOA)          = true
       test (Token.Stdin)        (Solved.Stdin)        = true

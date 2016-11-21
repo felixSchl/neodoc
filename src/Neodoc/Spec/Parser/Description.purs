@@ -207,10 +207,10 @@ parse toks =
 
     short :: P.TokenParser _
     short = do
-      { flag, arg } <- do
-        { chars: c :| cs, arg } <- P.sopt
+      { flag, arg, neg } <- do
+        { chars: flag :| cs, neg, arg } <- P.sopt
         (guard $ A.length cs == 0) P.<?> "No stacked options"
-        pure { flag: c, arg: arg }
+        pure { flag, neg, arg }
 
       -- Grab the adjacent positional-looking argument
       -- in case the token did not have an explicit
@@ -231,14 +231,14 @@ parse toks =
       repeatable <- P.option false $ P.tripleDot $> true
 
       pure {
-        alias: OptionAlias.Short flag
+        alias: OptionAlias.Short flag neg
       , arg
       , repeatable
       }
 
     long :: P.TokenParser _
     long = do
-      { name, arg } <- P.lopt
+      { name, neg, arg } <- P.lopt
 
       -- Grab the adjacent positional-looking argument
       -- in case the token did not have an explicit
@@ -259,7 +259,7 @@ parse toks =
       repeatable <- P.option false $ P.tripleDot $> true
 
       pure {
-        alias: OptionAlias.Long name
+        alias: OptionAlias.Long name neg
       , arg:   arg'
       , repeatable
       }

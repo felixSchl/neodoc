@@ -17,13 +17,13 @@ opt :: Aliases -> Maybe OptionArgument -> Maybe Value -> Description
 opt as mArg mDef = OptionDescription as false mArg mDef Nothing
 
 lname :: String -> Aliases
-lname n = OptionAlias.Long n :| Nil
+lname n = OptionAlias.Long n false :| Nil
 
 sname :: Char -> Aliases
-sname f = OptionAlias.Short f :| Nil
+sname f = OptionAlias.Short f false :| Nil
 
 fname :: Char -> String -> Aliases
-fname f n = OptionAlias.Short f :| OptionAlias.Long n : Nil
+fname f n = OptionAlias.Short f false :| OptionAlias.Long n false : Nil
 
 argument :: String -> Boolean -> OptionArgument
 argument = OptionArgument

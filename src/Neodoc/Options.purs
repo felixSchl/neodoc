@@ -69,8 +69,8 @@ defaultOptionsObj = {
 , requireFlags: false
 , laxPlacement: false
 , version:      Nothing
-, versionFlags: [ OA.Long "version" ]
-, helpFlags:    [ OA.Short 'h', OA.Long "help"    ]
+, versionFlags: [ OA.Long "version" false ]
+, helpFlags:    [ OA.Short 'h' false, OA.Long "help" false ]
 , transforms:   { presolve: Right [], postsolve: Right [] }
 , repeatableOptions: false
 , allowUnknown: false
@@ -149,6 +149,6 @@ instance isForeign :: IsForeign NeodocOptions where
              in case fromEmptyableSpec <$> ((runExcept $ F.read spec') :: Either _ (Spec (EmptyableLayout SolvedLayoutArg))) of
                   Left e  -> throwException $ error $ show e
                   Right s -> pure s
-    _maybe           = F.readPropMaybe
-    _default         = F.defaultIfUndefined
+    _maybe = F.readPropMaybe
+    _default = F.defaultIfUndefined
     _readBool k d v  = F.isTruthy <$> _default k (F.truthy d) v

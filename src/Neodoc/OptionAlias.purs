@@ -5,6 +5,7 @@ module Neodoc.OptionAlias (
   , isShort
   , toAliasList
   , fromString
+  , IsNegative
   , module NonEmpty
   ) where
 
@@ -28,7 +29,8 @@ import Data.Foreign.Class
 import Data.Foreign.Extra as F
 
 type Aliases = NonEmpty List OptionAlias
-data OptionAlias = Short Char | Long String
+type IsNegative = Boolean
+data OptionAlias = Short Char IsNegative | Long String IsNegative
 
 derive instance eqOptionAlias :: Eq OptionAlias
 derive instance ordOptionAlias :: Ord OptionAlias
@@ -46,31 +48,41 @@ instance isForeignOptionAlias :: IsForeign OptionAlias where
 
 fromString :: String -> Either String OptionAlias
 fromString s = case String.uncons s of
+  Just { head: '+', tail } ->
+    case String.uncons tail of
+      Just { head, tail: "" } -> Right $ Short head true
+      _ -> Left "short option must have a singe char"
   Just { head: '-', tail } ->
     case String.uncons tail of
       Just { head: '-', tail: "" } ->
         Left "long option must have a name"
-      Just { head: '-', tail: tail' } -> pure $ Long tail'
-      Just { head, tail: "" } -> pure $ Short head
+      Just { head: '-', tail: tail' } -> Right
+        let neg = String.take (String.length "no-") tail' == "no-"
+         in Long tail' neg
+      Just { head, tail: "" } -> Right $ Short head false
       _ -> Left "short option must have a singe char"
   Nothing -> Left "option may not be empty"
   _ -> Left "option must start with a dash"
 
 instance asForeignOptionAlias :: AsForeign OptionAlias where
-  write (Short c) = F.toForeign $ "-"  <> (String.singleton c)
-  write (Long  n) = F.toForeign $ "--" <> n
+  write (Short c neg) = F.toForeign $ sign <> (String.singleton c)
+    where sign = if neg then "+" else "-"
+  write (Long  n neg) = F.toForeign $ sign <> n
+    where sign = if neg then "--no-" else "--"
 
 instance prettyOptionAlias :: Pretty OptionAlias where
-  pretty (Short c) = "-"  <> (String.singleton c)
-  pretty (Long  n) = "--" <> n
+  pretty (Short c neg) = sign <> (String.singleton c)
+    where sign = if neg then "+" else "-"
+  pretty (Long  n neg) = sign <> n
+    where sign = if neg then "--no-" else "--"
 
 isLong :: OptionAlias -> Boolean
-isLong (Long _) = true
-isLong _        = false
+isLong (Long _ _) = true
+isLong _          = false
 
 isShort :: OptionAlias -> Boolean
-isShort (Short _) = true
-isShort _         = false
+isShort (Short _ _) = true
+isShort _           = false
 
 toAliasList :: NonEmpty List OptionAlias -> List OptionAlias
 toAliasList = fromNonEmpty (:)

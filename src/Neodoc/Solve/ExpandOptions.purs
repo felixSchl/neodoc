@@ -111,19 +111,17 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
             Usage.EOA            -> solved Solved.EOA
             Usage.Stdin          -> solved Solved.Stdin
             Usage.Reference n    -> return (ReferenceArg n)
-            Usage.Option n arg r -> preSolveOption (Args6 mAdjLayout slurped solved n arg r)
+            Usage.Option n arg r -> preSolveOption (Args7 mAdjLayout slurped solved n false {- TODO: use opts' `neg` -} arg r)
             Usage.OptionStack cs@(x:|xs) arg r ->
-              preSolveOptionStack (Args6 mAdjLayout slurpedM solvedM cs arg r)
+              preSolveOptionStack (Args7 mAdjLayout slurpedM solvedM cs false {- TODO: use opts' `neg` -} arg r)
 
     where
-    preSolveOption (Args6 mAdjLayout slurped solved n mArg r) = do
+    preSolveOption (Args7 mAdjLayout slurped solved n isNeg mArg r) = do
+      let alias = OptionAlias.Long n isNeg
       mDescription <- lookupValidDescription
       case mArg of
         Just (OptionArgument aN aO) ->
-          solved $ Solved.Option
-            (OptionAlias.Long n)
-            (Just $ OptionArgument aN aO)
-            r
+          solved $ Solved.Option alias (Just $ OptionArgument aN aO) r
 
         Nothing -> do
           case mDescription of
@@ -131,13 +129,13 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
               maybe
                 (if not aO'
                   then fail $ "Option-Argument specified in options-section missing"
-                              <> " --" <> n
-                  else solved $ Solved.Option (OptionAlias.Long n) descArg r
+                              <> pretty alias
+                  else solved $ Solved.Option alias descArg r
                 )
                 (\(adjR /\ adjN /\ adjO) -> do
                   guardArgNames adjN aN'
                   slurped $ Solved.Option
-                    (OptionAlias.Long n)
+                    alias
                     (Just $ OptionArgument adjN adjO)
                     adjR)
                 do
@@ -151,7 +149,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                       Elem (Usage.Command    n r') -> Just ((r || r') /\ n /\ o)
                       _ -> Nothing
                     _ -> Nothing
-            _ -> solved $ Solved.Option (OptionAlias.Long n) Nothing r
+            _ -> solved $ Solved.Option alias Nothing r
 
       where
       guardArgNames aN aN' | aN ^=^ aN' = Right true
@@ -170,11 +168,12 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
         where
         isMatch (OptionDescription aliases _ _ _ _)
           = flip any aliases case _ of
-              OptionAlias.Long n' -> n == n'
-              _                   -> false
+              OptionAlias.Long n' _ -> n == n'
+              _                     -> false
         isMatch _ = false
 
-    preSolveOptionStack (Args6 mAdjLayout slurped solved (css@(c :| cs)) mArg r) = do
+    preSolveOptionStack (Args7 mAdjLayout slurped solved (css@(c :| cs)) isNeg mArg r) = do
+      let mkAlias c = OptionAlias.Short c isNeg
       -- transform: the last stacked char is the one to receive the explicit
       -- argument binding. the rest will be w/o any binding at all.
       -- ex: -abcdef=foo -> -a -b -c -d -e -f=foo
@@ -187,11 +186,8 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
           lookupValidDescription true h
           leading <- fromFoldable <$> for ts \t -> do
             lookupValidDescription false t
-            Right $ Solved.Option
-                    (OptionAlias.Short t)
-                    Nothing
-                    r
-          let opt = Solved.Option (OptionAlias.Short h)
+            Right $ Solved.Option (mkAlias t) Nothing r
+          let opt = Solved.Option (mkAlias h)
                                   (Just $ OptionArgument aN aO)
                                   r
           solved case leading of
@@ -202,7 +198,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
         -- however, a binding might result from either subsumption of the
         -- option's own characters or from an adjacent argument where possible.
         -- this implementation prefers subsumption over slurping.
-        Nothing -> trySubsume <|> trySlurp (Args2 h ts)
+        Nothing -> trySubsume mkAlias <|> trySlurp (Args3 h ts mkAlias)
 
       where
       -- try to subsume the option stack by iterating over it, checking for each
@@ -217,14 +213,14 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
       --
       -- this implementation is simple and favours the first description to
       -- yield a hit.
-      trySubsume = do
+      trySubsume mkAlias = do
         let fs  = S.fromCharArray $ c `Array.cons` cs
         -- XXX: Purescript is not lazy, so this is too expensive.
         --      We could just stop at the first `Just` value.
         match <- head <<< catMaybes <$> for descriptions case _ of
           OptionDescription aliases _ (Just (OptionArgument aN aO)) _ _ -> do
             head <<< catMaybes <<< NonEmpty.toList <$> for aliases case _ of
-              OptionAlias.Short f -> Right do
+              OptionAlias.Short f _ -> Right do
                 -- the haystack needs to be modified, such that the
                 -- the last (length a.name) characters are uppercased
                 -- and hence compared case INSENSITIVELY.
@@ -238,7 +234,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                      in if unsafePartial (US.charAt ix fs) == f then
                         let
                           rest = S.toCharArray $ S.take (S.length fs - S.length bareArgname - 1) fs
-                          opt = Solved.Option (OptionAlias.Short f) (Just (OptionArgument aN aO)) r
+                          opt = Solved.Option (mkAlias f) (Just (OptionArgument aN aO)) r
                         in Just (rest /\ opt)
                         else Nothing
                   else Nothing
@@ -250,9 +246,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                     lookupValidDescription false c
                     -- set the same repeatability flag for each stacked option
                     -- as indicated by trailing option.
-                    Right $ Solved.Option (OptionAlias.Short c)
-                                          Nothing
-                                          r
+                    Right $ Solved.Option (mkAlias c) Nothing r
                 Just $ rest /\ out
               _ -> Right Nothing
           _ -> Right Nothing
@@ -262,23 +256,23 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
             o : os -> o   :| os <> singleton out
             Nil    -> out :| Nil
 
-      trySlurp (Args2 h ts) = do
+      trySlurp (Args3 h ts mkAlias) = do
         mDesc <- lookupValidDescription true h
         leading <- fromFoldable <$> for ts \t -> do
           lookupValidDescription false t
           -- note: return a function to override the stacked option's
-          -- repeatability later.
-          Right $ \r' -> Solved.Option (OptionAlias.Short t) Nothing (r || r')
+          --       repeatability later.
+          Right $ \r' -> Solved.Option (mkAlias t) Nothing (r || r')
         case mDesc of
           Just (_ /\ (descArg@(Just (OptionArgument aN' aO')))) -> do
             maybe'
               (\_->
                 if not aO' then
                   fail $ "Option-Argument specified in options-section missing"
-                        <> " -" <> S.singleton h
+                        <> pretty (mkAlias h)
                 else
                   let leading' = (_ $ false) <$> leading
-                      opt = Solved.Option (OptionAlias.Short h) descArg r
+                      opt = Solved.Option (mkAlias h) descArg r
                   in solved case leading' of
                         x : xs -> x :| xs <> singleton opt
                         Nil    -> opt :| Nil
@@ -287,7 +281,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                 guardArgNames adjN aN'
                 let
                   leading' = (_ $ adjR) <$> leading
-                  opt = Solved.Option (OptionAlias.Short h)
+                  opt = Solved.Option (mkAlias h)
                                       (Just $ OptionArgument adjN adjO)
                                       adjR -- XXX: OR-apply description's repeatability here?
                 slurped case leading' of
@@ -307,7 +301,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                   _ -> Nothing
           _ ->
             let leading' = (_ $ false) <$> leading
-                opt = Solved.Option (OptionAlias.Short h) Nothing r
+                opt = Solved.Option (mkAlias h) Nothing r
              in solved case leading' of
                   x : xs -> x :| xs <> singleton opt
                   Nil    -> opt :| Nil
@@ -338,8 +332,8 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
         where
         isMatch (OptionDescription aliases _ _ _ _)
           = flip any aliases case _ of
-              OptionAlias.Short c' -> c == c'
-              _                    -> false
+              OptionAlias.Short c' _ -> c == c'
+              _                      -> false
         isMatch _ = false
 
 posArgsEq :: String -> String -> Boolean
