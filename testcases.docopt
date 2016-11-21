@@ -3627,11 +3627,7 @@ $ prog
 # TODO, check:
 #       * verify `isKnownToken` impl in ArgParser/Parser.purs
 #       * verify `lookupValidDescription` impl in ExpandOptions.purs (for sopts)
-#       * store negativity in UsageLayout
-#       * use UsageLayout's negativity in SmartOptions.purs
-#       * use UsageLayout's negativity in ExpandOptions.purs
 #       * verify behavior when option takes argument
-#       * ensure slicing works: +fabc -> +abc -> +bc -> +c
 #
 # Changes:
 #       * Incompat FFI change to UsageLayout

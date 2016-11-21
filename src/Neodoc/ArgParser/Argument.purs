@@ -193,7 +193,7 @@ shortOption term (f /\ neg) mArg = do
              in setInput newInput $> do
                   OptRes val true false
           else
-            let newSource = "-" <> String.drop 2 source
+            let newSource = (if neg then "+" else "-") <> String.drop 2 source
                 pushed = maybe empty
                           (\tok -> singleton $ PositionedToken tok newSource sourcePos)
                           result.remainder
