@@ -12,6 +12,7 @@ import Neodoc.Solve.Canonicalise as Solve
 import Neodoc.Solve.ExpandOptions as Solve
 import Neodoc.Solve.ExpandReferences as Solve
 import Neodoc.Solve.SmartOptions as Solve
+import Neodoc.Solve.AddMissingDescriptions as Solve
 import Neodoc.Spec as Spec
 import Data.Either (Either(..), either)
 import Data.Foldable (class Foldable)
@@ -37,6 +38,7 @@ solve' { smartOptions } usageTs solvedTs =
   >=> Solve.expandOptions
   >=> Solve.expandReferences
   >=> Solve.canonicalise
+  >=> Solve.addMissingDescriptions
   >=> flip (List.foldM (#)) solvedTs
 
 solve

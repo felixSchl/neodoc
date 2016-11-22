@@ -11,6 +11,7 @@ import Data.Set (Set)
 import Data.Set as Set
 import Data.Maybe (Maybe(..))
 import Data.List (List(..), (:), head, filter, singleton, fromFoldable)
+import Data.List.Extra as List
 import Data.NonEmpty (NonEmpty)
 import Data.NonEmpty.Extra as NonEmpty
 import Data.Foldable (any)
@@ -67,7 +68,7 @@ findDescription
   -> ArgKey
   -> Maybe Description
 findDescription descriptions (OptionKey alias)
-  = head $ filter matchesAlias descriptions
+  = List.first matchesAlias descriptions
     where
     matchesAlias (OptionDescription aliases _ _ _ _) = any (_ == alias) aliases
     matchesAlias _ = false

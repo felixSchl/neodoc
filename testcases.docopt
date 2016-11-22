@@ -3627,9 +3627,10 @@ $ prog
 # negated options
 ################################################################################
 # TODO, check:
-#       * verify `isKnownToken` impl in ArgParser/Parser.purs
 #       * verify `lookupValidDescription` impl in ExpandOptions.purs (for sopts)
 #       * verify behavior when option takes argument
+#       * verify `bloatDescAliases` in Reduce.purs (should we only do this if
+#         `options.implicitNegatives`?)
 #       * `findDescriptions` should also look for negative matches (Annotate.purs)
 #       * parsing `--no-` and `+` should fail if option does not allow it (when
 #         (implicit) feature is turned off)

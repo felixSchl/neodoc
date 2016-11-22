@@ -25,14 +25,15 @@ import Data.StrMap (StrMap())
 import Data.Maybe (Maybe(..), maybe, fromJust, fromMaybe)
 import Data.List (
   List(..), concat, head, filter, singleton, reverse, nub, catMaybes
-, fromFoldable, (:))
+, fromFoldable, (:), foldM)
+import Data.List.Extra as List
 import Data.Array as A
 import Data.NonEmpty (NonEmpty)
 import Data.NonEmpty.Extra as NonEmpty
 import Data.Foldable (any, foldl, maximum, all)
-import Data.Traversable (for)
+import Data.Traversable (for_, for)
 import Control.Alt ((<|>))
-import Control.Monad.State (execState)
+import Control.Monad.State (evalState, execState)
 import Control.Monad.State as State
 import Neodoc.Env (Env)
 import Neodoc.Data.Layout (Layout(..), Branch, getElem)
@@ -74,7 +75,7 @@ reduce
 reduce _ _ Nothing _ = StrMap.empty
 reduce env descriptions (Just branch) kvs = (_.value <<< unRichValue) <$>
   let -- 0. bloat up descriptions by expanding all possible aliases
-      descriptions' = bloatDescAliases <$> descriptions
+      descriptions' = expandDescriptions descriptions
 
       -- 1. annotate all layout elements with their description
       annotedBranch = annotateLayout descriptions' <$> branch
@@ -235,8 +236,6 @@ expandLayout (Group o r xs) =
   --       too much as long as it resolves to the same description which is
   --       implicitely true due to the encapsulating `Key`. The same applies
   --       for the option's option-argument.
-  -- mergeargs forcer _ ((option true nothing r) /\ mdesc)
-  --   = option true nothing r /\ mdesc
   mergeArgs forceR (x@((Option neg mA r) /\ mDesc)) ((Option _ mA' r') /\ mDesc')
     = let
         -- find a median for the option-argument
@@ -284,19 +283,23 @@ isCommand :: FacelessLayoutArg -> Boolean
 isCommand (Command _) = true
 isCommand _ = false
 
--- Expand all option aliases occuring in a description block.
--- Expanding means to derive all negative and non-negative versions of the alias
--- if, and only if the option is a flag or a semi-flag (optional
--- option-argument)
-bloatDescAliases :: Description -> Description
-bloatDescAliases (OptionDescription as r mA mD mE)
-  -- note: only expand negative/positive aliases if the option does *not* take
-  --       an option-argument or if the option-argument itself is optional.
-  | maybe true isOptionArgumentOptional mA
-  =
-    let as' = NonEmpty.concat $ as <#> \a ->
-                OptionAlias.setNegative true a :|
-                  OptionAlias.setNegative false a :
-                    Nil
-     in OptionDescription as' r mA mD mE
-bloatDescAliases d = d
+-- Expand the descriptions and add missing (fabricated) ones, so that we can
+-- derive the most complete output map possible.
+expandDescriptions
+  :: List Description
+  -> List Description
+expandDescriptions descs = bloat <$> descs
+  where
+  -- Expand every option alias into it's negative, fully saturating the set
+  bloat :: Description -> Description
+  bloat (OptionDescription as r mA mD mE)
+    -- note: only expand negative/positive aliases if the option does *not* take
+    --       an option-argument or if the option-argument itself is optional.
+    | maybe true isOptionArgumentOptional mA
+    =
+      let as' = NonEmpty.concat $ as <#> \a ->
+                  OptionAlias.setNegative true a :|
+                    OptionAlias.setNegative false a :
+                      Nil
+      in OptionDescription as' r mA mD mE
+  bloat d = d

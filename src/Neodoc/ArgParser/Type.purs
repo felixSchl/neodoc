@@ -69,6 +69,7 @@ import Data.Foldable (any, intercalate)
 import Data.Lazy (Lazy, defer, force)
 import Data.List (List(..))
 import Data.List (head, filter, (:))
+import Data.List.Extra as List
 import Data.Map (Map)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.NonEmpty (NonEmpty, (:|))
@@ -234,7 +235,7 @@ type ArgParser r a =
 
 -- XXX: This could be more efficient using a table lookup
 findDescription :: OptionAlias -> List Description -> Maybe Description
-findDescription alias descriptions = head $ filter matchesAlias descriptions
+findDescription alias descriptions = List.first matchesAlias descriptions
   where
   matchesAlias (OptionDescription aliases _ _ _ _) = any (_ == alias) aliases
   matchesAlias _ = false
