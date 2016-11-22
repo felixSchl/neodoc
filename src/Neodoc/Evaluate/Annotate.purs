@@ -41,7 +41,7 @@ annotate'
   => List Description
   -> a
   -> WithDescription a
-annotate' descriptions x = x /\ (findDescription descriptions (toArgKey x))
+annotate' descriptions x = x /\ (findDescription descriptions $ toArgKey x)
 
 -- Annotate a layout of arguments with it's description
 annotate

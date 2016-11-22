@@ -22,12 +22,13 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.StrMap as StrMap
 import Data.StrMap (StrMap())
-import Data.Maybe (Maybe(..), fromJust, fromMaybe)
+import Data.Maybe (Maybe(..), maybe, fromJust, fromMaybe)
 import Data.List (
   List(..), concat, head, filter, singleton, reverse, nub, catMaybes
 , fromFoldable, (:))
 import Data.Array as A
 import Data.NonEmpty (NonEmpty)
+import Data.NonEmpty.Extra as NonEmpty
 import Data.Foldable (any, foldl, maximum, all)
 import Data.Traversable (for)
 import Control.Alt ((<|>))
@@ -72,8 +73,11 @@ reduce
   -> _ -- Map ArgKey RichValue
 reduce _ _ Nothing _ = StrMap.empty
 reduce env descriptions (Just branch) kvs = (_.value <<< unRichValue) <$>
-  let -- 1. annotate all layout elements with their description
-      annotedBranch = annotateLayout descriptions <$> branch
+  let -- 0. bloat up descriptions by expanding all possible aliases
+      descriptions' = expandDescription <$> descriptions
+
+      -- 1. annotate all layout elements with their description
+      annotedBranch = annotateLayout descriptions' <$> branch
 
       -- 2. derive a set of arguments and their description for the matched
       --    branch. this removes all levels of nesting and is a lossy operation.
@@ -84,7 +88,7 @@ reduce env descriptions (Just branch) kvs = (_.value <<< unRichValue) <$>
       -- 3. Collect the input map. This map reduces the matched values by their
       --    denominator. Currently, this denominator is the `Key` derived from
       --    the option's name as it was matched.
-      input = collect descriptions kvs
+      input = collect descriptions' kvs
 
       -- 3. fill the values for each key of the target map
       values = fillValues target input
@@ -100,8 +104,6 @@ reduce env descriptions (Just branch) kvs = (_.value <<< unRichValue) <$>
   collect descriptions kvs =
     let kvs' = lmap getArgKey <$> kvs
         kvs'' = kvs' <#> \(k /\ v) ->
-          -- TODO: here, me must further include all negative variants of the
-          --       arg keys, in order for the composite set to be coherent.
           (Key $ findArgKeys descriptions k) /\ k /\ v
      in go kvs'' Map.empty
 
@@ -112,10 +114,10 @@ reduce env descriptions (Just branch) kvs = (_.value <<< unRichValue) <$>
       -> Map Key (List RichValue)
     go ((k /\ (OptionKey a) /\ v):kvs) m | OptionAlias.isNegative a =
       -- replace all prior occurences if a negative options is met
-        go kvs (Map.insert k (pure v) m)
+      go kvs (Map.insert k (pure v) m)
     go ((k /\ _ /\ v):kvs) m =
       -- otherwise, just accumulate
-        go kvs (Map.alter (combine v) k m)
+      go kvs (Map.alter (combine v) k m)
     go Nil m = m
 
     combine v (Just v') = Just (v' <> singleton v)
@@ -271,6 +273,9 @@ setRepeatable r (Positional _) = Positional r
 setRepeatable r (Option y x _) = Option y x r
 setRepeatable _ x = x
 
+setRepeatableOr :: Boolean -> FacelessLayoutArg -> FacelessLayoutArg
+setRepeatableOr r x = setRepeatable (isRepeatable x || r) x
+
 isFlag :: FacelessLayoutArg -> Boolean
 isFlag (Option _ Nothing _) = true
 isFlag _ = false
@@ -279,4 +284,13 @@ isCommand :: FacelessLayoutArg -> Boolean
 isCommand (Command _) = true
 isCommand _ = false
 
-setRepeatableOr r x = setRepeatable (isRepeatable x || r) x
+expandDescription :: Description -> Description
+expandDescription (OptionDescription as r mA mD mE)
+  | maybe true isOptionArgumentOptional mA -- no opt-arg or optional
+  =
+    let as' = NonEmpty.concat $ as <#> \a ->
+                OptionAlias.setNegative true a :|
+                  OptionAlias.setNegative false a :
+                    Nil
+     in OptionDescription as' r mA mD mE
+expandDescription d = d
