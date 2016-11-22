@@ -100,6 +100,8 @@ reduce env descriptions (Just branch) kvs = (_.value <<< unRichValue) <$>
   collect descriptions kvs =
     let kvs' = lmap getArgKey <$> kvs
         kvs'' = kvs' <#> \(k /\ v) ->
+          -- TODO: here, me must further include all negative variants of the
+          --       arg keys, in order for the composite set to be coherent.
           (Key $ findArgKeys descriptions k) /\ k /\ v
      in go kvs'' Map.empty
 

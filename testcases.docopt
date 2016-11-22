@@ -3623,11 +3623,19 @@ usage: p <a> <b>
 $ prog
 "missing <a>"
 
+################################################################################
 # negated options
+################################################################################
 # TODO, check:
 #       * verify `isKnownToken` impl in ArgParser/Parser.purs
 #       * verify `lookupValidDescription` impl in ExpandOptions.purs (for sopts)
 #       * verify behavior when option takes argument
+#       * `findDescriptions` should also look for negative matches (Annotate.purs)
+#       * parsing `--no-` and `+` should fail if option does not allow it (when
+#         (implicit) feature is turned off)
+#       * In `collect` (Reduce.purs), we must inject all negative variants to
+#         build the composite key... or remove all negatives and represent only
+#         in terms of positives...
 #
 # Changes:
 #       * Incompat FFI change to UsageLayout
@@ -3672,8 +3680,29 @@ $ prog --no-foo
 r"""
 usage: p -f
 options:
+ -f, --[no-]foo, +f
+"""
+
+$ prog +f
+{"-f": false, "--foo": false}
+
+$ prog/R -f +f
+{"-f": false, "--foo": false}
+
+$ prog --no-foo
+{"-f": false, "--foo": false}
+
+r"""
+usage: p [options]
+options:
  -f, --[no-]foo
 """
+
+$ prog +f
+{"-f": false, "--foo": false}
+
+$ prog/R -f +f
+{"-f": false, "--foo": false}
 
 $ prog --no-foo
 {"-f": false, "--foo": false}
