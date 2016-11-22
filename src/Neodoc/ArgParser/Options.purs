@@ -15,6 +15,7 @@ type Options r = {
 , helpFlags         :: List OptionAlias
 , versionFlags      :: List OptionAlias
 , allowUnknown      :: Boolean
+, implicitNegatives :: Boolean
   | r
 }
 

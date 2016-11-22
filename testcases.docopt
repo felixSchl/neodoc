@@ -3675,6 +3675,9 @@ usage: p --foo
 """
 
 $ prog --no-foo
+"unknown option --no-foo"
+
+$ prog/n --no-foo
 {"--foo": false}
 
 r"""
@@ -3698,10 +3701,19 @@ options:
  -f, --[no-]foo
 """
 
+$ prog/n +f +f
+"unexpected option +f"
+
 $ prog +f
+"unknown option +f"
+
+$ prog/n +f
 {"-f": false, "--foo": false}
 
 $ prog/R -f +f
+"unknown option +f"
+
+$ prog/Rn -f +f
 {"-f": false, "--foo": false}
 
 $ prog --no-foo

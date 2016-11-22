@@ -61,6 +61,7 @@ type Options =  { stopAt            :: Array String
                 , laxPlacement      :: Boolean
                 , repeatableOptions :: Boolean
                 , allowUnknown      :: Boolean
+                , implicitNegatives :: Boolean
                 }
 
 defaultOptions :: Options
@@ -72,6 +73,7 @@ defaultOptions = {
 , laxPlacement: false
 , repeatableOptions: false
 , allowUnknown: false
+, implicitNegatives: false
 }
 
 type Test = { help  :: String
@@ -1035,6 +1037,7 @@ argParserSpec = \_ -> describe "The parser generator" do
                   , laxPlacement:      opts.laxPlacement
                   , repeatableOptions: opts.repeatableOptions
                   , allowUnknown:      opts.allowUnknown
+                  , implicitNegatives: opts.implicitNegatives
                   , helpFlags:         Nil
                   , versionFlags:      Nil
                   } env argv

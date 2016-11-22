@@ -74,7 +74,7 @@ reduce
 reduce _ _ Nothing _ = StrMap.empty
 reduce env descriptions (Just branch) kvs = (_.value <<< unRichValue) <$>
   let -- 0. bloat up descriptions by expanding all possible aliases
-      descriptions' = expandDescription <$> descriptions
+      descriptions' = bloatDescAliases <$> descriptions
 
       -- 1. annotate all layout elements with their description
       annotedBranch = annotateLayout descriptions' <$> branch
@@ -284,13 +284,19 @@ isCommand :: FacelessLayoutArg -> Boolean
 isCommand (Command _) = true
 isCommand _ = false
 
-expandDescription :: Description -> Description
-expandDescription (OptionDescription as r mA mD mE)
-  | maybe true isOptionArgumentOptional mA -- no opt-arg or optional
+-- Expand all option aliases occuring in a description block.
+-- Expanding means to derive all negative and non-negative versions of the alias
+-- if, and only if the option is a flag or a semi-flag (optional
+-- option-argument)
+bloatDescAliases :: Description -> Description
+bloatDescAliases (OptionDescription as r mA mD mE)
+  -- note: only expand negative/positive aliases if the option does *not* take
+  --       an option-argument or if the option-argument itself is optional.
+  | maybe true isOptionArgumentOptional mA
   =
     let as' = NonEmpty.concat $ as <#> \a ->
                 OptionAlias.setNegative true a :|
                   OptionAlias.setNegative false a :
                     Nil
      in OptionDescription as' r mA mD mE
-expandDescription d = d
+bloatDescAliases d = d

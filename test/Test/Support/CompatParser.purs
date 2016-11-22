@@ -60,6 +60,7 @@ type Flags = {
 , laxPlacement      :: Boolean -- ^ 'l'
 , repeatableOptions :: Boolean -- ^ 'R'
 , allowUnknown      :: Boolean -- ^ 'u'
+, implicitNegatives :: Boolean -- ^ 'n'
 }
 
 parseFlags :: String -> Flags
@@ -70,6 +71,7 @@ parseFlags s = {
 , laxPlacement:      String.contains (Pattern "l") s
 , repeatableOptions: String.contains (Pattern "R") s
 , allowUnknown:      String.contains (Pattern "u") s
+, implicitNegatives: String.contains (Pattern "n") s
 }
 
 renderFlags :: Flags -> String
@@ -79,6 +81,7 @@ renderFlags f = (if f.optionsFirst then "p" else "")
              <> (if f.laxPlacement then "l" else "")
              <> (if f.repeatableOptions then "R" else "")
              <> (if f.allowUnknown then "u" else "")
+             <> (if f.implicitNegatives then "n" else "")
 
 readTests :: ∀ eff
    . String
@@ -117,6 +120,7 @@ readTests filepath = do
                         , laxPlacement: false
                         , repeatableOptions: false
                         , allowUnknown: false
+                        , implicitNegatives: false
                         } $ parseFlags <$> do
                               P.char '/'
                               fromCharArray <$> A.many alpha
@@ -145,7 +149,7 @@ readTests filepath = do
             P.optional comment
             pure $ s
         ]
-      P.skipSpaces *> skipComments *>  P.skipSpaces
+      P.skipSpaces *> skipComments *> P.skipSpaces
       pure $ Kase { out: output
                   , options: NeodocOptions $ defaultOptionsObj {
                       argv              = pure input
@@ -157,6 +161,7 @@ readTests filepath = do
                     , laxPlacement      = flags.laxPlacement
                     , repeatableOptions = flags.repeatableOptions
                     , allowUnknown      = flags.allowUnknown
+                    , implicitNegatives = flags.implicitNegatives
                     }
                   }
 

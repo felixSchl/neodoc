@@ -74,9 +74,10 @@ longOption
   :: ∀ r
    . Boolean -- ^ does this option attempt to terminate the parse?
   -> String  -- ^ name of the option w/o leading dashes, i.e.: '--foo' => "foo"
+  -> Boolean -- ^ are we allowed to parse negatives?
   -> (Maybe OptionArgument)
   -> ArgParser r OptRes
-longOption term n mArg = do
+longOption term n negOK mArg = do
   input <- getInput
   case input of
     (PositionedToken token _ _):xs ->
@@ -111,7 +112,7 @@ longOption term n mArg = do
   -- Note that the option may *NOT* have an explicitly assigned
   -- option-argument. Finally, let the caller do the actual termination
   -- (updating parser state / consuming all input)
-  go (LOpt n' neg Nothing) _ | (n' == n) && term
+  go (LOpt n' neg Nothing) _ | (n' == n) && term && (negOK || not neg)
     = pure { rawValue:       Nothing
            , hasConsumedArg: false
            , explicitArg:    false
@@ -120,7 +121,7 @@ longOption term n mArg = do
 
   -- case 1:
   -- The name is an exact match
-  go (LOpt n' neg v) atok | (not isFlag) && (n' == n)
+  go (LOpt n' neg v) atok | (not isFlag) && (n' == n) && (negOK || not neg)
     = case v of
         Just s ->
           pure  { rawValue:       Just s
@@ -147,7 +148,7 @@ longOption term n mArg = do
 
   -- case 2:
   -- The name is an exact match and takes no argument
-  go (LOpt n' neg v) _ | isFlag && (n' == n)
+  go (LOpt n' neg v) _ | isFlag && (n' == n) && (negOK || not neg)
     = case v of
         Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Long n neg)
         Nothing -> pure { rawValue:       Nothing
@@ -159,7 +160,7 @@ longOption term n mArg = do
   -- case 3:
   -- The name is a substring of the input and no explicit argument has been
   -- provdided.
-  go (LOpt n' neg Nothing) _ | not isFlag
+  go (LOpt n' neg Nothing) _ | not isFlag && (negOK || not neg)
     = case stripPrefix (Pattern n) n' of
         Just s ->
           pure  { rawValue:        Just s
@@ -175,9 +176,10 @@ shortOption
   :: ∀ r
    . Boolean -- ^ does this option attempt to terminate the parse?
   -> Char    -- ^ flag of the option w/o leading dash, i.e.: '-f' => "f"
+  -> Boolean -- ^ are we allowed to parse negatives?
   -> (Maybe OptionArgument)
   -> ArgParser r OptRes
-shortOption term f mArg = do
+shortOption term f negOK mArg = do
   input <- getInput
   case input of
     (PositionedToken token source sourcePos):xs ->
@@ -231,7 +233,8 @@ shortOption term f mArg = do
   -- case 1:
   -- The leading flag matches, there are no stacked options, and an explicit
   -- argument may have been passed.
-  go (SOpt f' xs neg v) atok | (f' == f) && (not isFlag) && (A.null xs)
+  go (SOpt f' xs neg v) atok
+    | (f' == f) && (not isFlag) && (A.null xs) && (negOK || not neg)
     = case v of
         Just s ->
           pure { rawValue:       Just s
@@ -262,7 +265,8 @@ shortOption term f mArg = do
   -- case 2:
   -- The leading flag matches, there are stacked options, a explicit
   -- argument may have been passed and the option takes an argument.
-  go (SOpt f' xs neg v) _ | (f' == f) && (not isFlag) && (not $ A.null xs)
+  go (SOpt f' xs neg v) _
+    | (f' == f) && (not isFlag) && (not $ A.null xs) && (negOK || not neg)
     -- note: we put the '=' back on. this assumes that explicit arguments will
     --       *always* be bound with a '='.
     = let arg = fromCharArray xs <> maybe "" ("=" <> _) v
@@ -290,7 +294,8 @@ shortOption term f mArg = do
   -- case 4:
   -- The leading flag matches, there are no stacked options and the option
   -- takes no argument - total consumption!
-  go (SOpt f' xs neg v) _ | (f' == f) && (isFlag) && (A.null xs)
+  go (SOpt f' xs neg v) _
+    | (f' == f) && (isFlag) && (A.null xs) && (negOK || not neg)
     = case v of
         Just _  -> fatal' $ optionTakesNoArgumentError (OptionAlias.Short f' neg)
         Nothing -> pure { rawValue:       Nothing

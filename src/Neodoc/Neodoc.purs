@@ -237,6 +237,7 @@ _run input (NeodocOptions opts) = do
           , laxPlacement:      opts.laxPlacement
           , repeatableOptions: opts.repeatableOptions
           , allowUnknown:      opts.allowUnknown
+          , implicitNegatives: opts.implicitNegatives
           , helpFlags:         fromFoldable opts.helpFlags
           , versionFlags:      fromFoldable opts.versionFlags
           } env argv
@@ -325,6 +326,7 @@ _runPure input (NeodocOptions opts) mVer = do
         , laxPlacement:      opts.laxPlacement
         , repeatableOptions: opts.repeatableOptions
         , allowUnknown:      opts.allowUnknown
+        , implicitNegatives: opts.implicitNegatives
         , helpFlags:         fromFoldable opts.helpFlags
         , versionFlags:      fromFoldable opts.versionFlags
         } env argv
