@@ -74,7 +74,7 @@ instance asForeignDescription :: AsForeign Description where
 instance prettyDescription :: Pretty Description where
   pretty CommandDescription = "<CommandDescription>" -- note: placeholder
   pretty (OptionDescription as r mA mDef mEnv) =
-    (intercalate ", " $ pretty <$> as)
+    (intercalate "~ " $ pretty <$> as)
     <> (maybe "" (\v -> " " <> pretty v) mA)
     <> (if r then "..." else "")
     <> (maybe "" (\v -> " [default: " <> pretty v <> "]") mDef)

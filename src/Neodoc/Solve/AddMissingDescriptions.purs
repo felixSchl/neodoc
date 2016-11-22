@@ -1,10 +1,12 @@
 module Neodoc.Solve.AddMissingDescriptions where
 
 import Prelude
-import Data.List (List(..), (:))
+import Debug.Trace
+import Data.List (List(..), (:), findIndex)
+import Data.List as List
 import Data.List.Extra as List
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), maybe, fromJust)
 import Data.NonEmpty ((:|))
 import Data.NonEmpty.Extra as NonEmpty
 import Data.Traversable (for_, traverse)
@@ -22,9 +24,12 @@ import Neodoc.Spec
 import Neodoc.Spec as Spec
 import Neodoc.Solve.Error
 
--- Add missing option descriptions
--- Note: this does *not* fill in option negatives. filling in negatives is only
---       performed during the final evaluation / reduction step.
+-- Add missing option descriptions.
+--
+-- Note: this does *not* fill in all option negatives. filling in negatives is
+-- only performed during the final evaluation / reduction step. Tihs step only
+-- ensures that those options mentioned on the usage pattern are visible in the
+-- descriptions
 addMissingDescriptions
   :: Spec SolvedLayout
   -> Either SolveError (Spec SolvedLayout)
@@ -43,18 +48,19 @@ addMissingDescriptions (Spec (spec@{ layouts, descriptions })) = do
                 -- check if there's a description for this option
                 let posAlias = OptionAlias.setNegative false a
                     negAlias = OptionAlias.setNegative true  a
-                case List.first (match negAlias posAlias) descs of
-                  -- ignore: it already exists in some form.
-                  -- Again we do not bother to expand all positive/negatives
-                  -- here.
-                  Just _  -> pure unit
-                  Nothing ->
-                    let newDesc = OptionDescription (posAlias :| Nil)
-                                                    false
-                                                    mA
-                                                    Nothing
-                                                    Nothing
-                      in State.modify (newDesc : _)
+                case findIndex (match negAlias posAlias) descs of
+                  Just i -> trace "mODDING" \_->
+                    let descs' =
+                          unsafePartial $ fromJust $ flip (List.modifyAt i) descs
+                            case _ of
+                              OptionDescription as r mA mD mE ->
+                                let as' = NonEmpty.cons a as
+                                  in OptionDescription as' r mA mD mE
+                              d -> d
+                     in State.modify (const descs')
+                  Nothing ->trace "INSERTING" \_->
+                    let newDesc = OptionDescription (a :| Nil) false mA Nothing Nothing
+                     in State.modify (newDesc : _)
             _ -> pure unit
     for_ layouts (traverse (traverse solveLayout))
 
