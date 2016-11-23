@@ -2,6 +2,7 @@ module Neodoc.Solve.AddMissingDescriptions where
 
 import Prelude
 import Debug.Trace
+import Data.Pretty
 import Data.List (List(..), (:), findIndex)
 import Data.List as List
 import Data.List.Extra as List
@@ -49,7 +50,7 @@ addMissingDescriptions (Spec (spec@{ layouts, descriptions })) = do
                 let posAlias = OptionAlias.setNegative false a
                     negAlias = OptionAlias.setNegative true  a
                 case findIndex (match negAlias posAlias) descs of
-                  Just i -> trace "mODDING" \_->
+                  Just i ->
                     let descs' =
                           unsafePartial $ fromJust $ flip (List.modifyAt i) descs
                             case _ of
@@ -58,7 +59,7 @@ addMissingDescriptions (Spec (spec@{ layouts, descriptions })) = do
                                   in OptionDescription as' r mA mD mE
                               d -> d
                      in State.modify (const descs')
-                  Nothing ->trace "INSERTING" \_->
+                  Nothing ->
                     let newDesc = OptionDescription (a :| Nil) false mA Nothing Nothing
                      in State.modify (newDesc : _)
             _ -> pure unit

@@ -259,7 +259,8 @@ _longOption = defer \_-> do
   P.string "--"
 
   neg <- P.choice [
-    P.string "[no-]" $> true
+    P.string "no-" $> true
+  , P.string "[no-]" $> true
   , pure false
   ]
 
