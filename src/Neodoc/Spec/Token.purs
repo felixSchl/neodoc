@@ -27,7 +27,9 @@ type OptionArgument = {
 , optional :: Boolean
 }
 
-type IsNegated = Boolean
+data Polarity = Positive | Negative | Both
+
+derive instance eqPolarity :: Eq Polarity
 
 data Token
   = LParen
@@ -41,8 +43,8 @@ data Token
   | Newline
   | TripleDot
   | Reference String
-  | LOpt String IsNegated (Maybe OptionArgument)
-  | SOpt (NonEmpty Array Char) IsNegated (Maybe OptionArgument)
+  | LOpt String Polarity (Maybe OptionArgument)
+  | SOpt (NonEmpty Array Char) Polarity (Maybe OptionArgument)
   | Tag String String
   | Name String
   | ShoutName String
@@ -71,15 +73,21 @@ instance prettyToken :: Pretty Token where
   pretty (Name      n) = "Name "      <> show n
   pretty (ShoutName n) = "ShoutName " <> show n
   pretty (AngleName n) = "AngleName " <> show n
-  pretty (LOpt n neg arg)  = sign <> n <> arg'
-    where sign = if neg then "--[no-]" else "--"
+  pretty (LOpt n pol arg)  = sign <> n <> arg'
+    where sign = case pol of
+                  Positive -> "--"
+                  Negative -> "--no-"
+                  Both     -> "--[no-]"
           arg' = fromMaybe "" do
                   arg <#> \a ->
                     if a.optional then "[" else ""
                       <> a.name
                       <> if a.optional then "]" else ""
-  pretty (SOpt (c :| cs) neg arg) = sign <> n <> arg'
-    where sign = if neg then "+" else "-"
+  pretty (SOpt (c :| cs) pol arg) = sign <> n <> arg'
+    where sign = case pol of
+                  Positive -> "-"
+                  Negative -> "+"
+                  Both     -> "-/+" -- XXX (implemen this)
           n = fromCharArray $ A.cons c cs
           arg' = fromMaybe "" do
                   arg <#> \a ->

@@ -120,7 +120,7 @@ parse
   -> Env
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
-parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags } env tokens = Debug.trace (pretty descriptions) \_->
+parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags } env tokens =
   let hasEmpty = any null layouts
       toplevels = concat (NonEmpty.toList layouts)
 

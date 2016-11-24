@@ -21,7 +21,7 @@ import Data.String (Pattern(..))
 import Data.String as String
 import Data.List (
   List(..), (:), head, length, filter, catMaybes, reverse,
-  singleton)
+  singleton, concat)
 
 import Neodoc.Parsing.Parser as P
 import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
@@ -154,7 +154,7 @@ parse toks =
     opt :: P.TokenParser _
     opt = do
       let optsP = "option" P.<??> P.choice [ P.try short, long ]
-      xs <- optsP `P.sepBy1` do  -- extra options: [, -f]
+      xs <- concat <$> optsP `P.sepBy1` do  -- extra options: [, -f]
         P.optional do
           P.comma
             *> P.many P.newline
@@ -207,10 +207,10 @@ parse toks =
 
     short :: P.TokenParser _
     short = do
-      { flag, arg, neg } <- do
-        { chars: flag :| cs, neg, arg } <- P.sopt
+      { flag, arg, pol } <- do
+        { chars: flag :| cs, pol, arg } <- P.sopt
         (guard $ A.length cs == 0) P.<?> "No stacked options"
-        pure { flag, neg, arg }
+        pure { flag, arg, pol }
 
       -- Grab the adjacent positional-looking argument
       -- in case the token did not have an explicit
@@ -230,15 +230,15 @@ parse toks =
 
       repeatable <- P.option false $ P.tripleDot $> true
 
-      pure {
-        alias: OptionAlias.Short flag neg
-      , arg
-      , repeatable
-      }
+      let ret n = { alias: OptionAlias.Short flag n, arg, repeatable }
+      pure case pol of
+            P.Positive -> ret false : Nil
+            P.Negative -> ret true  : Nil
+            P.Both     -> ret false : ret true : Nil
 
     long :: P.TokenParser _
     long = do
-      { name, neg, arg } <- P.lopt
+      { name, pol, arg } <- P.lopt
 
       -- Grab the adjacent positional-looking argument
       -- in case the token did not have an explicit
@@ -258,11 +258,11 @@ parse toks =
 
       repeatable <- P.option false $ P.tripleDot $> true
 
-      pure {
-        alias: OptionAlias.Long name neg
-      , arg:   arg'
-      , repeatable
-      }
+      let ret n = { alias: OptionAlias.Long name n, arg: arg', repeatable }
+      pure case pol of
+            P.Positive -> ret false : Nil
+            P.Negative -> ret true  : Nil
+            P.Both     -> ret false : ret true : Nil
 
 isDefaultTag :: Content -> Boolean
 isDefaultTag (Default _) = true
