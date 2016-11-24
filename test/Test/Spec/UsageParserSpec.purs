@@ -41,6 +41,8 @@ data Expected a = F | P a
 
 sopt_ f fs   r = (if r then U.soptR_ else U.sopt_) f fs
 sopt  f fs a r = (if r then U.soptR else U.sopt) f fs a
+nSopt_ f fs   r = (if r then U.nSoptR_ else U.nSopt_) f fs
+nSopt  f fs a r = (if r then U.nSoptR else U.nSopt) f fs a
 lopt_ f      r = (if r then U.loptR_ else U.lopt_) f
 lopt  f    a r = (if r then U.loptR else U.lopt) f a
 po    n      r = (if r then U.poR else U.po) n
@@ -174,6 +176,9 @@ usageParserSpec = \_ -> do
           -- disallow immediate following by '-'
         , fail "-bAR[=FOO]-"
         , fail "-bAR-"
+
+        -- negatives
+        , pass "+b" $ nSopt_ 'b' []
         ]
 
     -- Test required groups in various formats.

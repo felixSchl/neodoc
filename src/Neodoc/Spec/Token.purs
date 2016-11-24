@@ -86,7 +86,7 @@ instance prettyToken :: Pretty Token where
     where sign = case pol of
                   Positive -> "-"
                   Negative -> "+"
-                  Both     -> "-/+" -- XXX (implemen this)
+                  Both     -> "-/+"
           n = fromCharArray $ A.cons c cs
           arg' = fromMaybe "" do
                   arg <#> \a ->

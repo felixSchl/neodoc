@@ -47,6 +47,13 @@ sopt   f fs a   = sopt' f fs (pure a) false
 sopt_  f fs     = sopt' f fs Nothing false
 soptR  f fs a   = sopt' f fs (pure a) true
 soptR_ f fs     = sopt' f fs Nothing true
+
+nSopt'  f fs a r = Elem $ U.OptionStack (f:|fs) true a r
+nSopt   f fs a   = nSopt' f fs (pure a) false
+nSopt_  f fs     = nSopt' f fs Nothing false
+nSoptR  f fs a   = nSopt' f fs (pure a) true
+nSoptR_ f fs     = nSopt' f fs Nothing true
+
 lopt'  n    a r = Elem $ U.Option n false a r
 lopt   n    a   = lopt' n (pure a) false
 lopt_  n        = lopt' n Nothing false

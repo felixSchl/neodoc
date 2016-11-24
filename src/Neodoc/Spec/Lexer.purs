@@ -225,9 +225,9 @@ _shortOption = defer \_-> do
   let validChar = P.alphaNum <|> P.oneOf [ '?' ]
 
   pol <- P.choice [
-    P.char   '-'   $> Positive
-  , P.char   '+'   $> Negative
-  , P.string "-/+" $> Both
+    P.try $ P.string "-/+" $> Both
+  , P.char '-'             $> Positive
+  , P.char '+'             $> Negative
   ]
   x  <- validChar
   xs <- A.fromFoldable <$> P.many validChar
