@@ -230,11 +230,11 @@ parse toks =
 
       repeatable <- P.option false $ P.tripleDot $> true
 
-      let ret n = { alias: OptionAlias.Short flag n, arg, repeatable }
+      let opt n = { alias: OptionAlias.Short flag n, arg, repeatable }
       pure case pol of
-            P.Positive -> ret false : Nil
-            P.Negative -> ret true  : Nil
-            P.Both     -> ret false : ret true : Nil
+            P.Positive -> opt false : Nil
+            P.Negative -> opt true  : Nil
+            P.Both     -> opt false : opt true : Nil
 
     long :: P.TokenParser _
     long = do
@@ -258,11 +258,11 @@ parse toks =
 
       repeatable <- P.option false $ P.tripleDot $> true
 
-      let ret n = { alias: OptionAlias.Long name n, arg: arg', repeatable }
+      let opt n = { alias: OptionAlias.Long name n, arg: arg', repeatable }
       pure case pol of
-            P.Positive -> ret false : Nil
-            P.Negative -> ret true  : Nil
-            P.Both     -> ret false : ret true : Nil
+            P.Positive -> opt false : Nil
+            P.Negative -> opt true  : Nil
+            P.Both     -> opt false : opt true : Nil
 
 isDefaultTag :: Content -> Boolean
 isDefaultTag (Default _) = true

@@ -28,7 +28,6 @@ type OptionArgument = {
 }
 
 data Polarity = Positive | Negative | Both
-
 derive instance eqPolarity :: Eq Polarity
 
 data Token

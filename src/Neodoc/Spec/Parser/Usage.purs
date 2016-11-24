@@ -135,25 +135,37 @@ parse toks =
   reference :: P.TokenParser UsageLayoutArg
   reference = Reference <$> P.reference
 
-  longOption :: P.TokenParser UsageLayoutArg
+  longOption :: P.TokenParser UsageLayout
   longOption = do
     { name, pol, arg } <- P.lopt
     let arg' = do
           { name, optional } <- arg
           Just (OptionArgument name optional)
-    -- TODO: use pol (instead of "false" below)
-    Option name false arg' <$> repetition
+    r <- repetition
+    let opt neg = Option name neg arg' r
+    pure case pol of
+         P.Positive -> Elem $ opt false
+         P.Negative -> Elem $ opt true
+         P.Both     -> Group false false $ (Elem (opt true) :| Nil) :|
+                                            (Elem (opt false) :| Nil) :
+                                              Nil
 
-  shortOption :: P.TokenParser UsageLayoutArg
+  shortOption :: P.TokenParser UsageLayout
   shortOption = do
     { chars, pol, arg } <- P.sopt
     let arg' = do
           { name, optional } <- arg
           Just (OptionArgument name optional)
-    -- TODO: use pol (instead of "false" below)
-    OptionStack chars false arg' <$> repetition
+    r <- repetition
+    let opt neg = OptionStack chars neg arg' r
+    pure case pol of
+         P.Positive -> Elem $ opt false
+         P.Negative -> Elem $ opt true
+         P.Both     -> Group false false $ (Elem (opt true) :| Nil) :|
+                                            (Elem (opt false) :| Nil) :
+                                              Nil
 
-  option :: P.TokenParser UsageLayoutArg
+  option :: P.TokenParser UsageLayout
   option = longOption <|> shortOption
 
   repetition :: P.TokenParser Boolean
@@ -166,7 +178,7 @@ parse toks =
       , Elem <$> command
       , Elem <$> reference
       , Elem <$> stdin
-      , Elem <$> option
+      , option
       , defer \_ -> group
       ])
 
