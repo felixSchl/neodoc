@@ -21,7 +21,8 @@ import Data.Traversable (for)
 import Neodoc.OptionAlias (OptionAlias)
 
 type SolveOptions r = {
-  smartOptions :: Boolean
+    smartOptions :: Boolean
+  , implicitNegatives :: Boolean
   | r
 }
 
@@ -32,13 +33,13 @@ solve'
   -> List (Spec SolvedLayout -> Either SolveError (Spec SolvedLayout))
   -> Spec UsageLayout
   -> Either SolveError (Spec SolvedLayout)
-solve' { smartOptions } usageTs solvedTs =
+solve' { smartOptions, implicitNegatives } usageTs solvedTs =
       (if smartOptions then Solve.smartOptions else pure)
   >=> flip (List.foldM (#)) usageTs
   >=> Solve.expandOptions
   >=> Solve.expandReferences
   >=> Solve.canonicalise
-  >=> Solve.addMissingDescriptions
+  >=> Solve.addMissingDescriptions implicitNegatives
   >=> flip (List.foldM (#)) solvedTs
 
 solve

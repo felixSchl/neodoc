@@ -1001,7 +1001,8 @@ argParserSpec = \_ -> describe "The parser generator" do
 
               Error.capture do
                 Solver.solve
-                  { smartOptions: false }
+                  { smartOptions: false
+                  , implicitNegatives: false }
                   (Spec { program
                         , layouts
                         , descriptions

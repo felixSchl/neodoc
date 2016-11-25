@@ -276,7 +276,7 @@ solveSpec = \_ ->
                       , helpText: ""
                       , shortHelp: ""
                     })
-                  lmap pretty $ solve { smartOptions } spec
+                  lmap pretty $ solve { smartOptions, implicitNegatives: false } spec
             case expected' /\ output' of
               Left expected /\ Left actual | expected /= actual  ->
                 throwException $ error $

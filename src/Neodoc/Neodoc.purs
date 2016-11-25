@@ -213,8 +213,7 @@ _run input (NeodocOptions opts) = do
     Error.capture do
       Solver.solve'
         { smartOptions: opts.smartOptions
-        , helpFlags: fromFoldable opts.helpFlags
-        , versionFlags: fromFoldable opts.versionFlags
+        , implicitNegatives: opts.implicitNegatives
         }
         (fromFoldable $ either (fromJSCallback <$> _) id opts.transforms.presolve)
         (fromFoldable $ either (fromJSCallback <$> _) id opts.transforms.postsolve)
@@ -314,7 +313,10 @@ _runPure input (NeodocOptions opts) mVer = do
   -- 2. solve the spec
   spec@(Spec { descriptions }) <- do
     Error.capture do
-      Solver.solve { smartOptions: opts.smartOptions } inputSpec
+      Solver.solve {
+        smartOptions: opts.smartOptions
+      , implicitNegatives: opts.implicitNegatives
+      } inputSpec
 
   -- 3. run the arg parser agains the spec and user input
   ArgParseResult mBranch vs <- do

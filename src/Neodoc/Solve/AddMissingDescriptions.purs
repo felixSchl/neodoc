@@ -3,7 +3,7 @@ module Neodoc.Solve.AddMissingDescriptions where
 import Prelude
 import Debug.Trace
 import Data.Pretty
-import Data.List (List(..), (:), findIndex)
+import Data.List (List(..), (:), findIndex, nub)
 import Data.List as List
 import Data.List.Extra as List
 import Data.Either (Either(..))
@@ -26,19 +26,17 @@ import Neodoc.Spec as Spec
 import Neodoc.Solve.Error
 
 -- Add missing option descriptions.
---
--- Note: this does *not* fill in all option negatives. filling in negatives is
--- only performed during the final evaluation / reduction step. Tihs step only
--- ensures that those options mentioned on the usage pattern are visible in the
--- descriptions
 addMissingDescriptions
-  :: Spec SolvedLayout
+  :: Boolean
+  -> Spec SolvedLayout
   -> Either SolveError (Spec SolvedLayout)
-addMissingDescriptions (Spec (spec@{ layouts, descriptions })) = do
-  Right (Spec $ spec { descriptions = expandDescriptions layouts descriptions })
+addMissingDescriptions implyNegs (Spec (spec@{ layouts, descriptions })) = do
+  Right (Spec $ spec {
+    descriptions = expandDescriptions implyNegs layouts descriptions
+  })
 
   where
-  expandDescriptions layouts = execState do
+  expandDescriptions implyNegs layouts = execState do
     let solveLayout = case _ of
           (Group _ _ xs) -> for_ xs (traverse solveLayout)
           (Elem x) -> case x of
@@ -47,24 +45,31 @@ addMissingDescriptions (Spec (spec@{ layouts, descriptions })) = do
               | maybe true (isOptionArgumentOptional) mA -> do
                 descs <- State.get
                 -- check if there's a description for this option
-                let posAlias = OptionAlias.setNegative false a
-                    negAlias = OptionAlias.setNegative true  a
-                case findIndex (match negAlias posAlias) descs of
+                let cands = if implyNegs then OptionAlias.setNegative false a
+                                                : OptionAlias.setNegative true a
+                                                  : Nil
+                                        else a : Nil
+                case findIndex (match cands) descs of
                   Just i ->
                     let descs' =
                           unsafePartial $ fromJust $ flip (List.modifyAt i) descs
                             case _ of
                               OptionDescription as r mA mD mE ->
-                                let as' = NonEmpty.cons a as
+                                let as' = unsafePartial $ NonEmpty.fromList'
+                                            $ nub
+                                            $ cands <> List.fromFoldable as
                                   in OptionDescription as' r mA mD mE
                               d -> d
                      in State.modify (const descs')
                   Nothing ->
-                    let newDesc = OptionDescription (a :| Nil) false mA Nothing Nothing
+                    let as' = if implyNegs then OptionAlias.setNegative false a
+                                                :| OptionAlias.setNegative true a
+                                                  : Nil
+                                        else a :| Nil
+                        newDesc = OptionDescription as' false mA Nothing Nothing
                      in State.modify (newDesc : _)
             _ -> pure unit
     for_ layouts (traverse (traverse solveLayout))
 
-  match negAlias posAlias (OptionDescription aliases _ _ _ _)
-    = any (\a -> a == negAlias || a == posAlias) aliases
-  match _ _ _ = false
+  match cands (OptionDescription aliases _ _ _ _) = any (\a -> any (_ == a) cands) aliases
+  match _ _ = false

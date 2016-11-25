@@ -732,12 +732,12 @@ parseArg x = go x
               case longAliases of
                 Nil -> fail "Option has no long alias"
                 _   -> choice $ longAliases <#> \(n /\ neg) -> try do
-                        longOption term n (options.implicitNegatives || neg) mA
+                        longOption term n neg mA
             SOpt _ _ _ _ ->
               case shortAliases of
                 Nil -> fail "Option has no short alias"
                 _   -> choice $ shortAliases <#> \(f /\ neg) -> try do
-                        shortOption term f (options.implicitNegatives || neg) mA
+                        shortOption term f neg mA
 
           -- try terminating at this option
           return' isNeg <$> if term && canTerm
@@ -856,12 +856,12 @@ isKnownToken'
    . Token
   -> ArgParser r Boolean
 isKnownToken' tok = do
-  negOK <- _.options.implicitNegatives <$> getConfig
+  implyNegs <- _.options.implicitNegatives <$> getConfig
   (ParseArgs { spec } _ { isKnownCache } _) <- getParseState
   case Map.lookup tok isKnownCache of
     Just b -> return b
     Nothing ->
-      let isKnown = isKnownToken spec tok negOK
+      let isKnown = isKnownToken spec tok implyNegs
        in isKnown <$ modifyGlobalState \s -> s {
             isKnownCache = Map.alter (const (Just isKnown)) tok s.isKnownCache
           }
@@ -874,7 +874,7 @@ isKnownToken
   -> Token
   -> Boolean -- ^ does an option alias equal it's implicit alternative?
   -> Boolean
-isKnownToken (Spec { layouts, descriptions }) tok negOK
+isKnownToken (Spec { layouts, descriptions }) tok implyNegs
   = occuresInDescs || occuresInLayouts
   where
   occuresInDescs = any matchesDesc descriptions
@@ -891,9 +891,9 @@ isKnownToken (Spec { layouts, descriptions }) tok negOK
     matchesLayout (Elem x) = test tok x
       where
       test (Token.LOpt n neg _) (Solved.Option (OptionAlias.Long n' neg') _ _)
-        = n == n' && (negOK || neg == neg')
+        = n == n' && (implyNegs || neg == neg')
       test (Token.SOpt s _ neg _) (Solved.Option (OptionAlias.Short s' neg') _ _)
-        = s == s' && (negOK || neg == neg')
+        = s == s' && (implyNegs || neg == neg')
       test (Token.Lit n) (Solved.Command n' _) = n == n'
       test (Token.EOA _) (Solved.EOA)          = true
       test (Token.Stdin) (Solved.Stdin)        = true

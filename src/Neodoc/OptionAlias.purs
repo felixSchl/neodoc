@@ -14,12 +14,14 @@ module Neodoc.OptionAlias (
 import Prelude
 import Data.String as String
 import Data.Bifunctor (lmap, bimap)
+import Data.Optimize.Uncurried
 import Data.Maybe (Maybe(..))
+import Data.Array as A
 import Data.List (List(Nil), (:))
 import Data.Either (Either(..))
 import Data.Function (on)
 import Data.Generic (class Generic, gEq, gShow)
-import Data.String (singleton) as String
+import Data.String (singleton, fromCharArray) as String
 import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
 import Data.NonEmpty as NonEmpty
 import Data.Pretty (class Pretty)
@@ -29,6 +31,14 @@ import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
 import Data.Foreign.Extra as F
+
+import Neodoc.Parsing.Parser.Pos as P
+import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
+import Neodoc.Parsing.Parser.String (StringParser)
+import Neodoc.Parsing.Parser.String as P
+import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
+import Neodoc.Parsing.Parser.Combinators as P
+import Neodoc.Parsing.Parser as P
 
 type Aliases = NonEmpty List OptionAlias
 type IsNegative = Boolean
@@ -49,22 +59,20 @@ instance isForeignOptionAlias :: IsForeign OptionAlias where
       Right s   -> pure s
 
 fromString :: String -> Either String OptionAlias
-fromString s = case String.uncons s of
-  Just { head: '+', tail } ->
-    case String.uncons tail of
-      Just { head, tail: "" } -> Right $ Short head true
-      _ -> Left "short option must have a singe char"
-  Just { head: '-', tail } ->
-    case String.uncons tail of
-      Just { head: '-', tail: "" } ->
-        Left "long option must have a name"
-      Just { head: '-', tail: tail' } -> Right
-        let neg = String.take (String.length "no-") tail' == "no-"
-         in Long tail' neg
-      Just { head, tail: "" } -> Right $ Short head false
-      _ -> Left "short option must have a singe char"
-  Nothing -> Left "option may not be empty"
-  _ -> Left "option must start with a dash"
+fromString s = lmap (P.extractError id) do
+  P.runParser $ Args5 unit P.initialPos unit s $ (_ <$ P.eof) =<< do
+    P.choice [
+      P.try $ P.char '+' *> do
+        c <- P.noneOf [ '-', '+' ]
+        P.return $ Short c true
+    , P.try $ P.string "--" *> do
+        neg <- P.choice [ P.try (P.string "no-") $> true, pure false ]
+        n <- String.fromCharArray <$> A.many P.anyChar
+        P.return $ Long n neg
+    , P.try $ P.char '-' *> do
+        c <- P.noneOf [ '-', '+' ]
+        P.return $ Short c false
+    ]
 
 instance asForeignOptionAlias :: AsForeign OptionAlias where
   write (Short c neg) = F.toForeign $ sign <> (String.singleton c)
