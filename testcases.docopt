@@ -1785,7 +1785,7 @@ r"""usage: prog -a (--foo|--no-foo) -b"""
 # {"-a": true, "-b": true, "--foo": true}
 
 $ prog -b --no-foo -a
-{"-a": true, "-b": true, "--no-foo": true}
+{"-a": true, "-b": true, "--foo": false}
 
 $ prog -b --no-foo -a --foo
 "user-error"
