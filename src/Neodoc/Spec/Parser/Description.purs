@@ -233,8 +233,8 @@ parse toks =
       let opt n = { alias: OptionAlias.Short flag n, arg, repeatable }
       pure case pol of
             P.Positive -> opt false : Nil
-            P.Negative -> opt true  : Nil
-            P.Both     -> opt false : opt true : Nil
+            P.Negative | isNothing arg -> opt true  : Nil
+            _ -> opt false : opt true : Nil
 
     long :: P.TokenParser _
     long = do
@@ -261,8 +261,8 @@ parse toks =
       let opt n = { alias: OptionAlias.Long name n, arg: arg', repeatable }
       pure case pol of
             P.Positive -> opt false : Nil
-            P.Negative -> opt true  : Nil
-            P.Both     -> opt false : opt true : Nil
+            P.Negative | isNothing arg' -> opt true : Nil
+            _ -> opt false : opt true : Nil
 
 isDefaultTag :: Content -> Boolean
 isDefaultTag (Default _) = true

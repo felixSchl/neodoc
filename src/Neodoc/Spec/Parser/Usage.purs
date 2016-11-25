@@ -138,32 +138,32 @@ parse toks =
   longOption :: P.TokenParser UsageLayout
   longOption = do
     { name, pol, arg } <- P.lopt
-    let arg' = do
+    let mArg' = do
           { name, optional } <- arg
           Just (OptionArgument name optional)
     r <- repetition
-    let opt neg = Option name neg arg' r
+    let opt neg = Option name neg mArg' r
     pure case pol of
-         P.Positive -> Elem $ opt false
-         P.Negative -> Elem $ opt true
-         P.Both     -> Group false false $ (Elem (opt true) :| Nil) :|
-                                            (Elem (opt false) :| Nil) :
-                                              Nil
+        P.Positive -> Elem $ opt false
+        P.Negative | isNothing mArg' -> Elem $ opt true
+        _ -> Group false false $ (Elem (opt true) :| Nil) :|
+                                  (Elem (opt false) :| Nil) :
+                                    Nil
 
   shortOption :: P.TokenParser UsageLayout
   shortOption = do
     { chars, pol, arg } <- P.sopt
-    let arg' = do
+    let mArg' = do
           { name, optional } <- arg
           Just (OptionArgument name optional)
     r <- repetition
-    let opt neg = OptionStack chars neg arg' r
+    let opt neg = OptionStack chars neg mArg' r
     pure case pol of
-         P.Positive -> Elem $ opt false
-         P.Negative -> Elem $ opt true
-         P.Both     -> Group false false $ (Elem (opt true) :| Nil) :|
-                                            (Elem (opt false) :| Nil) :
-                                              Nil
+        P.Positive -> Elem $ opt false
+        P.Negative | isNothing mArg' -> Elem $ opt true
+        _ -> Group false false $ (Elem (opt true) :| Nil) :|
+                                  (Elem (opt false) :| Nil) :
+                                    Nil
 
   option :: P.TokenParser UsageLayout
   option = longOption <|> shortOption

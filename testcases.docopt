@@ -3719,3 +3719,77 @@ $ prog/Rn -f +f
 
 $ prog --no-foo
 {"-f": false, "--foo": false}
+
+r"""
+usage: p --[no-]foo=ARG
+"""
+
+$ prog --no-foo=123
+"option takes no argument: --no-foo"
+
+$ prog --foo=123
+{"--foo": 123}
+
+$ prog --no-foo
+{"--foo": false}
+
+r"""
+usage: p --[no-]foo[=ARG]
+"""
+
+$ prog --no-foo=123
+"option takes no argument: --no-foo"
+
+$ prog --foo=123
+{"--foo": 123}
+
+$ prog --foo
+{"--foo": true}
+
+$ prog --no-foo
+{"--foo": false}
+
+r"""
+usage: p --no-foo=ARG
+"""
+
+$ prog --no-foo=123
+"option takes no argument: --no-foo"
+
+$ prog --foo=123
+{"--foo": 123}
+
+$ prog --no-foo
+{"--foo": false}
+
+r"""
+usage: p [options]
+
+options:
+    --[no-]foo=ARG
+"""
+
+$ prog --no-foo=123
+"option takes no argument: --no-foo"
+
+$ prog --foo=123
+{"--foo": 123}
+
+$ prog --no-foo
+{"--foo": false}
+
+r"""
+usage: p [options]
+
+options:
+    --no-foo=ARG
+"""
+
+$ prog --no-foo=123
+"option takes no argument: --no-foo"
+
+$ prog --foo=123
+{"--foo": 123}
+
+$ prog --no-foo
+{"--foo": false}
