@@ -388,20 +388,6 @@ descParserSpec = \_ ->
                 , repeatable: false
                 }
             ]
-
-        , pass  "-/+q, -?, --[no-]help"
-            [ o { aliases:    OA.Short 'q' false
-                              :| OA.Short 'q' true
-                                : OA.Short '?' false
-                                : OA.Long "help" false
-                                : OA.Long "help" true
-                                : Nil
-                , arg:        Nothing
-                , env:        Nothing
-                , default:    Nothing
-                , repeatable: false
-                }
-            ]
         ]
         runtest
   where
