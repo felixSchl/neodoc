@@ -67,7 +67,8 @@ import Data.Traversable (traverse, for)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty.Extra as NonEmpty
 import Data.Map as Map
-import Data.List (List(..), (:), fromFoldable, length, catMaybes, concat, filter)
+import Data.List (List(..), (:), fromFoldable, length, catMaybes, concat, filter,
+                  singleton)
 import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.Foldable (any, intercalate)
@@ -138,15 +139,18 @@ expandReferences (Spec (spec@{ layouts, descriptions })) =
         --    (XXX: it might be worth exploring if `Layout a` can be generalised
         --          to work on data structures other than `List a`s)
         expand = case _ of
-          (EmptyableGroup o r xs) -> EmptyableGroup o r $ (expand <$> _) <$> xs
-          (EmptyableElem (Indexed _ (SolvedArg x))) -> EmptyableElem x
+          (EmptyableGroup o r xs) -> singleton do
+            EmptyableGroup o r do
+              (concat <<< (expand <$> _)) <$> xs
+          (EmptyableElem (Indexed _ (SolvedArg x))) -> singleton do
+            EmptyableElem x
           (EmptyableElem (Indexed ix (ReferenceArg n))) ->
-            EmptyableGroup false false $ maybe Nil (_:Nil) do
+            fromMaybe Nil do
               args <- Map.lookup ix indexToArgs
               pure $ args <#> \arg ->
                 EmptyableGroup true false ((EmptyableElem arg:Nil):Nil)
 
-     in toStrictBranch $ toEmptyableBranch indexedBranch <#> expand
+     in toStrictBranch $ concat $ toEmptyableBranch indexedBranch <#> expand
 
 expandChunk
   :: List Description
