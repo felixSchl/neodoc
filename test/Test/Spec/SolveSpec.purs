@@ -213,13 +213,13 @@ solveSpec = \_ ->
             -r        Remote
             -m <msg>  Message
             """
-            "prog ([-a] [-r] [-m<msg>])"
+            "prog [-a] [-r] [-m<msg>]"
         ]
 
     , test "prog [options]"
-        [ pass (intercalate "\n" [ "-i", "-o" ]) "prog ([-i] [-o])"
-        , pass (intercalate "\n" [ "-i=FOO", "-o" ]) "prog ([-i=FOO] [-o])"
-        , pass (intercalate "\n" [ "-i=FOO", "-o=FOO" ]) "prog ([-i=FOO] [-o=FOO])"
+        [ pass (intercalate "\n" [ "-i", "-o" ]) "prog [-i] [-o]"
+        , pass (intercalate "\n" [ "-i=FOO", "-o" ]) "prog [-i=FOO] [-o]"
+        , pass (intercalate "\n" [ "-i=FOO", "-o=FOO" ]) "prog [-i=FOO] [-o=FOO]"
         ]
 
     , test "prog [options] -o"
