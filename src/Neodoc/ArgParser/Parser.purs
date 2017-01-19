@@ -802,12 +802,6 @@ toArgBranch options env descriptions x = go <$> x
                       else v.value
           }
      in Elem $ Arg 0 x (toArgKey x) fallback false
-  -- note: uncomment to collapse [-a] into an optional -a
-  -- go (Group o r (((e@(Elem _)):|Nil):|Nil))
-  --   = let e' = go e
-  --      in unsafePartial $ case e' of
-  --         Elem (Arg i x k mV o') ->
-  --           Elem $ Arg i (Solved.setElemRepeatable r x) k mV (o || o')
   go (Group o r xs) = Group o r $ (go <$> _) <$> xs
 
 -- Check if a given layout qualifies as a terminating argument for options-first
