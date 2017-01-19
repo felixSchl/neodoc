@@ -3622,3 +3622,80 @@ usage: p <a> <b>
 
 $ prog
 "missing <a>"
+
+# issue 85:
+# laxPlacement doesn't allow positional in the middle of two flags
+
+r"""
+usage: test -a <files>...
+"""
+
+$ prog/l foo.txt -a bar.txt
+{"<files>": ["foo.txt", "bar.txt"], "-a": true}
+
+r"""
+usage: test [-a] <files>...
+"""
+
+$ prog/l foo.txt -a bar.txt
+{"<files>": ["foo.txt", "bar.txt"], "-a": true}
+
+r"""
+usage: test [-a] [-b] [-c] <files>...
+"""
+
+$ prog/l foo.txt -a bar.txt
+{"<files>": ["foo.txt", "bar.txt"], "-a": true}
+
+$ prog/l foo.txt -a bar.txt -b
+{"<files>": ["foo.txt", "bar.txt"], "-a": true, "-b": true}
+
+$ prog/l -c foo.txt -a bar.txt -b
+{"<files>": ["foo.txt", "bar.txt"], "-a": true, "-b": true, "-c": true}
+
+r"""
+usage: test [-abc] <files>...
+"""
+
+$ prog/l foo.txt -a bar.txt
+{"<files>": ["foo.txt", "bar.txt"], "-a": true}
+
+# this won't work since the group itself has been consumed:
+$ prog/l foo.txt -a bar.txt -c
+"unexpected option -c"
+
+r"""
+usage: test [options] <files>...
+options:
+    -a
+    -b
+    -c
+"""
+
+$ prog/l foo.txt -a bar.txt
+{"<files>": ["foo.txt", "bar.txt"], "-a": true}
+
+$ prog/lr foo.txt -a bar.txt -c
+{"<files>": ["foo.txt", "bar.txt"], "-a": true, "-c": true}
+
+$ prog/l foo.txt -a bar.txt -c
+{"<files>": ["foo.txt", "bar.txt"], "-a": true, "-c": true}
+
+$ prog/lr -b foo.txt -a bar.txt -c
+{"<files>": ["foo.txt", "bar.txt"], "-a": true, "-b": true, "-c": true}
+
+$ prog/l -b foo.txt -a bar.txt -c
+{"<files>": ["foo.txt", "bar.txt"], "-a": true, "-b": true, "-c": true}
+
+r"""
+usage: test [-a][-b][-c] <files>...
+"""
+
+$ prog/l foo.txt -a bar.txt
+{"<files>": ["foo.txt", "bar.txt"], "-a": true}
+
+$ prog/l foo.txt -a bar.txt -c
+{"<files>": ["foo.txt", "bar.txt"], "-a": true, "-c": true}
+
+$ prog/lr foo.txt -a bar.txt -c
+{"<files>": ["foo.txt", "bar.txt"], "-a": true, "-c": true}
