@@ -321,29 +321,30 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
 
     unknowns <- if options.allowUnknown then many unknownOption else pure Nil
 
-    -- trace l' \i->
-    --   "solve: req = " <> pretty req
-    --     <> ", rep = " <> pretty rep
-    --     <> ", sub = " <> show sub
-    --     <> ", out = " <> pretty out
-    --     <> ", ? = "   <> pretty unknowns
-    --     <> ", i = "   <> pretty i
+    trace l' \i->
+      "solve: req = " <> pretty req
+        <> ", rep = " <> pretty rep
+        <> ", sub = " <> show sub
+        <> ", out = " <> pretty out
+        <> ", canRep = " <> show canRep
+        <> ", ? = "   <> pretty unknowns
+        <> ", i = "   <> pretty i
 
     -- 1. try making a match for any arg in `req` w/o allowing substitutions.
     --    if we make a match, we proceed *and never look back*. If we do not
     --    succeed with any argument, we try the `rep` list.
-    -- trace l' \i-> "solve: trying via argv, i = " <> pretty i
+    trace l' \i-> "solve: trying via argv, i = " <> pretty i
     Args4 mKv req' _ mNewRep <-
       (_lmap Just <$> (try $ match (Args3 (l' + 1) false req))) <|>
         return (Args4 Nothing req false Nothing)
 
-    -- trace l' \i-> "solve: req' = " <> pretty req'
-    --                 <> " out = " <> show (pretty <$> mKv)
-    --                 <> ", i = " <> pretty i
+    trace l' \i-> "solve: req' = " <> pretty req'
+                    <> " out = " <> show (pretty <$> mKv)
+                    <> ", i = " <> pretty i
 
     case mKv of
       Just kvs@(_:_) -> do
-        -- trace l' \i-> "solve: matched on argv: " <> pretty kvs <> ", i = " <> pretty i
+        trace l' \i-> "solve: matched on argv: " <> pretty kvs <> ", i = " <> pretty i
         let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
             rep' = nub ((maybe Nil singleton mNewRep) <> rep <> rRep)
         go (Args6 (l' + 1) sub' req' rep' true (out <> unknowns <> kvs))
@@ -356,7 +357,11 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         --    `req` again.
         --    note: the insertion of `res` back into `req` *does matter*, needs
         --          more thought though, as to put it into the front or back.
-        -- trace l' \i-> "solve: trying via rep, i = " <> pretty i
+        trace l' \i->
+            "solve: trying via rep"
+          <> "  i = " <> pretty i
+          <> ", canRep = " <> show canRep
+
         Args4 mKv' rep' _ mNewRep' <-
           if canRep
             then do
@@ -372,7 +377,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
               else return (Args4 Nothing rep false Nothing)
         case mKv' of
           Just kvs@(_:_) -> do
-            -- trace l' \i-> "solve: matched via rep: " <> pretty kvs <> ", i = " <> pretty i
+            trace l' \i-> "solve: matched via rep: " <> pretty kvs <> ", i = " <> pretty i
             let rRep = _toElem <$> filter (_isRepeatable) (fst <$> kvs)
                 rep'' = nub ((maybe Nil singleton mNewRep') <> rep' <> rRep)
             if any (isFrom Origin.Argv <<< snd) kvs
@@ -388,7 +393,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
           _ -> do
             case req' of
               Nil -> do
-                -- trace l' \i -> "solve: empty req' after rep. done. i = " <> pretty i
+                trace l' \i -> "solve: empty req' after rep. done. i = " <> pretty i
                 return $ out <> unknowns
               _:_ | sub ->
                 let
@@ -399,22 +404,22 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
                   exhaust Nil out' = return out'
                   exhaust req'' out' = do
                     Args4 kVs'' req''' changed _ <- try $ match (Args3 (l' + 1) true req'')
-                    -- trace l' \i ->
-                    --      "solve: matched via sub"
-                    --   <> " kVs''" <> pretty kVs''
-                    --   <> ", changed = " <> show changed
-                    --   <> ", req''' = " <> pretty req'''
-                    --   <> ", i = " <> pretty i
+                    trace l' \i ->
+                         "solve: matched via sub"
+                      <> " kVs''" <> pretty kVs''
+                      <> ", changed = " <> show changed
+                      <> ", req''' = " <> pretty req'''
+                      <> ", i = " <> pretty i
                     -- check if we consumed input. If we did, we must rinse
                     -- and repeat the entire process with the new input.
                     if (not (null kVs'')) && (any (isFrom Origin.Argv <<< snd) kVs'' || changed)
                       then go (Args6 (l' + 1) false req''' rep true (out' <> kVs''))
                       else exhaust req''' (out' <> kVs'')
                  in do
-                  -- trace l' \i-> "solve: trying via sub, i = " <> pretty i
+                  trace l' \i-> "solve: trying via sub, i = " <> pretty i
                   exhaust req' (out <> unknowns)
               xs -> do
-                -- trace l' \_-> "solve: failed to match: " <> pretty xs
+                trace l' \_-> "solve: failed to match: " <> pretty xs
                 fail "..." -- XXX: throw proper error here
 
   _lmap f (Args4 a b c d) = Args4 (f a) b c d
@@ -459,42 +464,46 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         Int -- the recursive level
         Boolean -- allow substitutions?
         (List ArgParseLayout)
-    -> ArgParser r (Args4 (List KeyValue)
-                          (List ArgParseLayout)
-                          (Boolean)
-                          (Maybe ArgParseLayout))
+    -> ArgParser r (Args4 (List KeyValue)         -- the parsed key-value pairs
+                          (List ArgParseLayout)   -- the left-over required args
+                          (Boolean)               -- has the input changed?
+                          (Maybe ArgParseLayout)) -- the (possibly) repeated args
   match' (Args3 l sub xs) = go' (Args5 Nothing false xs Nil Nil)
     where
     go' (Args5 errs locked (x:xs) ys matched) = (do
-      -- trace l \i-> "match: try"
-      --   <> " x = " <> pretty x
-      --   <> ", xs = " <> pretty xs
-      --   <> ", ys = " <> pretty ys
-      --   <> ", locked = " <> show locked
-      --   <> ", sub = " <> show sub
-      --   <> ", i = " <> pretty i
+      trace l \i-> "match: try"
+        <> " x = " <> pretty x
+        <> ", xs = " <> pretty xs
+        <> ", ys = " <> pretty ys
+        <> ", locked = " <> show locked
+        <> ", sub = " <> show sub
+        <> ", i = " <> pretty i
       if _isFixed x && locked
         then do
-          -- trace l \i-> "match: skip fixed because locked"
-          --   <> " x = " <> pretty x
-          --   <> ", xs = " <> pretty xs
-          --   <> ", ys = " <> pretty ys
-          --   <> ", sub = " <> show sub
-          --   <> ", i = " <> pretty i
+          trace l \i-> "match: skip fixed because locked"
+            <> " x = " <> pretty x
+            <> ", xs = " <> pretty xs
+            <> ", ys = " <> pretty ys
+            <> ", sub = " <> show sub
+            <> ", i = " <> pretty i
           go' (Args5 errs true xs (x:ys) matched)
         else do
           let sub' = sub && not locked
           cvs <- fork $ parseLayout (l + 1) sub' x
-          -- trace l \i-> "match: return"
-          --   <> " x = " <> pretty x
-          --   <> ", xs = " <> pretty xs
-          --   <> ", ys = " <> pretty ys
-          --   <> ", vs = " <> pretty (snd cvs)
-          --   <> ", locked = " <> show locked
-          --   <> ", sub = " <> show sub
-          -- <> ", i = " <> pretty i
+
+          trace l \i-> "match: return"
+            <> " x = " <> pretty x
+            <> ", xs = " <> pretty xs
+            <> ", ys = " <> pretty ys
+            <> ", vs = " <> pretty (snd cvs)
+            <> ", locked = " <> show locked
+            <> ", sub = " <> show sub
+            <> ", i = " <> pretty i
+            <> ", cvs = " <> (pretty $ snd cvs)
+
           go' (Args5 errs (locked || _isFixed x) xs ys ((x /\ cvs) : matched))
     ) `catch` \{ depth } e -> do
+      traceShowA e
       let errs' = case errs of
                     Just (d /\ _) | depth > d -> Just (depth /\ e)
                     Nothing -> Just (depth /\ e)
@@ -519,17 +528,17 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         then dropFirst (\x -> _isOptionalGroup x && _isFixed x) ys'
         else ys' /\ false
 
-      -- trace l \i' -> "match: eval"
-      --     <> " ys = " <> pretty ys
-      --     <> ", ys' = " <> pretty ys'
-      --     <> ", ys'' = " <> pretty ys''
-      --     <> ", locked = " <> show locked
-      --     <> ", sub = " <> show sub
-      --     <> ", i = " <> pretty i'
+      trace l \i' -> "match: eval"
+          <> " ys = " <> pretty ys
+          <> ", ys' = " <> pretty ys'
+          <> ", ys'' = " <> pretty ys''
+          <> ", locked = " <> show locked
+          <> ", sub = " <> show sub
+          <> ", i = " <> pretty i'
 
       case if sub then filter (not <<< _isOptionalGroup) ys'' else ys'' of
         Nil -> do
-          -- trace l \i' -> "match: succeeded!, i = " <> pretty i'
+          trace l \i' -> "match: succeeded!, i = " <> pretty i'
 
           -- substitute all leaf elements. we ignore groups because these groups
           -- have failed to parse irrespective of substitution, so they are a
@@ -543,14 +552,14 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
           -- return as a triplet, the values (only fallbacks), the layouts
           -- that where responsible for the values and finally if either have
           -- been locked (which indicates a possible change in input) or if
-          -- we noticed a change during `dropFirst` (also releated to locking /
+          -- we noticed a change during `dropFirst` (also related to locking /
           -- positionals)
           return (Args4 (_rest <$> subVs) (_fst <$> subVs) (locked || changed) Nothing)
 
         zs | changed -> go' (Args5 errs false zs Nil Nil)
 
         zss@(z:zs) -> do
-          -- trace l \i' -> "match: failed!" <> pretty zss <> ", i = " <> pretty i'
+          trace l \i' -> "match: failed!" <> pretty zss <> ", i = " <> pretty i'
           i <- getInput
           { depth } <- getState
           case errs of
@@ -590,6 +599,16 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
         -- resume the parser state with the continuation and the yielded value
         resume cvs
 
+        trace l \i' -> "################################################################################"
+        trace l \i' -> "### "
+          <> "locked = " <> show locked
+          <> ", x = " <> pretty x
+          <> ", rep = " <> (show $ pretty <$> rep)
+          <> ", vs = " <> pretty vs
+          <> ", xs' = " <> pretty xs'
+          <> ", ys = " <> pretty ys
+          <> ", i = " <> pretty i'
+
         -- re-sort the remaining elements (XXX: could this be skipped?)
         return (Args4 vs (sortBy (compare `on` getId) $ xs' <> ys) locked rep)
 
@@ -597,8 +616,8 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
     where go' Nil out = out /\ false
           go' (x:xs) out = if f x then (xs <> out) /\ true else go' xs (x:out)
 
-  _fst  (a /\ b /\ c) = a
-  _rest (a /\ b /\ c) = b /\ c
+  _fst  (a /\ _ /\ _) = a
+  _rest (_ /\ b /\ c) = b /\ c
 
   _isFixed :: ArgParseLayout -> Boolean
   _isFixed (ParseGroup _ f _ _ _) = not f
