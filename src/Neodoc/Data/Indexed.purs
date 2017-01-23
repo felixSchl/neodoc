@@ -5,7 +5,7 @@ import Data.Function (on)
 import Data.Tuple.Nested ((/\))
 import Data.Map as Map
 import Data.Map (Map())
-import Data.List (List())
+import Data.List (List(Nil), (:), reverse, length)
 import Data.Tuple (Tuple())
 import Data.Pretty (class Pretty, pretty)
 import Data.Foldable (intercalate)
@@ -34,3 +34,8 @@ getIndex (Indexed ix _) = ix
 
 toMap :: ∀ a. List (Indexed a) -> Map Int a
 toMap xs = Map.fromFoldable $ xs <#> \(Indexed ix x) -> ix /\ x
+
+indexed :: ∀ a. List a -> List (Indexed a)
+indexed xs = reverse $ go xs (length xs)
+  where go Nil _     = Nil
+        go (x:xs) ix = Indexed ix x : go xs (ix - 1)
