@@ -25,7 +25,7 @@
     "purescript-globals": "^2.0.0",
     "purescript-maps": "^2.0.0",
     "purescript-node-process": "^3.0.0",
-    "purescript-spec": "^0.10.0",
+    "purescript-spec": "^0.11.0",
     "purescript-foreign": "^3.0.0",
     "purescript-datetime": "^2.0.0",
     "purescript-node-fs": "^3.0.0",
