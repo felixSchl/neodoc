@@ -151,7 +151,7 @@ parse (spec@(Spec { layouts, descriptions })) options@{ helpFlags, versionFlags 
           -- parse whose only requirement is that there be no input.
           <> if hasEmpty then singleton emptyBranch else Nil
 
-   in runParser $ Args5 { env, options, spec } initialState initialGlobalState tokens $
+   in runParser' $ Args5 { env, options, spec } initialState initialGlobalState tokens $
         let p = if null parsers'
                   then emptyBranch
                   else evalParsers (Args2 (byOrigin <<< getResult) parsers')

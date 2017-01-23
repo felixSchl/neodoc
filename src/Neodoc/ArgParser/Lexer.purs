@@ -106,7 +106,7 @@ lex xs options = lmap (P.extractError id) $ go xs 1
       let toEOA l = Right
             $ singleton
             $ PositionedToken (EOA (StringValue <$> xs)) x n
-      tok <- P.runParser (Args5 unit P.initialPos unit x parseToken)
+      tok <- P.runParser' (Args5 unit P.initialPos unit x parseToken)
       case tok of
         (EOA _) -> toEOA "--"
         otherwise -> do

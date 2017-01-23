@@ -138,8 +138,11 @@ instance lazyParser :: Lazy (Parser e c s g i a) where
 
 instance monadZeroParser :: MonadZero (Parser e c s g i)
 
-runParser :: ∀ e c s g i a. Args5 c s g i (Parser e c s g i a) -> Either (ParseError e) a
-runParser (Args5 c s g i p) = case unParser p (ParseArgs c s g i) of (Step _ _ r) -> r
+runParser :: ∀ e c s g i a. c -> s -> g -> i -> (Parser e c s g i a) -> Either (ParseError e) a
+runParser c s g i p = case unParser p (ParseArgs c s g i) of (Step _ _ r) -> r
+
+runParser' :: ∀ e c s g i a. Args5 c s g i (Parser e c s g i a) -> Either (ParseError e) a
+runParser' (Args5 c s g i p) = case unParser p (ParseArgs c s g i) of (Step _ _ r) -> r
 
 --------------------------------------------------------------------------------
 -- Induced errors. The prime versions target the custom error type 'e'.
@@ -183,6 +186,9 @@ getGlobalState = Parser \a -> Step false a (Right (getG a))
 
 modifyGlobalState :: ∀ e c s g i. (g -> g) -> Parser e c s g i Unit
 modifyGlobalState f = Parser \a -> Step false (mapG f a) (Right unit)
+
+setGlobalState :: ∀ e c s g i. g -> Parser e c s g i Unit
+setGlobalState g = Parser \a -> Step false (mapG (const g) a) (Right unit)
 
 getInput :: ∀ e c s g i. Parser e c s g i i
 getInput = Parser \a -> Step false a (Right (getI a))

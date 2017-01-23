@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Aff (Aff, launchAff)
 import Test.Spec.Runner (run)
-import Test.Spec.Reporter.Console (consoleReporter)
+import Test.Spec.Reporter (specReporter)
 import Test.Spec.ScannerSpec (scannerSpec)
 import Test.Spec.UsageParserSpec (usageParserSpec)
 import Test.Spec.DescParserSpec (descParserSpec)
@@ -12,6 +12,7 @@ import Test.Spec.ArgParserSpec (argParserSpec)
 import Test.Spec.ForeignSpec (foreignSpec)
 import Test.Spec.SolveSpec (solveSpec)
 import Test.Spec.CompatSpec (compatSpec)
+import Test.Spec.ParserSpec (parserSpec)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff (Eff())
 import Node.FS (FS())
@@ -34,7 +35,8 @@ main :: Eff ( err     :: EXCEPTION
             ) _
 main = launchAff do
   tests <- _liftEff $ readTests "testcases.docopt"
-  liftEff $ run [consoleReporter] do
+  liftEff $ run [specReporter] do
+    parserSpec      unit
     scannerSpec     unit
     usageParserSpec unit
     descParserSpec  unit

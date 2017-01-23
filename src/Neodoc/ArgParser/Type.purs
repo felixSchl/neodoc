@@ -190,7 +190,7 @@ type ParseConfig r = {
 }
 
 type ArgParseState = {
-  depth :: Int -- how many elements have been consumed?
+  depth :: Int             -- how many elements have been consumed?
 , hasTerminated :: Boolean -- have we terminated using `--` or `opts.stopAt`?
 }
 
@@ -274,55 +274,3 @@ setErrorAtDepth d e = do
     Just (d' /\ _) | d > d' -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
     Nothing -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
     _ -> pure unit
-
--- withLocalCaches :: ∀ r a. ArgParser r a -> ArgParser r a
--- withLocalCaches p = do
---   { matchCache, argCache } <- getGlobalState
---   modifyGlobalState \s -> s {
---     matchCache = Map.empty :: MatchCache
---   , argCache = Map.empty :: ArgCache
---   }
---   let reset = modifyGlobalState \s -> s {
---         matchCache = matchCache
---       , argCache = argCache
---       }
---   r <- p `catch` \_ e -> reset *> throw e
---   reset
---   pure r
---
--- cachedMatch
---   :: ∀ r
---    . List Int
---   -> Boolean
---   -> ArgParser r _
---   -> ArgParser r _
--- cachedMatch x b p = do
---   Parser \(args@(c /\ (s@{ hasTerminated }) /\ (g@{ matchCache }) /\ i)) ->
---     let key = x /\ b /\ hasTerminated /\ i
---      in case Map.lookup key matchCache of
---           Just (CachedStep b' _ _ _ i' result) ->
---             Step b' (c /\ s /\ g /\ i') result
---           Nothing ->
---             case unParser p args of
---               step@(Step b (c' /\ s' /\ g' /\ i') result) ->
---                 let step' = CachedStep b unit s' unit i' result
---                     cache' = Map.alter (const (Just step')) key g.matchCache
---                  in Step b (c' /\ s' /\ (g' { matchCache = cache' }) /\ i') result
---
--- cachedArg
---   :: ∀ r
---    . Int
---   -> ArgParser r CachedArg
---   -> ArgParser r CachedArg
--- cachedArg x p = do
---   Parser \(args@(c /\ s /\ (g@{ argCache }) /\ i)) ->
---     let key = x /\ i
---      in case Map.lookup key argCache of
---           Just (CachedStep b' _ _ _ i' result) ->
---             Step b' (c /\ s /\ g /\ i') result
---           Nothing ->
---             case unParser p args of
---               step@(Step b (c' /\ s' /\ g' /\ i') result) ->
---                 let step' = CachedStep b unit s' unit i' result
---                     cache' = Map.alter (const (Just step')) key g.argCache
---                  in Step b (c' /\ s' /\ (g' { argCache = cache' }) /\ i') result

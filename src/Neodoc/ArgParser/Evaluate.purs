@@ -80,7 +80,7 @@ evalParsers (Args2 p parsers) = do
 
   -- Run all parsers and collect their results for further evaluation
   let collected = parsers <#> \parser ->
-        runParser $ Args5 config state globalState input $ Parser \a ->
+        runParser' $ Args5 config state globalState input $ Parser \a ->
           case unParser parser a of
             Step b' a'@(ParseArgs c' s' g' i') result ->
               let cont = ParserCont c' s' g' i'
@@ -166,7 +166,7 @@ fork parser = do
   state       <- getState
   globalState <- getGlobalState
   input       <- getInput
-  let result = runParser $ Args5 config state globalState input $ Parser \a ->
+  let result = runParser' $ Args5 config state globalState input $ Parser \a ->
         case unParser parser a of
           Step b' a' result ->
           --  TODO: use tuple in `ParserCont`

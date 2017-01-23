@@ -223,7 +223,7 @@ parse
 parse s split =
   let p = if split then values else value <* P.eof
   in lmap (P.extractError id) $
-      P.runParser (Args5 unit P.initialPos unit s p)
+      P.runParser' (Args5 unit P.initialPos unit s p)
 
   where
     values = do

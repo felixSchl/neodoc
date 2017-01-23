@@ -79,7 +79,7 @@ lex m input =
                 Descriptions -> input
    in do
      lmap (SpecParseError <<< (P.extractError id)) $
-        P.runParser $ Args5 unit P.initialPos unit input' (parseTokens m)
+        P.runParser' $ Args5 unit P.initialPos unit input' (parseTokens m)
 
 lexDescs :: String -> Either SpecParseError (List PositionedToken)
 lexDescs = lex Descriptions <<< trimDescSection
