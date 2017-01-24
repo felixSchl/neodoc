@@ -4,7 +4,7 @@ import Prelude
 import Debug.Trace
 import Data.List hiding (many)
 import Data.Tuple (Tuple, fst)
-import Data.Tuple.Nested ((/\))
+import Data.Tuple.Nested ((/\), Tuple3)
 import Data.Newtype
 import Data.Generic
 import Data.Pretty
@@ -32,48 +32,100 @@ type TestParser i a = Parser TestError {} Int Int i a
 runTestParser :: _ -> _ -> _ -> _ -> TestParser _ _ -> _
 runTestParser = runParser
 
+type IsOptional = Boolean
 type IsRepeatable = Boolean
 type IsFixed = Boolean
+type HasMoved = Boolean
 
-data Pattern a = LeafPattern IsRepeatable IsFixed a
-               | ChoicePattern IsRepeatable IsFixed (List (List (Pattern a)))
+data Pattern a = LeafPattern   IsOptional IsRepeatable IsFixed a
+               | ChoicePattern IsOptional IsRepeatable IsFixed (List (List (Pattern a)))
 
 derive instance genericPattern :: (Generic a) => Generic (Pattern a)
 instance showPattern :: (Generic a, Show a) => Show (Pattern a) where
   show = gShow
 
 instance prettyPattern :: (Pretty a) => Pretty (Pattern a) where
-  pretty (LeafPattern r _ a) = pretty a <> (if r then "..." else "")
-  pretty (ChoicePattern r _ as) = intercalate " | " do
-    ((intercalate " " <<< (pretty <$> _)) <$> _) as
+  pretty (LeafPattern r o _ a) =
+        (if o then "[" else "")
+    <>  (pretty a <> (if r then "..." else ""))
+    <>  (if o then "]" else "")
+  pretty (ChoicePattern r o _ as) =
+        (if o then "[" else "")
+    <>  (intercalate " | " $ ((intercalate " " <<< (pretty <$> _)) <$> _) as)
+    <>  (if o then "]" else "")
+
+isOptional :: ∀ a. Pattern a -> Boolean
+isOptional (LeafPattern o _ _ _) = o
+isOptional (ChoicePattern o _ _ _) = o
 
 isRepeatable :: ∀ a. Pattern a -> Boolean
-isRepeatable (LeafPattern r _ _) = r
-isRepeatable (ChoicePattern r _ _) = r
+isRepeatable (LeafPattern _ r _ _) = r
+isRepeatable (ChoicePattern _ r _ _) = r
 
 leaf :: ∀ a. a -> Pattern a
-leaf = LeafPattern false false
+leaf = LeafPattern false false false
 
 leafR :: ∀ a. a -> Pattern a
-leafR = LeafPattern true false
+leafR = LeafPattern false true false
 
 leafF :: ∀ a. a -> Pattern a
-leafF = LeafPattern false true
+leafF = LeafPattern false false true
 
 leafRF :: ∀ a. a -> Pattern a
-leafRF = LeafPattern true true
+leafRF = LeafPattern false true true
+
+leafO :: ∀ a. a -> Pattern a
+leafO = LeafPattern true false false
+
+leafOR :: ∀ a. a -> Pattern a
+leafOR = LeafPattern true true false
+
+leafOF :: ∀ a. a -> Pattern a
+leafOF = LeafPattern true false true
+
+leafORF :: ∀ a. a -> Pattern a
+leafORF = LeafPattern true true true
 
 choiz :: ∀ a. Array (Array (Pattern a)) -> Pattern a
-choiz xs = ChoicePattern false false $ fromFoldable (fromFoldable <$> xs)
+choiz xs = ChoicePattern false false false $ fromFoldable (fromFoldable <$> xs)
 
 choizR :: ∀ a. Array (Array (Pattern a)) -> Pattern a
-choizR xs = ChoicePattern true false $ fromFoldable (fromFoldable <$> xs)
+choizR xs = ChoicePattern false true false $ fromFoldable (fromFoldable <$> xs)
 
 choizF :: ∀ a. Array (Array (Pattern a)) -> Pattern a
-choizF xs = ChoicePattern false true $ fromFoldable (fromFoldable <$> xs)
+choizF xs = ChoicePattern false false true $ fromFoldable (fromFoldable <$> xs)
 
 choizRF :: ∀ a. Array (Array (Pattern a)) -> Pattern a
-choizRF xs = ChoicePattern true true $ fromFoldable (fromFoldable <$> xs)
+choizRF xs = ChoicePattern false true true $ fromFoldable (fromFoldable <$> xs)
+
+choizO :: ∀ a. Array (Array (Pattern a)) -> Pattern a
+choizO xs = ChoicePattern true false false $ fromFoldable (fromFoldable <$> xs)
+
+choizOR :: ∀ a. Array (Array (Pattern a)) -> Pattern a
+choizOR xs = ChoicePattern true true false $ fromFoldable (fromFoldable <$> xs)
+
+choizOF :: ∀ a. Array (Array (Pattern a)) -> Pattern a
+choizOF xs = ChoicePattern true false true $ fromFoldable (fromFoldable <$> xs)
+
+choizORF :: ∀ a. Array (Array (Pattern a)) -> Pattern a
+choizORF xs = ChoicePattern true true true $ fromFoldable (fromFoldable <$> xs)
+
+type Result a u = Tuple (List a)
+                        (Tuple (List (Pattern u))
+                                HasMoved)
+
+parse
+  :: ∀ i e c s g u a
+   . (Generic u, Show u, Pretty u, Show a, Pretty i)
+  => (u -> Parser e c s g (List i) a)
+  -> List (Pattern u) -- input patterns
+  -> Parser e c s g (List i) (List a)
+parse f pats = do
+  vs <- fst <$> parsePatterns f pats Nil
+  is <- getInput
+  case is of
+    Nil   -> Parser.return vs
+    i : _ -> Parser.fail $ "Unexpected " <> pretty i
 
 parsePatterns
   :: ∀ i e c s g u a
@@ -81,56 +133,101 @@ parsePatterns
   => (u -> Parser e c s g (List i) a)
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
-  -> Parser e c s g (List i) (Tuple (List a) (List (Pattern u)))
+  -> Parser e c s g (List i) (Result a u)
 parsePatterns f repPats pats =
   let xs = indexed pats
-      f' reps = case _ of
-                  p@(LeafPattern r _ x) -> do
-                    v <- singleton <$> f x
-                    pure (v /\ if r then p : reps else reps)
-                  ChoicePattern _ _ xs -> do
-                    evalParsers'
-                      (const 1 {- TODO -})
-                      (const 0 {- TODO -})
-                      (const Nothing {- TODO -})
-                      (\_ _ -> pure unit {- TODO -})
-                      (parsePatterns f reps <$> xs)
+      f' reps pat = do
+        (vs /\ reps' /\ hasMoved) <- case pat of
+                LeafPattern _ r _ x -> do
+                  vs <- singleton <$> f x
+                  pure (vs /\ Nil /\ true)
+                ChoicePattern _ _ _ xs -> do
+                  evalParsers'
+                    (const 1 {- TODO -})
+                    (const 0 {- TODO -})
+                    (const Nothing {- TODO -})
+                    (\_ _ -> pure unit {- TODO -})
+                    (parsePatterns f reps <$> xs)
+        let reps'' = if isRepeatable pat then pat : reps' else reps'
+        pure (vs /\ reps'' /\ hasMoved)
    in do
-        (vs /\ rep) <- go f' xs xs Nil repPats Nil
+        -- 1. parse the pattern wholly
+        (vs /\ rep /\ hasMoved) <- go f' xs xs Nil false repPats Nil
+
+        -- 2. consume any trailing arguments using the repeating patterns we
+        --    learned about so far.
+        --    note: parsing the remainder may have consumed input, since we
+        --          never substitute values during rep parsing.
         vs' <- parseRemainder rep ((fst <$> _) <<< f' rep)
-        pure ((vs <> vs') /\ rep)
+
+        pure $ (vs <> vs') /\ rep /\ (hasMoved' || (not $ null vs'))
   where
   go
-    :: _ -> _ -> _ -> _
+    :: _
+    -> _
+    -> _
+    -> _
+    -> HasMoved
     -> (List (Pattern u))
     -> (List a)
-    -> Parser e c s g (List i) (Tuple (List a) (List (Pattern u)))
-  go _ _ Nil Nil rep out = Parser.return $ out /\ rep
-  go _ _ Nil ((Indexed _ pat):_) _ _ = Parser.fail do
-    "Expected " <> pretty pat
-  go f' orig (x@(Indexed ix pat):xs) carry reps out = do
+    -> Parser e c s g (List i) (Result a u)
+  go _ _ Nil Nil hasMoved reps out = Parser.return $ out /\ reps /\ hasMoved
+
+  go _ _ Nil ((Indexed _ pat):_) _ _ _ = do
+    -- at this point we rotated the entire input and tried to consume via
+    -- repetitions, but w/o any luck. it's time for drastic measures (TODO)
+
+    Parser.fail $ "Expected " <> pretty pat
+  go f' orig (x@(Indexed ix pat):xs) carry hasMoved reps out = do
+
+    -- 1. try parsing the pattern
     mR <- (Just <$> f' reps pat) <|> (pure Nothing)
     case mR of
-      Just (result /\ reps') ->
+      -- if we have a result, and the result consumed input, we're looking
+      -- good. we reset the input pattern bar the matched element, clear
+      -- the carry and add this pattern to the list of repeated patterns,
+      -- (if this pattern allows for repetition)
+      Just (result /\ reps' /\ true) ->
         let orig' = filter (not <<< (_ == ix) <<< getIndex) orig
-         in go f' orig' orig' Nil reps' (result <> out)
-      Nothing -> do
-        -- TODO: is `f' reps <$> reps` correct?
-        mR' <- (Just <$> choice (f' reps <$> reps)) <|> (pure Nothing)
+         in go f' orig' orig' Nil true reps' (result <> out)
+
+      -- 2. if we did not manage to make a match, we will try to make a match
+      --    using all previously matched, repeatable patterns.
+      _ -> do
+        mR' <- (Just <$> choice (f' Nil <$> reps)) <|> (pure Nothing)
         case mR' of
-          Just (result' /\ _) ->
+          -- if we have a result, and the result consumed input, we're looking
+          -- ok. we reset the input pattern completely, clear the carry and
+          -- re-iterate using the input.
+          Just (result' /\ _ /\ true) ->
             let orig' = filter (not <<< (_ == ix) <<< getIndex) orig
-             in go f' orig' orig' Nil reps (result' <> out)
-          Nothing -> go f' orig xs (x:carry) reps out
+             in do
+                traceA $ pretty (orig /\ orig' /\ ix /\ reps)
+                go f' orig' orig' Nil true reps (result' <> out)
+
+          -- 3. if, at this point, we still did not manage to make a match, we
+          --    rotate this pattern into the carry and give the next pattern a
+          --    chance.
+          _ -> go f' orig xs (x:carry) hasMoved reps out
 
 parseRemainder
   :: ∀ i e c s g u a
    . List u -- repeatables
   -> (u -> Parser e c s g (List i) (List a))
   -> Parser e c s g (List i) (List a)
-parseRemainder repPats f = concat <$> many do
-                            choice do
-                              f <$> repPats
+parseRemainder repPats f = do
+  go (choice $ f <$> repPats) Nil
+  where go p xs = do
+          vs <- p <|> pure Nil
+          if null vs then pure xs else go p (vs <> xs)
+
+parseString x = Parser \a ->
+  let _return = \i r -> Step true (setI i a) r
+      _fail m = Step false a (Left $ ParseError false (Left m))
+   in case getI a of
+        s : ss | s == x -> _return ss (Right x)
+        s : _ -> _fail $ "expected " <> x <> ", but got: " <> s
+        _ -> _fail $ "expected " <> x
 
 parserSpec = \_ ->
   describe "The parser" do
@@ -166,21 +263,13 @@ parserSpec = \_ ->
     describe "parse patterns" do
       it "should exhaust the patterns" do
         liftEff do
-          result <- runEitherEff do
+
+          traceShowA =<< runEitherEff do
             runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
-              result <- parsePatterns
-                (\x -> Parser \a ->
-                  let _return = \i r -> Step true (setI i a) r
-                      _fail m = Step false a (Left $ ParseError false (Left m))
-                   in case getI a of
-                        s : ss | s == x -> _return ss (Right x)
-                        s : _ -> _fail $ "expected " <> x <> ", but got: " <> s
-                        _ -> _fail $ "expected " <> x
-                )
-                Nil
-                (fromFoldable [ leafR "b", leaf "a" ])
-              is <- getInput
-              case is of
-                Nil   -> Parser.return result
-                i : _ -> Parser.fail $ "Unexpected " <> pretty i
-          traceShowA result
+              parse parseString $ fromFoldable do
+                [ choizORF [[ leaf "b" ]], leaf "a" ]
+
+          traceShowA =<< runEitherEff do
+            runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
+              parse parseString $ fromFoldable do
+                [ choizORF [[ leaf "a" ]], leaf "b" ]
