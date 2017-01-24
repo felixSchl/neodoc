@@ -36,6 +36,6 @@ toMap :: ∀ a. List (Indexed a) -> Map Int a
 toMap xs = Map.fromFoldable $ xs <#> \(Indexed ix x) -> ix /\ x
 
 indexed :: ∀ a. List a -> List (Indexed a)
-indexed xs = reverse $ go xs (length xs)
+indexed xs = go xs 0
   where go Nil _     = Nil
-        go (x:xs) ix = Indexed ix x : go xs (ix - 1)
+        go (x:xs) ix = Indexed ix x : go xs (ix + 1)
