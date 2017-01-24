@@ -5,6 +5,7 @@ import Debug.Trace
 import Data.Function
 import Data.List hiding (many)
 import Data.Tuple (Tuple, fst)
+import Data.Bifunctor (lmap)
 import Data.Tuple.Nested ((/\), Tuple3)
 import Data.Newtype
 import Data.Generic
@@ -179,16 +180,20 @@ parsePatterns f repPats pats =
     -> _                  -- the patterns to match
     -> _                  -- the carry
     -> HasMoved           -- have we consumed any input this far?
-    -> (List (Pattern u)) -- repeatable patterns found so far
-    -> (List a)           -- output values
+    -> List (Pattern u)   -- repeatable patterns found so far
+    -> List a             -- output values
     -> Parser e c s g (List i) (Result a u)
+  go _ _ Nil Nil false _ _ = Parser.return $ Nil /\ Nil /\ false
   go _ _ Nil Nil hasMoved reps out = Parser.return $ out /\ reps /\ hasMoved
 
-  go _ _ Nil ((Indexed _ pat):_) _ _ _ = do
+  go f' orig Nil (yss@(((Indexed _ pat):xs))) _ reps _ = do
     -- at this point we rotated the entire input and tried to consume via
-    -- repetitions, but w/o any luck. it's time for drastic measures (TODO)
+    -- repetitions, but w/o any luck. it's time for drastic measures by starting
+    -- to remove optional elements, ony be one.
 
-    Parser.fail $ "Expected " <> pretty pat
+    go f' xs xs Nil false reps Nil <|> do
+      Parser.fail $ "Expected " <> pretty pat
+
   go f' orig (x@(Indexed ix pat):xs) carry hasMoved reps out = do
     -- 1. try parsing the pattern
     mR <- (Just <$> f' reps pat) <|> (pure Nothing)
@@ -229,6 +234,15 @@ parsePatterns f repPats pats =
                                           Just xs -> xs
                                           Nothing -> snoc orig x
                  in go f' orig' xs (x:carry) hasMoved reps out
+
+{-
+  drop the first matching element from the list and return the
+  resulting list or nothing if nothign changed
+-}
+dropFirst f xs = reverse <$> go xs Nil
+  where go Nil _ = Nothing
+        go (x:xs) out | f x = Just $ xs <> out
+        go (x:xs) out = go xs (x:out)
 
 parseRemainder
   :: ∀ i e c s g u a
@@ -281,16 +295,24 @@ parserSpec = \_ ->
 
     -- TODO: should be it's own spec
     describe "parse patterns" do
-      it "should exhaust the patterns" do
-        liftEff do
-          traceShowA =<< runEitherEff do
-            runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
-              parse parseString $ fromFoldable do
-                [ choizOR [[ leaf "b" ]], leaf "a" ]
+
+      -- it "should exhaust the patterns" do
+      --   liftEff do
+      --     traceShowA =<< runEitherEff do
+      --       runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
+      --         parse parseString $ fromFoldable do
+      --           [ choizOR [[ leaf "b" ]], leaf "a" ]
+      --
+      -- it "unexpected b" do
+      --   liftEff do
+      --     traceShowA =<< runEitherEff do
+      --       runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
+      --         parse parseString $ fromFoldable do
+      --           [ choizORF [[ leaf "a" ]], leaf "b" ]
 
       it "unexpected b" do
         liftEff do
           traceShowA =<< runEitherEff do
-            runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
+            runTestParser {} 0 0 (fromFoldable [ "b", "c", "a", "b" ]) do
               parse parseString $ fromFoldable do
-                [ choizORF [[ leaf "a" ]], leaf "b" ]
+                [ choizORF [[ leaf "a", leaf "b" ]], leafF "c" ]
