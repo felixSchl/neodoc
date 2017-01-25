@@ -5,7 +5,7 @@ import Debug.Trace
 import Data.Function
 import Data.List hiding (many)
 import Data.Tuple (Tuple, fst)
-import Data.Bifunctor (lmap)
+import Data.Bifunctor (rmap, lmap)
 import Data.Tuple.Nested ((/\), Tuple3)
 import Data.Newtype
 import Data.Generic
@@ -141,7 +141,7 @@ parse f pats = do
 
 parsePatterns
   :: ∀ i e c s g u a
-   . (Generic u, Show u, Pretty u, Show a)
+   . (Generic u, Show u, Pretty u, Show a, Pretty i)
   => (u -> Parser e c s g (List i) a)
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
@@ -153,13 +153,15 @@ parsePatterns f repPats pats =
                 LeafPattern _ r _ x -> do
                   vs <- singleton <$> f x
                   pure (vs /\ reps /\ true)
-                ChoicePattern _ _ _ xs -> do
-                  evalParsers'
-                    (const 1 {- TODO -})
-                    (const 0 {- TODO -})
-                    (const Nothing {- TODO -})
-                    (\_ _ -> pure unit {- TODO -})
-                    (parsePatterns f reps <$> xs)
+                ChoicePattern _ _ _ xs ->
+                  let resetReps = rmap (lmap (const reps))
+                   in resetReps <$> do
+                        evalParsers'
+                          (const 1 {- TODO -})
+                          (const 0 {- TODO -})
+                          (const Nothing {- TODO -})
+                          (\_ _ -> pure unit {- TODO -})
+                          (parsePatterns f reps <$> xs)
         let reps'' = if isRepeatable pat then pat : reps' else reps'
         pure (vs /\ reps'' /\ hasMoved)
    in do
@@ -186,15 +188,28 @@ parsePatterns f repPats pats =
   go _ _ Nil Nil false _ _ = Parser.return $ Nil /\ Nil /\ false
   go _ _ Nil Nil hasMoved reps out = Parser.return $ out /\ reps /\ hasMoved
 
-  go f' orig Nil (yss@(((Indexed _ pat):xs))) _ reps _ = do
+  go f' orig Nil (ys@(((Indexed _ pat):xs))) true reps _ = do
+    Parser.fail $ "Expected " <> pretty pat
+
+  go f' orig Nil (ys@(((Indexed _ pat):xs))) _ reps _ = do
     -- at this point we rotated the entire input and tried to consume via
     -- repetitions, but w/o any luck. it's time for drastic measures by starting
     -- to remove optional elements, ony be one.
 
-    go f' xs xs Nil false reps Nil <|> do
-      Parser.fail $ "Expected " <> pretty pat
+    i <- getInput
+    traceA $ "starting to drop: " <> pretty ys <> ") (input=" <> pretty i <> ")"
+
+    -- TODO: this might need more logic as to which element we throw out first
+    --       the current approach is simply removes from left to right.
+    case dropFirst (isOptional <<< getIndexedElem) ys of
+      Just ys' -> go f' ys' ys' Nil false reps Nil <|> do
+                    Parser.fail $ "Expected " <> pretty pat
+      Nothing  -> Parser.fail $ "Expected " <> pretty pat
 
   go f' orig (x@(Indexed ix pat):xs) carry hasMoved reps out = do
+    i <- getInput
+    traceA $ "parsing " <> pretty x <> " (carry=" <> pretty carry <> ") (input=" <> pretty i <> ")"
+
     -- 1. try parsing the pattern
     mR <- (Just <$> f' reps pat) <|> (pure Nothing)
     case mR of
@@ -313,6 +328,6 @@ parserSpec = \_ ->
       it "unexpected b" do
         liftEff do
           traceShowA =<< runEitherEff do
-            runTestParser {} 0 0 (fromFoldable [ "b", "c", "a", "b" ]) do
+            runTestParser {} 0 0 (fromFoldable [ "b", "a", "b", "a" ]) do
               parse parseString $ fromFoldable do
-                [ choizORF [[ leaf "a", leaf "b" ]], leafF "c" ]
+                [ choizORF [[ leaf "a", leaf "b" ]]]
