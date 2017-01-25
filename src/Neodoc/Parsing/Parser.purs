@@ -162,6 +162,7 @@ fatal' e = Parser \a -> Step false a (Left $ ParseError true (Right e))
 
 throw :: ∀ e c s g i a. ParseError e -> Parser e c s g i a
 throw e = Parser \a -> Step false a (Left e)
+
 --------------------------------------------------------------------------------
 -- Parser getters, setters, modifiers, ...
 --------------------------------------------------------------------------------

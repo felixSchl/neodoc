@@ -3,6 +3,7 @@ module Debug.Profile where
 import Prelude
 import Debug.Trace
 import Data.Either
+import Data.Tuple
 import Data.Tuple.Nested
 import Data.Newtype (unwrap)
 import Control.Monad.Eff
@@ -13,6 +14,14 @@ foreign import _ENABLE_PROFILING_ :: Boolean
 
 prof :: ∀ m a. (Monad m) => String -> (Unit -> m a) -> m a
 prof = profileA
+
+measureA :: ∀ m a. (Monad m) => (Unit -> m a) -> m (Tuple Number a)
+measureA f = do
+  pure unit
+  let t  = unsafePerformEff timerStart
+  a <- f unit
+  let t' = unsafePerformEff $ timerEnd t
+  pure (t' /\ a)
 
 profileA :: ∀ m a. (Monad m) => String -> (Unit -> m a) -> m a
 profileA msg f =
@@ -43,5 +52,5 @@ profileS msg f =
             r /\ t -> trace (msg <> " (" <> (show t) <> " ms)") \_-> r
     else f unit
 
-foreign import timerStart :: ∀ eff. Eff eff Int
-foreign import timerEnd :: ∀ eff. Int -> Eff eff Int
+foreign import timerStart :: ∀ eff. Eff eff Number
+foreign import timerEnd :: ∀ eff. Number -> Eff eff Number
