@@ -9,9 +9,11 @@ import Data.Bifunctor (rmap, lmap)
 import Data.Tuple.Nested ((/\), Tuple3)
 import Data.Newtype
 import Data.Generic
+import Data.String as String
 import Data.Pretty
 import Data.Maybe
 import Data.List.Lazy (replicateM)
+import Data.List.Lazy as LL
 import Data.Either
 import Control.Alt
 import Control.Monad.Aff
@@ -128,25 +130,29 @@ type Result a u = Tuple (List a)
 
 parse
   :: ∀ i e c s g u a
-   . (Generic u, Show u, Pretty u, Show a, Pretty i)
+   . (Generic u, Show u, Show a, Pretty u, Pretty a, Pretty i)
   => (u -> Parser e c s g (List i) a)
   -> List (Pattern u) -- input patterns
   -> Parser e c s g (List i) (List a)
 parse f pats = do
-  vs <- fst <$> parsePatterns f Nil pats
+  vs <- fst <$> parsePatterns 0 f Nil pats
   is <- getInput
   case is of
     Nil   -> Parser.return vs
     i : _ -> Parser.fail $ "Unexpected " <> pretty i
 
+indent :: Int -> String
+indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
+
 parsePatterns
   :: ∀ i e c s g u a
-   . (Generic u, Show u, Pretty u, Show a, Pretty i)
-  => (u -> Parser e c s g (List i) a)
+   . (Generic u, Show u, Show a, Pretty u, Pretty a, Pretty i)
+  => Int
+  -> (u -> Parser e c s g (List i) a)
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
   -> Parser e c s g (List i) (Result a u)
-parsePatterns f repPats pats =
+parsePatterns l f repPats pats =
   let xs = indexed pats
       f' reps pat = do
         (vs /\ reps' /\ hasMoved) <- case pat of
@@ -161,7 +167,7 @@ parsePatterns f repPats pats =
                           (const 0 {- TODO -})
                           (const Nothing {- TODO -})
                           (\_ _ -> pure unit {- TODO -})
-                          (parsePatterns f reps <$> xs)
+                          (parsePatterns (l + 1) f reps <$> xs)
         let reps'' = if isRepeatable pat then pat : reps' else reps'
         pure (vs /\ reps'' /\ hasMoved)
    in do
@@ -197,7 +203,11 @@ parsePatterns f repPats pats =
     -- to remove optional elements, ony be one.
 
     i <- getInput
-    traceA $ "starting to drop: " <> pretty ys <> ") (input=" <> pretty i <> ")"
+    traceA $ indent l <> "starting to drop: "
+      <> pretty ys
+      <> " (orig=" <> pretty orig <> ")"
+      <> " (input=" <> pretty i <> ")"
+      <> " (xs=" <> pretty xs <> ")"
 
     -- TODO: this might need more logic as to which element we throw out first
     --       the current approach is simply removes from left to right.
@@ -207,8 +217,14 @@ parsePatterns f repPats pats =
       Nothing  -> Parser.fail $ "Expected " <> pretty pat
 
   go f' orig (x@(Indexed ix pat):xs) carry hasMoved reps out = do
+
     i <- getInput
-    traceA $ "parsing " <> pretty x <> " (carry=" <> pretty carry <> ") (input=" <> pretty i <> ")"
+    traceA $ indent l <> "parsing: "
+      <> pretty x
+      <> " (orig=" <> pretty orig <> ")"
+      <> " (carry=" <> pretty carry <> ")"
+      <> " (input=" <> pretty i <> ")"
+      <> " (xs=" <> pretty xs <> ")"
 
     -- 1. try parsing the pattern
     mR <- (Just <$> f' reps pat) <|> (pure Nothing)
@@ -217,23 +233,48 @@ parsePatterns f repPats pats =
       -- good. we reset the input pattern bar the matched element, clear
       -- the carry and add this pattern to the list of repeated patterns,
       -- (if this pattern allows for repetition)
-      Just (result /\ reps' /\ true) ->
+      Just (result /\ reps' /\ true) -> do
+        traceA $ indent l <> "SUCCESS"
+          <> pretty x
+          <> " (orig=" <> pretty orig <> ")"
+          <> " (carry=" <> pretty carry <> ")"
+          <> " (input=" <> pretty i <> ")"
+          <> " (xs=" <> pretty xs <> ")"
+          <> " (result=" <> pretty result <> ")"
         let orig' = sortBy (compare `on` getIndex) do
                       filter (not <<< (_ == ix) <<< getIndex) orig
-         in go f' orig' orig' Nil true reps' (result <> out)
+        go f' orig' orig' Nil true reps' (result <> out)
 
       -- 2. if we did not manage to make a match, we will try to make a match
       --    using all previously matched, repeatable patterns.
       _ -> do
+
+        i <- getInput
+        traceA $ indent l <> "parsing via rep: "
+          <> pretty x
+          <> " (orig=" <> pretty orig <> ")"
+          <> " (carry=" <> pretty carry <> ")"
+          <> " (input=" <> pretty i <> ")"
+          <> " (xs=" <> pretty xs <> ")"
+
         mR' <- (Just <$> choice (f' Nil <$> reps)) <|> (pure Nothing)
         case mR' of
           -- if we have a result, and the result consumed input, we're looking
           -- ok. we reset the input pattern completely, clear the carry and
           -- re-iterate using the input.
-          Just (result' /\ _ /\ true) ->
+          Just (result' /\ _ /\ true) -> do
+
+            i <- getInput
+            traceA $ indent l <> "SUCCESS via rep"
+              <> pretty x
+              <> " (orig=" <> pretty orig <> ")"
+              <> " (carry=" <> pretty carry <> ")"
+              <> " (input=" <> pretty i <> ")"
+              <> " (xs=" <> pretty xs <> ")"
+              <> " (result=" <> pretty result' <> ")"
             let orig' = sortBy (compare `on` getIndex) do
                           filter (not <<< (_ == ix) <<< getIndex) orig
-             in go f' orig' orig' Nil true reps (result' <> out)
+            go f' orig' orig' Nil true reps (result' <> out)
 
           -- 3. if, at this point, we still did not manage to make a match, we
           --    rotate this pattern into the carry and give the next pattern a
