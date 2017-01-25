@@ -167,7 +167,13 @@ parsePatterns l f repPats pats =
                           (const 0 {- TODO -})
                           (const Nothing {- TODO -})
                           (\_ _ -> pure unit {- TODO -})
-                          (parsePatterns (l + 1) f reps <$> xs)
+                          -- TODO: do we need to pass `reps` down?
+                          --       since `reps` are now tried before rotating
+                          --       all input, this can come off as too eager.
+                          -- TODO: implement such that repetitions are only
+                          --       used if a parse w/o them is a noop, similar
+                          --       to how omissions work
+                          (parsePatterns (l + 1) f Nil <$> xs)
         let reps'' = if isRepeatable pat then pat : reps' else reps'
         pure (vs /\ reps'' /\ hasMoved)
    in do
@@ -202,13 +208,6 @@ parsePatterns l f repPats pats =
     -- repetitions, but w/o any luck. it's time for drastic measures by starting
     -- to remove optional elements, ony be one.
 
-    i <- getInput
-    traceA $ indent l <> "starting to drop: "
-      <> pretty ys
-      <> " (orig=" <> pretty orig <> ")"
-      <> " (input=" <> pretty i <> ")"
-      <> " (xs=" <> pretty xs <> ")"
-
     -- TODO: this might need more logic as to which element we throw out first
     --       the current approach is simply removes from left to right.
     case dropFirst (isOptional <<< getIndexedElem) ys of
@@ -217,15 +216,6 @@ parsePatterns l f repPats pats =
       Nothing  -> Parser.fail $ "Expected " <> pretty pat
 
   go f' orig (x@(Indexed ix pat):xs) carry hasMoved reps out = do
-
-    i <- getInput
-    traceA $ indent l <> "parsing: "
-      <> pretty x
-      <> " (orig=" <> pretty orig <> ")"
-      <> " (carry=" <> pretty carry <> ")"
-      <> " (input=" <> pretty i <> ")"
-      <> " (xs=" <> pretty xs <> ")"
-
     -- 1. try parsing the pattern
     mR <- (Just <$> f' reps pat) <|> (pure Nothing)
     case mR of
@@ -234,47 +224,22 @@ parsePatterns l f repPats pats =
       -- the carry and add this pattern to the list of repeated patterns,
       -- (if this pattern allows for repetition)
       Just (result /\ reps' /\ true) -> do
-        traceA $ indent l <> "SUCCESS"
-          <> pretty x
-          <> " (orig=" <> pretty orig <> ")"
-          <> " (carry=" <> pretty carry <> ")"
-          <> " (input=" <> pretty i <> ")"
-          <> " (xs=" <> pretty xs <> ")"
-          <> " (result=" <> pretty result <> ")"
         let orig' = sortBy (compare `on` getIndex) do
                       filter (not <<< (_ == ix) <<< getIndex) orig
-        go f' orig' orig' Nil true reps' (result <> out)
+         in go f' orig' orig' Nil true reps' (result <> out)
 
       -- 2. if we did not manage to make a match, we will try to make a match
       --    using all previously matched, repeatable patterns.
       _ -> do
-
-        i <- getInput
-        traceA $ indent l <> "parsing via rep: "
-          <> pretty x
-          <> " (orig=" <> pretty orig <> ")"
-          <> " (carry=" <> pretty carry <> ")"
-          <> " (input=" <> pretty i <> ")"
-          <> " (xs=" <> pretty xs <> ")"
-
         mR' <- (Just <$> choice (f' Nil <$> reps)) <|> (pure Nothing)
         case mR' of
           -- if we have a result, and the result consumed input, we're looking
           -- ok. we reset the input pattern completely, clear the carry and
           -- re-iterate using the input.
           Just (result' /\ _ /\ true) -> do
-
-            i <- getInput
-            traceA $ indent l <> "SUCCESS via rep"
-              <> pretty x
-              <> " (orig=" <> pretty orig <> ")"
-              <> " (carry=" <> pretty carry <> ")"
-              <> " (input=" <> pretty i <> ")"
-              <> " (xs=" <> pretty xs <> ")"
-              <> " (result=" <> pretty result' <> ")"
             let orig' = sortBy (compare `on` getIndex) do
                           filter (not <<< (_ == ix) <<< getIndex) orig
-            go f' orig' orig' Nil true reps (result' <> out)
+             in go f' orig' orig' Nil true reps (result' <> out)
 
           -- 3. if, at this point, we still did not manage to make a match, we
           --    rotate this pattern into the carry and give the next pattern a
@@ -352,19 +317,19 @@ parserSpec = \_ ->
     -- TODO: should be it's own spec
     describe "parse patterns" do
 
-      -- it "should exhaust the patterns" do
-      --   liftEff do
-      --     traceShowA =<< runEitherEff do
-      --       runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
-      --         parse parseString $ fromFoldable do
-      --           [ choizOR [[ leaf "b" ]], leaf "a" ]
-      --
-      -- it "unexpected b" do
-      --   liftEff do
-      --     traceShowA =<< runEitherEff do
-      --       runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
-      --         parse parseString $ fromFoldable do
-      --           [ choizORF [[ leaf "a" ]], leaf "b" ]
+      it "should exhaust the patterns" do
+        liftEff do
+          traceShowA =<< runEitherEff do
+            runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
+              parse parseString $ fromFoldable do
+                [ choizOR [[ leaf "b" ]], leaf "a" ]
+
+      it "unexpected b" do
+        liftEff do
+          traceShowA =<< runEitherEff do
+            runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
+              parse parseString $ fromFoldable do
+                [ choizORF [[ leaf "a" ]], leaf "b" ]
 
       it "unexpected b" do
         liftEff do
