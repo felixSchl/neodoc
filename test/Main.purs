@@ -13,6 +13,7 @@ import Test.Spec.ForeignSpec (foreignSpec)
 import Test.Spec.SolveSpec (solveSpec)
 import Test.Spec.CompatSpec (compatSpec)
 import Test.Spec.ParserSpec (parserSpec)
+import Test.Spec.PatternParserSpec (patternParserSpec)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff (Eff())
 import Node.FS (FS())
@@ -37,6 +38,7 @@ main = launchAff do
   tests <- _liftEff $ readTests "testcases.docopt"
   liftEff $ run [specReporter] do
     parserSpec      unit
+    patternParserSpec  unit
     scannerSpec     unit
     usageParserSpec unit
     descParserSpec  unit
