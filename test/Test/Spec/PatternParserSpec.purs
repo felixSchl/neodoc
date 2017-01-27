@@ -117,6 +117,17 @@ patternParserSpec = \_ ->
               parse parseString $ fromFoldable do
                 [ leafR "b", leaf "a" ]
 
+    it "should choose the best match" do
+      liftEff do
+        expectA 5.0 (fromFoldable [ "a", "b", "c" ]) do
+          measureA \_-> runEitherEff do
+            runTestParser {} 0 0 (fromFoldable [ "a", "b", "c" ]) do
+              parse parseString $ fromFoldable do
+                [ choiz [
+                  [ leafO "a", leafO "b", leaf "c" ]
+                , [ leaf "a", leaf "b", leaf "c" ]
+                ] ]
+
     it "unexpected b" do
       liftEff do
         expectFailureA "Unexpected b" do

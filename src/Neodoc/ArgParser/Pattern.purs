@@ -6,9 +6,7 @@ import Data.Function (on)
 import Data.Foldable (for_)
 import Data.Optimize.Uncurried
 import Data.List hiding (many)
-import Data.Tuple (Tuple, fst)
 import Data.Bifunctor (rmap, lmap)
-import Data.Tuple.Nested ((/\), Tuple3)
 import Data.Newtype
 import Data.Generic
 import Data.String as String
@@ -26,7 +24,7 @@ import Neodoc.Parsing.Parser hiding (error)
 import Neodoc.Parsing.Parser.Combinators
 import Neodoc.Parsing.Parser.Combinators as Parser
 import Neodoc.Parsing.Parser as Parser
-import Neodoc.ArgParser.Evaluate (evalParsers')
+import Neodoc.ArgParser.Evaluate (chooseBest)
 
 data Pattern a = LeafPattern   IsOptional IsRepeatable IsFixed a
                | ChoicePattern IsOptional IsRepeatable IsFixed (List (List (Pattern a)))
@@ -119,18 +117,27 @@ choizOF xs = ChoicePattern true false true $ fromFoldable (fromFoldable <$> xs)
 choizORF :: ∀ a. Array (Array (Pattern a)) -> Pattern a
 choizORF xs = ChoicePattern true true true $ fromFoldable (fromFoldable <$> xs)
 
-type Result a u = Tuple (List a)
-                        (Tuple (List (Pattern u))
-                                HasMoved)
+type Depth = Int
+type Reps u = List (Pattern u)
+data Result a u = Result (List a) (Reps u) HasMoved Depth
+
+setReps :: ∀ a u. Reps u -> Result a u -> Result a u
+setReps r (Result a _ c d) = Result a r c d
+
+getValue :: ∀ a u. Result a u -> List a
+getValue (Result a _ _ _) = a
+
+getDepth :: ∀ a u. Result a u -> Int
+getDepth (Result _ _ _ d) = d
 
 parse
   :: ∀ i e c s g u a
-   . (Generic u, Show u, Show a, Pretty u, Pretty a, Pretty i)
+   . (Pretty i, Pretty u)
   => (u -> Parser e c s g (List i) a)
   -> List (Pattern u) -- input patterns
   -> Parser e c s g (List i) (List a)
 parse f pats = do
-  vs <- fst <$> parsePatterns 0 f true Nil pats
+  vs <- getValue <$> parsePatterns 0 f true Nil pats
   is <- getInput
   case is of
     Nil   -> Parser.return vs
@@ -140,14 +147,14 @@ indent :: Int -> String
 indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
 requireMovement p = do
-  a /\ b /\ hasMoved <- p
+  Result a b hasMoved d <- p
   if not hasMoved
      then Parser.fail "no movement ..."
-     else pure $ a /\ b
+     else Parser.return $ Result a b true d
 
 parsePatterns
   :: ∀ i e c s g u a
-   . (Generic u, Show u, Show a, Pretty u, Pretty a, Pretty i)
+   . (Pretty u)
   => Int
   -> (u -> Parser e c s g (List i) a)
   -> AllowOmissions   -- allow omissions?
@@ -157,26 +164,22 @@ parsePatterns
 parsePatterns l f allowOmit repPats pats =
   let xs = indexed pats
       f' allowOmit' reps pat = do
-        vs /\ reps' /\ hasMoved <- case pat of
-                LeafPattern _ r _ x -> do
-                  vs <- singleton <$> f x
-                  pure (vs /\ reps /\ true)
-                ChoicePattern _ _ _ xs ->
-                  let resetReps = rmap (lmap (const reps))
-                   in resetReps <$> do
-                        evalParsers'
-                          (const 1 {- TODO -})
-                          (const 0 {- TODO -})
-                          (const Nothing {- TODO -})
-                          (\_ _ -> pure unit {- TODO -})
-                          -- TODO: do we need to pass `reps` down?
-                          (parsePatterns (l + 1) f allowOmit' Nil <$> xs)
+        Result vs reps' hasMoved depth <- case pat of
+          LeafPattern _ r _ x -> do
+            vs <- singleton <$> f x
+            pure $ Result vs reps true 1
+          ChoicePattern _ _ _ xs ->
+            let resetReps = setReps reps
+              in resetReps <$> do
+                  chooseBest
+                    getDepth
+                    (parsePatterns (l + 1) f allowOmit' Nil <$> xs)
         let reps'' = if isRepeatable pat then pat : reps' else reps'
-        pure (vs /\ reps'' /\ hasMoved)
+        pure $ Result vs reps'' hasMoved depth
    in do
         -- 1. parse the pattern wholly
-        vs /\ rep /\ hasMoved <- go do
-          Args10 f' xs xs Nil false false false false repPats Nil
+        Result vs rep hasMoved depth <- go do
+          Args11 f' xs xs Nil false false false false repPats Nil 0
 
         -- 2. consume any trailing arguments using the repeating patterns we
         --    learned about so far.
@@ -184,12 +187,16 @@ parsePatterns l f allowOmit repPats pats =
         --          never substitute values during rep parsing.
         --    note: we ignore any newly learned reps at this point (TODO: is
         --          this correct?)
-        vs' <- parseRemainder rep ((fst <$> _) <<< f' false rep)
+        vs' <- parseRemainder rep ((getValue <$> _) <<< f' false rep)
 
-        pure $ (vs <> vs') /\ rep /\ (hasMoved || (not $ null vs'))
+        Parser.return $ Result  (vs <> vs')
+                                rep
+                                (hasMoved || (not $ null vs'))
+                                (depth + length vs')
+
   where
   go
-    :: Args10
+    :: Args11
         _                  -- the parser function on elements of `u`
         _                  -- the original input for given iteration
         _                  -- the patterns to match
@@ -200,24 +207,26 @@ parsePatterns l f allowOmit repPats pats =
         IsLocked           -- are we locked from processing any more fixed?
         (List (Pattern u)) -- repeatable patterns found so far
         (List a)           -- output values
+        Int                -- the depth of this parse
     ->  Parser e c s g (List i) (Result a u)
   -- Success!
-  go (Args10 _ _ Nil Nil _ _ hasMoved _ reps out) = do
-    Parser.return $ out /\ reps /\ hasMoved
+  go (Args11 _ _ Nil Nil _ _ hasMoved _ reps out depth) = do
+    Parser.return $ Result out reps hasMoved depth
 
-  -- Failure: try again, this time allow omissions
-  go (Args10 f' orig Nil (_:_) false true _ _ reps out) | allowOmit = do
-    go (Args10 f' orig orig Nil true true false false reps out)
+  -- Failure: try again, this time allow omissions (keep the accumulator)
+  go (Args11 f' orig Nil (_:_) false true _ _ reps out depth) | allowOmit = do
+    go (Args11 f' orig orig Nil true true false false reps out depth)
 
-  -- Failure: try again, this time allow repetitions
-  go (Args10 f' orig Nil (_:_) allowOmissions false _ _ reps out) = do
-    go (Args10 f' orig orig Nil allowOmissions true false false reps out)
+  -- Failure: try again, this time allow repetitions (keep the accumulator)
+  go (Args11 f' orig Nil (_:_) allowOmissions false _ _ reps out depth) = do
+    go (Args11 f' orig orig Nil allowOmissions true false false reps out depth)
 
   -- Failure: ...
-  go (Args10 f' _ Nil (carry@(((Indexed _ pat):_))) false true _ _ _ _) = do
+  go (Args11 f' _ Nil (carry@(((Indexed _ pat):_))) false true _ _ _ _ _) = do
+    -- TODO: use an error type to indicate depth at failure?
     Parser.fail $ "Expected " <> pretty pat
 
-  go (Args10 f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ reps out) = do
+  go (Args11 f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ reps out depth) = do
 
     -- at this point we rotated the entire input and tried to consume via
     -- repetitions, but w/o any luck. it's time for drastic measures by starting
@@ -230,23 +239,22 @@ parsePatterns l f allowOmit repPats pats =
           let sortedCarry = sortBy (compare `on` getIndex) carry
           case dropFirst (isOptional <<< getIndexedElem) sortedCarry of
             Just carry' -> (
-              go $ Args10 f' carry' carry' Nil false false false false reps out
+              go $ Args11 f' carry' carry' Nil false false false false reps out depth
               ) <|> (Parser.fail $ "Expected " <> pretty pat)
             Nothing -> Parser.fail $ "Expected " <> pretty pat
        else Parser.fail $ "Expected " <> pretty pat
 
   -- Step: ignore fixed patterns when locked
-  go (Args10 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out) | isFixed pat = do
-    go (Args10 f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out)
+  go (Args11 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out depth) | isFixed pat = do
+    go (Args11 f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out depth)
 
   -- Step: process next element
-  go (Args10 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out) = do
+  go (Args11 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out depth) = do
 
     -- 1. try parsing the pattern
     mR <- (if allowOmissions
-            then (Just <$> (Parser.try $ (\(a /\ b /\ _) ->
-                    a /\ b) <$> (f' true reps pat)))
-            else (Just <$> (Parser.try $ requireMovement (f' false reps pat)))
+            then (Just <$> (Parser.try $ f' true reps pat))
+            else (Just <$> (Parser.try $ requireMovement $ f' false reps pat))
           ) <|> (pure Nothing)
 
     case mR of
@@ -255,17 +263,19 @@ parsePatterns l f allowOmit repPats pats =
       -- the carry and add this pattern to the list of repeated patterns,
       -- (if this pattern allows for repetition). We also reset `allowReps` to
       -- to treat the rest of the pattern as fresh input.
-      Just (result /\ reps') -> do
+      Just (Result result reps' hasMoved depth') -> do
         -- before attempting to parse the next element, we try to eagerly parse
         -- adjacent matches of the same pattern.
         -- note: we do not check `allowReps` because we want adjacent
         --       repetitions to be done eagerly.
         vs' <- if isRepeatable pat
-                then parseRemainder (singleton pat) ((fst <$> _) <<< f' false reps)
+                then parseRemainder (singleton pat) do
+                      (getValue <$> _) <<< f' false reps
                 else pure Nil
         let orig' = sortBy (compare `on` getIndex) do
                       filter (not <<< (_ == ix) <<< getIndex) orig
-        go (Args10 f' orig' orig' Nil false false true isLocked reps' (out <> result <> vs'))
+            depth'' = depth + depth' + length vs'
+        go (Args11 f' orig' orig' Nil false false true isLocked reps' (out <> result <> vs') depth'')
 
       -- 2. if we did not manage to make a match, we will try to make a match
       --    using all previously matched, repeatable patterns, provided we are
@@ -281,10 +291,11 @@ parsePatterns l f allowOmit repPats pats =
           -- ok. we reset the input pattern completely, clear the carry and
           -- re-iterate using the new input. Again, we reset `allowReps` to
           -- `false` in order to treat the resulting input as a fresh pattern.
-          Just (result' /\ _) ->
+          Just (Result result' _ _ depth') ->
             let orig' = sortBy (compare `on` getIndex) do
                           filter (not <<< (_ == ix) <<< getIndex) orig
-             in go (Args10 f' orig' orig' Nil false false true isLocked reps (out <> result'))
+                depth'' = depth + depth'
+             in go (Args11 f' orig' orig' Nil false false true isLocked reps (out <> result') depth'')
 
           -- 3. if, at this point, we still did not manage to make a match, we
           --    rotate this pattern into the carry and give the next pattern a
@@ -293,7 +304,7 @@ parsePatterns l f allowOmit repPats pats =
             -- if this pattern is fixed in place we have to make sure not to
             -- place it in front of a previously failed fixed pattern, since
             -- fixed patterns must be parsed in consecutive order.
-            go (Args10 f' orig xs (x:carry) allowOmissions allowReps hasMoved (isFixed pat) reps out)
+            go (Args11 f' orig xs (x:carry) allowOmissions allowReps hasMoved (isFixed pat) reps out depth)
 
 {-
   drop the first matching element from the list and return the
@@ -317,4 +328,3 @@ parseRemainder repPats f = do
   where go p xs = do
           vs <- p <|> pure Nil
           if null vs then pure xs else go p (xs <> vs)
-

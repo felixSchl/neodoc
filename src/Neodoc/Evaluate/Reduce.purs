@@ -37,6 +37,7 @@ import Neodoc.Data.OptionArgument
 import Neodoc.Value.RichValue
 import Neodoc.ArgParser.KeyValue (KeyValue)
 import Neodoc.ArgParser.Arg
+import Neodoc.ArgParser.Arg as Arg
 import Neodoc.ArgKey (ArgKey(..))
 import Neodoc.ArgKey.Class (class ToArgKey, toArgKey)
 import Neodoc.Value
@@ -78,7 +79,7 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
       input = Map.fromFoldableWith (<>) $
                 rmap singleton <$>
                 lmap (Key <<< findArgKeys descriptions) <$>
-                reverse (lmap getArgKey <$> vs)
+                reverse (lmap Arg.getKey <$> vs)
 
       -- 3. fill the values for each key of the target map
       values = fillValues target input

@@ -3,20 +3,6 @@ module Neodoc.ArgParser.Type (
   Input
 , ArgParser
 , ArgParseError(..)
-, Cache
-, CachedStep
-
-, MatchCache
-, MatchCacheKey
-, CachedMatch
--- , cachedMatch
--- , withLocalCaches
-
-, ArgCache
-, ArgCacheKey
-, CachedArg
--- , cachedArg
-
 , unexpectedInputError
 , missingArgumentsError
 , optionTakesNoArgumentError
@@ -36,13 +22,6 @@ module Neodoc.ArgParser.Type (
 , findDescription
 , lookupDescription
 , lookupDescription'
-, hasTerminated
-, setDone
-, unsetDone
-, skipIf
-, setDepth
-, modifyDepth
-, setErrorAtDepth
 ) where
 
 import Prelude
@@ -86,7 +65,6 @@ import Neodoc.Error.Class (class ToNeodocError, toNeodocError)
 import Neodoc.OptionAlias (OptionAlias)
 import Neodoc.ArgParser.KeyValue (KeyValue)
 import Neodoc.ArgParser.Required (Required)
-import Neodoc.ArgParser.ParseLayout
 import Neodoc.Value (Value(..))
 import Neodoc.Parsing.Parser
 
@@ -189,39 +167,9 @@ type ParseConfig r = {
 , spec :: Spec SolvedLayout
 }
 
-type ArgParseState = {
-  depth :: Int             -- how many elements have been consumed?
-, hasTerminated :: Boolean -- have we terminated using `--` or `opts.stopAt`?
-}
+type ArgParseState = {}
 
-type GlobalArgParseState = {
-  deepestError :: Maybe (Tuple Int ArgParseError)
-, isKnownCache :: Map Token Boolean
-, matchCache   :: MatchCache
-, argCache     :: ArgCache
-}
-
-{- A general cache type -}
-type Cache k v = Map k (CachedStep v)
-data CachedStep v = CachedStep  Boolean
-                                Unit -- do not restore config
-                                ArgParseState
-                                Unit -- do not restore global state
-                                Input
-                                (Result ArgParseError v)
-
-{- A cache of matches -}
-type MatchCache = Cache MatchCacheKey CachedMatch
-type MatchCacheKey = Tuple (List Int) (Tuple Boolean (Tuple Boolean Input))
-type CachedMatch = Tuple (List KeyValue)
-                          (Tuple (List ArgParseLayout)
-                                  (Tuple Boolean
-                                          (Maybe ArgParseLayout)))
-
-{- A cache of parsed args -}
-type ArgCache = Cache ArgCacheKey CachedArg
-type ArgCacheKey = Tuple Int Input
-type CachedArg = Value
+type GlobalArgParseState = {}
 
 {- The arg parser type  -}
 type ArgParser r a =
@@ -248,29 +196,3 @@ lookupDescription alias = do
 lookupDescription' :: ∀ r. OptionAlias -> ArgParser r Description
 lookupDescription' a = fromMaybe default <$> lookupDescription a
   where default = OptionDescription (NonEmpty.singleton a) false Nothing Nothing Nothing
-
-hasTerminated :: ∀ r. ArgParser r Boolean
-hasTerminated = _.hasTerminated <$> getState
-
-unsetDone :: ∀ r. ArgParser r Unit
-unsetDone = modifyState \s -> s { hasTerminated = false }
-
-setDone :: ∀ r. ArgParser r Unit
-setDone = modifyState \s -> s { hasTerminated = true }
-
-skipIf :: ∀ r a. ArgParser r Boolean -> a -> ArgParser r a -> ArgParser r a
-skipIf a b c = a >>= if _ then pure b else c
-
-modifyDepth :: ∀ r. (Int -> Int) -> ArgParser r Unit
-modifyDepth f = modifyState \s -> s { depth = f s.depth }
-
-setDepth :: ∀ r. Int -> ArgParser r Unit
-setDepth = modifyDepth <<< const
-
-setErrorAtDepth :: ∀ r. Int -> ArgParseError -> ArgParser r Unit
-setErrorAtDepth d e = do
-  { deepestError } <- getGlobalState
-  case deepestError of
-    Just (d' /\ _) | d > d' -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
-    Nothing -> modifyGlobalState \s -> s { deepestError = Just (d /\ e) }
-    _ -> pure unit
