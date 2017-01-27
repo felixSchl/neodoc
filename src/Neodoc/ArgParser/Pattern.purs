@@ -4,6 +4,7 @@ import Prelude
 import Debug.Trace
 import Data.Function (on)
 import Data.Foldable (for_)
+import Data.Optimize.Uncurried
 import Data.List hiding (many)
 import Data.Tuple (Tuple, fst)
 import Data.Bifunctor (rmap, lmap)
@@ -174,7 +175,8 @@ parsePatterns l f allowOmit repPats pats =
         pure (vs /\ reps'' /\ hasMoved)
    in do
         -- 1. parse the pattern wholly
-        vs /\ rep /\ hasMoved <- go f' xs xs Nil false false false false repPats Nil
+        vs /\ rep /\ hasMoved <- go do
+          Args10 f' xs xs Nil false false false false repPats Nil
 
         -- 2. consume any trailing arguments using the repeating patterns we
         --    learned about so far.
@@ -187,59 +189,66 @@ parsePatterns l f allowOmit repPats pats =
         pure $ (vs <> vs') /\ rep /\ (hasMoved || (not $ null vs'))
   where
   go
-    :: _                  -- the parser function on elements of `u`
-    -> _                  -- the original input for given iteration
-    -> _                  -- the patterns to match
-    -> _                  -- the carry
-    -> AllowOmissions     -- allow omissions?
-    -> AllowRepetitions   -- allow repetitions?
-    -> HasMoved           -- have we consumed any input this far?
-    -> IsLocked           -- are we locked from processing any more fixed?
-    -> List (Pattern u)   -- repeatable patterns found so far
-    -> List a             -- output values
-    -> Parser e c s g (List i) (Result a u)
+    :: Args10
+        _                  -- the parser function on elements of `u`
+        _                  -- the original input for given iteration
+        _                  -- the patterns to match
+        _                  -- the carry
+        AllowOmissions     -- allow omissions?
+        AllowRepetitions   -- allow repetitions?
+        HasMoved           -- have we consumed any input this far?
+        IsLocked           -- are we locked from processing any more fixed?
+        (List (Pattern u)) -- repeatable patterns found so far
+        (List a)           -- output values
+    ->  Parser e c s g (List i) (Result a u)
   -- Success!
-  go _ _ Nil Nil _ _ hasMoved _ reps out = do
+  go (Args10 _ _ Nil Nil _ _ hasMoved _ reps out) = do
     Parser.return $ out /\ reps /\ hasMoved
 
-  -- Failure: we used repetition and omission to no effect
-  go f' _ Nil ((Indexed _ pat):_) tryingOmissions true true _ _ _ | tryingOmissions || not allowOmit = do
-    Parser.fail $ "Expected " <> pretty pat
+  -- Failure: try again, this time allow omissions
+  go (Args10 f' orig Nil (_:_) false true _ _ reps out) | allowOmit = do
+    go (Args10 f' orig orig Nil true true false false reps out)
 
   -- Failure: try again, this time allow repetitions
-  go f' orig Nil (_:_) allowOmissions false _ _ reps out = do
-    go f' orig orig Nil allowOmissions true false false reps out
+  go (Args10 f' orig Nil (_:_) allowOmissions false _ _ reps out) = do
+    go (Args10 f' orig orig Nil allowOmissions true false false reps out)
 
-  -- Failure: try again, this time start dropping
-  go f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ _ _ = do
+  -- Failure: ...
+  go (Args10 f' _ Nil (carry@(((Indexed _ pat):_))) false true _ _ _ _) = do
     Parser.fail $ "Expected " <> pretty pat
 
-  go f' _ Nil (carry@(((Indexed _ pat):_))) false true _ _ reps out | allowOmit = do
+  go (Args10 f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ reps out) = do
+
     -- at this point we rotated the entire input and tried to consume via
     -- repetitions, but w/o any luck. it's time for drastic measures by starting
     -- to remove optional elements, ony be one.
 
     -- TODO: this might need more logic as to which element we throw out first
     --       the current approach is simply removes from left to right.
-    let sortedCarry = sortBy (compare `on` getIndex) carry
-
-    case dropFirst (isOptional <<< getIndexedElem) sortedCarry of
-      Just carry' -> go f' carry' carry' Nil false false false false reps out <|> do
-                        Parser.fail $ "Expected " <> pretty pat
-      Nothing -> Parser.fail $ "Expected " <> pretty pat
-
-  go f' _ Nil (carry@(((Indexed _ pat):_))) false true _ _ _ _ = do
-    Parser.fail $ "Expected " <> pretty pat
+    if allowOmit
+       then do
+          let sortedCarry = sortBy (compare `on` getIndex) carry
+          case dropFirst (isOptional <<< getIndexedElem) sortedCarry of
+            Just carry' -> (
+              go $ Args10 f' carry' carry' Nil false false false false reps out
+              ) <|> (Parser.fail $ "Expected " <> pretty pat)
+            Nothing -> Parser.fail $ "Expected " <> pretty pat
+       else Parser.fail $ "Expected " <> pretty pat
 
   -- Step: ignore fixed patterns when locked
-  go f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out | isFixed pat = do
-    go f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out
+  go (Args10 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out) | isFixed pat = do
+    go (Args10 f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out)
 
   -- Step: process next element
-  go f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out = do
+  go (Args10 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out) = do
 
     -- 1. try parsing the pattern
-    mR <- (Just <$> (Parser.try $ requireMovement (f' allowOmissions reps pat))) <|> (pure Nothing)
+    mR <- (if allowOmissions
+            then (Just <$> (Parser.try $ (\(a /\ b /\ _) ->
+                    a /\ b) <$> (f' true reps pat)))
+            else (Just <$> (Parser.try $ requireMovement (f' false reps pat)))
+          ) <|> (pure Nothing)
+
     case mR of
       -- if we have a result, and the result consumed input, we're looking
       -- good. we reset the input pattern bar the matched element, clear
@@ -256,7 +265,7 @@ parsePatterns l f allowOmit repPats pats =
                 else pure Nil
         let orig' = sortBy (compare `on` getIndex) do
                       filter (not <<< (_ == ix) <<< getIndex) orig
-        go f' orig' orig' Nil false false true isLocked reps' (out <> result <> vs')
+        go (Args10 f' orig' orig' Nil false false true isLocked reps' (out <> result <> vs'))
 
       -- 2. if we did not manage to make a match, we will try to make a match
       --    using all previously matched, repeatable patterns, provided we are
@@ -275,7 +284,7 @@ parsePatterns l f allowOmit repPats pats =
           Just (result' /\ _) ->
             let orig' = sortBy (compare `on` getIndex) do
                           filter (not <<< (_ == ix) <<< getIndex) orig
-             in go f' orig' orig' Nil false false true isLocked reps (out <> result')
+             in go (Args10 f' orig' orig' Nil false false true isLocked reps (out <> result'))
 
           -- 3. if, at this point, we still did not manage to make a match, we
           --    rotate this pattern into the carry and give the next pattern a
@@ -284,7 +293,7 @@ parsePatterns l f allowOmit repPats pats =
             -- if this pattern is fixed in place we have to make sure not to
             -- place it in front of a previously failed fixed pattern, since
             -- fixed patterns must be parsed in consecutive order.
-            go f' orig xs (x:carry) allowOmissions allowReps hasMoved (isFixed pat) reps out
+            go (Args10 f' orig xs (x:carry) allowOmissions allowReps hasMoved (isFixed pat) reps out)
 
 {-
   drop the first matching element from the list and return the

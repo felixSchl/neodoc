@@ -93,6 +93,14 @@ patternParserSpec = \_ ->
               parse parseString $ fromFoldable do
                 [ choizO [[ leafO "c" ]], leaf "b", leaf "a" ]
 
+    it "omits gracefully in subgroups" do
+      liftEff do
+        expectA 15.0 (fromFoldable [ "a", "b", "c" ]) do
+          measureA \_ -> runEitherEff do
+            runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
+              parse parseString $ fromFoldable do
+                [ choizO [[ leafO "c", leafO "d" ]], leaf "b", leaf "a" ]
+
     it "should exhaust the patterns" do
       liftEff do
         expectA 5.0 (fromFoldable [ "b", "b", "b", "a", "b"]) do
