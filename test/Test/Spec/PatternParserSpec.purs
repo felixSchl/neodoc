@@ -64,12 +64,16 @@ expectA eT eR m = do
           (t <= eT)
 
 expectFailureA
-  :: String
-  -> Either String _
+  :: ∀ a
+   . (Pretty a)
+  => String
+  -> Either String a
   -> Eff _ Unit
 expectFailureA eMsg (Left msg) | eMsg == msg = pure unit
-expectFailureA _ (Left msg) = throwException $ error $ "Bad exception message: " <> show msg
-expectFailureA _ (Right _) = throwException $ error $ "Missing failure"
+expectFailureA eMsg (Left msg) = throwException $ error do
+  "Bad exception message: " <> show msg <> " (as opposed to: " <> show eMsg <> ")"
+expectFailureA _ (Right r) = throwException $ error do
+  "Missing failure, got: " <> pretty r
 
 patternParserSpec = \_ ->
   describe "parse patterns" do
@@ -80,6 +84,14 @@ patternParserSpec = \_ ->
           runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
             parse parseString $ fromFoldable do
               [ leafF "c", leafF "b", leafF "a" ]
+
+    it "omits gracefully" do
+      liftEff do
+        expectA 10.0 (fromFoldable [ "a", "b", "c" ]) do
+          measureA \_ -> runEitherEff do
+            runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
+              parse parseString $ fromFoldable do
+                [ choizO [[ leafO "c" ]], leaf "b", leaf "a" ]
 
     it "should exhaust the patterns" do
       liftEff do
@@ -176,10 +188,9 @@ patternParserSpec = \_ ->
       , s choizR   leaf /\ reverse /\ y /\ "all repeatable choices"
       , s choizOR  leaf /\ reverse /\ y /\ "all optional & repeatable choices"
 
-        -- TODO: these can cause stack 
-      -- , s choiz    leafORF /\ reverse /\ y /\ "all choices (with fixed & optional & repeateable single leaf)"
-      -- , s choizO   leafORF /\ reverse /\ y /\ "all optional choices (with fixed & optional & repeateable single leaf)"
-      -- , s choizR   leafORF /\ reverse /\ y /\ "all repeatable choices (with fixed & optional & repeateable single leaf)"
+      , s choiz    leafORF /\ reverse /\ y /\ "all choices (with fixed & optional & repeateable single leaf)"
+      , s choizO   leafORF /\ reverse /\ y /\ "all optional choices (with fixed & optional & repeateable single leaf)"
+      , s choizR   leafORF /\ reverse /\ y /\ "all repeatable choices (with fixed & optional & repeateable single leaf)"
       , s choizOR  leafORF /\ reverse /\ y /\ "all optional & repeatable choices (with fixed & optional & repeateable single leaf)"
 
       , s choizF   leaf /\ reverse /\ n "Expected C!(L*(z)*)!"    /\ "all (reversed) fixed choices"
