@@ -29,9 +29,8 @@ run
   -> Either ArgParseError ArgParseResult
 run spec opts env input = do
   toks <- runLexer $ Lexer.lex (fromFoldable input) opts
-  Left (GenericError "NOT IMPLEMENTED")
-  -- runParser $ parse spec opts env toks
+  runParser $ parse spec opts env toks
 
   where
   runLexer = lmap malformedInputError
-  -- runParser = lmap (extractError genericError)
+  runParser = lmap (extractError genericError)

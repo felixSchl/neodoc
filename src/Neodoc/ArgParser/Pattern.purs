@@ -3,7 +3,10 @@ module Neodoc.ArgParser.Pattern where
 import Prelude
 import Debug.Trace
 import Data.Function (on)
+import Data.Tuple
+import Data.Tuple.Nested
 import Data.Foldable (for_)
+import Data.NonEmpty ((:|), NonEmpty)
 import Data.Optimize.Uncurried
 import Data.List hiding (many)
 import Data.Bifunctor (rmap, lmap)
@@ -40,6 +43,10 @@ type AllowOmissions = Boolean
 derive instance genericPattern :: (Generic a) => Generic (Pattern a)
 instance showPattern :: (Generic a, Show a) => Show (Pattern a) where
   show = gShow
+
+instance functorPattern :: Functor Pattern where
+  map f (ChoicePattern o r fix xs) = ChoicePattern o r fix $ ((f <$> _) <$> _) <$> xs
+  map f (LeafPattern o r fix x) = LeafPattern o r fix (f x)
 
 instance prettyPattern :: (Pretty a) => Pretty (Pattern a) where
   pretty (LeafPattern o r f a) = "L"
@@ -121,6 +128,10 @@ type Depth = Int
 type Reps u = List (Pattern u)
 data Result a u = Result (List a) (Reps u) HasMoved Depth
 
+type IsFatal = Boolean
+type PatternMatch i e a = Either (Tuple IsFatal e) (Tuple a (List i))
+type Matcher u i a e = u -> List i -> AllowOmissions -> PatternMatch i e a
+
 setReps :: ∀ a u. Reps u -> Result a u -> Result a u
 setReps r (Result a _ c d) = Result a r c d
 
@@ -130,14 +141,33 @@ getValue (Result a _ _ _) = a
 getDepth :: ∀ a u. Result a u -> Int
 getDepth (Result _ _ _ d) = d
 
+{-
+  XXX explain me
+-}
+match
+  :: ∀ i e c s g u a
+   . (Pretty u)
+  => Matcher u i a e
+  -> AllowOmissions
+  -> u
+  -> Parser e c s g (List i) a
+match f allowOmissions p = Parser \a ->
+  let result = f p (getI a) allowOmissions
+   in case result of
+        Left (isFatal /\ e) -> Step false a $ Left $ ParseError isFatal (Right e)
+        Right (r /\ i) -> Step true (Parser.setI i a) (Right r)
+
+{-
+  XXX explain me
+-}
 parse
   :: ∀ i e c s g u a
-   . (Pretty i, Pretty u)
-  => (u -> Parser e c s g (List i) a)
+   . (Pretty i, Pretty u, Pretty a)
+  => Matcher u i a e
   -> List (Pattern u) -- input patterns
   -> Parser e c s g (List i) (List a)
 parse f pats = do
-  vs <- getValue <$> parsePatterns 0 f true Nil pats
+  vs <- getValue <$> parsePatterns 0 (match f) true Nil pats
   is <- getInput
   case is of
     Nil   -> Parser.return vs
@@ -146,17 +176,23 @@ parse f pats = do
 indent :: Int -> String
 indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
 
+{-
+  XXX explain me
+-}
 requireMovement p = do
   Result a b hasMoved d <- p
   if not hasMoved
      then Parser.fail "no movement ..."
      else Parser.return $ Result a b true d
 
+{-
+  XXX explain me
+-}
 parsePatterns
   :: ∀ i e c s g u a
-   . (Pretty u)
+   . (Pretty u, Pretty a)
   => Int
-  -> (u -> Parser e c s g (List i) a)
+  -> (AllowOmissions -> u -> Parser e c s g (List i) a)
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
@@ -165,8 +201,8 @@ parsePatterns l f allowOmit repPats pats =
   let xs = indexed pats
       f' allowOmit' reps pat = do
         Result vs reps' hasMoved depth <- case pat of
-          LeafPattern _ r _ x -> do
-            vs <- singleton <$> f x
+          LeafPattern o r _ x -> do
+            vs <- singleton <$> f (o && allowOmit') x
             pure $ Result vs reps true 1
           ChoicePattern _ _ _ xs ->
             let resetReps = setReps reps
@@ -174,6 +210,7 @@ parsePatterns l f allowOmit repPats pats =
                   chooseBest
                     getDepth
                     (parsePatterns (l + 1) f allowOmit' Nil <$> xs)
+        traceA $ pretty (vs /\ hasMoved /\ reps)
         let reps'' = if isRepeatable pat then pat : reps' else reps'
         pure $ Result vs reps'' hasMoved depth
    in do
@@ -235,9 +272,9 @@ parsePatterns l f allowOmit repPats pats =
     -- TODO: this might need more logic as to which element we throw out first
     --       the current approach is simply removes from left to right.
     if allowOmit
-       then do
+       then
           let sortedCarry = sortBy (compare `on` getIndex) carry
-          case dropFirst (isOptional <<< getIndexedElem) sortedCarry of
+           in case dropFirst (isOptional <<< getIndexedElem) sortedCarry of
             Just carry' -> (
               go $ Args11 f' carry' carry' Nil false false false false reps out depth
               ) <|> (Parser.fail $ "Expected " <> pretty pat)

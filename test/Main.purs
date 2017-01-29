@@ -35,14 +35,14 @@ main :: Eff ( err     :: EXCEPTION
             | _
             ) _
 main = launchAff do
-  tests <- _liftEff $ readTests "testcases.docopt"
+  -- tests <- _liftEff $ readTests "testcases.docopt"
   liftEff $ run [specReporter] do
-    parserSpec      unit
-    patternParserSpec  unit
-    scannerSpec     unit
-    usageParserSpec unit
-    descParserSpec  unit
-    solveSpec       unit
-    argParserSpec   unit
-    foreignSpec     tests
-    compatSpec      tests
+    -- parserSpec        unit
+    patternParserSpec unit
+    -- scannerSpec       unit
+    -- usageParserSpec   unit
+    -- descParserSpec    unit
+    -- solveSpec         unit
+    -- argParserSpec     unit
+    -- foreignSpec       tests
+    -- compatSpec        tests

@@ -4,6 +4,7 @@ import Prelude
 import Debug.Trace
 import Debug.Profile
 import Data.Function
+import Data.NonEmpty (NonEmpty, (:|))
 import Data.Foldable (for_)
 import Data.List hiding (many)
 import Data.Tuple (Tuple, fst)
@@ -12,8 +13,8 @@ import Data.Tuple.Nested ((/\), Tuple3)
 import Data.Newtype
 import Data.Generic
 import Data.String as String
-import Data.Pretty
 import Data.Maybe
+import Data.Pretty
 import Data.Array as A
 import Data.List.Lazy (replicateM)
 import Data.List.Lazy as LL
@@ -31,24 +32,27 @@ import Neodoc.Parsing.Parser.Combinators
 import Neodoc.Parsing.Parser.Combinators as Parser
 import Neodoc.Parsing.Parser as Parser
 import Neodoc.ArgParser.Pattern
+import Neodoc.ArgParser.Pattern as Pattern
 
 import Test.Assert (assert')
 import Test.Spec (describe, describeOnly, it, itOnly)
+import Test.Spec as Test
 import Test.Support
 
 type TestError = String
 type TestParser i a = Parser TestError {} Int Int i a
 
-runTestParser :: _ -> _ -> _ -> _ -> TestParser _ _ -> Either String _
+runTestParser :: _ -> _ -> _ -> List _ -> TestParser _ _ -> Either String (List String)
 runTestParser a b c d x = lmap pretty $ runParser a b c d x
 
-parseString x = Parser \a ->
-  let _return = \i r -> Step true (setI i a) r
-      _fail m = Step false a (Left $ ParseError false (Left m))
-   in case getI a of
-        s : ss | s == x -> _return ss (Right x)
-        s : _ -> _fail $ "expected " <> x <> ", but got: " <> s
-        _ -> _fail $ "expected " <> x
+match
+  :: String
+  -> List String
+  -> AllowOmissions
+  -> PatternMatch String String String
+match s (i:is) _ | i == s = Right $ s /\ is
+match s is true = Right $ ("<sub: " <> show s <> ">") /\ is
+match s _ _ = Left $ false /\ ("Expected " <> show s)
 
 expectA
   :: ∀ r
@@ -75,38 +79,45 @@ expectFailureA eMsg (Left msg) = throwException $ error do
 expectFailureA _ (Right r) = throwException $ error do
   "Missing failure, got: " <> pretty r
 
+patternParserSpec :: Unit -> Test.Spec _ _
 patternParserSpec = \_ ->
   describe "parse patterns" do
 
-    it "Expect" do
+    it "should handle substitutions" do
       liftEff do
-        expectFailureA "Expected L!(c)!" do
-          runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
-            parse parseString $ fromFoldable do
-              [ leafF "c", leafF "b", leafF "a" ]
+        expectFailureA "Expected L!(b)!" do
+          runTestParser {} 0 0 (fromFoldable [ ]) do
+            Pattern.parse match $ fromFoldable do
+              [ choiz [[ leafOF "c", leafF "b", leafOF "a" ]] ]
+
+        expectA 10.0 (fromFoldable [ "<sub: \"c\">", "b", "<sub: \"a\">" ]) do
+          measureA \_ -> runEitherEff do
+            runTestParser {} 0 0 (fromFoldable [ "b" ]) do
+              Pattern.parse match $ fromFoldable do
+                [ choiz [[ leafOF "c", leafF "b", leafOF "a" ]] ]
 
     it "omits gracefully" do
       liftEff do
         expectA 10.0 (fromFoldable [ "a", "b", "c" ]) do
           measureA \_ -> runEitherEff do
             runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
-              parse parseString $ fromFoldable do
+              Pattern.parse match $ fromFoldable do
                 [ choizO [[ leafO "c" ]], leaf "b", leaf "a" ]
 
     it "omits gracefully in subgroups" do
       liftEff do
-        expectA 15.0 (fromFoldable [ "a", "b", "c" ]) do
+        expectA 15.0 (fromFoldable [ "a", "b", "c", "<sub: \"d\">" ]) do
           measureA \_ -> runEitherEff do
             runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
-              parse parseString $ fromFoldable do
+              Pattern.parse match $ fromFoldable do
                 [ choizO [[ leafO "c", leafO "d" ]], leaf "b", leaf "a" ]
 
     it "omits gracefully in subgroups" do
       liftEff do
-        expectA 15.0 (fromFoldable [ "a", "b", "c" ]) do
+        expectA 15.0 (fromFoldable [ "a", "b", "c", "<sub: \"d\">" ]) do
           measureA \_ -> runEitherEff do
             runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
-              parse parseString $ fromFoldable do
+              Pattern.parse match $ fromFoldable do
                 [ choizO [[ leafO "c", leafO "d" ]], leaf "b", leaf "a" ]
 
     it "should exhaust the patterns" do
@@ -114,7 +125,7 @@ patternParserSpec = \_ ->
         expectA 5.0 (fromFoldable [ "b", "b", "b", "a", "b"]) do
           measureA \_-> runEitherEff do
             runTestParser {} 0 0 (fromFoldable [ "b", "b", "b", "a", "b" ]) do
-              parse parseString $ fromFoldable do
+              Pattern.parse match $ fromFoldable do
                 [ leafR "b", leaf "a" ]
 
     it "should choose the best match" do
@@ -122,7 +133,7 @@ patternParserSpec = \_ ->
         expectA 5.0 (fromFoldable [ "a", "b", "c" ]) do
           measureA \_-> runEitherEff do
             runTestParser {} 0 0 (fromFoldable [ "a", "b", "c" ]) do
-              parse parseString $ fromFoldable do
+              Pattern.parse match $ fromFoldable do
                 [ choiz [
                   [ leafO "a", leafO "b", leaf "c" ]
                 , [ leaf "a", leaf "b", leaf "c" ]
@@ -132,7 +143,7 @@ patternParserSpec = \_ ->
       liftEff do
         expectFailureA "Unexpected b" do
           runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
-            parse parseString $ fromFoldable do
+            Pattern.parse match $ fromFoldable do
               [ choizORF [[ leaf "a" ]], leaf "b" ]
 
     it "should respect fixed, repeatable, optional choices" do
@@ -148,7 +159,7 @@ patternParserSpec = \_ ->
               "b", "a", "c", "b", "a",
               "b", "a", "c", "b", "a"
               ]) do
-              parse parseString $ fromFoldable do
+              Pattern.parse match $ fromFoldable do
                 [ choizORF [[ leaf "a", leaf "b" ]], leafR "c" ]
 
     it "should respect fixed optionals" do
@@ -158,7 +169,7 @@ patternParserSpec = \_ ->
         -- trailing input "b ..."
         expectFailureA "Unexpected b" do
           runTestParser {} 0 0 (fromFoldable [ "c", "b", "a" ]) do
-            parse parseString $ fromFoldable do
+            Pattern.parse match $ fromFoldable do
               [ leafOF "a", leafOF "b", leafOF "c" ]
 
     it "should respect fixed, repeatable, optional choices" do
@@ -166,7 +177,7 @@ patternParserSpec = \_ ->
         expectA 5.0 (fromFoldable [ "c" ]) do
           measureA \_-> runEitherEff do
             runTestParser {} 0 0 (fromFoldable [ "c" ]) do
-              parse parseString $ fromFoldable do
+              Pattern.parse match $ fromFoldable do
                 [ choizORF [[ leaf "a", leaf "b" ]], leafR "c" ]
 
     describe "the abcs" do
@@ -234,12 +245,12 @@ patternParserSpec = \_ ->
             Left exErrmsg ->
               expectFailureA exErrmsg do
                 runTestParser {} 0 0 abc do
-                  parse parseString $ fromFoldable do
+                  Pattern.parse match $ fromFoldable do
                     f <$> mod abc
             Right exResult ->
               expectA 75.0 exResult do
                 measureA \_-> runEitherEff do
                   runTestParser {} 0 0 abc do
-                    parse parseString $ fromFoldable do
+                    Pattern.parse match $ fromFoldable do
                       f <$> mod abc
 
