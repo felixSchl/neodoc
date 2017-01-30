@@ -253,4 +253,3 @@ patternParserSpec = \_ ->
                   runTestParser {} 0 0 abc do
                     Pattern.parse match $ fromFoldable do
                       f <$> mod abc
-

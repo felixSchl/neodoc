@@ -91,12 +91,12 @@ match arg is allowOmissions =
     go Stdin ((PositionedToken Tok.Stdin _ _):is)
       = return is $ BoolValue true
 
-    go (Option a@(OA.Long n) mA _) ((PositionedToken (Tok.LOpt n' mA') _ _):is)
+    go (arg@(Option a@(OA.Long n) mA _)) ((PositionedToken (Tok.LOpt n' mA') _ _):is)
       | String.startsWith n' n
       = case mA /\ mA' of
-          Nothing /\ Just _ ->
+          Nothing /\ Just _ | n == n' ->
             fatal $ "Option does not take arguments: " <> pretty a
-          Nothing /\ Nothing -> return is $ BoolValue true
+          Nothing /\ Nothing | n == n' -> return is $ BoolValue true
           Just (OptionArgument _ o) /\ _ ->
             let explicit = do
                   guard $ n' == n
@@ -115,6 +115,9 @@ match arg is allowOmissions =
                     fatal $ "Option requires argument: " <> pretty a
                   Nothing -> return is $ BoolValue true
                   Just (v /\ is) -> return is v
+          _ -> expected arg
+
+    {- TODO: implement short options matcher -}
 
     go arg _ = expected arg
 

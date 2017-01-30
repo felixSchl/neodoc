@@ -156,14 +156,15 @@ match
    . (Pretty u)
   => Matcher u i a e
   -> AllowOmissions
+  -> Depth
   -> u
   -> Parser (Error e) c s g (List i) a
-match f allowOmissions p = Parser \a ->
+match f allowOmissions depth p = Parser \a ->
   let result = f p (getI a) allowOmissions
    in case result of
         Right (r /\ i) -> Step true (Parser.setI i a) (Right r)
         Left (isFatal /\ e) ->
-          let error = Error (Right e) 0 {- TODO: inject depth -}
+          let error = Error (Right e) depth
            in Step false a $ Left $ ParseError isFatal (Right error)
 
 {-
@@ -239,7 +240,7 @@ parsePatterns
   :: ∀ i e c s g u a
    . (Pretty i, Pretty u, Pretty a, Show e)
   => Int
-  -> (AllowOmissions -> u -> Parser (Error e) c s g (List i) a)
+  -> (AllowOmissions -> Depth -> u -> Parser (Error e) c s g (List i) a)
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
@@ -249,7 +250,7 @@ parsePatterns l f allowOmit repPats pats =
       f' allowOmit' depth reps pat = do
         Result vs reps' hasMoved depth <- case pat of
           LeafPattern o r _ x -> do
-            vs <- singleton <$> f (o && allowOmit') x
+            vs <- singleton <$> f (o && allowOmit') depth x
             pure $ Result vs reps true depth
           ChoicePattern o _ _ xs ->
             let resetReps = setReps reps
@@ -409,7 +410,9 @@ parsePatterns l f allowOmit repPats pats =
             -- the currently tracked error.
             let mE'' = case mE /\ mE' of
                   Nothing /\ Just (ParseError _ (Right e)) -> Just e
-                  Just (Error _ d) /\ Just (ParseError _ (Right (e'@(Error _ d')))) | d' >= d -> Just e'
+                  Just (Error _ d) /\ Just (ParseError _ (Right (Error e' d')))
+                    | (d' + depth) >= d
+                    -> Just (Error e' (d' + depth))
                   _ /\ _ -> mE
 
             go (Args12 f' orig xs (x:carry) allowOmissions allowReps hasMoved (isFixed pat) reps out depth mE'')
