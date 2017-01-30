@@ -126,11 +126,28 @@ choizORF xs = ChoicePattern true true true $ fromFoldable (fromFoldable <$> xs)
 
 type Depth = Int
 type Reps u = List (Pattern u)
-data Error e = Error (Either String e) Depth
+
+data Error e i u = Error (Either (PatternError i u) e) Depth
+
+data PatternError i u
+  = GenericError String
+  | UnexpectedInputError (NonEmpty List i)
+  | MissingPatternError (Pattern u)
+
 data Result a u = Result (List a) (Reps u) HasMoved Depth
 
-instance showError :: (Show e) => Show (Error e) where
+instance showError :: (Generic u, Show e, Show i, Show u) => Show (Error e i u) where
   show (Error x d) = "(Error " <> show x <> " " <> show d <> ")"
+
+instance showPatternError :: (Generic u, Show i, Show u) => Show (PatternError i u) where
+  show (GenericError x) = "(GenericError " <> show x <> ")"
+  show (UnexpectedInputError x) = "(UnexpectedInputError " <> show x <> ")"
+  show (MissingPatternError x) = "(MissingPatternError " <> show x <> ")"
+
+instance prettyPatternError :: (Pretty i, Pretty u) => Pretty (PatternError i u) where
+  pretty (GenericError s) = s
+  pretty (UnexpectedInputError (s:|_)) = "Unexpected " <> pretty s
+  pretty (MissingPatternError p) = "Missing " <> pretty p
 
 type IsFatal = Boolean
 type PatternMatch i e a = Either (Tuple IsFatal e) (Tuple a (List i))
@@ -145,7 +162,7 @@ getValue (Result a _ _ _) = a
 getSuccessDepth :: ∀ a u. Result a u -> Int
 getSuccessDepth (Result _ _ _ d) = d
 
-getErrorDepth :: ∀ e. Error e -> Int
+getErrorDepth :: ∀ e i u. Error e i u -> Int
 getErrorDepth (Error _ d) = d
 
 {-
@@ -158,7 +175,7 @@ match
   -> AllowOmissions
   -> Depth
   -> u
-  -> Parser (Error e) c s g (List i) a
+  -> Parser (Error e i u) c s g (List i) a
 match f allowOmissions depth p = Parser \a ->
   let result = f p (getI a) allowOmissions
    in case result of
@@ -172,24 +189,25 @@ match f allowOmissions depth p = Parser \a ->
   error type e.
 -}
 lowerError
-  :: ∀ e c s g i a
-   . Parser (Error e) c s g i a
-  -> Parser e c s g i a
-lowerError p = Parser \a ->
+  :: ∀ e c s g i a u
+   . (PatternError i u -> e)
+  -> Parser (Error e i u) c s g (List i) a
+  -> Parser e c s g (List i) a
+lowerError fE p = Parser \a ->
   let step = unParser p a
    in case step of
-        Step c i (Left (ParseError fatal (Right (Error (Left s) _)))) ->
-          Step c i (Left (ParseError fatal (Left s)))
+        Step c i (Left (ParseError fatal (Right (Error (Left pE) _)))) ->
+          Step c i (Left (ParseError fatal (Right (fE pE))))
         Step c i (Left (ParseError fatal (Right (Error (Right e) _)))) ->
           Step c i (Left (ParseError fatal (Right e)))
         Step c i (Left (ParseError fatal (Left e))) ->
           Step c i (Left (ParseError fatal (Left e)))
         Step c i (Right r) -> Step c i (Right r)
 
-errorAt :: ∀ e. Int -> String -> Error e
-errorAt d s = Error (Left s) d
+errorAt :: ∀ e i u. Int -> PatternError i u -> Error e i u
+errorAt d e = Error (Left e) d
 
-errorAt' :: ∀ e. Int -> e -> Error e
+errorAt' :: ∀ e i u. Int -> e -> Error e i u
 errorAt' d e = Error (Right e) d
 
 {-
@@ -199,16 +217,16 @@ parse
   :: ∀ i e c s g u a
    . (Pretty i, Pretty u, Pretty a, Show e)
   => Matcher u i a e
+  -> (PatternError i u -> e)
   -> List (Pattern u) -- input patterns
   -> Parser e c s g (List i) (List a)
-parse f pats = do
-  vs <- getValue <$> do
-          lowerError do
-            parsePatterns 0 (match f) true Nil pats
-  is <- getInput
-  case is of
-    Nil   -> Parser.return vs
-    i : _ -> Parser.fail $ "Unexpected " <> pretty i
+parse f fE pats = do
+  lowerError fE do
+    Result vs _ _ depth <- parsePatterns 0 (match f) true Nil pats
+    is <- getInput
+    case is of
+      Nil  -> Parser.return vs
+      i:is -> Parser.fail' $ errorAt depth $ UnexpectedInputError (i :| is)
 
 indent :: Int -> String
 indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
@@ -221,8 +239,8 @@ expected
    . (Pretty u)
   => Int
   -> Pattern u
-  -> Parser (Error e) c s g i a
-expected depth pat = Parser.fail' $ errorAt depth ("Expected " <> pretty pat)
+  -> Parser (Error e i u) c s g (List i) a
+expected depth pat = Parser.fail' $ errorAt depth (MissingPatternError pat)
 
 {-
   XXX explain me
@@ -240,11 +258,11 @@ parsePatterns
   :: ∀ i e c s g u a
    . (Pretty i, Pretty u, Pretty a, Show e)
   => Int
-  -> (AllowOmissions -> Depth -> u -> Parser (Error e) c s g (List i) a)
+  -> (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) a)
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
-  -> Parser (Error e) c s g (List i) (Result a u)
+  -> Parser (Error e i u) c s g (List i) (Result a u)
 parsePatterns l f allowOmit repPats pats =
   let xs = indexed pats
       f' allowOmit' depth reps pat = do
@@ -297,8 +315,8 @@ parsePatterns l f allowOmit repPats pats =
         (List (Pattern u)) -- repeatable patterns found so far
         (List a)           -- output values
         Int                -- the depth of this parse
-        (Maybe (Error e))  -- the deepest error met
-    ->  Parser (Error e) c s g (List i) (Result a u)
+        (Maybe (Error e i u))  -- the deepest error met
+    ->  Parser (Error e i u) c s g (List i) (Result a u)
   -- Success!
   go (Args12 _ _ Nil Nil _ _ hasMoved _ reps out depth _) = do
     Parser.return $ Result out reps hasMoved depth

@@ -133,34 +133,34 @@ argParserSpec = \_ -> describe "The parser generator" do
     testCases = ([
       test
         "usage: prog <qux>..."
-        [ {-pass Nothing
+        [ pass Nothing
             [ "a", "b", "c" ]
             [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
             ]
-        , -}fail
+        , fail
             Nothing
             [ "--foo", "baz" ]
             "unknown option --foo"
-        -- , fail
-        --     Nothing
-        --     [ "a", "--foo", "-f=10" ]
-        --     "unknown option --foo"
+        , fail
+            Nothing
+            [ "a", "--foo", "-f=10" ]
+            "unknown option --foo"
         ]
 
-    -- , test
-    --     "usage: prog <qux>... --"
-    --     [ pass Nothing
-    --         [ "a", "b", "c", "--" ]
-    --         [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
-    --         , "--"    :> V.array []
-    --         ]
-    --     , pass Nothing
-    --         [ "a", "b", "c", "--", "--", "--" ]
-    --         [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
-    --         , "--"    :> V.array [ V.str "--" , V.str "--" ]
-    --         ]
-    --     ]
-    --
+    , test
+        "usage: prog <qux>... --"
+        [ pass Nothing
+            [ "a", "b", "c", "--" ]
+            [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+            , "--"    :> V.array []
+            ]
+        , pass Nothing
+            [ "a", "b", "c", "--", "--", "--" ]
+            [ "<qux>" :> V.array [ V.str "a", V.str "b", V.str "c" ]
+            , "--"    :> V.array [ V.str "--" , V.str "--" ]
+            ]
+        ]
+
     -- , test
     --     """
     --     usage: prog [options]

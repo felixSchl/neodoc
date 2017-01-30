@@ -4,7 +4,7 @@ module Neodoc.ArgParser.Type (
 , ArgParser
 , ArgParseError(..)
 , unexpectedInputError
-, missingArgumentsError
+, missingArgumentError
 , optionTakesNoArgumentError
 , optionRequiresArgumentError
 , malformedInputError
@@ -95,8 +95,8 @@ unIsKnown (Known a) = a
 data ArgParseError
   = OptionTakesNoArgumentError OptionAlias (Lazy String)
   | OptionRequiresArgumentError OptionAlias (Lazy String)
-  | MissingArgumentsError (NonEmpty List SolvedLayout) (Lazy String)
-  | UnexpectedInputError (List (IsKnown PositionedToken)) (Lazy String)
+  | MissingArgumentError SolvedLayoutArg (Lazy String)
+  | UnexpectedInputError (IsKnown PositionedToken) (Lazy String)
   | MalformedInputError String (Lazy String)
   | GenericError String
   | InternalError String (Lazy String)
@@ -126,24 +126,21 @@ genericError msg = GenericError msg
 internalError msg = InternalError msg $ defer \_->
   "internal error: " <> msg
 
-unexpectedInputError toks
-  = UnexpectedInputError toks $ defer \_ -> render toks
+unexpectedInputError tok
+  = UnexpectedInputError tok $ defer \_ -> render tok
   where
-  render Nil = "" -- XXX: this shouldn't happen. can we encode this at type level?
-  render ((Known tok):_) = "unexpected " <> tokLabel tok
-  render ((Unknown tok):_) = "unknown " <> tokLabel tok
+  render (Known tok) = "unexpected " <> tokLabel tok
+  render (Unknown tok) = "unknown " <> tokLabel tok
 
-missingArgumentsError layouts
-  = MissingArgumentsError layouts $ defer \_ ->
-      let flat = flattenBranch layouts
-       in case flat of
-        layout:|_ -> "missing " <> pretty layout
+missingArgumentError arg
+  = MissingArgumentError arg $ defer \_ ->
+      "missing " <> pretty arg
 
 instance showArgParseError :: Show ArgParseError where
   show (OptionTakesNoArgumentError a msg) = "OptionTakesNoArgumentError " <> show a <> " " <> show msg
   show (OptionRequiresArgumentError a msg) = "OptionRequiresArgumentError " <> show a <> " " <> show msg
-  show (MissingArgumentsError xs msg) = "MissingArgumentsError " <> show xs <> " " <> show msg
-  show (UnexpectedInputError xs msg) = "UnexpectedInputError " <> show xs <> " " <> show msg
+  show (MissingArgumentError x msg) = "MissingArgumentError " <> show x <> " " <> show msg
+  show (UnexpectedInputError x msg) = "UnexpectedInputError " <> show x <> " " <> show msg
   show (MalformedInputError s msg) = "MalformedInputError " <> show s <> " " <> show msg
   show (GenericError s) = "GenericError " <> show s
   show (InternalError s msg) = "InternalError " <> show s <> " " <> show msg
@@ -151,7 +148,7 @@ instance showArgParseError :: Show ArgParseError where
 instance prettyArgParseError :: Pretty ArgParseError where
   pretty (OptionTakesNoArgumentError _ msg) = force msg
   pretty (OptionRequiresArgumentError _ msg) = force msg
-  pretty (MissingArgumentsError _ msg) = force msg
+  pretty (MissingArgumentError _ msg) = force msg
   pretty (UnexpectedInputError _ msg) = force msg
   pretty (MalformedInputError _ msg) = force msg
   pretty (GenericError s) = s

@@ -41,6 +41,7 @@ import Data.Foreign.Index as F
 import Data.Foreign.Index ((!))
 import Data.Foreign.Class
 import Data.Foreign.Extra as F
+import Data.Function.Memoize
 
 import Neodoc.Parsing.Parser.Pos as P
 import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
@@ -63,6 +64,7 @@ derive instance genericValue :: Generic Value
 
 instance showValue :: Show Value where
   show = gShow
+
 
 instance isForeignValue :: IsForeign Value where
   read v = do

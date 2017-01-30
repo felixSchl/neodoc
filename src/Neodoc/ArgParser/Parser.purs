@@ -43,13 +43,15 @@ import Neodoc.Parsing.Parser
 import Neodoc.Parsing.Parser as Parser
 import Neodoc.Parsing.Parser.Combinators
 import Neodoc.ArgParser.Type
+import Neodoc.ArgParser.Type as ArgParser
 import Neodoc.ArgParser.Arg
 import Neodoc.ArgParser.Arg as Arg
 import Neodoc.ArgParser.Fallback
 import Neodoc.ArgParser.Evaluate (chooseBest)
 import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.Options
-import Neodoc.ArgParser.Pattern
+import Neodoc.ArgParser.Pattern hiding (PatternError(..))
+import Neodoc.ArgParser.Pattern (PatternError)
 import Neodoc.ArgParser.Pattern as Pattern
 import Neodoc.ArgParser.Token hiding (Token(..))
 import Neodoc.ArgParser.Token (Token)
@@ -72,14 +74,18 @@ match isKnownToken arg is allowOmissions =
    in argv <|> fallback
 
   where
-  fail = Left <<< (false /\ _) <<< GenericError
-  fatal = Left <<< (true /\ _) <<< GenericError
+
+  fail' = Left <<< (false /\ _)
+  fail = fail' <<< ArgParser.GenericError
+  fatal' = Left <<< (true /\ _)
+  fatal = fatal' <<< ArgParser.GenericError
+
   expected arg = case is of
-    (PositionedToken tok _ _) : _ -> do
+    ptok@(PositionedToken tok _ _) : _ -> do
       if isKnownToken tok
-         then fail $ "unexpected " <> pretty arg
-         else fail $ "unknown " <> pretty tok
-    Nil -> fail $ "Expected " <> pretty arg
+         then fail' $ unexpectedInputError $ known ptok
+         else fail' $ unexpectedInputError $ unknown ptok
+    Nil -> fail' $ missingArgumentError arg
 
   fromArgv = go
     where
@@ -141,6 +147,18 @@ match isKnownToken arg is allowOmissions =
   fromFallback arg Nothing = expected arg
   fromFallback _ (Just v) = Right $ ((arg /\ v) /\ is)
 
+lowerError
+  :: (Token -> Boolean)
+  -> PatternError PositionedToken Arg
+  -> ArgParseError
+lowerError isKnownToken = case _ of
+  Pattern.GenericError s -> GenericError s
+  Pattern.UnexpectedInputError (ptok@(PositionedToken tok _ _):|_) ->
+    unexpectedInputError $ if isKnownToken tok
+                                then known ptok
+                                else unknown ptok
+  Pattern.MissingPatternError p -> GenericError "???" -- TODO
+
 parse
   :: ∀ r
    . Spec SolvedLayout
@@ -153,8 +171,10 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
       parsers =
         toplevels <#> \branch ->
           let leafs = layoutToPattern <$> NE.toList branch
+              isKnownToken' = isKnownToken spec
            in do
-              vs <- Pattern.parse (match (isKnownToken spec))
+              vs <- Pattern.parse (match isKnownToken')
+                                  (lowerError isKnownToken')
                                   (toArgs options env descriptions leafs)
               pure $ ArgParseResult (Just branch) vs
    in do

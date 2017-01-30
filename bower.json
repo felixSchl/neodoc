@@ -47,7 +47,8 @@
     "purescript-nonempty": "^3.0.0",
     "purescript-template-strings": "^2.0.0",
     "purescript-sets": "^2.0.0",
-    "purescript-free": "^3.0.0"
+    "purescript-free": "^3.0.0",
+    "purescript-memoize": "^3.0.0"
   },
   "resolutions": {
     "purescript-generics": "v3.0.0",
