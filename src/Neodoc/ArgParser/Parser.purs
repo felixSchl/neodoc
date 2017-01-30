@@ -9,6 +9,7 @@ import Data.Maybe
 import Data.Pretty
 import Data.String as String
 import Data.String.Ext as String
+import Data.Array.Partial as AU
 import Data.Foldable (foldl, elem)
 import Data.Tuple (curry)
 import Data.Tuple.Nested ((/\))
@@ -17,6 +18,7 @@ import Data.NonEmpty.Extra as NE
 import Data.Either (Either(..))
 import Data.Traversable (for, traverse)
 import Data.Function.Memoize
+import Partial.Unsafe
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
@@ -136,10 +138,25 @@ match isKnownToken arg is allowOmissions =
 
     go (arg@(Option a@(OA.Short f) mA _)) ((PositionedToken (Tok.SOpt f' xs mA') _ _):is)
       | f == f'
-      = expected arg
-
-
-    {- TODO: implement short options matcher -}
+      = let adjacent = case is of
+              (PositionedToken (Tok.Lit s) _ _):is' ->
+                pure (StringValue s /\ is')
+              _ -> Nothing
+         in case mA /\ xs /\ mA' of
+              Just _ /\ [] /\ (Just s) ->
+                return is $ StringValue s
+              Just (OptionArgument _ o) /\ [] /\ Nothing ->
+                case adjacent of
+                  Just (v /\ is) -> return is v
+                  Nothing | o -> return is $ BoolValue true
+                  Nothing  -> fatal' $ optionRequiresArgumentError (OA.Short f)
+              Nothing /\ [] /\ (Just _) ->
+                fatal' $ optionTakesNoArgumentError (OA.Short f)
+              Nothing /\ xs /\ mA' ->
+                let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
+                                      (unsafePartial $ AU.tail xs)
+                                      mA'
+                 in return (newTok <> is) $ BoolValue true
 
     go arg _ = expected arg
 

@@ -161,20 +161,20 @@ argParserSpec = \_ -> describe "The parser generator" do
             ]
         ]
 
-    -- , test
-    --     """
-    --     usage: prog [options]
-    --     options:
-    --       -h, --host <host[:port]> [default: "http://localhost:3000"]
-    --     """
-    --     [ pass
-    --         Nothing
-    --         [ "-hhttp://localhost:5000" ]
-    --         [ "-h"     :> V.str "http://localhost:5000"
-    --         , "--host" :> V.str "http://localhost:5000"
-    --         ]
-    --     ]
-    --
+    , test
+        """
+        usage: prog [options]
+        options:
+          -h, --host <host[:port]> [default: "http://localhost:3000"]
+        """
+        [ pass
+            Nothing
+            [ "-hhttp://localhost:5000" ]
+            [ "-h"     :> V.str "http://localhost:5000"
+            , "--host" :> V.str "http://localhost:5000"
+            ]
+        ]
+
     -- , test
     --     """
     --     usage: prog [options]
