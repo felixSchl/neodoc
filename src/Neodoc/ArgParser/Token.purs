@@ -2,14 +2,17 @@ module Neodoc.ArgParser.Token where
 
 import Prelude
 import Data.Generic
+import Data.Maybe
 import Data.Function (on)
 import Data.Pretty (class Pretty, pretty)
-import Data.Tuple.Nested ((/\))
+import Data.Tuple.Nested ((/\), uncurry2, uncurry3)
 import Data.Maybe (Maybe(), maybe)
 import Data.Foldable (intercalate)
-import Data.List (List())
+import Data.List (List(Nil))
 import Data.String (fromCharArray)
 import Data.Array as A
+import Data.Function.Memoize
+import Data.Lazy
 
 import Neodoc.Value (Value)
 data Token
@@ -22,6 +25,21 @@ data Token
 derive instance ordToken :: Ord Token
 derive instance eqToken :: Eq Token
 derive instance genericToken :: Generic Token
+
+{-
+  Tabulate a Token. We only tabulate the identifying part of the token.
+-}
+instance tabulateToken :: Tabulate Token where
+  tabulate f = let lopt = tabulate (f <<< flip LOpt Nothing)
+                   fSOpt (a /\ b) = SOpt a b Nothing
+                   sopt = tabulate (f <<< fSOpt)
+                   lit  = tabulate (f <<< Lit)
+                in case _ of
+                      LOpt s _    -> lopt s
+                      SOpt c cs _ -> sopt (c /\ cs)
+                      EOA _       -> defer (\_ -> f $ EOA Nil)
+                      Stdin       -> defer (\_ -> f $ Stdin)
+                      Lit s       -> lit s
 
 instance showToken :: Show Token where
   show = gShow
@@ -46,6 +64,15 @@ instance showPositionedToken :: Show PositionedToken where
 
 instance prettyPositionedToken :: Pretty PositionedToken where
   pretty (PositionedToken tok _ _) = pretty tok
+
+{-
+  Tabulate a Positioned Token. We only tabulate the identifying part of the token.
+-}
+instance tabulatePositionedToken :: Tabulate PositionedToken where
+  tabulate f = let c (a /\ b /\ c) = PositionedToken a b c
+                   g = tabulate (f <<< c)
+                in case _ of
+                    PositionedToken t s i -> g (t /\ s /\ i)
 
 getSource :: PositionedToken -> String
 getSource (PositionedToken _ s _) = s

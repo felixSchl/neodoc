@@ -9,13 +9,14 @@ import Data.Maybe
 import Data.Pretty
 import Data.String as String
 import Data.String.Ext as String
-import Data.Foldable (foldl)
+import Data.Foldable (foldl, elem)
 import Data.Tuple (curry)
 import Data.Tuple.Nested ((/\))
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty.Extra as NE
 import Data.Either (Either(..))
 import Data.Traversable (for, traverse)
+import Data.Function.Memoize
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
@@ -51,15 +52,20 @@ import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Pattern
 import Neodoc.ArgParser.Pattern as Pattern
 import Neodoc.ArgParser.Token hiding (Token(..))
+import Neodoc.ArgParser.Token (Token)
 import Neodoc.ArgParser.Token as Tok
 import Neodoc.ArgParser.KeyValue
 
+{-
+  Match a single argument against input
+-}
 match
-  :: Arg
+  :: (Token -> Boolean)
+  -> Arg
   -> List PositionedToken
   -> AllowOmissions
   -> PatternMatch PositionedToken ArgParseError KeyValue
-match arg is allowOmissions =
+match isKnownToken arg is allowOmissions =
   let a = Arg.getArg arg
       argv = fromArgv a is
       fallback = fromFallback a (Arg.getFallback arg)
@@ -68,7 +74,12 @@ match arg is allowOmissions =
   where
   fail = Left <<< (false /\ _) <<< GenericError
   fatal = Left <<< (true /\ _) <<< GenericError
-  expected arg = fail $ "Expected " <> pretty arg
+  expected arg = case is of
+    (PositionedToken tok _ _) : _ -> do
+      if isKnownToken tok
+         then fail $ "unexpected " <> pretty arg
+         else fail $ "unknown " <> pretty tok
+    Nil -> fail $ "Expected " <> pretty arg
 
   fromArgv = go
     where
@@ -117,6 +128,11 @@ match arg is allowOmissions =
                   Just (v /\ is) -> return is v
           _ -> expected arg
 
+    go (arg@(Option a@(OA.Short f) mA _)) ((PositionedToken (Tok.SOpt f' xs mA') _ _):is)
+      | f == f'
+      = expected arg
+
+
     {- TODO: implement short options matcher -}
 
     go arg _ = expected arg
@@ -138,7 +154,8 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
         toplevels <#> \branch ->
           let leafs = layoutToPattern <$> NE.toList branch
            in do
-              vs <- Pattern.parse match (toArgs options env descriptions leafs)
+              vs <- Pattern.parse (match (isKnownToken spec))
+                                  (toArgs options env descriptions leafs)
               pure $ ArgParseResult (Just branch) vs
    in do
     runParser { env, options, spec } {} {} tokens do
@@ -147,6 +164,41 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
         (\_ -> 1)
         (parsers)
 
+{-
+  Determine if a given token is considered known
+-}
+isKnownToken
+  :: Spec SolvedLayout
+  -> Token
+  -> Boolean
+isKnownToken (Spec { layouts, descriptions }) = memoize go
+  where
+  go tok = occuresInDescs || occuresInLayouts
+    where
+    occuresInDescs = any matchesDesc descriptions
+      where
+      matchesDesc (OptionDescription as _ _ _ _) = test tok
+        where
+        test (Tok.LOpt n _)   = elem (OA.Long n) as
+        test (Tok.SOpt s _ _) = elem (OA.Short s) as
+        test _ = false
+      matchesDesc _ = false
+    occuresInLayouts = any (any (any matchesLayout)) layouts
+      where
+      matchesLayout (Group _ _ xs) = any (any matchesLayout) xs
+      matchesLayout (Elem x) = test tok x
+        where
+        test (Tok.LOpt n _)   (Solved.Option a _ _) = OA.Long n == a
+        test (Tok.SOpt s _ _) (Solved.Option a _ _) = OA.Short s == a
+        test (Tok.Lit n)      (Solved.Command n' _) = n == n'
+        test (Tok.EOA _)      (Solved.EOA)          = true
+        test (Tok.Stdin)      (Solved.Stdin)        = true
+        test _ _ = false
+
+{-
+  Convert a list of patterns containing solved layout arguments into a list of
+  patterns containing pre-cached `Arg`s.
+-}
 toArgs
   :: ∀ r
    . Options r

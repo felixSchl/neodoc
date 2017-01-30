@@ -27,6 +27,7 @@ module Neodoc.ArgParser.Type (
 import Prelude
 import Debug.Trace
 import Data.Optimize.Uncurried
+import Data.Function.Memoize
 import Neodoc.Data.Layout
 import Neodoc.Data.SolvedLayout
 import Neodoc.ArgParser.Options
@@ -95,19 +96,21 @@ data ArgParseError
   = OptionTakesNoArgumentError OptionAlias (Lazy String)
   | OptionRequiresArgumentError OptionAlias (Lazy String)
   | MissingArgumentsError (NonEmpty List SolvedLayout) (Lazy String)
-  | UnexpectedInputError  (List SolvedLayout) (List (IsKnown PositionedToken)) (Lazy String)
+  | UnexpectedInputError (List (IsKnown PositionedToken)) (Lazy String)
   | MalformedInputError String (Lazy String)
   | GenericError String
   | InternalError String (Lazy String)
 
 tokLabel :: PositionedToken -> String
-tokLabel (PositionedToken token source _) = go token
+tokLabel = memoize go
   where
-  go (Token.LOpt _ _)   = "option " <> source
-  go (Token.SOpt _ _ _) = "option " <> source
-  go (Token.EOA _)      = "option --"
-  go Token.Stdin        = "option -"
-  go (Token.Lit _)      = "command " <> source
+  go (PositionedToken token source _) = go token
+    where
+    go (Token.LOpt _ _)   = "option " <> source
+    go (Token.SOpt _ _ _) = "option " <> source
+    go (Token.EOA _)      = "option --"
+    go Token.Stdin        = "option -"
+    go (Token.Lit _)      = "command " <> source
 
 optionTakesNoArgumentError a = OptionTakesNoArgumentError a $ defer \_ ->
   "option takes no argument: " <> pretty a
@@ -123,15 +126,12 @@ genericError msg = GenericError msg
 internalError msg = InternalError msg $ defer \_->
   "internal error: " <> msg
 
-unexpectedInputError expected toks
-  = UnexpectedInputError expected toks $ defer \_ -> render expected toks
+unexpectedInputError toks
+  = UnexpectedInputError toks $ defer \_ -> render toks
   where
-  render Nil Nil = "" -- XXX: this shouldn't happen. can we encode this at type level?
-  render Nil ((Known tok):_) = "unexpected " <> tokLabel tok
-  render xs ((Unknown tok):_) = "unknown " <> tokLabel tok
-  render (x:_) toks = "expected " <> pretty x <> butGot toks
-  butGot Nil = ""
-  butGot (x:_) = ", but got " <> pretty x
+  render Nil = "" -- XXX: this shouldn't happen. can we encode this at type level?
+  render ((Known tok):_) = "unexpected " <> tokLabel tok
+  render ((Unknown tok):_) = "unknown " <> tokLabel tok
 
 missingArgumentsError layouts
   = MissingArgumentsError layouts $ defer \_ ->
@@ -143,7 +143,7 @@ instance showArgParseError :: Show ArgParseError where
   show (OptionTakesNoArgumentError a msg) = "OptionTakesNoArgumentError " <> show a <> " " <> show msg
   show (OptionRequiresArgumentError a msg) = "OptionRequiresArgumentError " <> show a <> " " <> show msg
   show (MissingArgumentsError xs msg) = "MissingArgumentsError " <> show xs <> " " <> show msg
-  show (UnexpectedInputError xs ys msg) = "UnexpectedInputError " <> show xs <> " " <> show ys <> " " <> show msg
+  show (UnexpectedInputError xs msg) = "UnexpectedInputError " <> show xs <> " " <> show msg
   show (MalformedInputError s msg) = "MalformedInputError " <> show s <> " " <> show msg
   show (GenericError s) = "GenericError " <> show s
   show (InternalError s msg) = "InternalError " <> show s <> " " <> show msg
@@ -152,7 +152,7 @@ instance prettyArgParseError :: Pretty ArgParseError where
   pretty (OptionTakesNoArgumentError _ msg) = force msg
   pretty (OptionRequiresArgumentError _ msg) = force msg
   pretty (MissingArgumentsError _ msg) = force msg
-  pretty (UnexpectedInputError _ _ msg) = force msg
+  pretty (UnexpectedInputError _ msg) = force msg
   pretty (MalformedInputError _ msg) = force msg
   pretty (GenericError s) = s
   pretty (InternalError _ msg) = force msg
