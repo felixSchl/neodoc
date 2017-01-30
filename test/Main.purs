@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Aff (Aff, launchAff)
 import Test.Spec.Runner (run)
-import Test.Spec.Reporter (specReporter)
+import Test.Spec.Reporter
 import Test.Spec.ScannerSpec (scannerSpec)
 import Test.Spec.UsageParserSpec (usageParserSpec)
 import Test.Spec.DescParserSpec (descParserSpec)
@@ -36,13 +36,13 @@ main :: Eff ( err     :: EXCEPTION
             ) _
 main = launchAff do
   -- tests <- _liftEff $ readTests "testcases.docopt"
-  liftEff $ run [specReporter] do
+  liftEff $ run [consoleReporter] do
     -- parserSpec        unit
-    patternParserSpec unit
+    -- patternParserSpec unit
     -- scannerSpec       unit
     -- usageParserSpec   unit
     -- descParserSpec    unit
     -- solveSpec         unit
-    -- argParserSpec     unit
+    argParserSpec     unit
     -- foreignSpec       tests
     -- compatSpec        tests

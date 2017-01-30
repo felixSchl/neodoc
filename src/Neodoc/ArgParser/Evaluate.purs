@@ -67,10 +67,11 @@ snapshot = Parser \(a@(ParseArgs c s g i)) -> Step false a (Right a)
 
 chooseBest
   :: ∀ e c s g i a
-   . (a -> Int)
+   . (e -> Int) -- get depth of error
+  -> (a -> Int) -- get depth of result
   -> List (Parser e c s g (List i) a)
   -> Parser e c s g (List i) a
-chooseBest getDepth parsers = do
+chooseBest getErrorDepth getSuccessDepth parsers = do
   a@(ParseArgs c s g i) <- getParseState
 
   -- Run all parsers and collect their results for further evaluation
@@ -101,10 +102,20 @@ chooseBest getDepth parsers = do
       SuccessCont a r -> Just (a /\ r)
       _               -> Nothing
     bestSuccess = do
-      let depth = getDepth <<< snd
+      let depth = getSuccessDepth <<< snd
       deepestGroup <- last do
         groupBy (eq `on` depth) do
           sortBy (compare `on` depth) successes
+      -- note: could apply user-defined function on equal elements here to find
+      --       best of the best matches.
+      pure $ NEL.head deepestGroup
+    bestError = do
+      let depth = snd >>> case _ of
+            ParseError _ (Left _) -> 0
+            ParseError _ (Right e) -> getErrorDepth e
+      deepestGroup <- last do
+        groupBy (eq `on` depth) do
+          sortBy (compare `on` depth) errors
       -- note: could apply user-defined function on equal elements here to find
       --       best of the best matches.
       pure $ NEL.head deepestGroup
@@ -113,4 +124,6 @@ chooseBest getDepth parsers = do
     Just (a /\ r) -> Parser \_-> Step true a (Right r)
     _ -> do
       -- TODO: proper error handling
-      Parser.fail "..."
+      case errors of
+        (a /\ e):_ -> Parser \_ -> Step true a (Left e)
+        _ -> Parser.fail "..."

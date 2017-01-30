@@ -8,7 +8,10 @@ import Neodoc.Data.SolvedLayout (SolvedLayoutArg)
 import Neodoc.Data.Layout (Branch)
 import Neodoc.ArgParser.KeyValue (KeyValue)
 
-data ArgParseResult = ArgParseResult (Maybe (Branch SolvedLayoutArg)) (List KeyValue)
+data ArgParseResult
+  = ArgParseResult
+      (Maybe (Branch SolvedLayoutArg)) -- The matched branch, if any
+      (List KeyValue)                  -- The list of resulting key value pairs
 
 getResult :: ArgParseResult -> List KeyValue
 getResult (ArgParseResult _ r) = r
