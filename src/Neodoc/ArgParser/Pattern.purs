@@ -129,6 +129,9 @@ type Reps u = List (Pattern u)
 data Error e = Error (Either String e) Depth
 data Result a u = Result (List a) (Reps u) HasMoved Depth
 
+instance showError :: (Show e) => Show (Error e) where
+  show (Error x d) = "(Error " <> show x <> " " <> show d <> ")"
+
 type IsFatal = Boolean
 type PatternMatch i e a = Either (Tuple IsFatal e) (Tuple a (List i))
 type Matcher u i a e = u -> List i -> AllowOmissions -> PatternMatch i e a
@@ -193,7 +196,7 @@ errorAt' d e = Error (Right e) d
 -}
 parse
   :: ∀ i e c s g u a
-   . (Pretty i, Pretty u, Pretty a)
+   . (Pretty i, Pretty u, Pretty a, Show e)
   => Matcher u i a e
   -> List (Pattern u) -- input patterns
   -> Parser e c s g (List i) (List a)
@@ -234,7 +237,7 @@ requireMovement p = do
 -}
 parsePatterns
   :: ∀ i e c s g u a
-   . (Pretty u, Pretty a)
+   . (Pretty i, Pretty u, Pretty a, Show e)
   => Int
   -> (AllowOmissions -> u -> Parser (Error e) c s g (List i) a)
   -> AllowOmissions   -- allow omissions?
@@ -248,14 +251,15 @@ parsePatterns l f allowOmit repPats pats =
           LeafPattern o r _ x -> do
             vs <- singleton <$> f (o && allowOmit') x
             pure $ Result vs reps true depth
-          ChoicePattern _ _ _ xs ->
+          ChoicePattern o _ _ xs ->
             let resetReps = setReps reps
               in resetReps <$> do
                   chooseBest
                     getErrorDepth
                     getSuccessDepth
-                    (parsePatterns (l + 1) f allowOmit' Nil <$> xs)
+                    (parsePatterns (l + 1) f (o && allowOmit') Nil <$> xs)
         let reps'' = if isRepeatable pat then pat : reps' else reps'
+
         pure $ Result vs reps'' hasMoved depth
    in do
         -- 1. parse the pattern wholly
@@ -276,7 +280,7 @@ parsePatterns l f allowOmit repPats pats =
                                 --      be retrieving values via fallbacks.
                                 -- TODO: `match` should indicate if moved!
                                 (hasMoved || (not $ null vs'))
-                                (depth + length vs')
+                                (depth + length vs') -- XXX: same here (^)
 
   where
   go
@@ -320,15 +324,18 @@ parsePatterns l f allowOmit repPats pats =
 
     -- TODO: this might need more logic as to which element we throw out first
     --       the current approach is simply removes from left to right.
+    let throwExistingError = case mE of
+          Just e -> Parser.fail' e
+          _      -> expected depth pat
     if allowOmit
        then
           let sortedCarry = sortBy (compare `on` getIndex) carry
            in case dropFirst (isOptional <<< getIndexedElem) sortedCarry of
             Just carry' -> (
               go $ Args12 f' carry' carry' Nil false false false false reps out depth mE
-              ) <|> expected depth pat -- TODO: respect `mE`
-            Nothing -> expected depth pat -- TODO: respect `mE`
-       else expected depth pat -- TODO: respect `mE`
+              ) <|> throwExistingError
+            Nothing -> throwExistingError
+       else throwExistingError
 
   -- Step: ignore fixed patterns when locked
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out depth mE) | isFixed pat = do
@@ -367,9 +374,11 @@ parsePatterns l f allowOmit repPats pats =
                 then parseRemainder (singleton pat) do
                       (getValue <$> _) <<< f' false depth reps
                 else pure Nil
+
         let orig' = sortBy (compare `on` getIndex) do
                       filter (not <<< (_ == ix) <<< getIndex) orig
             depth'' = depth + depth' + length vs'
+
         go (Args12 f' orig' orig' Nil false false true isLocked reps' (out <> result <> vs') depth'' mE)
 
       -- 2. if we did not manage to make a match, we will try to make a match
@@ -396,7 +405,6 @@ parsePatterns l f allowOmit repPats pats =
           --    rotate this pattern into the carry and give the next pattern a
           --    chance.
           _ -> do
-
             -- check to see if the new error occurred at a greater depth than
             -- the currently tracked error.
             let mE'' = case mE /\ mE' of
@@ -426,5 +434,5 @@ parseRemainder
 parseRemainder repPats f = do
   go (choice $ f <$> repPats) Nil
   where go p xs = do
-          vs <- p <|> pure Nil
+          vs <- (Parser.try p) <|> pure Nil
           if null vs then pure xs else go p (xs <> vs)
