@@ -258,7 +258,7 @@ parse'
   -> List (Pattern u) -- input patterns
   -> Parser (Error e i u) c s g (List i) (Tuple (List a) Depth)
 parse' f pats = do
-  Result vs _ _ depth <- parsePatterns (match f) true Nil pats
+  Result vs _ _ depth <- parsePatterns 0 (match f) true Nil pats
   is <- getInput
   case is of
     Nil  -> Parser.return $ vs /\ depth
@@ -293,12 +293,13 @@ requireMovement p = do
 parsePatterns
   :: ∀ i e c s g u a
    . (Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
-  => (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) a)
+  => Int
+  -> (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) a)
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
   -> Parser (Error e i u) c s g (List i) (Result a u)
-parsePatterns f allowOmit repPats pats =
+parsePatterns l f allowOmit repPats pats =
   let xs = indexed pats
       f' allowOmit' depth reps pat = do
         Result vs reps' hasMoved depth <- case pat of
@@ -311,14 +312,14 @@ parsePatterns f allowOmit repPats pats =
                   chooseBest
                     getErrorDepth
                     getSuccessDepth
-                    (parsePatterns f allowOmit' Nil <$> xs)
+                    (parsePatterns (l + 1) f allowOmit' Nil <$> xs)
         let reps'' = if isRepeatable pat then pat : reps' else reps'
 
         pure $ Result vs reps'' hasMoved depth
    in do
         -- 1. parse the pattern wholly
         Result vs rep hasMoved depth <- go do
-          Args12 f' xs xs Nil false false false false repPats Nil 1 Nothing
+          Args12 f' xs xs Nil false false false false repPats Nil 0 Nothing
 
         -- 2. consume any trailing arguments using the repeating patterns we
         --    learned about so far.
@@ -353,19 +354,23 @@ parsePatterns f allowOmit repPats pats =
         (Maybe (Error e i u))  -- the deepest error met
     ->  Parser (Error e i u) c s g (List i) (Result a u)
   -- Success!
-  go (Args12 _ _ Nil Nil _ _ hasMoved _ reps out depth _) = do
+  go (Args12 _ orig Nil Nil _ _ hasMoved _ reps out depth _) = do
+    -- traceShowA $ indent l <> (pretty $ "success" /\ orig /\ out)
     Parser.return $ Result out reps hasMoved depth
 
   -- Failure: try again, this time allow omissions (keep the accumulator)
-  go (Args12 f' orig Nil (_:_) false true _ _ reps out depth mE) | allowOmit = do
+  go (Args12 f' orig Nil (carry@(_:_)) false true _ _ reps out depth mE) | allowOmit = do
+    -- traceShowA $ indent l <> (pretty $ "failure (0)" /\ out /\ carry)
     go (Args12 f' orig orig Nil true true false false reps out depth mE)
 
   -- Failure: try again, this time allow repetitions (keep the accumulator)
-  go (Args12 f' orig Nil (_:_) allowOmissions false _ _ reps out depth mE) = do
-    go (Args12 f' orig orig Nil allowOmissions true false false reps out depth mE)
+  go (Args12 f' orig Nil (carry@(_:_)) allowOmissions false _ _ reps out depth mE) = do
+    -- traceShowA $ indent l <> (pretty $ "failure (1)" /\ out /\ carry)
+    go (Args12 f' orig orig carry allowOmissions true false false reps out depth mE)
 
   -- Failure: ...
-  go (Args12 f' _ Nil (carry@(((Indexed _ pat):_))) false true _ _ _ _ depth mE) = do
+  go (Args12 f' orig Nil (carry@(((Indexed _ pat):_))) false true _ _ _ out depth mE) = do
+    -- traceShowA $ indent l <> (pretty $ "failure (2)" /\ out /\ carry)
     let throwExistingError = case mE of
           Just (e@(Error _ d)) | d > depth -> Parser.fail' e
           _ ->
@@ -375,6 +380,7 @@ parsePatterns f allowOmit repPats pats =
     throwExistingError
 
   go (Args12 f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ reps out depth mE) = do
+    -- traceShowA $ indent l <> (pretty $ "omit" /\ out /\ carry)
 
     -- at this point we rotated the entire input and tried to consume via
     -- repetitions, but w/o any luck. it's time for drastic measures by starting
@@ -400,10 +406,12 @@ parsePatterns f allowOmit repPats pats =
 
   -- Step: ignore fixed patterns when locked
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out depth mE) | isFixed pat = do
+    -- traceShowA $ indent l <> (pretty $ "ignore" /\ out /\ carry)
     go (Args12 f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out depth mE)
 
   -- Step: process next element
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out depth mE) = do
+    -- traceShowA $ indent l <> (pretty $ "step" /\ ("allowOmissions=" <> show allowOmissions) /\ ("allowReps=" <> show allowReps) /\ x /\ out /\ carry /\ ("orig=" <> pretty orig))
 
     -- 1. try parsing the pattern
     -- we try parsing this pattern under varying circumstances but only capture
@@ -431,6 +439,7 @@ parsePatterns f allowOmit repPats pats =
       -- (if this pattern allows for repetition). We also reset `allowReps` to
       -- to treat the rest of the pattern as fresh input.
       Right (Result result reps' hasMoved depth') -> do
+
         -- before attempting to parse the next element, we try to eagerly parse
         -- adjacent matches of the same pattern.
         -- note: we do not check `allowReps` because we want adjacent
@@ -461,8 +470,7 @@ parsePatterns f allowOmit repPats pats =
           -- re-iterate using the new input. Again, we reset `allowReps` to
           -- `false` in order to treat the resulting input as a fresh pattern.
           Just (Result result' _ _ depth') ->
-            let orig' = sortBy (compare `on` getIndex) do
-                          filter (not <<< (_ == ix) <<< getIndex) orig
+            let orig' = sortBy (compare `on` getIndex) orig
                 depth'' = depth + depth'
              in go (Args12 f' orig' orig' Nil false false true isLocked reps (out <> result') depth'' mE)
 

@@ -326,164 +326,164 @@ argParserSpec = \_ -> describe "The parser generator" do
             "expected (-iFILE <env>), but got -o"
         ]
 
-    -- , test
-    --     """
-    --     usage: prog [options]
-    --     options:
-    --       -o, --out FOO [env: FOO]
-    --     """
-    --     [ pass' Nothing
-    --         []
-    --         [ "FOO"    :> "BAR" ]
-    --         [  "--out" :> V.str "BAR"
-    --         ,  "-o"    :> V.str "BAR" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog [options]
-    --     options:
-    --       -o, --out FOO [default: "ADLER"] [env: FOO]
-    --     """
-    --     [ pass' Nothing
-    --         []
-    --         [ "FOO" :> "BAR" ]
-    --         [  "--out" :> V.str "BAR"
-    --         ,  "-o"    :> V.str "BAR" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog -a
-    --        or: prog -b
-    --     """
-    --     [ pass Nothing
-    --         [ "-a" ]
-    --         [ "-a" :> V.bool true ]
-    --     , pass Nothing
-    --         [ "-b" ]
-    --         [ "-b" :> V.bool true ]
-    --     , pass Nothing
-    --         []
-    --         []
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog a
-    --        or: prog b
-    --     """
-    --     [ pass Nothing
-    --         [ "a" ]
-    --         [ "a" :> V.bool true ]
-    --     , pass Nothing
-    --         [ "b" ]
-    --         [ "b" :> V.bool true ]
-    --     , fail Nothing
-    --         [ "a", "b" ]
-    --         "unexpected command b"
-    --     , fail Nothing
-    --         [ "b", "a" ]
-    --         "unexpected command a"
-    --     , fail Nothing [] ""
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog foo -io [-q]... -b=BAZ (-f FOZ)... baz
-    --     options:
-    --       -i, --input
-    --       -o, --out
-    --       -q, --qux...
-    --       -b, --baz BAZ [default: "ax"]
-    --       -f, --foo FOZ...
-    --     """
-    --     [ pass Nothing
-    --         [ "foo", "--out", "--input", "--qux", "--foo=ox", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "--qux"   :> V.int 1
-    --         , "-q"      :> V.int 1
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         , "baz"     :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         ]
-    --
-    --     , pass Nothing
-    --         [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--qux"   :> V.int 3
-    --         , "-q"      :> V.int 3
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "baz"     :> V.bool true
-    --         ]
-    --
-    --     , pass Nothing
-    --         [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--qux"   :> V.int 2
-    --         , "-q"      :> V.int 2
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         , "baz"     :> V.bool true
-    --         ]
-    --
-    --     , pass Nothing
-    --         [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "baz"     :> V.bool true
-    --         ]
-    --
-    --     , pass Nothing
-    --         [ "foo", "-o", "-i", "-bax", "-f=ox", "baz" ]
-    --         [ "foo"     :> V.bool true
-    --         , "--out"   :> V.bool true
-    --         , "-o"      :> V.bool true
-    --         , "--input" :> V.bool true
-    --         , "-i"      :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "baz"     :> V.bool true
-    --         , "--baz"   :> V.str "ax"
-    --         , "-b"      :> V.str "ax"
-    --         , "--foo"   :> V.array [ V.str "ox" ]
-    --         , "-f"      :> V.array [ V.str "ox" ]
-    --         ]
-    --
-    --     , fail Nothing
-    --         [ "foo" ]
-    --         "missing -fFOZ"
-    --     , fail Nothing
-    --         [ "foo", "-o", "-i", "-bax" ]
-    --         "missing -fFOZ"
-    --     ]
-    --
+    , test
+        """
+        usage: prog [options]
+        options:
+          -o, --out FOO [env: FOO]
+        """
+        [ pass' Nothing
+            []
+            [ "FOO"    :> "BAR" ]
+            [  "--out" :> V.str "BAR"
+            ,  "-o"    :> V.str "BAR" ]
+        ]
+
+    , test
+        """
+        usage: prog [options]
+        options:
+          -o, --out FOO [default: "ADLER"] [env: FOO]
+        """
+        [ pass' Nothing
+            []
+            [ "FOO" :> "BAR" ]
+            [  "--out" :> V.str "BAR"
+            ,  "-o"    :> V.str "BAR" ]
+        ]
+
+    , test
+        """
+        usage: prog -a
+           or: prog -b
+        """
+        [ pass Nothing
+            [ "-a" ]
+            [ "-a" :> V.bool true ]
+        , pass Nothing
+            [ "-b" ]
+            [ "-b" :> V.bool true ]
+        , pass Nothing
+            []
+            []
+        ]
+
+    , test
+        """
+        usage: prog a
+           or: prog b
+        """
+        [ pass Nothing
+            [ "a" ]
+            [ "a" :> V.bool true ]
+        , pass Nothing
+            [ "b" ]
+            [ "b" :> V.bool true ]
+        , fail Nothing
+            [ "a", "b" ]
+            "unexpected command b"
+        , fail Nothing
+            [ "b", "a" ]
+            "unexpected command a"
+        , fail Nothing [] ""
+        ]
+
+    , test
+        """
+        usage: prog foo -io [-q]... -b=BAZ (-f FOZ)... baz
+        options:
+          -i, --input
+          -o, --out
+          -q, --qux...
+          -b, --baz BAZ [default: "ax"]
+          -f, --foo FOZ...
+        """
+        [ pass Nothing
+            [ "foo", "--out", "--input", "--qux", "--foo=ox", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "--qux"   :> V.int 1
+            , "-q"      :> V.int 1
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "baz"     :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            ]
+
+        , pass Nothing
+            [ "foo" , "--out", "-qqq", "--foo=ox", "--baz=ax", "--input", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--qux"   :> V.int 3
+            , "-q"      :> V.int 3
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "baz"     :> V.bool true
+            ]
+
+        , pass Nothing
+            [ "foo", "-q", "-o", "--qux", "-i", "--baz=ax", "-f=ox", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--qux"   :> V.int 2
+            , "-q"      :> V.int 2
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "baz"     :> V.bool true
+            ]
+
+        , pass Nothing
+            [ "foo", "--baz=ax", "-o", "-f=ox", "-i", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "baz"     :> V.bool true
+            ]
+
+        , pass Nothing
+            [ "foo", "-o", "-i", "-bax", "-f=ox", "baz" ]
+            [ "foo"     :> V.bool true
+            , "--out"   :> V.bool true
+            , "-o"      :> V.bool true
+            , "--input" :> V.bool true
+            , "-i"      :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "baz"     :> V.bool true
+            , "--baz"   :> V.str "ax"
+            , "-b"      :> V.str "ax"
+            , "--foo"   :> V.array [ V.str "ox" ]
+            , "-f"      :> V.array [ V.str "ox" ]
+            ]
+
+        , fail Nothing
+            [ "foo" ]
+            "missing -fFOZ"
+        , fail Nothing
+            [ "foo", "-o", "-i", "-bax" ]
+            "missing -fFOZ"
+        ]
+
     -- , test
     --     """
     --     usage: prog [foo]

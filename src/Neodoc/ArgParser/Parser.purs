@@ -15,6 +15,7 @@ import Data.Foldable (foldl, elem)
 import Data.Tuple (curry)
 import Data.Tuple.Nested ((/\))
 import Data.NonEmpty (NonEmpty, (:|))
+import Data.NonEmpty as NE
 import Data.NonEmpty.Extra as NE
 import Data.Either (Either(..))
 import Data.Traversable (for, traverse)
@@ -111,7 +112,15 @@ match isKnownToken arg is allowOmissions =
     go Stdin ((PositionedToken Tok.Stdin _ _):is)
       = return is $ BoolValue true
 
-    go (arg@(Option a@(OA.Long n) mA _)) ((PositionedToken (Tok.LOpt n' mA') _ _):is)
+    go (Option a mA _) toks
+      = let aliases = case Arg.getDescription arg of
+              Just (OptionDescription aliases _ _ _ _) -> aliases
+              _ -> NE.singleton a
+         in NE.foldl1 (<|>) (opt toks mA <$> aliases)
+
+    go arg _ = expected arg
+
+    opt ((PositionedToken (Tok.LOpt n' mA') _ _):is) mA (a@(OA.Long n))
       | String.startsWith n' n
       = case mA /\ mA' of
           Nothing /\ Just _ | n == n' ->
@@ -135,9 +144,9 @@ match isKnownToken arg is allowOmissions =
                     fatal $ "Option requires argument: " <> pretty a
                   Nothing -> return is $ BoolValue true
                   Just (v /\ is) -> return is v
-          _ -> expected arg
+          _ -> expected $ Arg.getArg arg
 
-    go (arg@(Option a@(OA.Short f) mA _)) ((PositionedToken (Tok.SOpt f' xs mA') src _):is)
+    opt ((PositionedToken (Tok.SOpt f' xs mA') src _):is) mA (a@(OA.Short f))
       | f == f'
       = let adjacent = case is of
               (PositionedToken (Tok.Lit s) _ _):is' ->
@@ -179,9 +188,9 @@ match isKnownToken arg is allowOmissions =
                     newSrc = "-" <> String.drop 2 src
                     newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
                  in return (newPtok : is) $ BoolValue true
-              _ -> expected arg
+              _ -> expected $ Arg.getArg arg
 
-    go arg _ = expected arg
+    opt _ _ _ = expected $ Arg.getArg arg
 
   fromFallback arg _ | not allowOmissions = expected arg
   fromFallback arg Nothing = expected arg

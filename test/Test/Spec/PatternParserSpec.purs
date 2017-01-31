@@ -51,7 +51,7 @@ match
   -> AllowOmissions
   -> PatternMatch String String String
 match s (i:is) _ | i == s = Right $ s /\ is
-match s is true = Right $ ("<sub: " <> show s <> ">") /\ is
+-- match s is true = Right $ ("<sub: " <> show s <> ">") /\ is
 match s _ _ = Left $ false /\ ("Expected " <> show s)
 
 parse :: _ -> _
@@ -86,102 +86,102 @@ patternParserSpec :: Unit -> Test.Spec _ _
 patternParserSpec = \_ ->
   describe "parse patterns" do
 
-    it "should handle substitutions" do
-      liftEff do
-        expectFailureA "Expected L!(b)!" do
-          runTestParser {} 0 0 (fromFoldable [ ]) do
-            parse $ fromFoldable do
-              [ choiz [[ leafOF "c", leafF "b", leafOF "a" ]] ]
-
-        expectA 10.0 (fromFoldable [ "<sub: \"c\">", "b", "<sub: \"a\">" ]) do
-          measureA \_ -> runEitherEff do
-            runTestParser {} 0 0 (fromFoldable [ "b" ]) do
-              parse $ fromFoldable do
-                [ choiz [[ leafOF "c", leafF "b", leafOF "a" ]] ]
-
-    it "omits gracefully" do
-      liftEff do
-        expectA 10.0 (fromFoldable [ "a", "b", "c" ]) do
-          measureA \_ -> runEitherEff do
-            runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
-              parse $ fromFoldable do
-                [ choizO [[ leafO "c" ]], leaf "b", leaf "a" ]
-
-    it "omits gracefully in subgroups" do
-      liftEff do
-        expectA 15.0 (fromFoldable [ "a", "b", "c", "<sub: \"d\">" ]) do
-          measureA \_ -> runEitherEff do
-            runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
-              parse $ fromFoldable do
-                [ choizO [[ leafO "c", leafO "d" ]], leaf "b", leaf "a" ]
-
-    it "omits gracefully in subgroups" do
-      liftEff do
-        expectA 15.0 (fromFoldable [ "a", "b", "c", "<sub: \"d\">" ]) do
-          measureA \_ -> runEitherEff do
-            runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
-              parse $ fromFoldable do
-                [ choizO [[ leafO "c", leafO "d" ]], leaf "b", leaf "a" ]
-
-    it "should exhaust the patterns" do
-      liftEff do
-        expectA 5.0 (fromFoldable [ "b", "b", "b", "a", "b"]) do
-          measureA \_-> runEitherEff do
-            runTestParser {} 0 0 (fromFoldable [ "b", "b", "b", "a", "b" ]) do
-              parse $ fromFoldable do
-                [ leafR "b", leaf "a" ]
-
-    it "should choose the best match" do
-      liftEff do
-        expectA 5.0 (fromFoldable [ "a", "b", "c" ]) do
-          measureA \_-> runEitherEff do
-            runTestParser {} 0 0 (fromFoldable [ "a", "b", "c" ]) do
-              parse $ fromFoldable do
-                [ choiz [
-                  [ leafO "a", leafO "b", leaf "c" ]
-                , [ leaf "a", leaf "b", leaf "c" ]
-                ] ]
-
-    it "unexpected b" do
-      liftEff do
-        expectFailureA "Unexpected b" do
-          runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
-            parse $ fromFoldable do
-              [ choizORF [[ leaf "a" ]], leaf "b" ]
-
-    it "should respect fixed, repeatable, optional choices" do
-      liftEff do
-        expectA 5.0
-                (fromFoldable [
-                  "b", "a", "c", "b", "a",
-                  "b", "a", "c", "b", "a"
-                  ])
-                do
-          measureA \_-> runEitherEff do
-            runTestParser {} 0 0 (fromFoldable [
-              "b", "a", "c", "b", "a",
-              "b", "a", "c", "b", "a"
-              ]) do
-              parse $ fromFoldable do
-                [ choizORF [[ leaf "a", leaf "b" ]], leafR "c" ]
-
-    it "should respect fixed optionals" do
-      liftEff do
-        -- We expect "Unexpected b" here because each item fails and gets
-        -- omitted except for "c", which then parses the first "c", but has
-        -- trailing input "b ..."
-        expectFailureA "Unexpected b" do
-          runTestParser {} 0 0 (fromFoldable [ "c", "b", "a" ]) do
-            parse $ fromFoldable do
-              [ leafOF "a", leafOF "b", leafOF "c" ]
-
-    it "should respect fixed, repeatable, optional choices" do
-      liftEff do
-        expectA 5.0 (fromFoldable [ "c" ]) do
-          measureA \_-> runEitherEff do
-            runTestParser {} 0 0 (fromFoldable [ "c" ]) do
-              parse $ fromFoldable do
-                [ choizORF [[ leaf "a", leaf "b" ]], leafR "c" ]
+    -- it "should handle substitutions" do
+    --   liftEff do
+    --     expectFailureA "Expected L!(b)!" do
+    --       runTestParser {} 0 0 (fromFoldable [ ]) do
+    --         parse $ fromFoldable do
+    --           [ choiz [[ leafOF "c", leafF "b", leafOF "a" ]] ]
+    --
+    --     expectA 10.0 (fromFoldable [ "<sub: \"c\">", "b", "<sub: \"a\">" ]) do
+    --       measureA \_ -> runEitherEff do
+    --         runTestParser {} 0 0 (fromFoldable [ "b" ]) do
+    --           parse $ fromFoldable do
+    --             [ choiz [[ leafOF "c", leafF "b", leafOF "a" ]] ]
+    --
+    -- it "omits gracefully" do
+    --   liftEff do
+    --     expectA 10.0 (fromFoldable [ "a", "b", "c" ]) do
+    --       measureA \_ -> runEitherEff do
+    --         runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
+    --           parse $ fromFoldable do
+    --             [ choizO [[ leafO "c" ]], leaf "b", leaf "a" ]
+    --
+    -- it "omits gracefully in subgroups" do
+    --   liftEff do
+    --     expectA 15.0 (fromFoldable [ "a", "b", "c", "<sub: \"d\">" ]) do
+    --       measureA \_ -> runEitherEff do
+    --         runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
+    --           parse $ fromFoldable do
+    --             [ choizO [[ leafO "c", leafO "d" ]], leaf "b", leaf "a" ]
+    --
+    -- it "omits gracefully in subgroups" do
+    --   liftEff do
+    --     expectA 15.0 (fromFoldable [ "a", "b", "c", "<sub: \"d\">" ]) do
+    --       measureA \_ -> runEitherEff do
+    --         runTestParser {} 0 0 (fromFoldable ["a", "b", "c"]) do
+    --           parse $ fromFoldable do
+    --             [ choizO [[ leafO "c", leafO "d" ]], leaf "b", leaf "a" ]
+    --
+    -- it "should exhaust the patterns" do
+    --   liftEff do
+    --     expectA 5.0 (fromFoldable [ "b", "b", "b", "a", "b"]) do
+    --       measureA \_-> runEitherEff do
+    --         runTestParser {} 0 0 (fromFoldable [ "b", "b", "b", "a", "b" ]) do
+    --           parse $ fromFoldable do
+    --             [ leafR "b", leaf "a" ]
+    --
+    -- it "should choose the best match" do
+    --   liftEff do
+    --     expectA 5.0 (fromFoldable [ "a", "b", "c" ]) do
+    --       measureA \_-> runEitherEff do
+    --         runTestParser {} 0 0 (fromFoldable [ "a", "b", "c" ]) do
+    --           parse $ fromFoldable do
+    --             [ choiz [
+    --               [ leafO "a", leafO "b", leaf "c" ]
+    --             , [ leaf "a", leaf "b", leaf "c" ]
+    --             ] ]
+    --
+    -- it "unexpected b" do
+    --   liftEff do
+    --     expectFailureA "Unexpected b" do
+    --       runTestParser {} 0 0 (fromFoldable [ "b", "a", "b" ]) do
+    --         parse $ fromFoldable do
+    --           [ choizORF [[ leaf "a" ]], leaf "b" ]
+    --
+    -- it "should respect fixed, repeatable, optional choices" do
+    --   liftEff do
+    --     expectA 5.0
+    --             (fromFoldable [
+    --               "b", "a", "c", "b", "a",
+    --               "b", "a", "c", "b", "a"
+    --               ])
+    --             do
+    --       measureA \_-> runEitherEff do
+    --         runTestParser {} 0 0 (fromFoldable [
+    --           "b", "a", "c", "b", "a",
+    --           "b", "a", "c", "b", "a"
+    --           ]) do
+    --           parse $ fromFoldable do
+    --             [ choizORF [[ leaf "a", leaf "b" ]], leafR "c" ]
+    --
+    -- it "should respect fixed optionals" do
+    --   liftEff do
+    --     -- We expect "Unexpected b" here because each item fails and gets
+    --     -- omitted except for "c", which then parses the first "c", but has
+    --     -- trailing input "b ..."
+    --     expectFailureA "Unexpected b" do
+    --       runTestParser {} 0 0 (fromFoldable [ "c", "b", "a" ]) do
+    --         parse $ fromFoldable do
+    --           [ leafOF "a", leafOF "b", leafOF "c" ]
+    --
+    -- it "should respect fixed, repeatable, optional choices" do
+    --   liftEff do
+    --     expectA 5.0 (fromFoldable [ "c" ]) do
+    --       measureA \_-> runEitherEff do
+    --         runTestParser {} 0 0 (fromFoldable [ "c" ]) do
+    --           parse $ fromFoldable do
+    --             [ choizORF [[ leaf "a", leaf "b" ]], leafR "c" ]
 
     describe "the abcs" do
 
@@ -210,10 +210,10 @@ patternParserSpec = \_ ->
       , leafR   /\ reverse /\ y /\ "all (reversed) repeatable leafs"
       , leafOR  /\ reverse /\ y /\ "all (reversed) optional & repeatable leafs"
 
-      , leafF   /\ reverse /\ n "Expected L!(z)!"    /\ "all (reversed) fixed leafs"
-      , leafRF  /\ reverse /\ n "Expected L!(z)...!" /\ "all (reversed) fixed leafs & repeatable leafs"
-      , leafOF  /\ reverse /\ n "Unexpected b"       /\ "all (reversed) optional & fixed leafs"
-      , leafORF /\ reverse /\ n "Unexpected b"       /\ "all (reversed) optional & repeatable & fixed leafs"
+      , leafF   /\ reverse /\ n "Missing L!(z)!"    /\ "all (reversed) fixed leafs"
+      , leafRF  /\ reverse /\ n "Missing L!(z)...!" /\ "all (reversed) fixed leafs & repeatable leafs"
+      , leafOF  /\ reverse /\ n "Unexpected b"      /\ "all (reversed) optional & fixed leafs"
+      , leafORF /\ reverse /\ n "Unexpected b"      /\ "all (reversed) optional & repeatable & fixed leafs"
 
       , s choiz    leaf /\ id /\ y /\ "all choices"
       , s choizO   leaf /\ id /\ y /\ "all optional choices"
@@ -234,10 +234,10 @@ patternParserSpec = \_ ->
       , s choizR   leafORF /\ reverse /\ y /\ "all (reversed) repeatable choices (with fixed & optional & repeateable single leaf)"
       , s choizOR  leafORF /\ reverse /\ y /\ "all (reversed) optional & repeatable choices (with fixed & optional & repeateable single leaf)"
 
-      , s choizF   leaf /\ reverse /\ n "Expected C!(L*(z)*)!"    /\ "all (reversed) fixed choices"
-      , s choizRF  leaf /\ reverse /\ n "Expected C!(L*(z)*)...!" /\ "all (reversed) fixed choices & repeatable choices"
-      , s choizOF  leaf /\ reverse /\ n "Unexpected b"            /\ "all (reversed) optional & fixed choices"
-      , s choizORF leaf /\ reverse /\ n "Unexpected b"            /\ "all (reversed) optional & repeatable & fixed choices"
+      , s choizF   leaf /\ reverse /\ n "Missing C!(L*(z)*)!"    /\ "all (reversed) fixed choices"
+      , s choizRF  leaf /\ reverse /\ n "Missing C!(L*(z)*)...!" /\ "all (reversed) fixed choices & repeatable choices"
+      , s choizOF  leaf /\ reverse /\ n "Unexpected b"           /\ "all (reversed) optional & fixed choices"
+      , s choizORF leaf /\ reverse /\ n "Unexpected b"           /\ "all (reversed) optional & repeatable & fixed choices"
 
       ] \(f /\ mod /\ ex /\ title) -> do
         let title' = title <> case ex of
