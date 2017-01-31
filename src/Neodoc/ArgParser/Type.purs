@@ -76,8 +76,8 @@ type Input = List PositionedToken
 data IsKnown a = Known a | Unknown a
 
 instance showIsKnown :: (Show a) => Show (IsKnown a) where
-  show (Known x) = "Known " <> show x
-  show (Unknown x) = "Unknown " <> show x
+  show (Known x) = "(Known " <> show x <> ")"
+  show (Unknown x) = "(Unknown " <> show x <> ")"
 
 instance prettyIsKnown :: (Pretty a) => Pretty (IsKnown a) where
   pretty (Known x) = pretty x
@@ -137,13 +137,13 @@ missingArgumentError arg
       "missing " <> pretty arg
 
 instance showArgParseError :: Show ArgParseError where
-  show (OptionTakesNoArgumentError a msg) = "OptionTakesNoArgumentError " <> show a <> " " <> show msg
-  show (OptionRequiresArgumentError a msg) = "OptionRequiresArgumentError " <> show a <> " " <> show msg
-  show (MissingArgumentError x msg) = "MissingArgumentError " <> show x <> " " <> show msg
-  show (UnexpectedInputError x msg) = "UnexpectedInputError " <> show x <> " " <> show msg
-  show (MalformedInputError s msg) = "MalformedInputError " <> show s <> " " <> show msg
-  show (GenericError s) = "GenericError " <> show s
-  show (InternalError s msg) = "InternalError " <> show s <> " " <> show msg
+  show (OptionTakesNoArgumentError a msg) = "(OptionTakesNoArgumentError " <> show a <> " " <> show msg <> ")"
+  show (OptionRequiresArgumentError a msg) = "(OptionRequiresArgumentError " <> show a <> " " <> show msg <> ")"
+  show (MissingArgumentError x msg) = "(MissingArgumentError " <> show x <> " " <> show msg <> ")"
+  show (UnexpectedInputError x msg) = "(UnexpectedInputError " <> show x <> " " <> show msg <> ")"
+  show (MalformedInputError s msg) = "(MalformedInputError " <> show s <> " " <> show msg <> ")"
+  show (GenericError s) = "(GenericError " <> show s <> ")"
+  show (InternalError s msg) = "(InternalError " <> show s <> " " <> show msg <> ")"
 
 instance prettyArgParseError :: Pretty ArgParseError where
   pretty (OptionTakesNoArgumentError _ msg) = force msg

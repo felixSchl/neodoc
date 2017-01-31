@@ -1,6 +1,7 @@
 module Neodoc.ArgParser.Evaluate where
 
 import Prelude
+import Debug.Trace
 import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.Optimize.Uncurried
@@ -8,7 +9,7 @@ import Data.Pretty
 import Data.Newtype (unwrap)
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)
-, null, length, reverse, catMaybes)
+, null, length, reverse, catMaybes, head)
 import Data.List.NonEmpty as NEL
 import Data.Function (on)
 import Data.Either (Either(..), fromRight)
@@ -67,15 +68,26 @@ snapshot = Parser \(a@(ParseArgs c s g i)) -> Step false a (Right a)
 
 chooseBest
   :: ∀ e c s g i a
-   . (e -> Int) -- get depth of error
+   . (Show e, Show a)
+  => (e -> Int) -- get depth of error
   -> (a -> Int) -- get depth of result
   -> List (Parser e c s g (List i) a)
   -> Parser e c s g (List i) a
-chooseBest getErrorDepth getSuccessDepth parsers = do
+chooseBest fE fA xs = snd <$> do
+  chooseBestTag fE fA ((unit /\ _) <$> xs)
+
+chooseBestTag
+  :: ∀ e c s g i a tag
+   . (Show e, Show a, Show tag)
+  => (e -> Int) -- get depth of error
+  -> (a -> Int) -- get depth of result
+  -> List (Tuple tag (Parser e c s g (List i) a))
+  -> Parser e c s g (List i) (Tuple tag a)
+chooseBestTag getErrorDepth getSuccessDepth parsers = do
   a@(ParseArgs c s g i) <- getParseState
 
   -- Run all parsers and collect their results for further evaluation
-  let collected = parsers <#> \parser ->
+  let collected = parsers <#> \(tag /\ parser) ->
         runParser' $ Args5 c s g i $ Parser \a' ->
           case unParser parser a' of
             Step b' a''@(ParseArgs c' s' g' i') result ->
@@ -83,7 +95,7 @@ chooseBest getErrorDepth getSuccessDepth parsers = do
               in Step b' a'' case result of
                   Left  (err@(ParseError true _)) -> Left err
                   Left  err -> Right $ ErrorCont   args' err
-                  Right val -> Right $ SuccessCont args' val
+                  Right val -> Right $ SuccessCont args' (tag /\ val)
 
   -- Now, check to see if we have any fatal errors, winners or errors.
   -- We know we must have either, but this is not encoded at the type-level.
@@ -102,7 +114,7 @@ chooseBest getErrorDepth getSuccessDepth parsers = do
       SuccessCont a r -> Just (a /\ r)
       _               -> Nothing
     bestSuccess = do
-      let depth = getSuccessDepth <<< snd
+      let depth = getSuccessDepth <<< snd <<< snd
       deepestGroup <- last do
         groupBy (eq `on` depth) do
           sortBy (compare `on` depth) successes
@@ -118,12 +130,12 @@ chooseBest getErrorDepth getSuccessDepth parsers = do
           sortBy (compare `on` depth) errors
       -- note: could apply user-defined function on equal elements here to find
       --       best of the best matches.
+
       pure $ NEL.head deepestGroup
 
   case bestSuccess of
     Just (a /\ r) -> Parser \_-> Step true a (Right r)
     _ -> do
-      -- TODO: proper error handling
-      case errors of
-        (a /\ e):_ -> Parser \_ -> Step true a (Left e)
-        _ -> Parser.fail "..."
+      case bestError of
+        Just (a /\ e) -> Parser \_ -> Step true a (Left e)
+        _ -> Parser.fail "..." -- this should never happen ...

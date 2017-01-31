@@ -30,7 +30,7 @@ import Neodoc.Parsing.Parser hiding (error)
 import Neodoc.Parsing.Parser.Combinators
 import Neodoc.Parsing.Parser.Combinators as Parser
 import Neodoc.Parsing.Parser as Parser
-import Neodoc.ArgParser.Evaluate (chooseBest)
+import Neodoc.ArgParser.Evaluate (chooseBest, chooseBestTag)
 
 data Pattern a = LeafPattern   IsOptional IsRepeatable IsFixed a
                | ChoicePattern IsOptional IsRepeatable IsFixed (List (List (Pattern a)))
@@ -139,6 +139,9 @@ data PatternError i u
 
 data Result a u = Result (List a) (Reps u) HasMoved Depth
 
+instance showResult :: (Generic u, Show a, Show u) => Show (Result a u) where
+  show (Result a u m d) = "(Result " <> show a <> " " <> show u <> " " <> show m <> " " <> show d <> ")"
+
 instance showError :: (Generic u, Show e, Show i, Show u) => Show (Error e i u) where
   show (Error x d) = "(Error " <> show x <> " " <> show d <> ")"
 
@@ -221,18 +224,45 @@ errorAt' d e = Error (Right e) d
 -}
 parse
   :: ∀ i e c s g u a
-   . (Generic u, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
+   . (Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> (PatternError i u -> e)
   -> List (Pattern u) -- input patterns
   -> Parser e c s g (List i) (List a)
-parse f fE pats = do
-  lowerError fE do
-    Result vs _ _ depth <- parsePatterns (match f) true Nil pats
-    is <- getInput
-    case is of
-      Nil  -> Parser.return vs
-      i:is -> Parser.fail' $ errorAt depth $ UnexpectedInputError (i :| is)
+parse f fE pats = lowerError fE $ fst <$> parse' f pats
+
+{-
+  XXX explain me
+-}
+parseBestTag
+  :: ∀ i e c s g u a tag
+   . (Generic u, Show a, Show i, Show u, Show e, Show tag, Pretty e, Pretty i, Pretty u, Pretty a)
+  => Matcher u i a e
+  -> (PatternError i u -> e)
+  -> List (Tuple tag (List (Pattern u))) -- tagged input patterns
+  -> Parser e c s g (List i) (Tuple tag (List a))
+parseBestTag f fE taggedPats = lowerError fE do
+  rmap fst <$> do
+    chooseBestTag
+      getErrorDepth
+      snd
+      (rmap (Parser.try <<< parse' f) <$> taggedPats)
+
+{-
+  XXX explain me
+-}
+parse'
+  :: ∀ i e c s g u a
+   . (Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
+  => Matcher u i a e
+  -> List (Pattern u) -- input patterns
+  -> Parser (Error e i u) c s g (List i) (Tuple (List a) Depth)
+parse' f pats = do
+  Result vs _ _ depth <- parsePatterns (match f) true Nil pats
+  is <- getInput
+  case is of
+    Nil  -> Parser.return $ vs /\ depth
+    i:is -> Parser.fail' $ errorAt depth $ UnexpectedInputError (i :| is)
 
 indent :: Int -> String
 indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
@@ -262,7 +292,7 @@ requireMovement p = do
 -}
 parsePatterns
   :: ∀ i e c s g u a
-   . (Generic u, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
+   . (Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) a)
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
@@ -274,7 +304,7 @@ parsePatterns f allowOmit repPats pats =
         Result vs reps' hasMoved depth <- case pat of
           LeafPattern _ r _ x -> do
             vs <- singleton <$> f allowOmit' depth x
-            pure $ Result vs reps true depth
+            pure $ Result vs reps true (depth + 1)
           ChoicePattern _ _ _ xs ->
             let resetReps = setReps reps
               in resetReps <$> do

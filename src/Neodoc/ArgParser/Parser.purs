@@ -10,6 +10,7 @@ import Data.Pretty
 import Data.String as String
 import Data.String.Ext as String
 import Data.Array.Partial as AU
+import Data.Array as A
 import Data.Foldable (foldl, elem)
 import Data.Tuple (curry)
 import Data.Tuple.Nested ((/\))
@@ -157,10 +158,13 @@ match isKnownToken arg is allowOmissions =
               Nothing /\ [] /\ (Just _) ->
                 fatal' $ optionTakesNoArgumentError (OA.Short f)
 
+              Nothing /\ [] /\ Nothing ->
+                return is $ BoolValue true
+
               Just (OptionArgument _ false) /\ xs /\ Just _ ->
                 fatal' $ optionRequiresArgumentError (OA.Short f)
 
-              Just (OptionArgument _ true) /\ xs /\ _ ->
+              Just (OptionArgument _ true) /\ xs /\ _ | (not $ A.null xs) ->
                 let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
                                       (unsafePartial $ AU.tail xs)
                                       mA'
@@ -168,13 +172,14 @@ match isKnownToken arg is allowOmissions =
                     newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
                  in return (newPtok : is) $ BoolValue true
 
-              Nothing /\ xs /\ mA' ->
+              Nothing /\ xs /\ mA' | (not $ A.null xs) ->
                 let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
                                       (unsafePartial $ AU.tail xs)
                                       mA'
                     newSrc = "-" <> String.drop 2 src
                     newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
                  in return (newPtok : is) $ BoolValue true
+              _ -> expected arg
 
     go arg _ = expected arg
 
@@ -211,21 +216,19 @@ parse
   -> Either (ParseError ArgParseError) ArgParseResult
 parse (spec@(Spec { layouts, descriptions })) options env tokens =
   let toplevels = concat $ NE.toList layouts
-      parsers =
+      isKnownToken' = isKnownToken spec
+      taggedPats =
         toplevels <#> \branch ->
           let leafs = layoutToPattern <$> NE.toList branch
-              isKnownToken' = isKnownToken spec
-           in do
-              vs <- Pattern.parse (match isKnownToken')
-                                  (lowerError isKnownToken')
-                                  (toArgs options env descriptions leafs)
-              pure $ ArgParseResult (Just branch) vs
+              argLeafs = toArgLeafs options env descriptions leafs
+           in Just branch /\ argLeafs
    in do
     runParser { env, options, spec } {} {} tokens do
-      chooseBest
-        (\_ -> 1)
-        (\_ -> 1)
-        (parsers)
+      mBranch /\ vs <- Pattern.parseBestTag
+                          (match isKnownToken')
+                          (lowerError isKnownToken')
+                          taggedPats
+      pure $ ArgParseResult mBranch vs
 
 {-
   Determine if a given token is considered known
@@ -262,14 +265,14 @@ isKnownToken (Spec { layouts, descriptions }) = memoize go
   Convert a list of patterns containing solved layout arguments into a list of
   patterns containing pre-cached `Arg`s.
 -}
-toArgs
+toArgLeafs
   :: ∀ r
    . Options r
   -> Env
   -> List Description
   -> List (Pattern SolvedLayoutArg)
   -> List (Pattern Arg)
-toArgs options env descriptions xs = evalState (for xs go) 0
+toArgLeafs options env descriptions xs = evalState (for xs go) 0
   where
   nextId = State.get <* State.modify (_ + 1)
   go (LeafPattern o r fix x) = nextId <#> LeafPattern o r fix <<< toArg x

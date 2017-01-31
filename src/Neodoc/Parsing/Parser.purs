@@ -25,7 +25,7 @@ mapError :: ∀ e. (e -> e) -> ParseError e -> ParseError e
 mapError f (ParseError b e) = ParseError b (rmap f e)
 
 instance showParseError :: (Show e) => Show (ParseError e) where
-  show (ParseError b e) = "ParseError " <> show b <> " "<> show e
+  show (ParseError b e) = "(ParseError " <> show b <> " "<> show e <> ")"
 
 instance prettyParseError :: (Pretty e) => Pretty (ParseError e) where
   pretty (ParseError false e) = either id pretty e
@@ -42,6 +42,13 @@ extractError _ (ParseError _ (Right e)) = e
 --------------------------------------------------------------------------------
 
 data ParserArgs c s g i = ParseArgs c s g i
+
+instance showParserArgs :: (Show c, Show s, Show g, Show i) => Show (ParserArgs c s g i) where
+  show (ParseArgs c s g i) = "(ParseArgs " <> show c
+                                    <> " " <> show s
+                                    <> " " <> show g
+                                    <> " " <> show i
+                                    <> ")"
 
 mapC :: ∀ c s g i. (c -> c) -> ParserArgs c s g i -> ParserArgs c s g i
 mapC f (ParseArgs c s g i) = ParseArgs (f c) s g i
