@@ -192,7 +192,15 @@ lowerError isKnownToken = case _ of
     unexpectedInputError $ if isKnownToken tok
                                 then known ptok
                                 else unknown ptok
-  Pattern.MissingPatternError p -> GenericError "???" -- TODO
+  Pattern.MissingPatternError x ->
+    case getLeftMostElement x of
+      Nothing -> GenericError ""
+      Just a  -> missingArgumentError (Arg.getArg a)
+
+  where
+  getLeftMostElement (LeafPattern _ _ _ x) = Just x
+  getLeftMostElement (ChoicePattern _ _ _ ((p:_):_)) = getLeftMostElement p
+  getLeftMostElement (ChoicePattern _ _ _ _) = Nothing
 
 parse
   :: ∀ r
