@@ -3,6 +3,7 @@ module Test.Spec.ArgParserSpec (argParserSpec) where
 import Prelude
 import Debug.Trace
 import Data.Tuple (Tuple(..))
+import Data.Tuple.Nested ((/\))
 import Control.Monad.Eff (Eff())
 import Control.Monad (when)
 import Control.Monad.Eff.Exception (EXCEPTION())
@@ -175,34 +176,34 @@ argParserSpec = \_ -> describe "The parser generator" do
             ]
         ]
 
-    -- , test
-    --     """
-    --     usage: prog [options]
-    --     options:
-    --       -h, --host FOO [default: BAR] [env: HOST]
-    --     """
-    --     [ pass'
-    --         Nothing
-    --         []
-    --         [ "HOST" :> "HOME" ]
-    --         [ "-h"     :> V.str "HOME"
-    --         , "--host" :> V.str "HOME"
-    --         ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog -iFILE
-    --     options:
-    --       -i, --input FILE
-    --     """
-    --     [ --fail Nothing [] "missing -iFILE"
-    --       pass Nothing
-    --         [ "-i", "bar" ]
-    --         [ "-i"      :> V.str "bar"
-    --         , "--input" :> V.str "bar" ]
-    --     ]
-    --
+    , test
+        """
+        usage: prog [options]
+        options:
+          -h, --host FOO [default: BAR] [env: HOST]
+        """
+        [ pass'
+            Nothing
+            []
+            [ "HOST" :> "HOME" ]
+            [ "-h"     :> V.str "HOME"
+            , "--host" :> V.str "HOME"
+            ]
+        ]
+
+    , test
+        """
+        usage: prog -iFILE
+        options:
+          -i, --input FILE
+        """
+        [ --fail Nothing [] "missing -iFILE"
+          pass Nothing
+            [ "-i", "bar" ]
+            [ "-i"      :> V.str "bar"
+            , "--input" :> V.str "bar" ]
+        ]
+
     -- , test
     --     """
     --     usage: prog -i FILE
@@ -973,11 +974,12 @@ argParserSpec = \_ -> describe "The parser generator" do
         let msg = either (\e -> "Should fail with \"" <> e <> "\"")
                           pretty
                           expected
-            premsg = if not (A.null argv)
+            envmsg = intercalate " " $ (\(a /\ b) -> a <> "=" <> b) <$> env
+            inpmsg = if not (A.null argv)
                         then intercalate " " argv
                         else "(no input)"
             help' = dedent help
-        in it ("\n~$ " <> premsg <> "\n== " <> msg) $ vliftEff do
+         in it ("\n~$ " <> envmsg <> " " <> inpmsg <> "\n== " <> msg) $ vliftEff do
             spec <- runEitherEff do
               -- scan the input text
               { originalUsage, usage, options } <- Error.capture do

@@ -136,7 +136,7 @@ match isKnownToken arg is allowOmissions =
                   Just (v /\ is) -> return is v
           _ -> expected arg
 
-    go (arg@(Option a@(OA.Short f) mA _)) ((PositionedToken (Tok.SOpt f' xs mA') _ _):is)
+    go (arg@(Option a@(OA.Short f) mA _)) ((PositionedToken (Tok.SOpt f' xs mA') src _):is)
       | f == f'
       = let adjacent = case is of
               (PositionedToken (Tok.Lit s) _ _):is' ->
@@ -150,13 +150,31 @@ match isKnownToken arg is allowOmissions =
                   Just (v /\ is) -> return is v
                   Nothing | o -> return is $ BoolValue true
                   Nothing  -> fatal' $ optionRequiresArgumentError (OA.Short f)
+
+              Just _ /\ xs /\ Nothing ->
+                return is $ StringValue $ String.fromCharArray xs
+
               Nothing /\ [] /\ (Just _) ->
                 fatal' $ optionTakesNoArgumentError (OA.Short f)
+
+              Just (OptionArgument _ false) /\ xs /\ Just _ ->
+                fatal' $ optionRequiresArgumentError (OA.Short f)
+
+              Just (OptionArgument _ true) /\ xs /\ _ ->
+                let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
+                                      (unsafePartial $ AU.tail xs)
+                                      mA'
+                    newSrc = "-" <> String.drop 2 src
+                    newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
+                 in return (newPtok : is) $ BoolValue true
+
               Nothing /\ xs /\ mA' ->
                 let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
                                       (unsafePartial $ AU.tail xs)
                                       mA'
-                 in return (newTok <> is) $ BoolValue true
+                    newSrc = "-" <> String.drop 2 src
+                    newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
+                 in return (newPtok : is) $ BoolValue true
 
     go arg _ = expected arg
 
