@@ -267,16 +267,16 @@ parsePatterns l f allowOmit repPats pats =
   let xs = indexed pats
       f' allowOmit' depth reps pat = do
         Result vs reps' hasMoved depth <- case pat of
-          LeafPattern o r _ x -> do
-            vs <- singleton <$> f (o && allowOmit') depth x
+          LeafPattern _ r _ x -> do
+            vs <- singleton <$> f allowOmit' depth x
             pure $ Result vs reps true depth
-          ChoicePattern o _ _ xs ->
+          ChoicePattern _ _ _ xs ->
             let resetReps = setReps reps
               in resetReps <$> do
                   chooseBest
                     getErrorDepth
                     getSuccessDepth
-                    (parsePatterns (l + 1) f (o && allowOmit') Nil <$> xs)
+                    (parsePatterns (l + 1) f allowOmit' Nil <$> xs)
         let reps'' = if isRepeatable pat then pat : reps' else reps'
 
         pure $ Result vs reps'' hasMoved depth
