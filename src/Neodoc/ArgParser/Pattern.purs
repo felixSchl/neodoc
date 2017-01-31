@@ -142,6 +142,9 @@ data Result a u = Result (List a) (Reps u) HasMoved Depth
 instance showError :: (Generic u, Show e, Show i, Show u) => Show (Error e i u) where
   show (Error x d) = "(Error " <> show x <> " " <> show d <> ")"
 
+instance prettyError :: (Generic u, Pretty e, Pretty i, Pretty u) => Pretty (Error e i u) where
+  pretty (Error x d) = pretty x <> " at " <> pretty d
+
 instance showPatternError :: (Generic u, Show i, Show u) => Show (PatternError i u) where
   show (GenericError x) = "(GenericError " <> show x <> ")"
   show (UnexpectedInputError x) = "(UnexpectedInputError " <> show x <> ")"
@@ -218,14 +221,14 @@ errorAt' d e = Error (Right e) d
 -}
 parse
   :: ∀ i e c s g u a
-   . (Pretty i, Pretty u, Pretty a, Show e)
+   . (Generic u, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> (PatternError i u -> e)
   -> List (Pattern u) -- input patterns
   -> Parser e c s g (List i) (List a)
 parse f fE pats = do
   lowerError fE do
-    Result vs _ _ depth <- parsePatterns 0 (match f) true Nil pats
+    Result vs _ _ depth <- parsePatterns (match f) true Nil pats
     is <- getInput
     case is of
       Nil  -> Parser.return vs
@@ -259,14 +262,13 @@ requireMovement p = do
 -}
 parsePatterns
   :: ∀ i e c s g u a
-   . (Pretty i, Pretty u, Pretty a, Show e)
-  => Int
-  -> (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) a)
+   . (Generic u, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
+  => (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) a)
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
   -> Parser (Error e i u) c s g (List i) (Result a u)
-parsePatterns l f allowOmit repPats pats =
+parsePatterns f allowOmit repPats pats =
   let xs = indexed pats
       f' allowOmit' depth reps pat = do
         Result vs reps' hasMoved depth <- case pat of
@@ -279,14 +281,14 @@ parsePatterns l f allowOmit repPats pats =
                   chooseBest
                     getErrorDepth
                     getSuccessDepth
-                    (parsePatterns (l + 1) f allowOmit' Nil <$> xs)
+                    (parsePatterns f allowOmit' Nil <$> xs)
         let reps'' = if isRepeatable pat then pat : reps' else reps'
 
         pure $ Result vs reps'' hasMoved depth
    in do
         -- 1. parse the pattern wholly
         Result vs rep hasMoved depth <- go do
-          Args12 f' xs xs Nil false false false false repPats Nil 0 Nothing
+          Args12 f' xs xs Nil false false false false repPats Nil 1 Nothing
 
         -- 2. consume any trailing arguments using the repeating patterns we
         --    learned about so far.
@@ -294,7 +296,7 @@ parsePatterns l f allowOmit repPats pats =
         --          never substitute values during rep parsing.
         --    note: we ignore any newly learned reps at this point (TODO: is
         --          this correct?)
-        vs' <- parseRemainder rep ((getValue <$> _) <<< f' false 0 rep)
+        vs' <- parseRemainder rep ((getValue <$> _) <<< f' false depth rep)
 
         Parser.return $ Result  (vs <> vs')
                                 rep
@@ -387,7 +389,9 @@ parsePatterns l f allowOmit repPats pats =
                         Parser.try do
                           requireMovement do
                             f' false depth reps pat
-               in p `catch` \_ e -> pure $ Left $ Just e
+               in p `catch` \_ e ->
+                    let e' = Parser.mapError (\(Error e d) -> Error e (d + depth)) e
+                      in pure $ Left $ Just e'
           ) <|> (pure $ Left Nothing)
 
     case eR of
@@ -440,9 +444,8 @@ parsePatterns l f allowOmit repPats pats =
             -- the currently tracked error.
             let mE'' = case mE /\ mE' of
                   Nothing /\ Just (ParseError _ (Right e)) -> Just e
-                  Just (Error _ d) /\ Just (ParseError _ (Right (Error e' d')))
-                    | (d' + depth) >= d
-                    -> Just (Error e' (d' + depth))
+                  Just (Error _ d) /\ Just (ParseError _ (Right (e'@(Error _ d'))))
+                    | d' > d -> Just e'
                   _ /\ _ -> mE
 
             go (Args12 f' orig xs (x:carry) allowOmissions allowReps hasMoved (isFixed pat) reps out depth mE'')

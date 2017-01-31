@@ -204,128 +204,128 @@ argParserSpec = \_ -> describe "The parser generator" do
             , "--input" :> V.str "bar" ]
         ]
 
-    -- , test
-    --     """
-    --     usage: prog -i FILE
-    --     options:
-    --       -i, --input FILE
-    --     """
-    --     [ --fail Nothing [] "missing -iFILE"
-    --       pass Nothing
-    --         [ "-i", "bar" ]
-    --         [ "-i"      :> V.str "bar"
-    --         , "--input" :> V.str "bar" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog (-iFILE)
-    --     options:
-    --       -i, --input FILE
-    --     """
-    --     [ --fail Nothing [] "missing -iFILE"
-    --       pass Nothing
-    --         [ "-i", "bar" ]
-    --         [ "-i"      :> V.str "bar"
-    --         , "--input" :> V.str "bar" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog (-iFILE) -oFILE
-    --     options:
-    --       -i, --input FILE
-    --       -o, --output FILE
-    --     """
-    --     [ fail Nothing []
-    --       $ "missing -iFILE"
-    --
-    --     , fail Nothing [ "-i", "bar" ]
-    --       $ "missing -oFILE"
-    --
-    --     , pass Nothing
-    --         [ "-i", "bar", "-o", "bar" ]
-    --         [ "--input"  :> V.str "bar"
-    --         , "-i"       :> V.str "bar"
-    --         , "--output" :> V.str "bar"
-    --         , "-o"       :> V.str "bar" ]
-    --
-    --       -- group should be interchangable if it's only of options:
-    --     , pass Nothing
-    --         [ "-o", "bar", "-i", "bar" ]
-    --         [ "--input"  :> V.str "bar"
-    --         , "-i"       :> V.str "bar"
-    --         , "--output" :> V.str "bar"
-    --         , "-o"       :> V.str "bar" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog ((-iFILE) -rFILE) -oFILE
-    --     options:
-    --       -i, --input FILE
-    --       -o, --output FILE
-    --       -r, --redirect FILE [env: QUX]
-    --     """
-    --     [ fail Nothing []
-    --       $ "missing -iFILE"
-    --
-    --     , fail Nothing [ "-i", "bar", "-r", "bar" ]
-    --         "missing -oFILE"
-    --
-    --     , pass Nothing
-    --         [ "-i", "bar", "-r", "bar", "-o", "bar" ]
-    --         [ "--input"    :> V.str "bar"
-    --         , "-i"         :> V.str "bar"
-    --         , "--redirect" :> V.str "bar"
-    --         , "-r"         :> V.str "bar"
-    --         , "--output"   :> V.str "bar"
-    --         , "-o"         :> V.str "bar" ]
-    --
-    --       -- group should be interchangable if it's only of options:
-    --     , pass Nothing
-    --         [ "-o", "bar", "-r", "bar", "-i", "bar" ]
-    --         [ "--input"    :> V.str "bar"
-    --         , "-i"         :> V.str "bar"
-    --         , "--redirect" :> V.str "bar"
-    --         , "-r"         :> V.str "bar"
-    --         , "--output"   :> V.str "bar"
-    --         , "-o"         :> V.str "bar" ]
-    --
-    --     , pass' Nothing
-    --         [ "-o", "bar", "-i", "bar" ]
-    --         [ "QUX" :> "BAR" ]
-    --         [ "--input"    :> V.str "bar"
-    --         , "-i"         :> V.str "bar"
-    --         , "--redirect" :> V.str "BAR"
-    --         , "-r"         :> V.str "BAR"
-    --         , "--output"   :> V.str "bar"
-    --         , "-o"         :> V.str "bar" ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog ((-i FILE) <env>) -oFILE
-    --     options:
-    --       -i, --input FILE
-    --       -o, --output FILE
-    --       -r, --redirect FILE
-    --     """
-    --     [ fail Nothing [] "missing -iFILE"
-    --       -- XXX: Would be cool to show the reason the group did not parse!
-    --     , fail Nothing [ "-i", "bar" ] "missing <env>"
-    --     , pass Nothing
-    --         [ "-i", "bar", "x", "-o", "bar" ]
-    --         [ "--input"  :> V.str "bar"
-    --         , "-i"       :> V.str "bar"
-    --         , "<env>"    :> V.str "x"
-    --         , "--output" :> V.str "bar"
-    --         , "-o"       :> V.str "bar" ]
-    --       -- group should NOT be interchangable if it contains non-options:
-    --     , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
-    --         "expected (-iFILE <env>), but got -o"
-    --     ]
-    --
+    , test
+        """
+        usage: prog -i FILE
+        options:
+          -i, --input FILE
+        """
+        [ --fail Nothing [] "missing -iFILE"
+          pass Nothing
+            [ "-i", "bar" ]
+            [ "-i"      :> V.str "bar"
+            , "--input" :> V.str "bar" ]
+        ]
+
+    , test
+        """
+        usage: prog (-iFILE)
+        options:
+          -i, --input FILE
+        """
+        [ --fail Nothing [] "missing -iFILE"
+          pass Nothing
+            [ "-i", "bar" ]
+            [ "-i"      :> V.str "bar"
+            , "--input" :> V.str "bar" ]
+        ]
+
+    , test
+        """
+        usage: prog (-iFILE) -oFILE
+        options:
+          -i, --input FILE
+          -o, --output FILE
+        """
+        [ fail Nothing []
+          $ "missing -iFILE"
+
+        , fail Nothing [ "-i", "bar" ]
+          $ "missing -oFILE"
+
+        , pass Nothing
+            [ "-i", "bar", "-o", "bar" ]
+            [ "--input"  :> V.str "bar"
+            , "-i"       :> V.str "bar"
+            , "--output" :> V.str "bar"
+            , "-o"       :> V.str "bar" ]
+
+          -- group should be interchangable if it's only of options:
+        , pass Nothing
+            [ "-o", "bar", "-i", "bar" ]
+            [ "--input"  :> V.str "bar"
+            , "-i"       :> V.str "bar"
+            , "--output" :> V.str "bar"
+            , "-o"       :> V.str "bar" ]
+        ]
+
+    , test
+        """
+        usage: prog ((-iFILE) -rFILE) -oFILE
+        options:
+          -i, --input FILE
+          -o, --output FILE
+          -r, --redirect FILE [env: QUX]
+        """
+        [ fail Nothing []
+          $ "missing -iFILE"
+
+        , fail Nothing [ "-i", "bar", "-r", "bar" ]
+            "missing -oFILE"
+
+        , pass Nothing
+            [ "-i", "bar", "-r", "bar", "-o", "bar" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "bar"
+            , "-r"         :> V.str "bar"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
+
+          -- group should be interchangable if it's only of options:
+        , pass Nothing
+            [ "-o", "bar", "-r", "bar", "-i", "bar" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "bar"
+            , "-r"         :> V.str "bar"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
+
+        , pass' Nothing
+            [ "-o", "bar", "-i", "bar" ]
+            [ "QUX" :> "BAR" ]
+            [ "--input"    :> V.str "bar"
+            , "-i"         :> V.str "bar"
+            , "--redirect" :> V.str "BAR"
+            , "-r"         :> V.str "BAR"
+            , "--output"   :> V.str "bar"
+            , "-o"         :> V.str "bar" ]
+        ]
+
+    , test
+        """
+        usage: prog ((-i FILE) <env>) -oFILE
+        options:
+          -i, --input FILE
+          -o, --output FILE
+          -r, --redirect FILE
+        """
+        [ fail Nothing [] "missing -iFILE"
+          -- XXX: Would be cool to show the reason the group did not parse!
+        , fail Nothing [ "-i", "bar" ] "missing <env>"
+        , pass Nothing
+            [ "-i", "bar", "x", "-o", "bar" ]
+            [ "--input"  :> V.str "bar"
+            , "-i"       :> V.str "bar"
+            , "<env>"    :> V.str "x"
+            , "--output" :> V.str "bar"
+            , "-o"       :> V.str "bar" ]
+          -- group should NOT be interchangable if it contains non-options:
+        , fail Nothing [ "-o", "bar", "x", "-i", "bar" ]
+            "expected (-iFILE <env>), but got -o"
+        ]
+
     -- , test
     --     """
     --     usage: prog [options]
