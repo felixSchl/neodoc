@@ -17,12 +17,15 @@ import Data.Pretty
 import Data.Maybe
 import Data.Array as A
 import Data.List.Lazy (replicateM)
+import Data.List.Partial as LU
 import Data.List.Lazy as LL
 import Data.Either
+import Partial.Unsafe
 import Control.Alt
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.State as State
 import Neodoc.Data.Indexed
+import Neodoc.Data.Indexed as Indexed
 import Neodoc.Parsing.Parser hiding (error)
 import Neodoc.Parsing.Parser.Combinators
 import Neodoc.Parsing.Parser.Combinators as Parser
@@ -331,9 +334,13 @@ parsePatterns l f allowOmit repPats pats =
 
   -- Failure: ...
   go (Args12 f' _ Nil (carry@(((Indexed _ pat):_))) false true _ _ _ _ depth mE) = do
-    case mE of
-      Just e -> Parser.fail' e
-      _      -> expected depth pat
+    let throwExistingError = case mE of
+          Just (e@(Error _ d)) | d > depth -> Parser.fail' e
+          _ ->
+            let sortedCarry = sortBy (compare `on` getIndex) carry
+                pat' = getIndexedElem $ unsafePartial $ LU.head sortedCarry
+             in expected depth pat'
+    throwExistingError
 
   go (Args12 f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ reps out depth mE) = do
 
@@ -344,15 +351,18 @@ parsePatterns l f allowOmit repPats pats =
     -- TODO: this might need more logic as to which element we throw out first
     --       the current approach is simply removes from left to right.
     let throwExistingError = case mE of
-          Just e -> Parser.fail' e
-          _      -> expected depth pat
+          Just (e@(Error _ d)) | d > depth -> Parser.fail' e
+          _ ->
+            let sortedCarry = sortBy (compare `on` getIndex) carry
+                pat' = getIndexedElem $ unsafePartial $ LU.head sortedCarry
+             in expected depth pat'
     if allowOmit
        then
           let sortedCarry = sortBy (compare `on` getIndex) carry
            in case dropFirst (isOptional <<< getIndexedElem) sortedCarry of
             Just carry' -> (
               go $ Args12 f' carry' carry' Nil false false false false reps out depth mE
-              ) <|> throwExistingError
+              ) <|> throwExistingError -- XXX: is this right, or `catch` here?
             Nothing -> throwExistingError
        else throwExistingError
 
@@ -367,9 +377,11 @@ parsePatterns l f allowOmit repPats pats =
     -- we try parsing this pattern under varying circumstances but only capture
     -- new errors for non-ommissable parses.
     eR <- (if allowOmissions
-            then Right <$> do
-                  Parser.try do
-                    f' true depth reps pat
+            then
+              let p = Right <$> do
+                        Parser.try do
+                          f' true depth reps pat
+               in p -- XXX: should we `catch` here?
             else
               let p = Right <$> do
                         Parser.try do
