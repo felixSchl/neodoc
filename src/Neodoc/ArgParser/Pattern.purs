@@ -159,7 +159,9 @@ instance prettyPatternError :: (Pretty i, Pretty u) => Pretty (PatternError i u)
   pretty (MissingPatternError p) = "Missing " <> pretty p
 
 type IsFatal = Boolean
-type PatternMatch i e a = Either (Tuple IsFatal e) (Tuple a (List i))
+type HasTerminated = Boolean
+type PatternMatch i e a = Either (Tuple IsFatal e)
+                                 (Tuple a (Maybe (List i)))
 type Matcher u i a e = u -> List i -> AllowOmissions -> PatternMatch i e a
 
 setReps :: ∀ a u. Reps u -> Result a u -> Result a u
@@ -184,11 +186,12 @@ match
   -> AllowOmissions
   -> Depth
   -> u
-  -> Parser (Error e i u) c s g (List i) a
+  -> Parser (Error e i u) c s g (List i) (Tuple a HasTerminated)
 match f allowOmissions depth p = Parser \a ->
   let result = f p (getI a) allowOmissions
    in case result of
-        Right (r /\ i) -> Step true (Parser.setI i a) (Right r)
+        Right (r /\ Just i) -> Step true (Parser.setI i a) (Right (r /\ false))
+        Right (r /\ Nothing) -> Step true (Parser.setI Nil a) (Right (r /\ true))
         Left (isFatal /\ e) ->
           let error = Error (Right e) depth
            in Step false a $ Left $ ParseError isFatal (Right error)
@@ -294,7 +297,7 @@ parsePatterns
   :: ∀ i e c s g u a
    . (Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Int
-  -> (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) a)
+  -> (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) (Tuple a HasTerminated))
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
