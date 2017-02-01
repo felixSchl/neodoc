@@ -484,62 +484,62 @@ argParserSpec = \_ -> describe "The parser generator" do
             "missing -fFOZ"
         ]
 
-    -- , test
-    --     """
-    --     usage: prog [foo]
-    --     """
-    --     [ fail Nothing [ "goo" ] "unknown command goo" ]
-    --
-    -- , test
-    --     """
-    --     usage: prog (foo)
-    --     """
-    --     [ fail Nothing [ "goo" ] "unknown command goo" ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "true", "false" ]
-    --         [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n...
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "true", "false" ]
-    --         [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
-    --     ]
-    --
+    , test
+        """
+        usage: prog [foo]
+        """
+        [ fail Nothing [ "goo" ] "unknown command goo" ]
+
+    , test
+        """
+        usage: prog (foo)
+        """
+        [ fail Nothing [ "goo" ] "unknown command goo" ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "true", "false" ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n...
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "true", "false" ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
+        ]
+
     -- , test
     --     """
     --     Usage: prog [options]

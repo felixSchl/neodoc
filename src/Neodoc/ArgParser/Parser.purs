@@ -5,7 +5,9 @@ import Prelude
 import Debug.Trace
 
 import Data.List (List(..), (:), fromFoldable, toUnfoldable, concat, singleton, any)
+import Data.List.Extra (spanMap)
 import Data.Maybe
+import Data.Bifunctor (lmap)
 import Data.Pretty
 import Data.String as String
 import Data.String.Ext as String
@@ -112,15 +114,15 @@ match isKnownToken arg is allowOmissions =
     go Stdin ((PositionedToken Tok.Stdin _ _):is)
       = return is $ BoolValue true
 
-    go (Option a mA _) toks
+    go (Option a mA r) toks
       = let aliases = case Arg.getDescription arg of
               Just (OptionDescription aliases _ _ _ _) -> aliases
               _ -> NE.singleton a
-         in NE.foldl1 (<|>) (opt toks mA <$> aliases)
+         in NE.foldl1 (<|>) (opt toks mA r <$> aliases)
 
     go arg _ = expected arg
 
-    opt ((PositionedToken (Tok.LOpt n' mA') _ _):is) mA (a@(OA.Long n))
+    opt ((PositionedToken (Tok.LOpt n' mA') _ _):is) mA r (a@(OA.Long n))
       | String.startsWith n' n
       = case mA /\ mA' of
           Nothing /\ Just _ | n == n' ->
@@ -134,7 +136,15 @@ match isKnownToken arg is allowOmissions =
                   guard $ n' == n
                   case is of
                     (PositionedToken (Tok.Lit s) _ _):is' ->
-                      pure (StringValue s /\ is')
+                      if r
+                        then do
+                          ss /\ is'' <- pure $
+                            lmap A.fromFoldable $
+                              flip spanMap is' case _ of
+                                PositionedToken (Tok.Lit s) _ _ -> Just s
+                                _ -> Nothing
+                          pure $ (ArrayValue $ StringValue <$> (s A.: ss)) /\ is''
+                        else pure $ StringValue s /\ is'
                     _ -> Nothing
                 subsume = do
                   v <- String.stripPrefix (String.Pattern n) n'
@@ -146,11 +156,19 @@ match isKnownToken arg is allowOmissions =
                   Just (v /\ is) -> return is v
           _ -> expected $ Arg.getArg arg
 
-    opt ((PositionedToken (Tok.SOpt f' xs mA') src _):is) mA (a@(OA.Short f))
+    opt ((PositionedToken (Tok.SOpt f' xs mA') src _):is) mA r (a@(OA.Short f))
       | f == f'
       = let adjacent = case is of
               (PositionedToken (Tok.Lit s) _ _):is' ->
-                pure (StringValue s /\ is')
+                if r
+                  then do
+                    ss /\ is'' <- pure $
+                      lmap A.fromFoldable $
+                        flip spanMap is' case _ of
+                          PositionedToken (Tok.Lit s) _ _ -> Just s
+                          _ -> Nothing
+                    pure $ (ArrayValue $ StringValue <$> (s A.: ss)) /\ is''
+                  else pure $ StringValue s /\ is'
               _ -> Nothing
          in case mA /\ xs /\ mA' of
               Just _ /\ [] /\ (Just s) ->
@@ -190,7 +208,7 @@ match isKnownToken arg is allowOmissions =
                  in return (newPtok : is) $ BoolValue true
               _ -> expected $ Arg.getArg arg
 
-    opt _ _ _ = expected $ Arg.getArg arg
+    opt _ _ _ _ = expected $ Arg.getArg arg
 
   fromFallback arg _ | not allowOmissions = expected arg
   fromFallback arg Nothing = expected arg
