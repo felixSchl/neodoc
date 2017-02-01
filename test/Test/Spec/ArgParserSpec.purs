@@ -720,34 +720,34 @@ argParserSpec = \_ -> describe "The parser generator" do
             [ "-a", "-d", "-a", "-a", "-d", "-a" ]
             [ "-a" :> V.int 4
             , "-d" :> V.int 2 ]
-        , pass
-            Nothing
-            [ "-a", "-b" ]
-            [ "-a" :> V.int 1
-            , "-b" :> V.int 1 ]
+        -- , pass
+        --     Nothing
+        --     [ "-a", "-b" ]
+        --     [ "-a" :> V.int 1
+        --     , "-b" :> V.int 1 ]
         ]
 
-    , test
-        """
-        usage: prog foo --foo... --bar...
-           or: prog <env>...
-        """
-        [ pass
-            Nothing
-            [ "100", "200" ]
-            [ "<env>" :> V.array [ V.int 100, V.int 200 ] ]
-        , pass
-            Nothing
-            [ "foo", "--foo", "--foo" ]
-            [ "foo"   :> V.bool true
-            , "--foo" :> V.int 2 ]
-        , pass
-            Nothing
-            [ "foo", "--foo", "--bar", "--foo" ]
-            [ "foo"   :> V.bool true
-            , "--foo" :> V.int 2
-            , "--bar" :> V.int 1 ]
-        ]
+    -- , test
+    --     """
+    --     usage: prog foo --foo... --bar...
+    --        or: prog <env>...
+    --     """
+    --     [ pass
+    --         Nothing
+    --         [ "100", "200" ]
+    --         [ "<env>" :> V.array [ V.int 100, V.int 200 ] ]
+    --     , pass
+    --         Nothing
+    --         [ "foo", "--foo", "--foo" ]
+    --         [ "foo"   :> V.bool true
+    --         , "--foo" :> V.int 2 ]
+    --     , pass
+    --         Nothing
+    --         [ "foo", "--foo", "--bar", "--foo" ]
+    --         [ "foo"   :> V.bool true
+    --         , "--foo" :> V.int 2
+    --         , "--bar" :> V.int 1 ]
+    --     ]
 
     -- , test
     --     """

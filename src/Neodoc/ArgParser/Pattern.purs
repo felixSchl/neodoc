@@ -44,8 +44,12 @@ type AllowRepetitions = Boolean
 type AllowOmissions = Boolean
 
 derive instance genericPattern :: (Generic a) => Generic (Pattern a)
+
 instance showPattern :: (Generic a, Show a) => Show (Pattern a) where
   show = gShow
+
+instance eqPattern :: (Generic a, Eq a) => Eq (Pattern a) where
+  eq = gEq
 
 instance functorPattern :: Functor Pattern where
   map f (ChoicePattern o r fix xs) = ChoicePattern o r fix $ ((f <$> _) <$> _) <$> xs
@@ -227,7 +231,7 @@ errorAt' d e = Error (Right e) d
 -}
 parse
   :: ∀ i e c s g u a
-   . (Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
+   . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> (PatternError i u -> e)
   -> List (Pattern u) -- input patterns
@@ -239,7 +243,7 @@ parse f fE pats = lowerError fE $ fst <$> parse' f pats
 -}
 parseBestTag
   :: ∀ i e c s g u a tag
-   . (Generic u, Show a, Show i, Show u, Show e, Show tag, Pretty e, Pretty i, Pretty u, Pretty a)
+   . (Eq u, Generic u, Show a, Show i, Show u, Show e, Show tag, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> (PatternError i u -> e)
   -> List (Tuple tag (List (Pattern u))) -- tagged input patterns
@@ -256,7 +260,7 @@ parseBestTag f fE taggedPats = lowerError fE do
 -}
 parse'
   :: ∀ i e c s g u a
-   . (Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
+   . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> List (Pattern u) -- input patterns
   -> Parser (Error e i u) c s g (List i) (Tuple (List a) Depth)
@@ -295,7 +299,7 @@ requireMovement p = do
 -}
 parsePatterns
   :: ∀ i e c s g u a
-   . (Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
+   . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Int
   -> (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) (Tuple a HasTerminated))
   -> AllowOmissions   -- allow omissions?
@@ -315,8 +319,8 @@ parsePatterns l f allowOmit repPats pats =
                   chooseBest
                     getErrorDepth
                     getSuccessDepth
-                    (parsePatterns (l + 1) f allowOmit' Nil <$> xs)
-        let reps'' = if isRepeatable pat then pat : reps' else reps'
+                    (parsePatterns (l + 1) f allowOmit' reps <$> xs)
+        let reps'' = if isRepeatable pat then nub (pat : reps') else reps'
         pure $ Result vs reps'' hasMoved depth hasTerminated
    in do
         -- 1. parse the pattern wholly
