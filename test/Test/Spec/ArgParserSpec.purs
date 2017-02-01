@@ -520,7 +520,7 @@ argParserSpec = \_ -> describe "The parser generator" do
 
     , test
         """
-        Usage: prog [options]
+        Usage: prog [options] baz
         options:
           -n...
         """
@@ -540,215 +540,215 @@ argParserSpec = \_ -> describe "The parser generator" do
             [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
         ]
 
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n[=FOO]
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "true", "false" ]
-    --         [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n[=FOO]...
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "true", "false" ]
-    --         [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n, --noop
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
-    --         , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "--noop" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
-    --         , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     , pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n", "--noop" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
-    --         , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [options]
-    --     options:
-    --       -n ARC
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog ((((foo|bar)|qux)|wux)|-n ARC) ARGS...
-    --     options:
-    --       -n ARC
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [-n ARG]
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt       = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 , smartOptions = false
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog ((((foo|bar)|-n ARC)|wux))
-    --     options:
-    --       -n ARC
-    --     """
-    --     [ pass
-    --         (Just (defaultOptions
-    --                 { stopAt = [ "-n" ]
-    --                 , optionsFirst = true
-    --                 }))
-    --         [ "-n", "-a", "-b", "-c" ]
-    --         [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     Usage: prog [-i] [-q]...
-    --     """
-    --     [ pass
-    --         Nothing
-    --         [ "-q", "-i", "-q" ]
-    --         [ "-i" :> V.bool true
-    --         , "-q" :> V.int 2 ]
-    --     , pass
-    --         Nothing
-    --         [ "-i", "-q", "-q" ]
-    --         [ "-i" :> V.bool true
-    --         , "-q" :> V.int 2 ]
-    --     , pass
-    --         Nothing
-    --         [ "-q", "-q", "-i" ]
-    --         [ "-i" :> V.bool true
-    --         , "-q" :> V.int 2 ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog (-a | -b)... (-d | -e)...
-    --     """
-    --     [ pass
-    --         Nothing
-    --         [ "-a", "-d" ]
-    --         [ "-a" :> V.int 1
-    --         , "-d" :> V.int 1 ]
-    --     , pass
-    --         Nothing
-    --         [ "-a", "-a", "-d" ]
-    --         [ "-a" :> V.int 2
-    --         , "-d" :> V.int 1 ]
-    --     , pass
-    --         Nothing
-    --         [ "-a", "-a", "-d", "-d" ]
-    --         [ "-a" :> V.int 2
-    --         , "-d" :> V.int 2 ]
-    --     , pass
-    --         Nothing
-    --         [ "-a", "-d", "-a", "-a", "-d", "-a" ]
-    --         [ "-a" :> V.int 4
-    --         , "-d" :> V.int 2 ]
-    --     , pass
-    --         Nothing
-    --         [ "-a", "-b" ]
-    --         [ "-a" :> V.int 1
-    --         , "-b" :> V.int 1 ]
-    --     ]
-    --
-    -- , test
-    --     """
-    --     usage: prog foo --foo... --bar...
-    --        or: prog <env>...
-    --     """
-    --     [ pass
-    --         Nothing
-    --         [ "100", "200" ]
-    --         [ "<env>" :> V.array [ V.int 100, V.int 200 ] ]
-    --     , pass
-    --         Nothing
-    --         [ "foo", "--foo", "--foo" ]
-    --         [ "foo"   :> V.bool true
-    --         , "--foo" :> V.int 2 ]
-    --     , pass
-    --         Nothing
-    --         [ "foo", "--foo", "--bar", "--foo" ]
-    --         [ "foo"   :> V.bool true
-    --         , "--foo" :> V.int 2
-    --         , "--bar" :> V.int 1 ]
-    --     ]
-    --
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n[=FOO]
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "true", "false" ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n[=FOO]...
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "true", "false" ]
+            [ "-n" :> V.array [ V.str "true",  V.str "false" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n, --noop
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
+            , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "--noop" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
+            , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        , pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n", "--noop" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n"     :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ]
+            , "--noop" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [options]
+        options:
+          -n ARC
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog ((((foo|bar)|qux)|wux)|-n ARC) ARGS...
+        options:
+          -n ARC
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [-n ARG]
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt       = [ "-n" ]
+                    , optionsFirst = true
+                    , smartOptions = false
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog ((((foo|bar)|-n ARC)|wux))
+        options:
+          -n ARC
+        """
+        [ pass
+            (Just (defaultOptions
+                    { stopAt = [ "-n" ]
+                    , optionsFirst = true
+                    }))
+            [ "-n", "-a", "-b", "-c" ]
+            [ "-n" :> V.array [ V.str "-a",  V.str "-b",  V.str "-c" ] ]
+        ]
+
+    , test
+        """
+        Usage: prog [-i] [-q]...
+        """
+        [ pass
+            Nothing
+            [ "-q", "-i", "-q" ]
+            [ "-i" :> V.bool true
+            , "-q" :> V.int 2 ]
+        , pass
+            Nothing
+            [ "-i", "-q", "-q" ]
+            [ "-i" :> V.bool true
+            , "-q" :> V.int 2 ]
+        , pass
+            Nothing
+            [ "-q", "-q", "-i" ]
+            [ "-i" :> V.bool true
+            , "-q" :> V.int 2 ]
+        ]
+
+    , test
+        """
+        usage: prog (-a | -b)... (-d | -e)...
+        """
+        [ pass
+            Nothing
+            [ "-a", "-d" ]
+            [ "-a" :> V.int 1
+            , "-d" :> V.int 1 ]
+        , pass
+            Nothing
+            [ "-a", "-a", "-d" ]
+            [ "-a" :> V.int 2
+            , "-d" :> V.int 1 ]
+        , pass
+            Nothing
+            [ "-a", "-a", "-d", "-d" ]
+            [ "-a" :> V.int 2
+            , "-d" :> V.int 2 ]
+        , pass
+            Nothing
+            [ "-a", "-d", "-a", "-a", "-d", "-a" ]
+            [ "-a" :> V.int 4
+            , "-d" :> V.int 2 ]
+        , pass
+            Nothing
+            [ "-a", "-b" ]
+            [ "-a" :> V.int 1
+            , "-b" :> V.int 1 ]
+        ]
+
+    , test
+        """
+        usage: prog foo --foo... --bar...
+           or: prog <env>...
+        """
+        [ pass
+            Nothing
+            [ "100", "200" ]
+            [ "<env>" :> V.array [ V.int 100, V.int 200 ] ]
+        , pass
+            Nothing
+            [ "foo", "--foo", "--foo" ]
+            [ "foo"   :> V.bool true
+            , "--foo" :> V.int 2 ]
+        , pass
+            Nothing
+            [ "foo", "--foo", "--bar", "--foo" ]
+            [ "foo"   :> V.bool true
+            , "--foo" :> V.int 2
+            , "--bar" :> V.int 1 ]
+        ]
+
     -- , test
     --     """
     --     usage: prog [<foo> <bar>]

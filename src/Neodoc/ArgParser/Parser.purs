@@ -4,10 +4,10 @@ import Prelude
 
 import Debug.Trace
 
-import Data.List (List(..), (:), fromFoldable, toUnfoldable, concat, singleton, any)
+import Data.List (List(..), (:), fromFoldable, toUnfoldable, concat, singleton, any, null)
 import Data.List.Extra (spanMap)
 import Data.Maybe
-import Data.Bifunctor (lmap)
+import Data.Bifunctor (rmap, lmap)
 import Data.Pretty
 import Data.String as String
 import Data.String.Ext as String
@@ -68,14 +68,14 @@ import Neodoc.ArgParser.KeyValue
   Match a single argument against input
 -}
 match
-  :: (Token -> Boolean)
+  :: (Token -> Boolean) -- is this token known?
   -> Arg
   -> List PositionedToken
   -> AllowOmissions
   -> PatternMatch PositionedToken ArgParseError KeyValue
 match isKnownToken arg is allowOmissions =
   let a = Arg.getArg arg
-      argv = fromArgv a is
+      argv = fromArgv (Arg.canTerm arg) a is
       fallback = fromFallback a (Arg.getFallback arg)
    in argv <|> fallback
 
@@ -93,23 +93,28 @@ match isKnownToken arg is allowOmissions =
          else fail' $ unexpectedInputError $ unknown ptok
     Nil -> fail' $ missingArgumentError arg
 
-  fromArgv = go
+  fromArgv canTerm = go
     where
-    return is = Right <<< (_ /\ is)
-                      <<< (arg /\ _)
-                      <<< RichValue.from Origin.Argv
+    _return v mIs = Right $ (arg /\ (RichValue.from Origin.Argv v)) /\ mIs
+    return is v = _return v (Just is)
+    term' v = _return v Nothing
+    term is =
+      let v = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
+       in _return v (Just is)
 
     go arg Nil = expected arg
 
     go (Command n _) ((PositionedToken (Tok.Lit s) _ _):is)
       | n == s
-      = return is $ BoolValue true
+      = if canTerm
+          then term is
+          else return is (BoolValue true)
 
     go (Positional _ _) ((PositionedToken (Tok.Lit s) _ _):is)
       = return is $ StringValue s
 
     go EOA ((PositionedToken (Tok.EOA xs) _ _):is)
-      = return is $ ArrayValue (toUnfoldable xs)
+      = term' $ ArrayValue (toUnfoldable xs)
 
     go Stdin ((PositionedToken Tok.Stdin _ _):is)
       = return is $ BoolValue true
@@ -118,7 +123,7 @@ match isKnownToken arg is allowOmissions =
       = let aliases = case Arg.getDescription arg of
               Just (OptionDescription aliases _ _ _ _) -> aliases
               _ -> NE.singleton a
-         in NE.foldl1 (<|>) (opt toks mA r <$> aliases)
+         in NE.foldl1 (<|>) $ opt toks mA r <$> aliases
 
     go arg _ = expected arg
 
@@ -150,6 +155,13 @@ match isKnownToken arg is allowOmissions =
                   v <- String.stripPrefix (String.Pattern n) n'
                   pure (StringValue v /\ is)
              in case explicit <|> adjacent <|> subsume of
+                  mV | canTerm ->
+                    case mV of
+                      Nothing -> term is
+                      Just (v /\ is') ->
+                        let v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is'
+                            v'' = ArrayValue $ Value.intoArray v <> Value.intoArray v'
+                         in term' v''
                   Nothing | not o ->
                     fatal $ "Option requires argument: " <> pretty a
                   Nothing -> return is $ BoolValue true
@@ -171,6 +183,13 @@ match isKnownToken arg is allowOmissions =
                   else pure $ StringValue s /\ is'
               _ -> Nothing
          in case mA /\ xs /\ mA' of
+              _ /\ xs /\ _ | canTerm ->
+                let rest = String.drop 2 src
+                    v = if String.null rest then [] else [ StringValue rest ]
+                    v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
+                    v'' = ArrayValue $ v <> Value.intoArray v'
+                 in term' v''
+
               Just _ /\ [] /\ (Just s) ->
                 return is $ StringValue s
               Just (OptionArgument _ o) /\ [] /\ Nothing ->
@@ -212,7 +231,7 @@ match isKnownToken arg is allowOmissions =
 
   fromFallback arg _ | not allowOmissions = expected arg
   fromFallback arg Nothing = expected arg
-  fromFallback _ (Just v) = Right $ ((arg /\ v) /\ is)
+  fromFallback _ (Just v) = Right ((arg /\ v) /\ Just is)
 
 lowerError
   :: (Token -> Boolean)
@@ -255,7 +274,16 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
                           (match isKnownToken')
                           (lowerError isKnownToken')
                           taggedPats
-      pure $ ArgParseResult mBranch vs
+
+      -- actually parse captured values into their respective types.
+      -- note: previous version of neodoc would do this parse on-the-fly.
+      let readRv rv =
+            let readV = case _ of
+                          StringValue v -> Value.read v false
+                          ArrayValue vs -> ArrayValue $ readV <$> vs
+                          v             -> v
+             in RichValue.setValue (readV $ RichValue.getValue rv) rv
+      pure $ ArgParseResult mBranch (rmap readRv <$> vs)
 
 {-
   Determine if a given token is considered known
@@ -315,7 +343,19 @@ toArgLeafs options env descriptions xs = evalState (for xs go) 0
                       then ArrayValue $ Value.intoArray v.value
                       else v.value
           }
-     in Arg id x (toArgKey x) mDesc fallback
+        canTerm = case x of
+          Solved.Option a _ _ ->
+            let aliases = case mDesc of
+                  Just (OptionDescription as _ _ _ _) -> NE.toList as
+                  _ -> singleton a
+             in any (_ `elem` options.stopAt) $ aliases <#> case _ of
+                      OA.Short s -> "-"  <> String.singleton s
+                      OA.Long n  -> "--" <> n
+          Solved.Positional _ r -> r && options.optionsFirst
+          Solved.EOA -> true
+          _ -> false
+
+     in Arg id x (toArgKey x) canTerm mDesc fallback
 
 {-
   Convert a layout into a "pattern" for the pattern parser to consume

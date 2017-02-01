@@ -50,7 +50,7 @@ match
   -> List String
   -> AllowOmissions
   -> PatternMatch String String String
-match s (i:is) _ | i == s = Right $ s /\ is
+match s (i:is) _ | i == s = Right $ s /\ (Just is)
 -- match s is true = Right $ ("<sub: " <> show s <> ">") /\ is
 match s _ _ = Left $ false /\ ("Expected " <> show s)
 

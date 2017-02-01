@@ -193,11 +193,11 @@ isFloatValue (FloatValue _) = true
 isFloatValue _              = false
 
 prettyPrintValue :: Value -> String
-prettyPrintValue (StringValue s) = s
+prettyPrintValue (StringValue s) = show s
 prettyPrintValue (BoolValue   b) = show b
-prettyPrintValue (ArrayValue xs) = show $ prettyPrintValue <$> xs
 prettyPrintValue (IntValue    i) = show i
 prettyPrintValue (FloatValue  f) = show f
+prettyPrintValue (ArrayValue xs) = "[" <> (A.intercalate ", " $ prettyPrintValue <$> xs) <> "]"
 
 intoArray (ArrayValue xs) = xs
 intoArray v               = [v]
@@ -280,5 +280,3 @@ skipSpaces = go
   where go = (do space
                  go) <|> pure unit
 skipSomeSpaces = space *> skipSpaces
-
-

@@ -35,15 +35,14 @@ instance showRichValue :: Show RichValue where
 instance prettyRichValue :: Pretty RichValue where
   pretty (RichValue v) = pretty v.value <> " " <> "(" <> pretty v.origin <> ")"
 
-
 unRichValue :: RichValue -> RichValueObj
 unRichValue (RichValue o) = o
 
-setValue :: RichValue -> Value -> RichValue
-setValue (RichValue v) value = RichValue v { value = value }
+setValue :: Value -> RichValue -> RichValue
+setValue value (RichValue v) = RichValue v { value = value }
 
-setOrigin :: RichValue -> Origin -> RichValue
-setOrigin (RichValue v) origin = RichValue v { origin = origin }
+setOrigin :: Origin -> RichValue -> RichValue
+setOrigin origin (RichValue v) = RichValue v { origin = origin }
 
 getValue :: RichValue -> Value
 getValue (RichValue v) = v.value
