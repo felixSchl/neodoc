@@ -100,7 +100,7 @@ match isKnownToken arg is allowOmissions =
     term' v = _return v Nothing
     term is =
       let v = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
-       in _return v (Just is)
+       in _return v Nothing
 
     go arg Nil = expected arg
 
@@ -128,11 +128,14 @@ match isKnownToken arg is allowOmissions =
     go arg _ = expected arg
 
     opt ((PositionedToken (Tok.LOpt n' mA') _ _):is) mA r (a@(OA.Long n))
-      | String.startsWith n' n
+      | String.startsWith n n'
       = case mA /\ mA' of
           Nothing /\ Just _ | n == n' ->
             fatal $ "Option does not take arguments: " <> pretty a
-          Nothing /\ Nothing | n == n' -> return is $ BoolValue true
+          Nothing /\ Nothing | n == n' ->
+            if canTerm
+               then term is
+               else return is $ BoolValue true
           Just (OptionArgument _ o) /\ _ ->
             let explicit = do
                   guard $ n' == n
@@ -153,15 +156,19 @@ match isKnownToken arg is allowOmissions =
                     _ -> Nothing
                 subsume = do
                   v <- String.stripPrefix (String.Pattern n) n'
-                  pure (StringValue v /\ is)
+                  v' <- if String.null v
+                            then if (o || canTerm)
+                                    then pure $ ArrayValue []
+                                    else Nothing
+                            else pure $ StringValue v
+                  pure (v' /\ is)
+
              in case explicit <|> adjacent <|> subsume of
-                  mV | canTerm ->
-                    case mV of
-                      Nothing -> term is
-                      Just (v /\ is') ->
-                        let v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is'
-                            v'' = ArrayValue $ Value.intoArray v <> Value.intoArray v'
-                         in term' v''
+                  Nothing | canTerm -> term is
+                  Just (v /\ is') | canTerm ->
+                    let v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is'
+                        v'' = ArrayValue $ Value.intoArray v <> Value.intoArray v'
+                      in term' v''
                   Nothing | not o ->
                     fatal $ "Option requires argument: " <> pretty a
                   Nothing -> return is $ BoolValue true
@@ -183,15 +190,30 @@ match isKnownToken arg is allowOmissions =
                   else pure $ StringValue s /\ is'
               _ -> Nothing
          in case mA /\ xs /\ mA' of
-              _ /\ xs /\ _ | canTerm ->
-                let rest = String.drop 2 src
-                    v = if String.null rest then [] else [ StringValue rest ]
+
+              -- note: fail even for `canTerm` to retain current neodoc behavior
+              Nothing /\ [] /\ (Just _) ->
+                fatal' $ optionTakesNoArgumentError (OA.Short f)
+
+              Just _ /\ xs /\ mA' | canTerm ->
+                let rest = if A.null xs then "" else String.drop 2 src
+                    v = maybe [] (A.singleton <<< StringValue) mA'
+                    v' = if String.null rest then v else [ StringValue rest ]
+                    v'' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
+                    v''' = ArrayValue $ v' <> Value.intoArray v''
+                 in term' v'''
+
+              -- note: allow explict arg even when option does not take one,
+              --       when `canTerm` is true.
+              Nothing /\ [] /\ mA' | canTerm ->
+                let v = maybe [] (A.singleton <<< StringValue) mA'
                     v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
                     v'' = ArrayValue $ v <> Value.intoArray v'
                  in term' v''
 
               Just _ /\ [] /\ (Just s) ->
                 return is $ StringValue s
+
               Just (OptionArgument _ o) /\ [] /\ Nothing ->
                 case adjacent of
                   Just (v /\ is) -> return is v
@@ -200,9 +222,6 @@ match isKnownToken arg is allowOmissions =
 
               Just _ /\ xs /\ Nothing ->
                 return is $ StringValue $ String.fromCharArray xs
-
-              Nothing /\ [] /\ (Just _) ->
-                fatal' $ optionTakesNoArgumentError (OA.Short f)
 
               Nothing /\ [] /\ Nothing ->
                 return is $ BoolValue true
@@ -280,7 +299,6 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
       let readRv rv =
             let readV = case _ of
                           StringValue v -> Value.read v false
-                          ArrayValue vs -> ArrayValue $ readV <$> vs
                           v             -> v
              in RichValue.setValue (readV $ RichValue.getValue rv) rv
       pure $ ArgParseResult mBranch (rmap readRv <$> vs)
