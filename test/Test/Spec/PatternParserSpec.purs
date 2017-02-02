@@ -50,12 +50,12 @@ match
   -> List String
   -> AllowOmissions
   -> PatternMatch String String String
-match s (i:is) _ | i == s = Right $ s /\ (Just is)
+match s (i:is) _ | i == s = Right $ s /\ (Just is) /\ false
 -- match s is true = Right $ ("<sub: " <> show s <> ">") /\ is
 match s _ _ = Left $ false /\ ("Expected " <> show s)
 
 parse :: _ -> _
-parse = Pattern.parse match pretty
+parse = Pattern.parseToEnd match pretty
 
 expectA
   :: ∀ r

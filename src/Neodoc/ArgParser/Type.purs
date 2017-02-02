@@ -96,7 +96,7 @@ data ArgParseError
   = OptionTakesNoArgumentError OptionAlias (Lazy String)
   | OptionRequiresArgumentError OptionAlias (Lazy String)
   | MissingArgumentError SolvedLayoutArg (Lazy String)
-  | UnexpectedInputError (IsKnown PositionedToken) (Lazy String)
+  | UnexpectedInputError (NonEmpty List (IsKnown PositionedToken)) (Lazy String)
   | MalformedInputError String (Lazy String)
   | GenericError String
   | InternalError String (Lazy String)
@@ -126,8 +126,8 @@ genericError msg = GenericError msg
 internalError msg = InternalError msg $ defer \_->
   "internal error: " <> msg
 
-unexpectedInputError tok
-  = UnexpectedInputError tok $ defer \_ -> render tok
+unexpectedInputError :: NonEmpty List (IsKnown PositionedToken) -> ArgParseError
+unexpectedInputError (toks@(tok:|_)) = UnexpectedInputError toks $ defer \_ -> render tok
   where
   render (Known tok) = "unexpected " <> tokLabel tok
   render (Unknown tok) = "unknown " <> tokLabel tok
@@ -140,7 +140,7 @@ instance showArgParseError :: Show ArgParseError where
   show (OptionTakesNoArgumentError a msg) = "(OptionTakesNoArgumentError " <> show a <> " " <> show msg <> ")"
   show (OptionRequiresArgumentError a msg) = "(OptionRequiresArgumentError " <> show a <> " " <> show msg <> ")"
   show (MissingArgumentError x msg) = "(MissingArgumentError " <> show x <> " " <> show msg <> ")"
-  show (UnexpectedInputError x msg) = "(UnexpectedInputError " <> show x <> " " <> show msg <> ")"
+  show (UnexpectedInputError xs msg) = "(UnexpectedInputError " <> show xs <> " " <> show msg <> ")"
   show (MalformedInputError s msg) = "(MalformedInputError " <> show s <> " " <> show msg <> ")"
   show (GenericError s) = "(GenericError " <> show s <> ")"
   show (InternalError s msg) = "(InternalError " <> show s <> " " <> show msg <> ")"

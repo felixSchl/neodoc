@@ -141,10 +141,24 @@ data PatternError i u
   | UnexpectedInputError (NonEmpty List i)
   | MissingPatternError (Pattern u)
 
-data Result a u = Result (List a) (Reps u) HasMoved Depth HasTerminated
+type IsFatal = Boolean
+type HasTerminated = Boolean
+type KeepPattern = Boolean
+type PatternMatch i e a = Either (Tuple IsFatal e)
+                                 (Tuple a
+                                        (Tuple (Maybe (List i))
+                                                KeepPattern))
+type Matcher u i a e = u -> List i -> AllowOmissions -> PatternMatch i e a
+
+data Result a u = Result (List a) (Reps u) HasMoved Depth HasTerminated KeepPattern
 
 instance showResult :: (Generic u, Show a, Show u) => Show (Result a u) where
-  show (Result a u m d t) = "(Result " <> show a <> " " <> show u <> " " <> show m <> " " <> show d <> " " <> show t <> ")"
+  show (Result a u m d t k) = "(Result " <> show a
+                                  <> " " <> show u
+                                  <> " " <> show m
+                                  <> " " <> show d
+                                  <> " " <> show t
+                                  <> " " <> show k <> ")"
 
 instance showError :: (Generic u, Show e, Show i, Show u) => Show (Error e i u) where
   show (Error x d) = "(Error " <> show x <> " " <> show d <> ")"
@@ -162,20 +176,14 @@ instance prettyPatternError :: (Pretty i, Pretty u) => Pretty (PatternError i u)
   pretty (UnexpectedInputError (s:|_)) = "Unexpected " <> pretty s
   pretty (MissingPatternError p) = "Missing " <> pretty p
 
-type IsFatal = Boolean
-type HasTerminated = Boolean
-type PatternMatch i e a = Either (Tuple IsFatal e)
-                                 (Tuple a (Maybe (List i)))
-type Matcher u i a e = u -> List i -> AllowOmissions -> PatternMatch i e a
-
 setReps :: ∀ a u. Reps u -> Result a u -> Result a u
-setReps r (Result a _ c d t) = Result a r c d t
+setReps r (Result a _ c d t k) = Result a r c d t k
 
 getValue :: ∀ a u. Result a u -> List a
-getValue (Result a _ _ _ _) = a
+getValue (Result a _ _ _ _ _) = a
 
 getSuccessDepth :: ∀ a u. Result a u -> Int
-getSuccessDepth (Result _ _ _ d _) = d
+getSuccessDepth (Result _ _ _ d _ _) = d
 
 getErrorDepth :: ∀ e i u. Error e i u -> Int
 getErrorDepth (Error _ d) = d
@@ -190,12 +198,12 @@ match
   -> AllowOmissions
   -> Depth
   -> u
-  -> Parser (Error e i u) c s g (List i) (Tuple a HasTerminated)
+  -> Parser (Error e i u) c s g (List i) (Tuple a (Tuple HasTerminated KeepPattern))
 match f allowOmissions depth p = Parser \a ->
   let result = f p (getI a) allowOmissions
    in case result of
-        Right (r /\ Just i) -> Step true (Parser.setI i a) (Right (r /\ false))
-        Right (r /\ Nothing) -> Step true (Parser.setI Nil a) (Right (r /\ true))
+        Right (r /\ Just i /\ k) -> Step true (Parser.setI i a) (Right (r /\ false /\ k))
+        Right (r /\ Nothing /\ k) -> Step true (Parser.setI Nil a) (Right (r /\ true /\ k))
         Left (isFatal /\ e) ->
           let error = Error (Right e) depth
            in Step false a $ Left $ ParseError isFatal (Right error)
@@ -241,6 +249,18 @@ parse f fE pats = lowerError fE $ fst <$> parse' f pats
 {-
   XXX explain me
 -}
+parseToEnd
+  :: ∀ i e c s g u a
+   . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
+  => Matcher u i a e
+  -> (PatternError i u -> e)
+  -> List (Pattern u) -- input patterns
+  -> Parser e c s g (List i) (List a)
+parseToEnd f fE pats = lowerError fE $ fst <$> parseToEnd' f pats
+
+{-
+  XXX explain me
+-}
 parseBestTag
   :: ∀ i e c s g u a tag
    . (Eq u, Generic u, Show a, Show i, Show u, Show e, Show tag, Pretty e, Pretty i, Pretty u, Pretty a)
@@ -258,6 +278,39 @@ parseBestTag f fE taggedPats = lowerError fE do
 {-
   XXX explain me
 -}
+parseBestTagToEnd
+  :: ∀ i e c s g u a tag
+   . (Eq u, Generic u, Show a, Show i, Show u, Show e, Show tag, Pretty e, Pretty i, Pretty u, Pretty a)
+  => Matcher u i a e
+  -> (PatternError i u -> e)
+  -> List (Tuple tag (List (Pattern u))) -- tagged input patterns
+  -> Parser e c s g (List i) (Tuple tag (List a))
+parseBestTagToEnd f fE taggedPats = lowerError fE do
+  rmap fst <$> do
+    chooseBestTag
+      getErrorDepth
+      snd
+      (rmap (Parser.try <<< parseToEnd' f) <$> taggedPats)
+
+{-
+  XXX explain me
+-}
+parseToEnd'
+  :: ∀ i e c s g u a
+   . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
+  => Matcher u i a e
+  -> List (Pattern u) -- input patterns
+  -> Parser (Error e i u) c s g (List i) (Tuple (List a) Depth)
+parseToEnd' f pats = do
+  vs /\ depth <- parse' f pats
+  is <- getInput
+  case is of
+    Nil  -> Parser.return $ vs /\ depth
+    i:is -> Parser.fail' $ errorAt depth $ UnexpectedInputError (i :| is)
+
+{-
+  XXX explain me
+-}
 parse'
   :: ∀ i e c s g u a
    . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
@@ -265,11 +318,8 @@ parse'
   -> List (Pattern u) -- input patterns
   -> Parser (Error e i u) c s g (List i) (Tuple (List a) Depth)
 parse' f pats = do
-  Result vs _ _ depth _ <- parsePatterns 0 (match f) true Nil pats
-  is <- getInput
-  case is of
-    Nil  -> Parser.return $ vs /\ depth
-    i:is -> Parser.fail' $ errorAt depth $ UnexpectedInputError (i :| is)
+  Result vs _ _ depth _ _ <- parsePatterns' 0 (match f) true Nil pats
+  Parser.return $ vs /\ depth
 
 indent :: Int -> String
 indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
@@ -289,42 +339,47 @@ expected depth pat = Parser.fail' $ errorAt depth (MissingPatternError pat)
   XXX explain me
 -}
 requireMovement p = do
-  Result a b hasMoved d hasTerminated <- p
+  Result a b hasMoved d hasTerminated keepPat <- p
   if hasMoved || hasTerminated
-     then Parser.return $ Result a b true d hasTerminated
+     then Parser.return $ Result a b true d hasTerminated keepPat
      else Parser.fail "no movement ..."
 
 {-
   XXX explain me
 -}
-parsePatterns
+parsePatterns'
   :: ∀ i e c s g u a
    . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Int
-  -> (AllowOmissions -> Depth -> u -> Parser (Error e i u) c s g (List i) (Tuple a HasTerminated))
+  -> (AllowOmissions
+      -> Depth
+      -> u
+      -> Parser (Error e i u) c s g (List i) (Tuple a
+                                                    (Tuple HasTerminated
+                                                            KeepPattern)))
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
   -> Parser (Error e i u) c s g (List i) (Result a u)
-parsePatterns l f allowOmit repPats pats =
+parsePatterns' l f allowOmit repPats pats =
   let xs = indexed pats
       f' allowOmit' depth reps pat = do
-        Result vs reps' hasMoved depth hasTerminated <- case pat of
+        Result vs reps' hasMoved depth hasTerminated keepPat <- case pat of
           LeafPattern _ r _ x -> do
-            v /\ hasTerminated <- f allowOmit' depth x
-            pure $ Result (singleton v) reps true (depth + 1) hasTerminated
+            v /\ hasTerminated /\ keepPat <- f allowOmit' depth x
+            pure $ Result (singleton v) reps true (depth + 1) hasTerminated keepPat
           ChoicePattern _ _ _ xs ->
-            let resetReps = setReps reps
+            let resetReps = id -- setReps reps
               in resetReps <$> do
                   chooseBest
                     getErrorDepth
                     getSuccessDepth
-                    (parsePatterns (l + 1) f allowOmit' reps <$> xs)
+                    (parsePatterns' (l + 1) f allowOmit' reps <$> xs)
         let reps'' = if isRepeatable pat then nub (pat : reps') else reps'
-        pure $ Result vs reps'' hasMoved depth hasTerminated
+        pure $ Result vs reps'' hasMoved depth hasTerminated keepPat
    in do
         -- 1. parse the pattern wholly
-        Result vs rep hasMoved depth hasTerminated <- go do
+        Result vs rep hasMoved depth hasTerminated keepPat <- go do
           Args12 f' xs xs Nil false false false false repPats Nil 0 Nothing
 
         -- 2. consume any trailing arguments using the repeating patterns we
@@ -345,6 +400,7 @@ parsePatterns l f allowOmit repPats pats =
                                 (hasMoved || (not $ null vs'))
                                 (depth + length vs') -- XXX: same here (^)
                                 hasTerminated
+                                keepPat
 
   where
   go
@@ -370,7 +426,7 @@ parsePatterns l f allowOmit repPats pats =
     --                          /\ ("out=" <> pretty out)
     --                          /\ ("orig=" <> pretty orig)
     --                          )
-    Parser.return $ Result out reps hasMoved depth false
+    Parser.return $ Result out reps hasMoved depth false false
 
   -- Failure: try again, this time allow omissions (keep the accumulator)
   go (Args12 f' orig Nil (carry@(_:_)) false true _ _ reps out depth mE) | allowOmit = do
@@ -392,6 +448,11 @@ parsePatterns l f allowOmit repPats pats =
                 pat' = getIndexedElem $ unsafePartial $ LU.head sortedCarry
              in expected depth pat'
     throwExistingError
+
+  -- Step: ignore fixed patterns when locked
+  go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out depth mE) | isFixed pat = do
+    -- traceShowA $ indent l <> (pretty $ "ignore" /\ out /\ carry)
+    go (Args12 f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out depth mE)
 
   go (Args12 f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ reps out depth mE) = do
     -- traceShowA $ indent l <> (pretty $ "omit" /\ out /\ carry)
@@ -417,11 +478,6 @@ parsePatterns l f allowOmit repPats pats =
               ) <|> throwExistingError -- XXX: is this right, or `catch` here?
             Nothing -> throwExistingError
        else throwExistingError
-
-  -- Step: ignore fixed patterns when locked
-  go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out depth mE) | isFixed pat = do
-    -- traceShowA $ indent l <> (pretty $ "ignore" /\ out /\ carry)
-    go (Args12 f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out depth mE)
 
   -- Step: process next element
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out depth mE) = do
@@ -460,7 +516,7 @@ parsePatterns l f allowOmit repPats pats =
       -- the carry and add this pattern to the list of repeated patterns,
       -- (if this pattern allows for repetition). We also reset `allowReps` to
       -- to treat the rest of the pattern as fresh input.
-      Right (Result result reps' hasMoved depth' hasTerminated) -> do
+      Right (Result result reps' hasMoved depth' hasTerminated keepPat) -> do
 
         -- before attempting to parse the next element, we try to eagerly parse
         -- adjacent matches of the same pattern.
@@ -472,12 +528,14 @@ parsePatterns l f allowOmit repPats pats =
                       (getValue <$> _) <<< f' false depth reps
 
         let orig' = sortBy (compare `on` getIndex) do
-                      filter (not <<< (_ == ix) <<< getIndex) orig
+                      if keepPat
+                          then orig
+                          else filter (not <<< (_ == ix) <<< getIndex) orig
             depth'' = depth + depth' + length vs'
             out' = out <> result <> vs'
 
         if hasTerminated
-          then Parser.return $ Result out' reps' hasMoved depth'' true
+          then Parser.return $ Result out' reps' hasMoved depth'' true false
           else go (Args12 f' orig' orig' Nil false false true isLocked reps' out' depth'' mE)
 
       -- 2. if we did not manage to make a match, we will try to make a match
@@ -494,12 +552,12 @@ parsePatterns l f allowOmit repPats pats =
           -- ok. we reset the input pattern completely, clear the carry and
           -- re-iterate using the new input. Again, we reset `allowReps` to
           -- `false` in order to treat the resulting input as a fresh pattern.
-          Just (Result result' _ _ depth' hasTerminated) ->
+          Just (Result result' _ _ depth' hasTerminated _) ->
             let orig' = sortBy (compare `on` getIndex) orig
                 depth'' = depth + depth'
                 out' = out <> result'
              in if hasTerminated
-                   then pure $ Result out' reps true depth'' true
+                   then pure $ Result out' reps true depth'' true false
                    else go (Args12 f' orig' orig' Nil false false true isLocked reps out' depth'' mE)
 
           -- 3. if, at this point, we still did not manage to make a match, we

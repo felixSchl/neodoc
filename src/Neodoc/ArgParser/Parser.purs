@@ -4,7 +4,7 @@ import Prelude
 
 import Debug.Trace
 
-import Data.List (List(..), (:), fromFoldable, toUnfoldable, concat, singleton, any, null)
+import Data.List (List(..), (:), fromFoldable, toUnfoldable, concat, singleton, any, null, filter)
 import Data.List.Extra (spanMap)
 import Data.Maybe
 import Data.Bifunctor (rmap, lmap)
@@ -64,16 +64,32 @@ import Neodoc.ArgParser.Token (Token)
 import Neodoc.ArgParser.Token as Tok
 import Neodoc.ArgParser.KeyValue
 
+-- An artificial argument to be injected to capture any unknown options
+_UNKNOWN_ARG :: Arg
+_UNKNOWN_ARG =
+  let arg = Solved.Command "?" true
+      key = toArgKey arg
+   in Arg (-1) arg key false Nothing Nothing
+
+-- An artificial argument to be injected to capture any '--', regardless
+-- of whether it occurs in the spec or not
+_EOA :: Arg
+_EOA =
+  let arg = Solved.EOA
+      key = toArgKey arg
+   in Arg (-2) arg key false Nothing Nothing
+
 {-
   Match a single argument against input
 -}
 match
   :: (Token -> Boolean) -- is this token known?
+  -> Boolean            -- allow unknown?
   -> Arg
   -> List PositionedToken
   -> AllowOmissions
   -> PatternMatch PositionedToken ArgParseError KeyValue
-match isKnownToken arg is allowOmissions =
+match isKnownToken allowUnknown arg is allowOmissions =
   let a = Arg.getArg arg
       argv = fromArgv (Arg.canTerm arg) a is
       fallback = fromFallback a (Arg.getFallback arg)
@@ -85,17 +101,34 @@ match isKnownToken arg is allowOmissions =
   fail = fail' <<< ArgParser.GenericError
   fatal' = Left <<< (true /\ _)
   fatal = fatal' <<< ArgParser.GenericError
+  toIsKnown (ptok@(PositionedToken tok _ _)) = if isKnownToken tok
+                                                  then known ptok
+                                                  else unknown ptok
 
   expected arg = case is of
-    ptok@(PositionedToken tok _ _) : _ -> do
+    -- if all fails, try to see if we can consume this input as an "unknown"
+    -- option
+    ptok@(PositionedToken tok src _) : is ->
       if isKnownToken tok
-         then fail' $ unexpectedInputError $ known ptok
-         else fail' $ unexpectedInputError $ unknown ptok
-    Nil -> fail' $ missingArgumentError arg
+        then fail' $ unexpectedInputError $ known ptok :| (toIsKnown <$> is)
+        else if allowUnknown
+          then case tok of
+            Tok.Lit _ ->
+              fail' $ unexpectedInputError $ unknown ptok :| (toIsKnown <$> is)
+            Tok.EOA xs -> Right $
+              (_EOA /\ (RichValue.from Origin.Argv $ ArrayValue $ A.fromFoldable xs))
+                /\ Just is
+                /\ true
+            _ -> Right $
+              (_UNKNOWN_ARG /\ (RichValue.from Origin.Argv $ StringValue src))
+                /\ Just is
+                /\ true
+          else fail' $ unexpectedInputError $ unknown ptok :| (toIsKnown <$> is)
+    _ -> fail' $ missingArgumentError arg
 
   fromArgv canTerm = go
     where
-    _return v mIs = Right $ (arg /\ (RichValue.from Origin.Argv v)) /\ mIs
+    _return v mIs = Right $ (arg /\ (RichValue.from Origin.Argv v)) /\ mIs /\ false
     return is v = _return v (Just is)
     term' v = _return v Nothing
     term is =
@@ -250,7 +283,7 @@ match isKnownToken arg is allowOmissions =
 
   fromFallback arg _ | not allowOmissions = expected arg
   fromFallback arg Nothing = expected arg
-  fromFallback _ (Just v) = Right ((arg /\ v) /\ Just is)
+  fromFallback _ (Just v) = Right ((arg /\ v) /\ Just is /\ false)
 
 lowerError
   :: (Token -> Boolean)
@@ -258,10 +291,11 @@ lowerError
   -> ArgParseError
 lowerError isKnownToken = case _ of
   Pattern.GenericError s -> GenericError s
-  Pattern.UnexpectedInputError (ptok@(PositionedToken tok _ _):|_) ->
-    unexpectedInputError $ if isKnownToken tok
-                                then known ptok
-                                else unknown ptok
+  Pattern.UnexpectedInputError ptoks ->
+    unexpectedInputError $ ptoks <#> \(ptok@(PositionedToken tok _ _)) ->
+                                        if isKnownToken tok
+                                          then known ptok
+                                          else unknown ptok
   Pattern.MissingPatternError x ->
     case getLeftMostElement x of
       Nothing -> GenericError ""
@@ -284,24 +318,76 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
       isKnownToken' = isKnownToken spec
       taggedPats =
         toplevels <#> \branch ->
-          let leafs = layoutToPattern <$> NE.toList branch
+          let leafs = layoutToPattern options.requireFlags
+                                      options.repeatableOptions <$> NE.toList branch
               argLeafs = toArgLeafs options env descriptions leafs
-           in Just branch /\ argLeafs
+           in branch /\ argLeafs
    in do
     runParser { env, options, spec } {} {} tokens do
-      mBranch /\ vs <- Pattern.parseBestTag
-                          (match isKnownToken')
-                          (lowerError isKnownToken')
-                          taggedPats
+      branch /\ vs <- do
+        branch /\ vs <- Pattern.parseBestTag
+          (match isKnownToken' options.allowUnknown)
+          (lowerError isKnownToken')
+          taggedPats
+        vs' <- eof options.allowUnknown isKnownToken'
+        Parser.return $ branch /\ (vs <> vs')
 
       -- actually parse captured values into their respective types.
       -- note: previous version of neodoc would do this parse on-the-fly.
       let readRv rv =
-            let readV = case _ of
-                          StringValue v -> Value.read v false
-                          v             -> v
-             in RichValue.setValue (readV $ RichValue.getValue rv) rv
-      pure $ ArgParseResult mBranch (rmap readRv <$> vs)
+            let v = case RichValue.getValue rv of
+                        StringValue v -> Value.read v false
+                        v -> v
+             in RichValue.setValue v rv
+
+          -- inject the pseudo argument to collect unknown options into layout
+          -- so that the value reduction will work.
+          outBranch = if options.allowUnknown
+            then NE.append (Elem <<< Arg.getArg <$> do
+                    _UNKNOWN_ARG :| _EOA : Nil
+                  ) branch
+            else branch
+      pure $ ArgParseResult (Just outBranch) (rmap readRv <$> vs)
+
+  where
+  eof :: ∀ r. Boolean -> (_ -> Boolean) -> ArgParser r (List KeyValue)
+  eof allowUnknown isKnownToken = do
+    input <- getInput
+    case input of
+      Nil -> pure Nil
+      tok:toks -> do
+        let kToks = (tok:|toks) <#> \pTok -> if isKnownToken $ Tok.getToken pTok
+                                                  then known pTok
+                                                  else unknown pTok
+
+        -- deal with unkown options matched after the pattern has ended.
+        if allowUnknown
+          then
+            let ks = filter isKnown (NE.toList kToks)
+                uks = filter isUnknown (NE.toList kToks)
+             in case ks of
+                  Nil ->
+                    -- check the list of unknown tokens for literals which we
+                    -- consider positional and therefore reject
+                    let ukPs = filter (isPosTok <<< unIsKnown) uks
+                     in case ukPs of
+                          Nil -> Parser.return $ uks <#> unIsKnown >>>
+                            \(pTok@(PositionedToken tok _ _)) ->
+                              case tok of
+                                Tok.EOA xs ->
+                                  let v = ArrayValue $ A.fromFoldable xs
+                                      rv = RichValue.from Origin.Argv v
+                                    in _EOA /\ rv
+                                _ ->
+                                  let v = StringValue $ Tok.getSource pTok
+                                      rv = RichValue.from Origin.Argv v
+                                    in _UNKNOWN_ARG /\ rv
+                          u:us -> fail' $ unexpectedInputError (u:|us)
+                  k:ks -> fail' $ unexpectedInputError (k:|ks)
+          else fail' $ unexpectedInputError kToks
+    where isPosTok (PositionedToken tok _ _) = case tok of
+                                                  Tok.Lit _ -> true
+                                                  _ -> false
 
 {-
   Determine if a given token is considered known
@@ -379,19 +465,23 @@ toArgLeafs options env descriptions xs = evalState (for xs go) 0
   Convert a layout into a "pattern" for the pattern parser to consume
 -}
 layoutToPattern
-  :: SolvedLayout
+  :: Boolean -- are flags considered required?
+  -> Boolean -- can options always repeat?
+  -> SolvedLayout
   -> Pattern SolvedLayoutArg
 
-layoutToPattern (Elem x) = case x of
-  Solved.Command    n r -> LeafPattern false r     true  x
-  Solved.Positional n r -> LeafPattern false r     true  x
-  Solved.Option  a mA r -> LeafPattern false r     false x
+layoutToPattern reqFlags repOpts (Elem x) = case x of
+  Solved.Command    n r -> LeafPattern false r true x
+  Solved.Positional n r -> LeafPattern false r true x
+  Solved.Option  a Nothing r ->                        LeafPattern (not reqFlags) (r || repOpts) false x
+  Solved.Option  a (Just (OptionArgument _ true)) r -> LeafPattern (not reqFlags) (r || repOpts) false x
+  Solved.Option  a mA r -> LeafPattern false (r || repOpts) false x
   Solved.EOA            -> LeafPattern false false false x
   Solved.Stdin          -> LeafPattern false false false x
 
-layoutToPattern (Group o r xs) =
+layoutToPattern reqFlags repOpts (Group o r xs) =
   let xs' = NE.toList do
-              ((layoutToPattern <$> _) <<< NE.toList) <$> do
+              ((layoutToPattern reqFlags repOpts <$> _) <<< NE.toList) <$> do
                 xs
       fix = any (any isFixed) xs'
    in ChoicePattern o r fix xs'
