@@ -3660,9 +3660,8 @@ usage: test [-abc] <files>...
 $ prog/l foo.txt -a bar.txt
 {"<files>": ["foo.txt", "bar.txt"], "-a": true}
 
-# this won't work since the group itself has been consumed:
 $ prog/l foo.txt -a bar.txt -c
-"unexpected option -c"
+{"<files>": ["foo.txt", "bar.txt"], "-a": true, "-c": true}
 
 r"""
 usage: test [options] <files>...
