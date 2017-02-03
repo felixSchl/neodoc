@@ -48,12 +48,12 @@ import Neodoc.Spec (Spec(..), Toplevel)
 import Neodoc.Parsing.Parser
 import Neodoc.Parsing.Parser as Parser
 import Neodoc.Parsing.Parser.Combinators
+import Neodoc.Parsing.Parser.Combinators as Parser
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Type as ArgParser
 import Neodoc.ArgParser.Arg
 import Neodoc.ArgParser.Arg as Arg
 import Neodoc.ArgParser.Fallback
-import Neodoc.ArgParser.Evaluate (chooseBest)
 import Neodoc.ArgParser.Result
 import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Pattern hiding (PatternError(..))
@@ -314,23 +314,32 @@ parse
   -> List PositionedToken
   -> Either (ParseError ArgParseError) ArgParseResult
 parse (spec@(Spec { layouts, descriptions })) options env tokens =
-  let toplevels = concat $ NE.toList layouts
+  let hasEmpty = any null layouts
+      toplevels = concat $ NE.toList layouts
       isKnownToken' = isKnownToken spec
-      taggedPats =
-        toplevels <#> \branch ->
+      taggedPats = toplevels <#> (\branch ->
           let leafs = layoutToPattern options.requireFlags
                                       options.repeatableOptions <$> NE.toList branch
               argLeafs = toArgLeafs options env descriptions leafs
-           in branch /\ argLeafs
+           in Just branch /\ argLeafs
+        )
    in do
     runParser { env, options, spec } {} {} tokens do
-      branch /\ vs <- do
-        branch /\ vs <- Pattern.parseBestTag
-          (match isKnownToken' options.allowUnknown)
-          (lowerError isKnownToken')
-          taggedPats
+      mBranch /\ vs <- do
+        mBranch /\ vs <- Parser.choice $ Parser.try <$> do
+            (Pattern.parseBestTag
+              (match isKnownToken' options.allowUnknown)
+              (lowerError isKnownToken')
+              taggedPats
+            )
+          : (if not hasEmpty then Nil else singleton $
+              let b = emptyBranch options.allowUnknown
+               in do
+                vs <- eof options.allowUnknown isKnownToken'
+                pure $ b /\ vs
+            )
         vs' <- eof options.allowUnknown isKnownToken'
-        Parser.return $ branch /\ (vs <> vs')
+        Parser.return $ mBranch /\ (vs <> vs')
 
       -- actually parse captured values into their respective types.
       -- note: previous version of neodoc would do this parse on-the-fly.
@@ -342,12 +351,15 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
 
           -- inject the pseudo argument to collect unknown options into layout
           -- so that the value reduction will work.
-          outBranch = if options.allowUnknown
-            then NE.append (Elem <<< Arg.getArg <$> do
-                    _UNKNOWN_ARG :| _EOA : Nil
-                  ) branch
-            else branch
-      pure $ ArgParseResult (Just outBranch) (rmap readRv <$> vs)
+          mOutBranch = case mBranch of
+            Nothing -> mBranch
+            Just branch -> Just do
+              if options.allowUnknown
+                then NE.append (Elem <<< Arg.getArg <$> do
+                        _UNKNOWN_ARG :| _EOA : Nil
+                      ) branch
+                else branch
+      pure $ ArgParseResult mOutBranch (rmap readRv <$> vs)
 
   where
   eof :: ∀ r. Boolean -> (_ -> Boolean) -> ArgParser r (List KeyValue)
@@ -388,6 +400,12 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
     where isPosTok (PositionedToken tok _ _) = case tok of
                                                   Tok.Lit _ -> true
                                                   _ -> false
+
+  emptyBranch :: _ -> Maybe _
+  emptyBranch false = Nothing
+  emptyBranch true = Just $ (Elem $ Arg.getArg _UNKNOWN_ARG)
+                            :| (Elem $ Arg.getArg _EOA)
+                                : Nil
 
 {-
   Determine if a given token is considered known
