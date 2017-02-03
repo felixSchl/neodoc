@@ -3302,51 +3302,23 @@ usage: prog [foo] -a [bar]
 $ prog/l -a foo bar
 {"-a": true, "foo": true, "bar": true}
 
-r"""
-usage: prog [foo] -a [bar]
-"""
-
 $ prog/l foo -a bar
 {"-a": true, "foo": true, "bar": true}
-
-r"""
-usage: prog [foo] -a [bar]
-"""
 
 $ prog/l foo bar -a
 {"-a": true, "foo": true, "bar": true}
 
-r"""
-usage: prog [foo] -a [bar]
-"""
-
 $ prog/l bar foo -a
 "unexpected command foo"
-
-r"""
-usage: prog [foo] -a [bar]
-"""
 
 $ prog/l bar -a foo
 "unexpected command foo"
 
-r"""
-usage: prog [foo] -a [bar]
-"""
-
 $ prog/l bar foo
 "unexpected command foo"
 
-r"""
-usage: prog [foo] -a [bar]
-"""
-
 $ prog/l -a bar foo
 "unexpected command foo"
-
-r"""
-usage: prog [foo] -a [bar]
-"""
 
 $ prog/l -a bar
 {"-a": true, "bar": true}

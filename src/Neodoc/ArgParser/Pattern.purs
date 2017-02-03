@@ -435,7 +435,7 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Failure: try again, this time allow omissions (keep the accumulator)
   go (Args12 f' orig Nil (carry@(_:_)) false true _ _ reps out depth mE) | allowOmit = do
-    i <- getInput
+    -- i <- getInput
     -- traceShowA $ indent l <> (pretty $ "failure (retry w/ reps)"
     --   /\ ("input=" <> pretty i)
     --   /\ ("out=" <> pretty out)
@@ -444,8 +444,8 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Failure: try again, this time allow repetitions (keep the accumulator)
   go (Args12 f' orig Nil (carry@(_:_)) allowOmissions false _ _ reps out depth mE) = do
-    i <- getInput
-    -- traceShowA $ indent l <> (pretty $ "failure (retry w/ omits)"
+    -- i <- getInput
+    -- -- traceShowA $ indent l <> (pretty $ "failure (retry w/ omits)"
     --   /\ ("input=" <> pretty i)
     --   /\ ("out=" <> pretty out)
     --   /\ ("carry=" <> pretty carry))
@@ -489,7 +489,7 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Step: process next element
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out depth mE) = do
-    -- i <- getInput
+    i <- getInput
     -- traceShowA $ indent l <> (pretty $
     --                             "step"
     --                           /\ ("input=" <> pretty i)
@@ -552,7 +552,7 @@ parsePatterns' l f allowOmit repPats pats =
       --    using all previously matched, repeatable patterns, provided we are
       --    allowed to do so (`allowReps`).
       Left mE' -> do
-        mR' <- if allowReps
+        mR' <- if allowReps && (not $ null reps)
                   then (Just <$> choice (Parser.try <<< requireMovement
                                                     <<< f' false depth Nil <$> reps))
                           <|> (pure Nothing)
@@ -582,8 +582,7 @@ parsePatterns' l f allowOmit repPats pats =
                     | d' > d -> Just e'
                   _ /\ _ -> mE
 
-            i <- getInput
-            go (Args12 f' orig xs (x:carry) allowOmissions allowReps hasMoved (isFixed pat) reps out depth mE'')
+            go (Args12 f' orig xs (x:carry) allowOmissions allowReps hasMoved (isLocked || isFixed pat) reps out depth mE'')
 
 {-
   drop the first matching element from the list and return the

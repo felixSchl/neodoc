@@ -321,25 +321,25 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
           let leafs = layoutToPattern options.requireFlags
                                       options.repeatableOptions <$> NE.toList branch
               argLeafs = toArgLeafs options env descriptions leafs
-           in Just branch /\ argLeafs
+           in branch /\ argLeafs
         )
    in do
     runParser { env, options, spec } {} {} tokens do
       mBranch /\ vs <- do
-        mBranch /\ vs <- Parser.choice $ Parser.try <$> do
-            (Pattern.parseBestTag
-              (match isKnownToken' options.allowUnknown)
-              (lowerError isKnownToken')
-              taggedPats
-            )
-          : (if not hasEmpty then Nil else singleton $
-              let b = emptyBranch options.allowUnknown
-               in do
-                vs <- eof options.allowUnknown isKnownToken'
-                pure $ b /\ vs
-            )
-        vs' <- eof options.allowUnknown isKnownToken'
-        Parser.return $ mBranch /\ (vs <> vs')
+        Parser.choice $ Parser.try <$>
+          let x = do
+                branch /\ vs <- Pattern.parseBestTag
+                  (match isKnownToken' options.allowUnknown)
+                  (lowerError isKnownToken')
+                  taggedPats
+                vs' <- eof options.allowUnknown isKnownToken'
+                Parser.return $ Just branch /\ (vs <> vs')
+              y = if not hasEmpty then Nil else singleton $
+                    let branch = emptyBranch options.allowUnknown
+                      in do
+                      vs <- eof options.allowUnknown isKnownToken'
+                      pure $ branch /\ vs
+           in x : y
 
       -- actually parse captured values into their respective types.
       -- note: previous version of neodoc would do this parse on-the-fly.
