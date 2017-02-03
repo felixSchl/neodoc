@@ -93,9 +93,14 @@ match isKnownToken allowUnknown arg is allowOmissions =
   let a = Arg.getArg arg
       argv = fromArgv (Arg.canTerm arg) a is
       fallback = fromFallback a (Arg.getFallback arg)
-   in argv <|> fallback
+   in choice (argv :| fallback : Nil)
 
   where
+
+  choice :: ∀ a. NonEmpty List (Either _ a) -> (Either _ a)
+  choice ((x@(Left (true /\ _))):|xs) = x
+  choice (x:|Nil) = x
+  choice (x:|y:zs) = x <|> choice (y:|zs)
 
   fail' = Left <<< (false /\ _)
   fail = fail' <<< ArgParser.GenericError
@@ -156,7 +161,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
       = let aliases = case Arg.getDescription arg of
               Just (OptionDescription aliases _ _ _ _) -> aliases
               _ -> NE.singleton a
-         in NE.foldl1 (<|>) $ opt toks mA r <$> aliases
+         in choice $ opt toks mA r <$> aliases
 
     go arg _ = expected arg
 
@@ -164,7 +169,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
       | String.startsWith n n'
       = case mA /\ mA' of
           Nothing /\ Just _ | n == n' ->
-            fatal $ "Option does not take arguments: " <> pretty a
+            fatal' $ optionTakesNoArgumentError (OA.Long n)
           Nothing /\ Nothing | n == n' ->
             if canTerm
                then term is
@@ -190,9 +195,11 @@ match isKnownToken allowUnknown arg is allowOmissions =
                 subsume = do
                   v <- String.stripPrefix (String.Pattern n) n'
                   v' <- if String.null v
-                            then if (o || canTerm)
-                                    then pure $ ArrayValue []
-                                    else Nothing
+                            then if o
+                                    then pure $ BoolValue true
+                                    else if canTerm
+                                            then pure $ ArrayValue []
+                                            else Nothing
                             else pure $ StringValue v
                   pure (v' /\ is)
 
@@ -203,7 +210,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
                         v'' = ArrayValue $ Value.intoArray v <> Value.intoArray v'
                       in term' v''
                   Nothing | not o ->
-                    fatal $ "Option requires argument: " <> pretty a
+                    fatal' $ optionRequiresArgumentError (OA.Long n)
                   Nothing -> return is $ BoolValue true
                   Just (v /\ is) -> return is v
           _ -> expected $ Arg.getArg arg
@@ -259,8 +266,11 @@ match isKnownToken allowUnknown arg is allowOmissions =
               Nothing /\ [] /\ Nothing ->
                 return is $ BoolValue true
 
-              Just (OptionArgument _ false) /\ xs /\ Just _ ->
-                fatal' $ optionRequiresArgumentError (OA.Short f)
+              -- note: there's varying opinion here as to what should happen:
+              --    -fb=oobar => either (a) -f => "b=oobar"
+              --                        (b) fail! (since '-b' is using explicit arg)
+              Just (OptionArgument _ false) /\ xs /\ Just _ | (not $ A.null xs) ->
+                return is $ StringValue $ String.drop 2 src
 
               Just (OptionArgument _ true) /\ xs /\ _ | (not $ A.null xs) ->
                 let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
@@ -344,10 +354,11 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
       -- actually parse captured values into their respective types.
       -- note: previous version of neodoc would do this parse on-the-fly.
       let readRv rv =
-            let v = case RichValue.getValue rv of
+            let readV = case _ of
                         StringValue v -> Value.read v false
+                        ArrayValue vs -> ArrayValue $ readV <$> vs
                         v -> v
-             in RichValue.setValue v rv
+             in RichValue.setValue (readV $ _.value $ unRichValue rv) rv
 
           -- inject the pseudo argument to collect unknown options into layout
           -- so that the value reduction will work.

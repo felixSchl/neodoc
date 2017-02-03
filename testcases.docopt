@@ -2649,12 +2649,6 @@ r"""
 Usage: foo [-f=FOO] [-b=BAR]
 """
 
-$ prog -foobar
-{"-f": "oobar"}
-
-$ prog -f=oobar
-{"-f": "oobar"}
-
 $ prog -fb=oobar
 {"-f": "b=oobar"}
 
