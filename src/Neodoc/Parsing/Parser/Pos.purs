@@ -21,7 +21,7 @@ instance showPosition :: Show Position where
 initialPos :: Position
 initialPos = Position 1 1
 
--- | Updates a `Position` by adding the columns and lines in `String`.
+split :: String -> Array String
 split = S.split (wrap "")
 
 updatePosString :: Position -> String -> Position

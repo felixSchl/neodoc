@@ -88,7 +88,7 @@ match
   -> Arg
   -> List PositionedToken
   -> AllowOmissions
-  -> PatternMatch PositionedToken ArgParseError KeyValue
+  -> Match PositionedToken ArgParseError KeyValue
 match isKnownToken allowUnknown arg is allowOmissions =
   let a = Arg.getArg arg
       argv = fromArgv (Arg.canTerm arg) a is

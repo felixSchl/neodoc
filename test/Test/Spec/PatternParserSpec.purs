@@ -49,7 +49,7 @@ match
   :: String
   -> List String
   -> AllowOmissions
-  -> PatternMatch String String String
+  -> Match String String String
 match s (i:is) _ | i == s = Right $ s /\ (Just is) /\ false
 -- match s is true = Right $ ("<sub: " <> show s <> ">") /\ is
 match s _ _ = Left $ false /\ ("Expected " <> show s)

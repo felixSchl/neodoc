@@ -132,9 +132,12 @@ choizORF :: ∀ a. Array (Array (Pattern a)) -> Pattern a
 choizORF xs = ChoicePattern true true true $ fromFoldable (fromFoldable <$> xs)
 
 type Depth = Int
-type Reps u = List (Pattern u)
+type RepPats u = List (Pattern u)
+type InputPats u = List (Pattern u)
 
-data Error e i u = Error (Either (PatternError i u) e) Depth
+-- depth-tracking error type
+data Error e i u = Error (Either (PatternError i u) e)
+                          Depth -- the depth of this error
 
 data PatternError i u
   = GenericError String
@@ -144,13 +147,32 @@ data PatternError i u
 type IsFatal = Boolean
 type HasTerminated = Boolean
 type KeepPattern = Boolean
-type PatternMatch i e a = Either (Tuple IsFatal e)
+
+-- the type of a single match
+-- it indiciates whether the match was successful, terminated, failed or failed
+-- fatally. it further indicates whether or not to keep the matched pattern -
+-- this is useful - for example - to capture unknown patterns.
+type Match i e a = Either (Tuple IsFatal e)
                                  (Tuple a
                                         (Tuple (Maybe (List i))
                                                 KeepPattern))
-type Matcher u i a e = u -> List i -> AllowOmissions -> PatternMatch i e a
 
-data Result a u = Result (List a) (Reps u) HasMoved Depth HasTerminated KeepPattern
+-- the function to yield a match
+-- it is provided with the currently to-be-matched pattern item, the input
+-- and a flag indicating whether omissions / substitutions are allowed to occur.
+type Matcher u i a e = u -> List i -> AllowOmissions -> Match i e a
+
+-- the internal type of a match, as used by the pattern parse algorithm.
+-- it is essentially a reduction of `Match`.
+type Match' a = Tuple a (Tuple HasTerminated KeepPattern)
+
+-- the type of a single result, used by the pattern parse algorithm.
+data Result a u = Result  (List a)       -- the output
+                          (RepPats u)    -- resulting repeating patterns
+                          HasMoved       -- indication if input was changed
+                          Depth          -- relative depth
+                          HasTerminated  -- forcefully terminate?
+                          KeepPattern    -- keep the pattern, do not discard (useful for unknown patterns)
 
 instance showResult :: (Generic u, Show a, Show u) => Show (Result a u) where
   show (Result a u m d t k) = "(Result " <> show a
@@ -176,7 +198,7 @@ instance prettyPatternError :: (Pretty i, Pretty u) => Pretty (PatternError i u)
   pretty (UnexpectedInputError (s:|_)) = "Unexpected " <> pretty s
   pretty (MissingPatternError p) = "Missing " <> pretty p
 
-setReps :: ∀ a u. Reps u -> Result a u -> Result a u
+setReps :: ∀ a u. RepPats u -> Result a u -> Result a u
 setReps r (Result a _ c d t k) = Result a r c d t k
 
 getValue :: ∀ a u. Result a u -> List a
@@ -189,7 +211,8 @@ getErrorDepth :: ∀ e i u. Error e i u -> Int
 getErrorDepth (Error _ d) = d
 
 {-
-  XXX explain me
+  Apply the `Matcher` function to current input and update the parser state
+  based on the results.
 -}
 match
   :: ∀ i e c s g u a
@@ -198,7 +221,7 @@ match
   -> AllowOmissions
   -> Depth
   -> u
-  -> Parser (Error e i u) c s g (List i) (Tuple a (Tuple HasTerminated KeepPattern))
+  -> Parser (Error e i u) c s g (List i) (Match' a)
 match f allowOmissions depth p = Parser \a ->
   let result = f p (getI a) allowOmissions
    in case result of
@@ -235,31 +258,33 @@ errorAt' :: ∀ e i u. Int -> e -> Error e i u
 errorAt' d e = Error (Right e) d
 
 {-
-  XXX explain me
+  Parse the given patterns using the custom matcher function.
 -}
 parse
   :: ∀ i e c s g u a
    . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> (PatternError i u -> e)
-  -> List (Pattern u) -- input patterns
+  -> InputPats u
   -> Parser e c s g (List i) (List a)
 parse f fE pats = lowerError fE $ fst <$> parse' f pats
 
 {-
-  XXX explain me
+  Parse the given patterns using the custom matcher function and expect the EOF
+  after the parse.
+  TODO: this should probably be removed
 -}
 parseToEnd
   :: ∀ i e c s g u a
    . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> (PatternError i u -> e)
-  -> List (Pattern u) -- input patterns
+  -> InputPats u
   -> Parser e c s g (List i) (List a)
 parseToEnd f fE pats = lowerError fE $ fst <$> parseToEnd' f pats
 
 {-
-  XXX explain me
+  Parse the given tagged patterns using the custom matcher function.
 -}
 parseBestTag
   :: ∀ i e c s g u a tag
@@ -276,7 +301,9 @@ parseBestTag f fE taggedPats = lowerError fE do
       (rmap (Parser.try <<< parse' f) <$> taggedPats)
 
 {-
-  XXX explain me
+  Parse the given tagged patterns using the custom matcher function and expect
+  the EOF after the parse.
+  TODO: this should probably be removed
 -}
 parseBestTagToEnd
   :: ∀ i e c s g u a tag
@@ -354,9 +381,7 @@ parsePatterns'
   -> (AllowOmissions
       -> Depth
       -> u
-      -> Parser (Error e i u) c s g (List i) (Tuple a
-                                                    (Tuple HasTerminated
-                                                            KeepPattern)))
+      -> Parser (Error e i u) c s g (List i) (Match' a))
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
@@ -421,60 +446,60 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Success!
   go (Args12 _ orig Nil Nil _ _ hasMoved _ reps out depth _) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "success"
-    --                          /\ ("input=" <> pretty i)
-    --                          /\ ("reps=" <> pretty reps)
-    --                          /\ ("out=" <> pretty out)
-    --                          /\ ("orig=" <> pretty orig)
-    --                          )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "success"
+                             /\ ("input=" <> pretty i)
+                             /\ ("reps=" <> pretty reps)
+                             /\ ("out=" <> pretty out)
+                             /\ ("orig=" <> pretty orig)
+                             )
 
     Parser.return $ Result out reps hasMoved depth false false
 
   -- Step: ignore fixed patterns when locked
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out depth mE) | isFixed pat = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "ignore (locked)"
-    --                          /\ ("pat=" <> pretty pat)
-    --                          /\ ("input=" <> pretty i)
-    --                          /\ ("out=" <> pretty out)
-    --                          /\ ("carry=" <> pretty carry)
-    --                          /\ ("allowOmissions=" <> pretty allowOmissions)
-    --                          /\ ("allowReps=" <> pretty allowReps)
-    --                          )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "ignore (locked)"
+                             /\ ("pat=" <> pretty pat)
+                             /\ ("input=" <> pretty i)
+                             /\ ("out=" <> pretty out)
+                             /\ ("carry=" <> pretty carry)
+                             /\ ("allowOmissions=" <> pretty allowOmissions)
+                             /\ ("allowReps=" <> pretty allowReps)
+                             )
 
     go (Args12 f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out depth mE)
 
   -- Failure: try again, this time allow omissions (keep the accumulator)
   go (Args12 f' orig Nil (carry@(_:_)) false true _ _ reps out depth mE) | allowOmit = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "failure (next: retry w/ omissions)"
-    --                         /\ ("input=" <> pretty i)
-    --                         /\ ("out=" <> pretty out)
-    --                         /\ ("carry=" <> pretty carry)
-    --                         )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "failure (next: retry w/ omissions)"
+                            /\ ("input=" <> pretty i)
+                            /\ ("out=" <> pretty out)
+                            /\ ("carry=" <> pretty carry)
+                            )
 
     go (Args12 f' orig orig Nil true true false false reps out depth mE)
 
   -- Failure: try again, this time allow repetitions (keep the accumulator)
   go (Args12 f' orig Nil (carry@(_:_)) allowOmissions false _ isLocked reps out depth mE) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "failure (next: retry w/ reps)"
-    --                         /\ ("input=" <> pretty i)
-    --                         /\ ("out=" <> pretty out)
-    --                         /\ ("carry=" <> pretty carry)
-    --                         )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "failure (next: retry w/ reps)"
+                            /\ ("input=" <> pretty i)
+                            /\ ("out=" <> pretty out)
+                            /\ ("carry=" <> pretty carry)
+                            )
 
     go (Args12 f' orig Nil carry allowOmissions true false false reps out depth mE)
 
   -- Failure: ...
   go (Args12 f' orig Nil (carry@(((Indexed _ pat):_))) false true _ _ _ out depth mE) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "failure"
-    --                         /\ ("input=" <> pretty i)
-    --                         /\ ("out=" <> pretty out)
-    --                         /\ ("carry=" <> pretty carry)
-    --                         )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "failure"
+                            /\ ("input=" <> pretty i)
+                            /\ ("out=" <> pretty out)
+                            /\ ("carry=" <> pretty carry)
+                            )
 
     let throwExistingError = case mE of
           Just (e@(Error _ d)) | d > depth -> Parser.fail' e
@@ -486,12 +511,12 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Failure: now try to omit one element and reset
   go (Args12 f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ reps out depth mE) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "omit"
-    --                         /\ ("input=" <> pretty i)
-    --                         /\ ("out=" <> pretty out)
-    --                         /\ ("carry=" <> pretty carry)
-    --                         )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "omit"
+                            /\ ("input=" <> pretty i)
+                            /\ ("out=" <> pretty out)
+                            /\ ("carry=" <> pretty carry)
+                            )
 
     -- at this point we rotated the entire input and tried to consume via
     -- repetitions, but w/o any luck. it's time for drastic measures by starting
@@ -517,18 +542,18 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Step: process next element
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out depth mE) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "step"
-    --                           /\ ("input=" <> pretty i)
-    --                           /\ ("allowOmissions=" <> show allowOmissions)
-    --                           /\ ("allowReps=" <> show allowReps)
-    --                           /\ ("reps=" <> pretty reps)
-    --                           /\ ("isLocked=" <> pretty isLocked)
-    --                           /\ ("pat=" <> pretty pat)
-    --                           /\ ("carry=" <> pretty carry)
-    --                           /\ ("orig=" <> pretty orig)
-    --                           /\ ("out=" <> pretty out)
-    --                           )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "step"
+                              /\ ("input=" <> pretty i)
+                              /\ ("allowOmissions=" <> show allowOmissions)
+                              /\ ("allowReps=" <> show allowReps)
+                              /\ ("reps=" <> pretty reps)
+                              /\ ("isLocked=" <> pretty isLocked)
+                              /\ ("pat=" <> pretty pat)
+                              /\ ("carry=" <> pretty carry)
+                              /\ ("orig=" <> pretty orig)
+                              /\ ("out=" <> pretty out)
+                              )
 
     -- 1. try parsing the pattern
     -- we try parsing this pattern under varying circumstances but only capture
