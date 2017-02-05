@@ -93,77 +93,62 @@ match isKnownToken allowUnknown arg is allowOmissions =
   let a = Arg.getArg arg
       argv = fromArgv (Arg.canTerm arg) a is
       fallback = fromFallback a (Arg.getFallback arg)
-   in choice (argv :| fallback : Nil)
+   in ((arg /\ _) <$> (argv <|> fallback)) <|> unknown
 
   where
 
-  choice :: ∀ a. NonEmpty List (Either _ a) -> (Either _ a)
-  choice ((x@(Left (true /\ _))):|xs) = x
-  choice (x:|Nil) = x
-  choice (x:|y:zs) = x <|> choice (y:|zs)
+  fail' = Failed false
+  fail = Failed false <<< ArgParser.GenericError
+  fatal' = Failed true
+  fatal = Failed true <<< ArgParser.GenericError
 
-  fail' = Left <<< (false /\ _)
-  fail = fail' <<< ArgParser.GenericError
-  fatal' = Left <<< (true /\ _)
-  fatal = fatal' <<< ArgParser.GenericError
-  toIsKnown (ptok@(PositionedToken tok _ _)) = if isKnownToken tok
-                                                  then known ptok
-                                                  else unknown ptok
-
-  expected arg = case is of
+  unknown = case is of
     -- if all fails, try to see if we can consume this input as an "unknown"
     -- option
     ptok@(PositionedToken tok src _) : is ->
       if isKnownToken tok
-        then fail' $ unexpectedInputError $ known ptok :| (toIsKnown <$> is)
+        then NoMatch
         else if allowUnknown
           then case tok of
             Tok.Lit _ ->
-              fail' $ unexpectedInputError $ unknown ptok :| (toIsKnown <$> is)
-            Tok.EOA xs -> Right $
+              NoMatch
+            Tok.EOA xs -> Success true is do
               (_EOA /\ (RichValue.from Origin.Argv $ ArrayValue $ A.fromFoldable xs))
-                /\ Just is
-                /\ true
-            _ -> Right $
+            _ -> Success true is do
               (_UNKNOWN_ARG /\ (RichValue.from Origin.Argv $ StringValue src))
-                /\ Just is
-                /\ true
-          else fail' $ unexpectedInputError $ unknown ptok :| (toIsKnown <$> is)
-    _ -> fail' $ missingArgumentError arg
+          else NoMatch
+    _ -> NoMatch
 
-  fromArgv canTerm = go
+  fromArgv canTerm a is = RichValue.from Origin.Argv <$> go a is
     where
-    _return v mIs = Right $ (arg /\ (RichValue.from Origin.Argv v)) /\ mIs /\ false
-    return is v = _return v (Just is)
-    term' v = _return v Nothing
-    term is =
-      let v = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
-       in _return v Nothing
 
-    go arg Nil = expected arg
+    terminate is = Terminated do
+      ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
+
+    go arg Nil = NoMatch
 
     go (Command n _) ((PositionedToken (Tok.Lit s) _ _):is)
       | n == s
       = if canTerm
-          then term is
-          else return is (BoolValue true)
+          then terminate is
+          else Success false is $ BoolValue true
 
     go (Positional _ _) ((PositionedToken (Tok.Lit s) _ _):is)
-      = return is $ StringValue s
+      = Success false is $ StringValue s
 
     go EOA ((PositionedToken (Tok.EOA xs) _ _):is)
-      = term' $ ArrayValue (toUnfoldable xs)
+      = Terminated $ ArrayValue (toUnfoldable xs)
 
     go Stdin ((PositionedToken Tok.Stdin _ _):is)
-      = return is $ BoolValue true
+      = Success false is $ BoolValue true
 
     go (Option a mA r) toks
       = let aliases = case Arg.getDescription arg of
               Just (OptionDescription aliases _ _ _ _) -> aliases
               _ -> NE.singleton a
-         in choice $ opt toks mA r <$> aliases
+         in NE.foldl1 (<|>) $ opt toks mA r <$> aliases
 
-    go arg _ = expected arg
+    go arg _ = NoMatch
 
     opt ((PositionedToken (Tok.LOpt n' mA') _ _):is) mA r (a@(OA.Long n))
       | String.startsWith n n'
@@ -172,8 +157,8 @@ match isKnownToken allowUnknown arg is allowOmissions =
             fatal' $ optionTakesNoArgumentError (OA.Long n)
           Nothing /\ Nothing | n == n' ->
             if canTerm
-               then term is
-               else return is $ BoolValue true
+               then terminate is
+               else Success false is $ BoolValue true
           Just (OptionArgument _ o) /\ _ ->
             let explicit = do
                   guard $ n' == n
@@ -204,16 +189,16 @@ match isKnownToken allowUnknown arg is allowOmissions =
                   pure (v' /\ is)
 
              in case explicit <|> adjacent <|> subsume of
-                  Nothing | canTerm -> term is
+                  Nothing | canTerm -> terminate is
                   Just (v /\ is') | canTerm ->
                     let v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is'
                         v'' = ArrayValue $ Value.intoArray v <> Value.intoArray v'
-                      in term' v''
+                      in Terminated v''
                   Nothing | not o ->
                     fatal' $ optionRequiresArgumentError (OA.Long n)
-                  Nothing -> return is $ BoolValue true
-                  Just (v /\ is) -> return is v
-          _ -> expected $ Arg.getArg arg
+                  Nothing -> Success false is $ BoolValue true
+                  Just (v /\ is) -> Success false is v
+          _ -> NoMatch
 
     opt ((PositionedToken (Tok.SOpt f' xs mA') src _):is) mA r (a@(OA.Short f))
       | f == f'
@@ -241,7 +226,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
                     v' = if String.null rest then v else [ StringValue rest ]
                     v'' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
                     v''' = ArrayValue $ v' <> Value.intoArray v''
-                 in term' v'''
+                 in Terminated v'''
 
               -- note: allow explict arg even when option does not take one,
               --       when `canTerm` is true.
@@ -249,28 +234,28 @@ match isKnownToken allowUnknown arg is allowOmissions =
                 let v = maybe [] (A.singleton <<< StringValue) mA'
                     v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
                     v'' = ArrayValue $ v <> Value.intoArray v'
-                 in term' v''
+                 in Terminated v''
 
               Just _ /\ [] /\ (Just s) ->
-                return is $ StringValue s
+                Success false is $ StringValue s
 
               Just (OptionArgument _ o) /\ [] /\ Nothing ->
                 case adjacent of
-                  Just (v /\ is) -> return is v
-                  Nothing | o -> return is $ BoolValue true
+                  Just (v /\ is) -> Success false is v
+                  Nothing | o -> Success false is $ BoolValue true
                   Nothing  -> fatal' $ optionRequiresArgumentError (OA.Short f)
 
               Just _ /\ xs /\ Nothing ->
-                return is $ StringValue $ String.fromCharArray xs
+                Success false is $ StringValue $ String.fromCharArray xs
 
               Nothing /\ [] /\ Nothing ->
-                return is $ BoolValue true
+                Success false is $ BoolValue true
 
               -- note: there's varying opinion here as to what should happen:
               --    -fb=oobar => either (a) -f => "b=oobar"
               --                        (b) fail! (since '-b' is using explicit arg)
               Just (OptionArgument _ false) /\ xs /\ Just _ | (not $ A.null xs) ->
-                return is $ StringValue $ String.drop 2 src
+                Success false is $ StringValue $ String.drop 2 src
 
               Just (OptionArgument _ true) /\ xs /\ _ | (not $ A.null xs) ->
                 let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
@@ -278,7 +263,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
                                       mA'
                     newSrc = "-" <> String.drop 2 src
                     newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
-                 in return (newPtok : is) $ BoolValue true
+                 in Success false (newPtok : is) $ BoolValue true
 
               Nothing /\ xs /\ mA' | (not $ A.null xs) ->
                 let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
@@ -286,14 +271,14 @@ match isKnownToken allowUnknown arg is allowOmissions =
                                       mA'
                     newSrc = "-" <> String.drop 2 src
                     newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
-                 in return (newPtok : is) $ BoolValue true
-              _ -> expected $ Arg.getArg arg
+                 in Success false (newPtok : is) $ BoolValue true
+              _ -> NoMatch
 
-    opt _ _ _ _ = expected $ Arg.getArg arg
+    opt _ _ _ _ = NoMatch
 
-  fromFallback arg _ | not allowOmissions = expected arg
-  fromFallback arg Nothing = expected arg
-  fromFallback _ (Just v) = Right ((arg /\ v) /\ Just is /\ false)
+  fromFallback arg _ | not allowOmissions = NoMatch
+  fromFallback arg Nothing = NoMatch
+  fromFallback _ (Just v) = Success false is v
 
 lowerError
   :: (Token -> Boolean)
@@ -306,6 +291,8 @@ lowerError isKnownToken = case _ of
                                         if isKnownToken tok
                                           then known ptok
                                           else unknown ptok
+  Pattern.MissingElementError a ->
+    missingArgumentError (Arg.getArg a)
   Pattern.MissingPatternError x ->
     case getLeftMostElement x of
       Nothing -> GenericError ""
