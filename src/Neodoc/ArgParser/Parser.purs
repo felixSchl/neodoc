@@ -13,7 +13,7 @@ import Data.String as String
 import Data.String.Ext as String
 import Data.Array.Partial as AU
 import Data.Array as A
-import Data.Foldable (foldl, elem)
+import Data.Foldable (foldl, elem, all)
 import Data.Tuple (curry)
 import Data.Tuple.Nested ((/\))
 import Data.NonEmpty (NonEmpty, (:|))
@@ -315,9 +315,13 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
       toplevels = concat $ NE.toList layouts
       isKnownToken' = isKnownToken spec
       taggedPats = toplevels <#> (\branch ->
-          let leafs = layoutToPattern options.requireFlags
-                                      options.repeatableOptions <$> NE.toList branch
-              argLeafs = toArgLeafs options env descriptions leafs
+          let leafs = do
+                layoutToPattern options.requireFlags
+                                options.repeatableOptions <$> NE.toList branch
+              argLeafs = concat $ simplifyLayout <$> toArgLeafs   options
+                                                                  env
+                                                                  descriptions
+                                                                  leafs
            in branch /\ argLeafs
         )
    in do
@@ -435,6 +439,21 @@ isKnownToken (Spec { layouts, descriptions }) = memoize go
         test (Tok.EOA _)      (Solved.EOA)          = true
         test (Tok.Stdin)      (Solved.Stdin)        = true
         test _ _ = false
+
+{-
+  Remove singleton groups and single branch groups (where possible).
+-}
+simplifyLayout (ChoicePattern o r f (xs:Nil)) =
+  let ys = concat $ simplifyLayout <$> xs
+      t = all case _ of
+            LeafPattern o r f x -> o || Arg.hasFallback x
+            ChoicePattern o r f xs -> o || all id (t <$> xs)
+   in if t ys
+        then xs
+        else singleton $ ChoicePattern o r f $ singleton ys
+simplifyLayout (ChoicePattern o r f xs) = singleton $
+  ChoicePattern o r f $ concat <<< (simplifyLayout <$> _) <$> xs
+simplifyLayout p = singleton p
 
 {-
   Convert a list of patterns containing solved layout arguments into a list of

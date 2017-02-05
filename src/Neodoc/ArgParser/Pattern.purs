@@ -35,6 +35,10 @@ import Neodoc.ArgParser.Evaluate (chooseBest, chooseBestTag)
 data Pattern a = LeafPattern   IsOptional IsRepeatable IsFixed a
                | ChoicePattern IsOptional IsRepeatable IsFixed (List (List (Pattern a)))
 
+setIsOptional :: ∀ a. Boolean -> Pattern a -> Pattern a
+setIsOptional o (LeafPattern _ r f a) = LeafPattern o r f a
+setIsOptional o (ChoicePattern _ r f a) = ChoicePattern o r f a
+
 type IsOptional = Boolean
 type IsRepeatable = Boolean
 type IsFixed = Boolean
@@ -445,7 +449,7 @@ parsePatterns' l f allowOmit repPats pats =
         --          this correct?)
         vs' <- if hasTerminated || keepPat
                   then pure Nil
-                  else parseRemainder rep ((getValue <$> _) <<< f' false depth rep)
+                  else parseRemainder rep ((getValue <$> _) <<< f' true depth rep)
 
         Parser.return $ Result  (vs <> vs')
                                 rep
@@ -476,60 +480,60 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Success!
   go (Args12 _ orig Nil Nil _ _ hasMoved _ reps out depth _) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "success"
-    --                          /\ ("input=" <> pretty i)
-    --                          /\ ("reps=" <> pretty reps)
-    --                          /\ ("out=" <> pretty out)
-    --                          /\ ("orig=" <> pretty orig)
-    --                          )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "success"
+                             /\ ("input=" <> pretty i)
+                             /\ ("reps=" <> pretty reps)
+                             /\ ("out=" <> pretty out)
+                             /\ ("orig=" <> pretty orig)
+                             )
 
     Parser.return $ Result out reps hasMoved depth false false
 
   -- Step: ignore fixed patterns when locked
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out depth mE) | isFixed pat = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "ignore (locked)"
-    --                          /\ ("pat=" <> pretty pat)
-    --                          /\ ("input=" <> pretty i)
-    --                          /\ ("out=" <> pretty out)
-    --                          /\ ("carry=" <> pretty carry)
-    --                          /\ ("allowOmissions=" <> pretty allowOmissions)
-    --                          /\ ("allowReps=" <> pretty allowReps)
-    --                          )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "ignore (locked)"
+                             /\ ("pat=" <> pretty pat)
+                             /\ ("input=" <> pretty i)
+                             /\ ("out=" <> pretty out)
+                             /\ ("carry=" <> pretty carry)
+                             /\ ("allowOmissions=" <> pretty allowOmissions)
+                             /\ ("allowReps=" <> pretty allowReps)
+                             )
 
     go (Args12 f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out depth mE)
 
   -- Failure: try again, this time allow omissions (keep the accumulator)
   go (Args12 f' orig Nil (carry@(_:_)) false true _ _ reps out depth mE) | allowOmit = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "failure (next: retry w/ omissions)"
-    --                         /\ ("input=" <> pretty i)
-    --                         /\ ("out=" <> pretty out)
-    --                         /\ ("carry=" <> pretty carry)
-    --                         )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "failure (next: retry w/ omissions)"
+                            /\ ("input=" <> pretty i)
+                            /\ ("out=" <> pretty out)
+                            /\ ("carry=" <> pretty carry)
+                            )
 
     go (Args12 f' orig orig Nil true true false false reps out depth mE)
 
   -- Failure: try again, this time allow repetitions (keep the accumulator)
   go (Args12 f' orig Nil (carry@(_:_)) allowOmissions false _ isLocked reps out depth mE) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "failure (next: retry w/ reps)"
-    --                         /\ ("input=" <> pretty i)
-    --                         /\ ("out=" <> pretty out)
-    --                         /\ ("carry=" <> pretty carry)
-    --                         )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "failure (next: retry w/ reps)"
+                            /\ ("input=" <> pretty i)
+                            /\ ("out=" <> pretty out)
+                            /\ ("carry=" <> pretty carry)
+                            )
 
     go (Args12 f' orig Nil carry allowOmissions true false false reps out depth mE)
 
   -- Failure: ...
   go (Args12 f' orig Nil (carry@(((Indexed _ pat):_))) false true _ _ _ out depth mE) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "failure"
-    --                         /\ ("input=" <> pretty i)
-    --                         /\ ("out=" <> pretty out)
-    --                         /\ ("carry=" <> pretty carry)
-    --                         )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "failure"
+                            /\ ("input=" <> pretty i)
+                            /\ ("out=" <> pretty out)
+                            /\ ("carry=" <> pretty carry)
+                            )
 
     let throwExistingError = case mE of
           Just (e@(Error _ d)) | d > depth -> Parser.fail' e
@@ -541,12 +545,12 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Failure: now try to omit one element and reset
   go (Args12 f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ reps out depth mE) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "omit"
-    --                         /\ ("input=" <> pretty i)
-    --                         /\ ("out=" <> pretty out)
-    --                         /\ ("carry=" <> pretty carry)
-    --                         )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "omit"
+                            /\ ("input=" <> pretty i)
+                            /\ ("out=" <> pretty out)
+                            /\ ("carry=" <> pretty carry)
+                            )
 
     -- at this point we rotated the entire input and tried to consume via
     -- repetitions, but w/o any luck. it's time for drastic measures by starting
@@ -572,18 +576,19 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Step: process next element
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out depth mE) = do
-    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
-    --                             "step"
-    --                           /\ ("input=" <> pretty i)
-    --                           /\ ("allowOmissions=" <> show allowOmissions)
-    --                           /\ ("allowReps=" <> show allowReps)
-    --                           /\ ("reps=" <> pretty reps)
-    --                           /\ ("isLocked=" <> pretty isLocked)
-    --                           /\ ("pat=" <> pretty pat)
-    --                           /\ ("carry=" <> pretty carry)
-    --                           /\ ("orig=" <> pretty orig)
-    --                           /\ ("out=" <> pretty out)
-    --                           )
+    getInput >>= \i-> traceShowA $ indent l <> (pretty $
+                                "step"
+                              /\ ("input=" <> pretty i)
+                              /\ ("allowOmissions=" <> show allowOmissions)
+                              /\ ("allowReps=" <> show allowReps)
+                              /\ ("reps=" <> pretty reps)
+                              /\ ("isLocked=" <> pretty isLocked)
+                              /\ ("pat=" <> pretty pat)
+                              /\ ("carry=" <> pretty carry)
+                              /\ ("orig=" <> pretty orig)
+                              /\ ("hasMoved=" <> pretty hasMoved)
+                              /\ ("out=" <> pretty out)
+                              )
 
     -- 1. try parsing the pattern
     -- we try parsing this pattern under varying circumstances but only capture
@@ -621,7 +626,7 @@ parsePatterns' l f allowOmit repPats pats =
         vs' <- if keepPat || hasTerminated || (not $ isRepeatable pat)
                 then pure Nil
                 else parseRemainder (singleton pat) do
-                      (getValue <$> _) <<< f' false depth reps
+                      (getValue <$> _) <<< f' true depth reps
 
         let orig' = sortBy (compare `on` getIndex) do
                       if keepPat
@@ -683,13 +688,17 @@ dropFirst f xs = go xs Nil
   Parse remaining elements, applying the given parser to each pattern.
 -}
 parseRemainder
-  :: ∀ i e c s g u a .(Show a) =>  
+  :: ∀ i e c s g u a. (Show a, Show i) =>
     List u -- repeatables
   -> (u -> Parser e c s g (List i) (List a))
   -> Parser e c s g (List i) (List a)
 parseRemainder Nil _ = pure Nil
-parseRemainder repPats f = do
-  go (choice $ f <$> repPats) Nil
+parseRemainder repPats f =  go (choice $ f <$> repPats) Nil
   where go p xs = do
-          vs <- (Parser.try p) <|> pure Nil
-          if null vs then pure xs else go p (xs <> vs)
+          i <- Parser.getInput
+          case i of
+            Nil -> pure xs
+            _   -> do
+              vs <- (Parser.try p) <|> pure Nil
+              traceShowA vs
+              if null vs then pure xs else go p (xs <> vs)

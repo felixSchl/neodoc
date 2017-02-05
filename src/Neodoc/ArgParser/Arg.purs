@@ -57,5 +57,9 @@ getDescription (Arg _ _ _ _ mD _) = mD
 getFallback :: Arg -> Maybe RichValue
 getFallback (Arg _ _ _ _ _ mV) = mV
 
+hasFallback :: Arg -> Boolean
+hasFallback (Arg _ _ _ _ _ (Just _)) = true
+hasFallback _ = false
+
 canTerm :: Arg -> Boolean
 canTerm (Arg _ _ _ c _ _) = c

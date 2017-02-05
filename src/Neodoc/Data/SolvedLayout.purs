@@ -139,6 +139,9 @@ isOptional :: SolvedLayout -> Boolean
 isOptional (Group o _ _) = o
 isOptional _ = false
 
+isOptionalElem :: SolvedLayoutArg -> Boolean
+isOptionalElem _ = false
+
 isPositional :: SolvedLayoutArg -> Boolean
 isPositional (Positional _ _) = true
 isPositional _ = false
