@@ -278,7 +278,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
 
   fromFallback arg _ | not allowOmissions = NoMatch
   fromFallback arg Nothing = NoMatch
-  fromFallback _ (Just v) = Success false is v
+  fromFallback _ (Just v) = Substituted v
 
 lowerError
   :: (Token -> Boolean)

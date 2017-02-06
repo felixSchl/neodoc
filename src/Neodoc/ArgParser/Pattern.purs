@@ -39,6 +39,26 @@ setIsOptional :: ∀ a. Boolean -> Pattern a -> Pattern a
 setIsOptional o (LeafPattern _ r f a) = LeafPattern o r f a
 setIsOptional o (ChoicePattern _ r f a) = ChoicePattern o r f a
 
+data Substitutable a
+  = Match a
+  | Substitution a
+
+unSubstitutableMatch :: ∀ a. Substitutable a -> a
+unSubstitutableMatch (Match a) = a
+unSubstitutableMatch (Substitution a) = a
+
+isSubstitution :: ∀ a. Substitutable a -> Boolean
+isSubstitution (Substitution _) = true
+isSubstitution _ = false
+
+instance showSubstitutable :: (Show a) => Show (Substitutable a) where
+  show (Match a) = "(Match " <> show a <> ")"
+  show (Substitution a) = "(Substitution " <> show a <> ")"
+
+instance prettySubstitutable :: (Pretty a) => Pretty (Substitutable a) where
+  pretty (Match a) = "M{" <> pretty a <> "}"
+  pretty (Substitution a) = "S{" <> pretty a <> "}"
+
 type IsOptional = Boolean
 type IsRepeatable = Boolean
 type IsFixed = Boolean
@@ -160,38 +180,41 @@ type Matcher u i a e = u -> List i -> AllowOmissions -> Match i e a
 
 -- the internal type of a match, as used by the pattern parse algorithm.
 -- it is essentially a reduction of `Match`.
-type Match' a = Tuple a (Tuple HasTerminated KeepPattern)
+type SingleMatch a = Tuple  (Substitutable a)
+                            (Tuple HasTerminated KeepPattern)
 
 -- the type of a single result, used by the pattern parse algorithm.
-data Result a u = Result  (List a)       -- the output
-                          (RepPats u)    -- resulting repeating patterns
-                          HasMoved       -- indication if input was changed
-                          Depth          -- relative depth
-                          HasTerminated  -- forcefully terminate?
-                          KeepPattern    -- keep the pattern, do not discard (useful for unknown patterns)
+data Result a u = Result  (List (Substitutable a)) -- the output
+                          (RepPats u)              -- resulting repeating patterns
+                          HasMoved                 -- indication if input was changed
+                          Depth                    -- relative depth
+                          HasTerminated            -- forcefully terminate?
+                          KeepPattern              -- keep the pattern, do not discard (useful for unknown patterns)
 
 data Match i e a
   = NoMatch
   | Failed IsFatal e
   | Success KeepPattern (List i) a
-  | Substituted (List i) a
+  | Substituted a
   | Terminated a
 
 instance functorMatch :: Functor (Match i e) where
   map f (Terminated a) = Terminated (f a)
   map f (Success k is a) = Success k is (f a)
-  map f (Substituted is a) = Substituted is (f a)
+  map f (Substituted a) = Substituted (f a)
   map _ NoMatch = NoMatch
   map _ (Failed f e) = Failed f e
 
 instance altMatch :: Alt (Match i e) where
-  alt (m1@(Failed true _)) _   = m1
-  alt _ (m2@(Failed true _))   = m2
-  alt (Failed _ _) m2          = m2
-  alt NoMatch m2               = m2
-  alt (m1@(Terminated _)) _    = m1
-  alt (m1@(Success _ _ _)) _   = m1
-  alt (m1@(Substituted _ _)) _ = m1
+  alt (m1@(Failed true _)) _               = m1
+  alt _ (m2@(Failed true _))               = m2
+  alt (Failed _ _) m2                      = m2
+  alt NoMatch m2                           = m2
+  alt (m1@(Terminated _)) _                = m1
+  alt (m1@(Success _ _ _)) _               = m1
+  alt (Substituted _) (m2@(Terminated _))  = m2
+  alt (Substituted _) (m2@(Success _ _ _)) = m2
+  alt (m1@(Substituted _)) _               = m1
 
 instance showResult :: (Generic u, Show a, Show u) => Show (Result a u) where
   show (Result a u m d t k) = "(Result " <> show a
@@ -222,7 +245,7 @@ instance prettyPatternError :: (Pretty i, Pretty u) => Pretty (PatternError i u)
 setReps :: ∀ a u. RepPats u -> Result a u -> Result a u
 setReps r (Result a _ c d t k) = Result a r c d t k
 
-getValue :: ∀ a u. Result a u -> List a
+getValue :: ∀ a u. Result a u -> List (Substitutable a)
 getValue (Result a _ _ _ _ _) = a
 
 getSuccessDepth :: ∀ a u. Result a u -> Int
@@ -242,25 +265,25 @@ match
   -> AllowOmissions
   -> Depth
   -> u
-  -> Parser (Error e i u) c s g (List i) (Match' a)
-match f allowOmissions depth p = Parser \a ->
-  let result = f p (getI a) allowOmissions
+  -> Parser (Error e i u) c s g (List i) (SingleMatch a)
+match f allowOmissions depth u = Parser \a ->
+  let result = f u (getI a) allowOmissions
    in case result of
         NoMatch ->
-          let error = Error (Left $ GenericError "TODO") depth
+          let error = Error (Left $ MissingElementError u) depth
            in Step false a $ Left $ ParseError false $ Right error
         Success k i v ->
           Step  true
                 (Parser.setI i a)
-                (Right $ v /\ false /\ k)
-        Substituted i v ->
+                (Right $ (Match v) /\ false /\ k)
+        Substituted v ->
           Step  true
-                (Parser.setI i a)
-                (Right $ v /\ false /\ false)
+                a
+                (Right $ (Substitution v) /\ false /\ false)
         Terminated v ->
           Step  true
                 (Parser.setI Nil a)
-                (Right $ v /\ true /\ false)
+                (Right $ (Match v) /\ true /\ false)
         Failed isFatal e ->
           let error = Error (Right e) depth
            in Step false a $ Left $ ParseError isFatal $ Right error
@@ -380,7 +403,7 @@ parse'
   -> Parser (Error e i u) c s g (List i) (Tuple (List a) Depth)
 parse' f pats = do
   Result vs _ _ depth _ _ <- parsePatterns' 0 (match f) true Nil pats
-  Parser.return $ vs /\ depth
+  Parser.return $  (unSubstitutableMatch <$> vs) /\ depth
 
 indent :: Int -> String
 indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l * 4) $ LL.repeat ' '
@@ -415,7 +438,7 @@ parsePatterns'
   -> (AllowOmissions
       -> Depth
       -> u
-      -> Parser (Error e i u) c s g (List i) (Match' a))
+      -> Parser (Error e i u) c s g (List i) (SingleMatch a))
   -> AllowOmissions   -- allow omissions?
   -> List (Pattern u) -- repeatables
   -> List (Pattern u) -- input patterns
@@ -449,14 +472,13 @@ parsePatterns' l f allowOmit repPats pats =
         --          this correct?)
         vs' <- if hasTerminated || keepPat
                   then pure Nil
-                  else parseRemainder rep ((getValue <$> _) <<< f' true depth rep)
+                  else parseRemainder rep ((getValue <$> _) <<< f' true depth Nil)
 
-        Parser.return $ Result  (vs <> vs')
+        let vs'' = vs <> vs'
+
+        Parser.return $ Result  vs''
                                 rep
-                                -- XXX: is `not (null vs')` fair here? we might
-                                --      be retrieving values via fallbacks.
-                                -- TODO: `match` should indicate if moved!
-                                (hasMoved || (not $ null vs'))
+                                (not $ all isSubstitution vs'')
                                 (depth + length vs') -- XXX: same here (^)
                                 hasTerminated
                                 keepPat
@@ -473,67 +495,67 @@ parsePatterns' l f allowOmit repPats pats =
         HasMoved              -- have we consumed any input this far?
         IsLocked              -- are we locked from processing any more fixed?
         (List (Pattern u))    -- repeatable patterns found so far
-        (List a)              -- output values
+        (List (Substitutable a)) -- output values
         Int                   -- the depth of this parse
         (Maybe (Error e i u)) -- the deepest error met
     ->  Parser (Error e i u) c s g (List i) (Result a u)
 
   -- Success!
   go (Args12 _ orig Nil Nil _ _ hasMoved _ reps out depth _) = do
-    getInput >>= \i-> traceShowA $ indent l <> (pretty $
-                                "success"
-                             /\ ("input=" <> pretty i)
-                             /\ ("reps=" <> pretty reps)
-                             /\ ("out=" <> pretty out)
-                             /\ ("orig=" <> pretty orig)
-                             )
+    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
+    --                             "success"
+    --                          /\ ("input=" <> pretty i)
+    --                          /\ ("reps=" <> pretty reps)
+    --                          /\ ("out=" <> pretty out)
+    --                          /\ ("orig=" <> pretty orig)
+    --                          )
 
     Parser.return $ Result out reps hasMoved depth false false
 
   -- Step: ignore fixed patterns when locked
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved true reps out depth mE) | isFixed pat = do
-    getInput >>= \i-> traceShowA $ indent l <> (pretty $
-                                "ignore (locked)"
-                             /\ ("pat=" <> pretty pat)
-                             /\ ("input=" <> pretty i)
-                             /\ ("out=" <> pretty out)
-                             /\ ("carry=" <> pretty carry)
-                             /\ ("allowOmissions=" <> pretty allowOmissions)
-                             /\ ("allowReps=" <> pretty allowReps)
-                             )
+    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
+    --                             "ignore (locked)"
+    --                          /\ ("pat=" <> pretty pat)
+    --                          /\ ("input=" <> pretty i)
+    --                          /\ ("out=" <> pretty out)
+    --                          /\ ("carry=" <> pretty carry)
+    --                          /\ ("allowOmissions=" <> pretty allowOmissions)
+    --                          /\ ("allowReps=" <> pretty allowReps)
+    --                          )
 
     go (Args12 f' orig xs (snoc carry x) allowOmissions allowReps hasMoved true reps out depth mE)
 
   -- Failure: try again, this time allow omissions (keep the accumulator)
   go (Args12 f' orig Nil (carry@(_:_)) false true _ _ reps out depth mE) | allowOmit = do
-    getInput >>= \i-> traceShowA $ indent l <> (pretty $
-                                "failure (next: retry w/ omissions)"
-                            /\ ("input=" <> pretty i)
-                            /\ ("out=" <> pretty out)
-                            /\ ("carry=" <> pretty carry)
-                            )
+    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
+    --                             "failure (next: retry w/ omissions)"
+    --                         /\ ("input=" <> pretty i)
+    --                         /\ ("out=" <> pretty out)
+    --                         /\ ("carry=" <> pretty carry)
+    --                         )
 
     go (Args12 f' orig orig Nil true true false false reps out depth mE)
 
   -- Failure: try again, this time allow repetitions (keep the accumulator)
   go (Args12 f' orig Nil (carry@(_:_)) allowOmissions false _ isLocked reps out depth mE) = do
-    getInput >>= \i-> traceShowA $ indent l <> (pretty $
-                                "failure (next: retry w/ reps)"
-                            /\ ("input=" <> pretty i)
-                            /\ ("out=" <> pretty out)
-                            /\ ("carry=" <> pretty carry)
-                            )
+    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
+    --                             "failure (next: retry w/ reps)"
+    --                         /\ ("input=" <> pretty i)
+    --                         /\ ("out=" <> pretty out)
+    --                         /\ ("carry=" <> pretty carry)
+    --                         )
 
     go (Args12 f' orig Nil carry allowOmissions true false false reps out depth mE)
 
   -- Failure: ...
   go (Args12 f' orig Nil (carry@(((Indexed _ pat):_))) false true _ _ _ out depth mE) = do
-    getInput >>= \i-> traceShowA $ indent l <> (pretty $
-                                "failure"
-                            /\ ("input=" <> pretty i)
-                            /\ ("out=" <> pretty out)
-                            /\ ("carry=" <> pretty carry)
-                            )
+    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
+    --                             "failure"
+    --                         /\ ("input=" <> pretty i)
+    --                         /\ ("out=" <> pretty out)
+    --                         /\ ("carry=" <> pretty carry)
+    --                         )
 
     let throwExistingError = case mE of
           Just (e@(Error _ d)) | d > depth -> Parser.fail' e
@@ -545,12 +567,12 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Failure: now try to omit one element and reset
   go (Args12 f' _ Nil (carry@(((Indexed _ pat):_))) true true _ _ reps out depth mE) = do
-    getInput >>= \i-> traceShowA $ indent l <> (pretty $
-                                "omit"
-                            /\ ("input=" <> pretty i)
-                            /\ ("out=" <> pretty out)
-                            /\ ("carry=" <> pretty carry)
-                            )
+    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
+    --                             "omit"
+    --                         /\ ("input=" <> pretty i)
+    --                         /\ ("out=" <> pretty out)
+    --                         /\ ("carry=" <> pretty carry)
+    --                         )
 
     -- at this point we rotated the entire input and tried to consume via
     -- repetitions, but w/o any luck. it's time for drastic measures by starting
@@ -576,19 +598,19 @@ parsePatterns' l f allowOmit repPats pats =
 
   -- Step: process next element
   go (Args12 f' orig (x@(Indexed ix pat):xs) carry allowOmissions allowReps hasMoved isLocked reps out depth mE) = do
-    getInput >>= \i-> traceShowA $ indent l <> (pretty $
-                                "step"
-                              /\ ("input=" <> pretty i)
-                              /\ ("allowOmissions=" <> show allowOmissions)
-                              /\ ("allowReps=" <> show allowReps)
-                              /\ ("reps=" <> pretty reps)
-                              /\ ("isLocked=" <> pretty isLocked)
-                              /\ ("pat=" <> pretty pat)
-                              /\ ("carry=" <> pretty carry)
-                              /\ ("orig=" <> pretty orig)
-                              /\ ("hasMoved=" <> pretty hasMoved)
-                              /\ ("out=" <> pretty out)
-                              )
+    -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
+    --                             "step"
+    --                           /\ ("input=" <> pretty i)
+    --                           /\ ("allowOmissions=" <> show allowOmissions)
+    --                           /\ ("allowReps=" <> show allowReps)
+    --                           /\ ("reps=" <> pretty reps)
+    --                           /\ ("isLocked=" <> pretty isLocked)
+    --                           /\ ("pat=" <> pretty pat)
+    --                           /\ ("carry=" <> pretty carry)
+    --                           /\ ("orig=" <> pretty orig)
+    --                           /\ ("hasMoved=" <> pretty hasMoved)
+    --                           /\ ("out=" <> pretty out)
+    --                           )
 
     -- 1. try parsing the pattern
     -- we try parsing this pattern under varying circumstances but only capture
@@ -688,10 +710,10 @@ dropFirst f xs = go xs Nil
   Parse remaining elements, applying the given parser to each pattern.
 -}
 parseRemainder
-  :: ∀ i e c s g u a. (Show a, Show i) =>
-    List u -- repeatables
-  -> (u -> Parser e c s g (List i) (List a))
-  -> Parser e c s g (List i) (List a)
+  :: ∀ i e c s g u a
+   . List u -- repeatables
+  -> (u -> Parser e c s g (List i) (List (Substitutable a)))
+  -> Parser e c s g (List i) (List (Substitutable a))
 parseRemainder Nil _ = pure Nil
 parseRemainder repPats f =  go (choice $ f <$> repPats) Nil
   where go p xs = do
@@ -700,5 +722,6 @@ parseRemainder repPats f =  go (choice $ f <$> repPats) Nil
             Nil -> pure xs
             _   -> do
               vs <- (Parser.try p) <|> pure Nil
-              traceShowA vs
-              if null vs then pure xs else go p (xs <> vs)
+              if null vs || all isSubstitution vs
+                 then pure (xs <> vs)
+                 else go p (xs <> vs)
