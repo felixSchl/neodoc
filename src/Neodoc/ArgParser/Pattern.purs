@@ -501,7 +501,7 @@ parsePatterns' l f allowOmit repPats pats =
     ->  Parser (Error e i u) c s g (List i) (Result a u)
 
   -- Success!
-  go (Args12 _ orig Nil Nil _ _ hasMoved _ reps out depth _) = do
+  go (Args12 f' orig Nil Nil _ _ hasMoved _ reps out depth _) = do
     -- getInput >>= \i-> traceShowA $ indent l <> (pretty $
     --                             "success"
     --                          /\ ("input=" <> pretty i)
@@ -532,6 +532,7 @@ parsePatterns' l f allowOmit repPats pats =
     --                             "failure (next: retry w/ omissions)"
     --                         /\ ("input=" <> pretty i)
     --                         /\ ("out=" <> pretty out)
+    --                         /\ ("orig=" <> pretty orig)
     --                         /\ ("carry=" <> pretty carry)
     --                         )
 
@@ -543,10 +544,11 @@ parsePatterns' l f allowOmit repPats pats =
     --                             "failure (next: retry w/ reps)"
     --                         /\ ("input=" <> pretty i)
     --                         /\ ("out=" <> pretty out)
+    --                         /\ ("reps=" <> pretty reps)
     --                         /\ ("carry=" <> pretty carry)
     --                         )
 
-    go (Args12 f' orig Nil carry allowOmissions true false false reps out depth mE)
+    go (Args12 f' orig orig Nil allowOmissions true false false reps out depth mE)
 
   -- Failure: ...
   go (Args12 f' orig Nil (carry@(((Indexed _ pat):_))) false true _ _ _ out depth mE) = do
@@ -715,13 +717,23 @@ parseRemainder
   -> (u -> Parser e c s g (List i) (List (Substitutable a)))
   -> Parser e c s g (List i) (List (Substitutable a))
 parseRemainder Nil _ = pure Nil
-parseRemainder repPats f =  go (choice $ f <$> repPats) Nil
-  where go p xs = do
-          i <- Parser.getInput
-          case i of
-            Nil -> pure xs
-            _   -> do
-              vs <- (Parser.try p) <|> pure Nil
-              if null vs || all isSubstitution vs
-                 then pure (xs <> vs)
-                 else go p (xs <> vs)
+parseRemainder repPats f =  go (choice $ Parser.try
+                                    <<< requireMovement'
+                                    <<< f <$> repPats) Nil
+  where
+  go p xs = do
+    i <- Parser.getInput
+    case i of
+      Nil -> pure xs
+      _   -> do
+        vs <- p <|> pure Nil
+        if null vs
+            then pure xs
+            else go p (xs <> vs)
+
+  requireMovement' p = do
+    vs <- p
+    if all isSubstitution vs
+      then Parser.fail "all substituted"
+      else pure vs
+
