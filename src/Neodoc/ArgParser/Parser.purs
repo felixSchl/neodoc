@@ -133,8 +133,10 @@ match isKnownToken allowUnknown arg is allowOmissions =
           then terminate is
           else Success false is $ BoolValue true
 
-    go (Positional _ _) ((PositionedToken (Tok.Lit s) _ _):is)
-      = Success false is $ StringValue s
+    go (Positional _ _) ((i@(PositionedToken (Tok.Lit s) _ _)):is)
+      = if canTerm
+          then terminate (i:is)
+          else Success false is $ StringValue s
 
     go EOA ((PositionedToken (Tok.EOA xs) _ _):is)
       = Terminated $ ArrayValue (toUnfoldable xs)
