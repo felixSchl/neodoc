@@ -1724,18 +1724,22 @@ $ prog -c -a -b
 $ prog -cab
 {"-a": true, "-b": true, "-c": true}
 
+# note: these used to fail until neodoc 1.3.x because [-b -d] needed to be
+# parsed together. In newer versions of neodoc this requirement is lifted to
+# extend using a rule that if all elements in a singe-branch group are optional
+# or substitutable, they can be lifted to the next level: [-b -d] -> -b -d.
+
 $ prog -d -a -b -c
-"user-error" # -b and -d must appear together
+{"-a": true, "-b": true, "-c": true, "-d": true}
 
 $ prog -a -d -c -b
-"user-error" # -b and -d must appear together
+{"-a": true, "-b": true, "-c": true, "-d": true}
 
 $ prog -b -a -d -c
-"user-error" # -b and -d must appear together
+{"-a": true, "-b": true, "-c": true, "-d": true}
 
 $ prog -b -c -a -d
-"user-error" # -b and -d must appear together
-
+{"-a": true, "-b": true, "-c": true, "-d": true}
 
 r"""usage: prog [(-a -b)]"""
 
