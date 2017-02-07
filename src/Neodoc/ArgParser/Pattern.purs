@@ -19,6 +19,7 @@ import Data.Array as A
 import Data.List.Lazy (replicateM)
 import Data.List.Partial as LU
 import Data.List.Lazy as LL
+import Data.Lazy (defer)
 import Data.Either
 import Partial.Unsafe
 import Control.Alt
@@ -38,6 +39,10 @@ data Pattern a = LeafPattern   IsOptional IsRepeatable IsFixed a
 setIsOptional :: ∀ a. Boolean -> Pattern a -> Pattern a
 setIsOptional o (LeafPattern _ r f a) = LeafPattern o r f a
 setIsOptional o (ChoicePattern _ r f a) = ChoicePattern o r f a
+
+toList :: ∀ a. Pattern a -> List a
+toList (LeafPattern _ _ _ x) = singleton x
+toList (ChoicePattern _ _ _ xs) = concat $ concat $ (toList <$> _) <$> xs
 
 data Substitutable a
   = Match a
@@ -344,17 +349,18 @@ parseToEnd f fE pats = lowerError fE $ fst <$> parseToEnd' f pats
   Parse the given tagged patterns using the custom matcher function.
 -}
 parseBestTag
-  :: ∀ i e c s g u a tag
-   . (Eq u, Generic u, Show a, Show i, Show u, Show e, Show tag, Pretty e, Pretty i, Pretty u, Pretty a)
+  :: ∀ i e c s g u a w tag
+   . (Eq u, Generic u, Ord a, Show a, Ord w, Show i, Show u, Show e, Show tag, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> (PatternError i u -> e)
+  -> (tag -> w)
   -> List (Tuple tag (List (Pattern u))) -- tagged input patterns
   -> Parser e c s g (List i) (Tuple tag (List a))
-parseBestTag f fE taggedPats = lowerError fE do
+parseBestTag f fE fT taggedPats = lowerError fE do
   rmap fst <$> do
     chooseBestTag
       getErrorDepth
-      snd
+      (\tag v -> v /\ (defer \_ -> fT tag))
       (rmap (Parser.try <<< parse' f) <$> taggedPats)
 
 {-
@@ -363,17 +369,18 @@ parseBestTag f fE taggedPats = lowerError fE do
   TODO: this should probably be removed
 -}
 parseBestTagToEnd
-  :: ∀ i e c s g u a tag
-   . (Eq u, Generic u, Show a, Show i, Show u, Show e, Show tag, Pretty e, Pretty i, Pretty u, Pretty a)
+  :: ∀ i e c s g u a w tag
+   . (Eq u, Generic u, Ord a, Ord w, Show a, Show i, Show u, Show e, Show tag, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> (PatternError i u -> e)
+  -> (tag -> w)
   -> List (Tuple tag (List (Pattern u))) -- tagged input patterns
   -> Parser e c s g (List i) (Tuple tag (List a))
-parseBestTagToEnd f fE taggedPats = lowerError fE do
+parseBestTagToEnd f fE fT taggedPats = lowerError fE do
   rmap fst <$> do
     chooseBestTag
       getErrorDepth
-      snd
+      (\tag v -> v /\ (defer \_ -> fT tag))
       (rmap (Parser.try <<< parseToEnd' f) <$> taggedPats)
 
 {-
@@ -449,7 +456,8 @@ parsePatterns' l f allowOmit repPats pats =
         Result vs reps' hasMoved depth hasTerminated keepPat <- case pat of
           LeafPattern _ r _ x -> do
             v /\ hasTerminated /\ keepPat <- f allowOmit' depth x
-            pure $ Result (singleton v) reps true (depth + 1) hasTerminated keepPat
+            let depth' = depth + if isSubstitution v then 0 else 1
+            pure $ Result (singleton v) reps true depth' hasTerminated keepPat
           ChoicePattern _ _ _ xs ->
             let resetReps = id -- setReps reps
               in resetReps <$> do
@@ -479,26 +487,26 @@ parsePatterns' l f allowOmit repPats pats =
         Parser.return $ Result  vs''
                                 rep
                                 (not $ all isSubstitution vs'')
-                                (depth + length vs') -- XXX: same here (^)
+                                (depth + length (filter (not <<< isSubstitution) vs'))
                                 hasTerminated
                                 keepPat
 
   where
-  go
-    :: Args12
-        _                     -- the parser function on elements of `u`
-        _                     -- the original input for given iteration
-        _                     -- the patterns to match
-        _                     -- the carry
-        AllowOmissions        -- allow omissions?
-        AllowRepetitions      -- allow repetitions?
-        HasMoved              -- have we consumed any input this far?
-        IsLocked              -- are we locked from processing any more fixed?
-        (List (Pattern u))    -- repeatable patterns found so far
-        (List (Substitutable a)) -- output values
-        Int                   -- the depth of this parse
-        (Maybe (Error e i u)) -- the deepest error met
-    ->  Parser (Error e i u) c s g (List i) (Result a u)
+  -- go
+  --   :: Args12
+  --       _                     -- the parser function on elements of `u`
+  --       _                     -- the original input for given iteration
+  --       _                     -- the patterns to match
+  --       _                     -- the carry
+  --       AllowOmissions        -- allow omissions?
+  --       AllowRepetitions      -- allow repetitions?
+  --       HasMoved              -- have we consumed any input this far?
+  --       IsLocked              -- are we locked from processing any more fixed?
+  --       (List (Pattern u))    -- repeatable patterns found so far
+  --       (List (Substitutable a)) -- output values
+  --       Int                   -- the depth of this parse
+  --       (Maybe (Error e i u)) -- the deepest error met
+  --   ->  Parser (Error e i u) c s g (List i) (Result a u)
 
   -- Success!
   go (Args12 f' orig Nil Nil _ _ hasMoved _ reps out depth _) = do

@@ -56,3 +56,6 @@ fromList'
   => List a
   -> NonEmpty List a
 fromList' (x:xs) = x :| xs
+
+length :: ∀ a. NonEmpty List a -> Int
+length = List.length <<< toList

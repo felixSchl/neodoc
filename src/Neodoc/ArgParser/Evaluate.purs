@@ -2,7 +2,8 @@ module Neodoc.ArgParser.Evaluate where
 
 import Prelude
 import Debug.Trace
-import Data.Tuple (Tuple, fst, snd)
+import Data.Ord
+import Data.Tuple (Tuple, fst, snd, uncurry)
 import Data.Tuple.Nested ((/\))
 import Data.Optimize.Uncurried
 import Data.Pretty
@@ -15,6 +16,7 @@ import Data.Function (on)
 import Data.Either (Either(..), fromRight)
 import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.NonEmpty as NE
+import Data.NonEmpty.Extra as NE
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for)
 import Data.Foldable (class Foldable, maximumBy)
@@ -67,23 +69,23 @@ snapshot :: ∀ e c s g i. Parser e c s g i (ParserArgs c s g i)
 snapshot = Parser \(a@(ParseArgs c s g i)) -> Step false a (Right a)
 
 chooseBest
-  :: ∀ e c s g i a
-   . (Show e, Show a)
+  :: ∀ e c s g i a w
+   . (Ord w, Show e, Show a)
   => (e -> Int) -- get depth of error
-  -> (a -> Int) -- get depth of result
+  -> (a -> w)   -- get orderable to compare against other successes
   -> List (Parser e c s g (List i) a)
   -> Parser e c s g (List i) a
 chooseBest fE fA xs = snd <$> do
-  chooseBestTag fE fA ((unit /\ _) <$> xs)
+  chooseBestTag fE (const fA) ((unit /\ _) <$> xs)
 
 chooseBestTag
-  :: ∀ e c s g i a tag
-   . (Show e, Show a, Show tag)
-  => (e -> Int) -- get depth of error
-  -> (a -> Int) -- get depth of result
+  :: ∀ e c s g i a v w tag
+   . (Ord w, Show e, Show a, Show tag)
+  => (e -> Int)      -- get depth of error
+  -> (tag -> a -> w) -- get orderable to compare against other successes
   -> List (Tuple tag (Parser e c s g (List i) a))
   -> Parser e c s g (List i) (Tuple tag a)
-chooseBestTag getErrorDepth getSuccessDepth parsers = do
+chooseBestTag getErrorDepth cmpSuccess parsers = do
   a@(ParseArgs c s g i) <- getParseState
 
   -- Run all parsers and collect their results for further evaluation
@@ -114,7 +116,7 @@ chooseBestTag getErrorDepth getSuccessDepth parsers = do
       SuccessCont a r -> Just (a /\ r)
       _               -> Nothing
     bestSuccess = do
-      let depth = getSuccessDepth <<< snd <<< snd
+      let depth = uncurry cmpSuccess <<< snd
       deepestGroup <- last do
         groupBy (eq `on` depth) do
           sortBy (compare `on` depth) successes
@@ -128,6 +130,7 @@ chooseBestTag getErrorDepth getSuccessDepth parsers = do
       deepestGroup <- last do
         groupBy (eq `on` depth) do
           sortBy (compare `on` depth) errors
+
       -- note: could apply user-defined function on equal elements here to find
       --       best of the best matches.
 

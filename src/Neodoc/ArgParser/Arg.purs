@@ -36,6 +36,9 @@ derive instance genericArg :: Generic Arg
 instance showArg :: Show Arg where
   show = gShow
 
+instance ordArg :: Ord Arg where
+  compare = gCompare
+
 instance eqArg :: Eq Arg where
   eq = eq `on` getId
 

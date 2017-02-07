@@ -32,6 +32,9 @@ derive instance genericRichValue :: Generic RichValue
 instance showRichValue :: Show RichValue where
   show = gShow
 
+instance ordRichValue :: Ord RichValue where
+  compare = gCompare
+
 instance prettyRichValue :: Pretty RichValue where
   pretty (RichValue v) = pretty v.value <> " " <> "(" <> pretty v.origin <> ")"
 

@@ -4,9 +4,12 @@ import Prelude
 
 import Debug.Trace
 
-import Data.List (List(..), (:), fromFoldable, toUnfoldable, concat, singleton, any, null, filter)
+import Data.List (
+  List(..), (:), fromFoldable, toUnfoldable, concat, singleton,
+  catMaybes, any, null, filter, length)
 import Data.List.Extra (spanMap)
 import Data.Maybe
+import Data.Lazy (defer, force)
 import Data.Bifunctor (rmap, lmap)
 import Data.Pretty
 import Data.String as String
@@ -14,7 +17,7 @@ import Data.String.Ext as String
 import Data.Array.Partial as AU
 import Data.Array as A
 import Data.Foldable (foldl, elem, all)
-import Data.Tuple (curry)
+import Data.Tuple (curry, fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty as NE
@@ -37,6 +40,7 @@ import Neodoc.Data.OptionArgument (OptionArgument(..))
 import Neodoc.Env
 import Neodoc.Data.Layout
 import Neodoc.Data.Description
+import Neodoc.Data.LayoutConversion
 import Neodoc.Data.SolvedLayout
 import Neodoc.Data.SolvedLayout as Solved
 import Neodoc.Value
@@ -317,26 +321,39 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
       toplevels = concat $ NE.toList layouts
       isKnownToken' = isKnownToken spec
       taggedPats = toplevels <#> (\branch ->
-          let leafs = do
+          let pats = do
                 layoutToPattern options.requireFlags
                                 options.repeatableOptions <$> NE.toList branch
-              argLeafs = concat $ simplifyLayout <$> toArgLeafs   options
-                                                                  env
-                                                                  descriptions
-                                                                  leafs
-           in branch /\ argLeafs
+              argPats = concat do
+                simplifyLayout <$> do
+                  toArgLeafs options env descriptions pats
+              branchLength = defer \_ -> NE.length $ flattenBranch branch
+           in (branch /\ argPats /\ branchLength) /\ argPats
         )
    in do
     runParser { env, options, spec } {} {} tokens do
       mBranch /\ vs <- do
         Parser.choice $ Parser.try <$>
           let x = do
-                branch /\ vs <- Pattern.parseBestTag
+                -- 1. parse the actual branch
+                (branch /\ argPats /\ _) /\ vs <- Pattern.parseBestTag
                   (match isKnownToken' options.allowUnknown)
                   (lowerError isKnownToken')
+                  (\(_ /\ _ /\ x) -> x)
                   taggedPats
+
+                -- 2. parse any remaining unknown elements
                 vs' <- eof options.allowUnknown isKnownToken'
-                Parser.return $ Just branch /\ (vs <> vs')
+
+                -- 3. fill in default values
+                let patArgs = concat $ Pattern.toList <$> argPats
+                    matchedArgs = fst <$> vs
+                    missingArgs = filter (not <<< flip elem matchedArgs) patArgs
+                    vs''' = catMaybes $ missingArgs <#> \a -> do
+                              v <- Arg.getFallback a
+                              pure $ a /\ v
+
+                Parser.return $ Just branch /\ (vs <> vs' <> vs''')
               y = if not hasEmpty then Nil else singleton $
                     let branch = emptyBranch options.allowUnknown
                       in do
