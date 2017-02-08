@@ -3,6 +3,18 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
+## [2.0.0] - 2016-11-02
+
+Major release featuring the 4th iteration of the arg parser.
+
+### Major changes
+
+* `opts.laxPlacement` has been removed and is now the normal behavior
+* Fix [#85] - options can now be repeated amonst repeated positionals
+* **Faster** - the arg parser now uses a tight recursive approach to matching
+  patterns that is also more likely to be able to be ported to other languages
+  (less reliance on monads)
+
 ## [1.3.0] - 2016-11-02
 
 ### New features
@@ -607,6 +619,7 @@ section &mdash; let it fail at the lexing stage.
 
 [@matthewmueller]: https://github.com/matthewmueller
 
+[#85]: https://github.com/felixSchl/neodoc/issues/85
 [#81]: https://github.com/felixSchl/neodoc/issues/81
 [#80]: https://github.com/felixSchl/neodoc/issues/80
 [#79]: https://github.com/felixSchl/neodoc/issues/79
@@ -689,6 +702,8 @@ section &mdash; let it fail at the lexing stage.
 [#2]: https://github.com/felixSchl/neodoc/issues/2
 [#1]: https://github.com/felixSchl/neodoc/issues/1
 
+[2.0.0]: https://github.com/felixschl/neodoc/compare/v1.3.0...v2.0.0
+[1.3.0]: https://github.com/felixschl/neodoc/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/felixschl/neodoc/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/felixschl/neodoc/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/felixschl/neodoc/compare/v1.0.1...v1.0.2
