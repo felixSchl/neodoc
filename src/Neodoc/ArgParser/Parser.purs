@@ -104,7 +104,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
   let a = Arg.getArg arg
       argv = fromArgv (Arg.canTerm arg) a is
       fallback = fromFallback (Arg.getFallback arg)
-   in ((arg /\ _) <$> (argv <|> fallback)) <|> unknown
+   in unknown <|> ((arg /\ _) <$> (argv <|> fallback))
 
   where
 
