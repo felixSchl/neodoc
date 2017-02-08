@@ -4,7 +4,8 @@ import Prelude
 
 import Control.Monad.Aff (Aff, launchAff)
 import Test.Spec.Runner (run)
-import Test.Spec.Reporter
+import Test.Spec.Reporter.Spec
+import Test.Spec.Reporter.Console
 import Test.Spec.ScannerSpec (scannerSpec)
 import Test.Spec.UsageParserSpec (usageParserSpec)
 import Test.Spec.DescParserSpec (descParserSpec)

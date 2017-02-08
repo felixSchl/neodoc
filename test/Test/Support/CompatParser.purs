@@ -10,6 +10,7 @@ module Test.Support.CompatParser (
 import Prelude
 import Global (readFloat)
 import Data.Int as Int
+import Data.Pretty
 import Data.String as String
 import Data.StrMap as StrMap
 import Data.String.Argv as Argv
@@ -166,7 +167,7 @@ readTests filepath = do
             A.many upperAlpha
           P.char '='
           val <- P.choice $ P.try <$> [
-              D.prettyPrintValue <$> value
+              pretty <$> value
             , fromCharArray <$> (A.many $ P.noneOf [ ' ' ])
             ]
           pure $ Tuple key val

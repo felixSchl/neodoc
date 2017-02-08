@@ -17,7 +17,7 @@ import Data.String.Ext as String
 import Data.Array.Partial as AU
 import Data.Array as A
 import Data.Foldable (foldl, elem, all)
-import Data.Tuple (Tuple(..), curry, fst, snd)
+import Data.Tuple (Tuple(..), curry, fst, snd, swap)
 import Data.Tuple.Nested ((/\))
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty as NE
@@ -111,12 +111,8 @@ match isKnownToken allowUnknown arg is allowOmissions =
   fatal' = Failed true
   fatal = Failed true <<< ArgParser.GenericError
 
-  readRv rv =
-    let readV = case _ of
-                StringValue v -> Value.read v false
-                ArrayValue vs -> ArrayValue $ readV <$> vs
-                v -> v
-     in RichValue.setValue (readV $ _.value $ unRichValue rv) rv
+  readV s | _READVALS = defer \_ -> Value.read s false
+  readV s = pure $ StringValue s
 
   unknown = case is of
     -- if all fails, try to see if we can consume this input as an "unknown"
@@ -149,10 +145,11 @@ match isKnownToken allowUnknown arg is allowOmissions =
           then terminate is
           else Success false is $ pure $ BoolValue true
 
+    go (Positional _ _) is | canTerm
+      = terminate is
+
     go (Positional _ _) ((i@(PositionedToken (Tok.Lit s) _ _)):is)
-      = if canTerm
-          then terminate (i:is)
-          else Success false is $ pure $ StringValue s
+      = Success false is $ readV s
 
     go EOA ((PositionedToken (Tok.EOA xs) _ _):is)
       = Terminated $ pure $ ArrayValue (toUnfoldable xs)
@@ -180,42 +177,45 @@ match isKnownToken allowUnknown arg is allowOmissions =
           Just (OptionArgument _ o) /\ _ ->
             let explicit = do
                   guard $ n' == n
-                  (_ /\ is) <<< StringValue <$> mA'
+                  (_ /\ is) <<< readV <$> mA'
                 adjacent = do
                   guard $ n' == n
                   case is of
                     (PositionedToken (Tok.Lit s) _ _):is' ->
                       if r
                         then do
-                          ss /\ is'' <- pure $
+                          ss /\ is'' <- pure <$>
                             lmap A.fromFoldable $
                               flip spanMap is' case _ of
                                 PositionedToken (Tok.Lit s) _ _ -> Just s
                                 _ -> Nothing
-                          pure $ (ArrayValue $ StringValue <$> (s A.: ss)) /\ is''
-                        else pure $ StringValue s /\ is'
+                          pure $ (defer \_ ->
+                                    ArrayValue $ force <<< readV <$> do
+                                      (s A.: ss)
+                                  ) /\ is''
+                        else pure $ readV s /\ is'
                     _ -> Nothing
                 subsume = do
                   v <- String.stripPrefix (String.Pattern n) n'
                   v' <- if String.null v
-                            then if o
+                            then pure <$> if o
                                     then pure $ BoolValue true
                                     else if canTerm
                                             then pure $ ArrayValue []
                                             else Nothing
-                            else pure $ StringValue v
+                            else pure $ readV v
                   pure (v' /\ is)
 
              in case explicit <|> adjacent <|> subsume of
                   Nothing | canTerm -> terminate is
                   Just (v /\ is') | canTerm ->
                     let v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is'
-                        v'' = ArrayValue $ Value.intoArray v <> Value.intoArray v'
+                        v'' = ArrayValue $ Value.intoArray (force v) <> Value.intoArray v'
                       in Terminated $ pure v''
                   Nothing | not o ->
                     fatal' $ optionRequiresArgumentError (OA.Long n)
                   Nothing -> Success false is $ pure $ BoolValue true
-                  Just (v /\ is) -> Success false is $ pure v
+                  Just (v /\ is) -> Success false is v
           _ -> NoMatch
 
     opt ((PositionedToken (Tok.SOpt f' xs mA') src _):is) mA r (a@(OA.Short f))
@@ -229,8 +229,11 @@ match isKnownToken allowUnknown arg is allowOmissions =
                         flip spanMap is' case _ of
                           PositionedToken (Tok.Lit s) _ _ -> Just s
                           _ -> Nothing
-                    pure $ (ArrayValue $ StringValue <$> (s A.: ss)) /\ is''
-                  else pure $ StringValue s /\ is'
+                    Just $ swap $ is'' /\ (defer \_ ->
+                      ArrayValue $ force <<< readV <$> do
+                        s A.: ss
+                    )
+                  else Just $ readV s /\ is'
               _ -> Nothing
          in case mA /\ xs /\ mA' of
 
@@ -255,16 +258,16 @@ match isKnownToken allowUnknown arg is allowOmissions =
                  in Terminated $ pure v''
 
               Just _ /\ [] /\ (Just s) ->
-                Success false is $ pure $ StringValue s
+                Success false is $ readV s
 
               Just (OptionArgument _ o) /\ [] /\ Nothing ->
                 case adjacent of
-                  Just (v /\ is) -> Success false is $ pure v
+                  Just (v /\ is) -> Success false is v
                   Nothing | o -> Success false is $ pure $ BoolValue true
                   Nothing  -> fatal' $ optionRequiresArgumentError (OA.Short f)
 
               Just _ /\ xs /\ Nothing ->
-                Success false is $ pure $ StringValue $ String.fromCharArray xs
+                Success false is $ readV $ String.fromCharArray xs
 
               Nothing /\ [] /\ Nothing ->
                 Success false is $ pure $ BoolValue true
@@ -273,7 +276,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
               --    -fb=oobar => either (a) -f => "b=oobar"
               --                        (b) fail! (since '-b' is using explicit arg)
               Just (OptionArgument _ false) /\ xs /\ Just _ | (not $ A.null xs) ->
-                Success false is $ pure $ StringValue $ String.drop 2 src
+                Success false is $ readV $ String.drop 2 src
 
               Just (OptionArgument _ true) /\ xs /\ _ | (not $ A.null xs) ->
                 let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
@@ -371,9 +374,19 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
                           eof options.allowUnknown isKnownToken'
            in x : y
 
+      let
+          -- read the Environment variables into real values
+          readEnvVar (RichValue (rv@{
+                        origin: Origin.Environment
+                      , value: StringValue s
+                      }))
+                      | _READVALS
+                      = RichValue $ rv { value = Value.read s false }
+          readEnvVar rv = rv
+
           -- inject the pseudo argument to collect unknown options into layout
           -- so that the value reduction will work.
-      let mOutBranch = case mBranch of
+          mOutBranch = case mBranch of
             Nothing -> mBranch
             Just branch -> Just do
               if options.allowUnknown
@@ -381,7 +394,7 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
                         _UNKNOWN_ARG :| _EOA : Nil
                       ) branch
                 else branch
-      pure $ ArgParseResult mOutBranch vs
+      pure $ ArgParseResult mOutBranch (rmap readEnvVar <$> vs)
 
   where
   eof :: ∀ r. Boolean -> (_ -> Boolean) -> ArgParser r (List KeyValue)
@@ -495,13 +508,7 @@ toArgLeafs options env descriptions xs = evalState (for xs go) 0
     let mDesc = case x of
           Option alias _ _ -> findDescription alias descriptions
           _ -> Nothing
-        fallback = do
-          v <- unRichValue <$> getFallbackValue options env mDesc x
-          pure $ RichValue v {
-            value = if Solved.isElemRepeatable x
-                      then ArrayValue $ Value.intoArray v.value
-                      else v.value
-          }
+        fallback = getFallbackValue options env mDesc x
         canTerm = case x of
           Solved.Option a _ _ ->
             let aliases = case mDesc of
