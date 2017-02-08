@@ -36,8 +36,10 @@ import Control.Monad.State as State
 import Neodoc.Value.Origin (Origin(..))
 import Neodoc.Value.Origin as Origin
 import Neodoc.OptionAlias as OA
+import Neodoc.OptionAlias (OptionAlias)
 import Neodoc.Data.OptionArgument (OptionArgument(..))
 import Neodoc.Env
+import Neodoc.Env as Env
 import Neodoc.Data.Layout
 import Neodoc.Data.Description
 import Neodoc.Data.LayoutConversion
@@ -353,11 +355,10 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
               branchLength = defer \_ -> NE.length $ flattenBranch branch
            in (branch /\ argPats /\ branchLength) /\ argPats
         )
-   in do
-    runParser { env, options, spec } {} {} tokens do
-      mBranch /\ vs <- do
-        Parser.choice $ Parser.try <$>
-          let x = do
+
+      explicitOrEmptyP = do
+        mBranch /\ vs <- Parser.choice $ Parser.try <$>
+          let explicitP = do
                 -- 1. parse the actual branch
                 (branch /\ argPats /\ _) /\ vs <- Pattern.parseBestTagToEnd
                   (match isKnownToken' options.allowUnknown)
@@ -376,41 +377,47 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
                               Tuple a <$> do
                                 Arg.getFallback a <|> do
                                   if Arg.canTerm a
-                                     then pure $ RichValue {
+                                    then pure $ RichValue {
                                             origin: Origin.Argv
                                           , value: ArrayValue []
                                           }
-                                     else Nothing
-
+                                    else Nothing
                 Parser.return $ Just branch /\ (matches <> extraMatches)
-              y = if not hasEmpty then Nil else singleton $
+
+              emptyP = if not hasEmpty then Nil else singleton $
                     let branch = emptyBranch options.allowUnknown
                       in Tuple branch <$> do
                           eof options.allowUnknown isKnownToken'
-           in x : y
+          in explicitP : emptyP
 
-      let
-          -- read the Environment variables into real values
-          readEnvVar (RichValue (rv@{
-                        origin: Origin.Environment
-                      , value: StringValue s
-                      }))
-                      | _READVALS
-                      = RichValue $ rv { value = Value.read s false }
-          readEnvVar rv = rv
+        let
+            -- read the Environment variables into real values
+            readEnvVar (RichValue (rv@{
+                          origin: Origin.Environment
+                        , value: StringValue s
+                        }))
+                        | _READVALS
+                        = RichValue $ rv { value = Value.read s false }
+            readEnvVar rv = rv
 
-          -- inject the pseudo argument to collect unknown options into layout
-          -- so that the value reduction will work.
-          mOutBranch = case mBranch of
-            Nothing -> mBranch
-            Just branch -> Just do
-              if options.allowUnknown
-                then NE.append (Elem <<< Arg.getArg <$> do
-                        _UNKNOWN_ARG :| _EOA : Nil
-                      ) branch
-                else branch
-      pure $ ArgParseResult mOutBranch (rmap readEnvVar <$> vs)
-
+            -- inject the pseudo argument to collect unknown options into layout
+            -- so that the value reduction will work.
+            mOutBranch = case mBranch of
+              Nothing -> mBranch
+              Just branch -> Just do
+                if options.allowUnknown
+                  then NE.append (Elem <<< Arg.getArg <$> do
+                          _UNKNOWN_ARG :| _EOA : Nil
+                        ) branch
+                  else branch
+        pure $ ArgParseResult mOutBranch (rmap readEnvVar <$> vs)
+      in do
+        runParser { env, options, spec } {} {} tokens do
+          Parser.try explicitOrEmptyP `catch` \_ e ->
+            let implicitFlags = options.helpFlags <> options.versionFlags
+             in case mkImplicitToplevelP isKnownToken' implicitFlags of
+                  Just p -> Parser.try p <|> Parser.throw e
+                  _      -> Parser.throw e
   where
   eof :: ∀ r. Boolean -> (_ -> Boolean) -> ArgParser r (List KeyValue)
   eof allowUnknown isKnownToken = do
@@ -456,6 +463,34 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
   emptyBranch true = Just $ (Elem $ Arg.getArg _UNKNOWN_ARG)
                             :| (Elem $ Arg.getArg _EOA)
                                 : Nil
+
+  -- create an implicit top-level to make "-h/--help" and "--version" "just
+  -- work". The idea is to remove the empty fallback for '--help' and
+  -- '--version' in order to fail that top-level branch.
+  mkImplicitToplevelP :: _ -> List OptionAlias -> _
+  mkImplicitToplevelP isKnownToken' flags = case flags of
+    Nil -> Nothing
+    f : fs -> Just
+      let args = toOption f :| (toOption <$> fs)
+          branch = (Group false true $ args <#> Elem >>> (_ :| Nil)) :| Nil
+          pats = layoutToPattern true true <$> NE.toList branch
+          argPats = toArgLeafs (options { requireFlags = true })
+                                Env.empty
+                                descriptions
+                                pats
+
+       in ArgParseResult (Just branch) <$> do
+            -- 1. parse the actual branch
+            (rmap force <$> _) <$> Pattern.parseToEnd
+              (match isKnownToken' true)
+              (lowerError isKnownToken')
+              -- note: allow trailing arguments: only ensure that flags occur
+              --       at beginning of parse
+              (Just $ pure Nil)
+              argPats
+    where
+    toOption :: OptionAlias -> SolvedLayoutArg
+    toOption a = Option a Nothing true
 
 {-
   Determine if a given token is considered known
