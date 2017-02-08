@@ -338,9 +338,10 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
           let pats = do
                 layoutToPattern options.requireFlags
                                 options.repeatableOptions <$> NE.toList branch
-              argPats = concat do
-                simplifyLayout <$> do
-                  toArgLeafs options env descriptions pats
+              argPats = do
+                  toArgLeafs options env descriptions
+                    $ concat $ simplifyLayout <$> do
+                      pats
               branchLength = defer \_ -> NE.length $ flattenBranch branch
            in (branch /\ argPats /\ branchLength) /\ argPats
         )
@@ -350,24 +351,29 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
         Parser.choice $ Parser.try <$>
           let x = do
                 -- 1. parse the actual branch
-                (branch /\ argPats /\ _) /\ vs <- Pattern.parseBestTag
+                (branch /\ argPats /\ _) /\ vs <- Pattern.parseBestTagToEnd
                   (match isKnownToken' options.allowUnknown)
                   (lowerError isKnownToken')
                   (\(_ /\ _ /\ x) -> x)
+                  (Just ((rmap pure <$> _) <$> do
+                    eof options.allowUnknown isKnownToken'))
                   taggedPats
 
-                -- 2. parse any remaining unknown elements
-                vs' <- eof options.allowUnknown isKnownToken'
-
-                -- 3. fill in default values
+                -- 2. fill in default values
                 let patArgs = concat $ Pattern.toList <$> argPats
                     matchedArgs = fst <$> vs
                     missingArgs = filter (not <<< flip elem matchedArgs) patArgs
-                    vs'' = catMaybes $ missingArgs <#> \a ->
+                    vs' = catMaybes $ missingArgs <#> \a ->
                               Tuple a <$> do
-                                Arg.getFallback a
+                                Arg.getFallback a <|> do
+                                  if Arg.canTerm a
+                                     then pure $ RichValue {
+                                            origin: Origin.Empty
+                                          , value: ArrayValue []
+                                          }
+                                     else Nothing
 
-                Parser.return $ Just branch /\ (((force <$> _) <$> vs) <> vs' <> vs'')
+                Parser.return $ Just branch /\ (((force <$> _) <$> vs) <> vs')
               y = if not hasEmpty then Nil else singleton $
                     let branch = emptyBranch options.allowUnknown
                       in Tuple branch <$> do
@@ -476,13 +482,18 @@ isKnownToken (Spec { layouts, descriptions }) = memoize go
 {-
   Remove singleton groups and single branch groups (where possible).
 -}
+simplifyLayout :: Pattern _ -> List (Pattern _)
+simplifyLayout (ChoicePattern o r f ((x:Nil):Nil)) = simplifyLayout $
+  Pattern.modRepeatable (_ || r)
+    $ Pattern.modOptional (_ || o)
+      x
 simplifyLayout (ChoicePattern o r f (xs:Nil)) =
   let ys = concat $ simplifyLayout <$> xs
       t = all case _ of
-            LeafPattern o r f x -> o || Arg.hasFallback x
+            LeafPattern o r f x -> o
             ChoicePattern o r f xs -> o || all id (t <$> xs)
    in if t ys
-        then xs
+        then Pattern.modRepeatable (_ || r) <$> xs
         else singleton $ ChoicePattern o r f $ singleton ys
 simplifyLayout (ChoicePattern o r f xs) = singleton $
   ChoicePattern o r f $ concat <<< (simplifyLayout <$> _) <$> xs
@@ -502,9 +513,9 @@ toArgLeafs
 toArgLeafs options env descriptions xs = evalState (for xs go) 0
   where
   nextId = State.get <* State.modify (_ + 1)
-  go (LeafPattern o r fix x) = nextId <#> LeafPattern o r fix <<< toArg x
+  go (LeafPattern o r fix x) = nextId <#> LeafPattern o r fix <<< toArg r x
   go (ChoicePattern o r fix xs) = ChoicePattern o r fix <$> for xs (traverse go)
-  toArg x id =
+  toArg r' x id =
     let mDesc = case x of
           Option alias _ _ -> findDescription alias descriptions
           _ -> Nothing
@@ -517,7 +528,7 @@ toArgLeafs options env descriptions xs = evalState (for xs go) 0
              in any (_ `elem` options.stopAt) $ aliases <#> case _ of
                       OA.Short s -> "-"  <> String.singleton s
                       OA.Long n  -> "--" <> n
-          Solved.Positional _ r -> r && options.optionsFirst
+          Solved.Positional _ r -> (r' || r) && options.optionsFirst
           Solved.EOA -> true
           _ -> false
 

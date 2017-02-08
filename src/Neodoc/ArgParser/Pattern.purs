@@ -40,6 +40,18 @@ setIsOptional :: ∀ a. Boolean -> Pattern a -> Pattern a
 setIsOptional o (LeafPattern _ r f a) = LeafPattern o r f a
 setIsOptional o (ChoicePattern _ r f a) = ChoicePattern o r f a
 
+setRepeatable :: ∀ a. Boolean -> Pattern a -> Pattern a
+setRepeatable r (LeafPattern o _ f a) = LeafPattern o r f a
+setRepeatable r (ChoicePattern o _ f a) = ChoicePattern o r f a
+
+modRepeatable :: ∀ a. (Boolean -> Boolean) -> Pattern a -> Pattern a
+modRepeatable fR (LeafPattern o r f a) = LeafPattern o (fR r) f a
+modRepeatable fR (ChoicePattern o r f a) = ChoicePattern o (fR r) f a
+
+modOptional :: ∀ a. (Boolean -> Boolean) -> Pattern a -> Pattern a
+modOptional fO (LeafPattern o r f a) = LeafPattern (fO o) r f a
+modOptional fO (ChoicePattern o r f a) = ChoicePattern (fO o) r f a
+
 toList :: ∀ a. Pattern a -> List a
 toList (LeafPattern _ _ _ x) = singleton x
 toList (ChoicePattern _ _ _ xs) = concat $ concat $ (toList <$> _) <$> xs
@@ -313,6 +325,20 @@ lowerError fE p = Parser \a ->
           Step c i (Left (ParseError fatal (Left e)))
         Step c i (Right r) -> Step c i (Right r)
 
+raiseError
+  :: ∀ e c s g i a u
+   . Depth
+  -> Parser e c s g (List i) a
+  -> Parser (Error e i u) c s g (List i) a
+raiseError depth p = Parser \a ->
+  let step = unParser p a
+   in case step of
+        Step c i (Left (ParseError fatal (Right e))) ->
+          Step c i (Left (ParseError fatal (Right (errorAt' depth e))))
+        Step c i (Left (ParseError fatal (Left e))) ->
+          Step c i (Left (ParseError fatal (Left e)))
+        Step c i (Right v) -> Step c i (Right v)
+
 errorAt :: ∀ e i u. Int -> PatternError i u -> Error e i u
 errorAt d e = Error (Left e) d
 
@@ -341,9 +367,17 @@ parseToEnd
    . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
   -> (PatternError i u -> e)
+  -> Maybe (Parser e c s g (List i) (List a))
   -> InputPats u
   -> Parser e c s g (List i) (List a)
-parseToEnd f fE pats = lowerError fE $ fst <$> parseToEnd' f pats
+parseToEnd f fE mEof pats = lowerError fE $ fst <$> do
+  parseToEnd' f (fromMaybe defaultEof (flip raiseError <$> mEof)) pats
+
+defaultEof depth = do
+  is <- getInput
+  case is of
+    Nil  -> Parser.return Nil
+    i:is -> Parser.fail' $ errorAt depth $ UnexpectedInputError (i :| is)
 
 {-
   Parse the given tagged patterns using the custom matcher function.
@@ -374,14 +408,16 @@ parseBestTagToEnd
   => Matcher u i a e
   -> (PatternError i u -> e)
   -> (tag -> w)
+  -> Maybe (Parser e c s g (List i) (List a))
   -> List (Tuple tag (List (Pattern u))) -- tagged input patterns
   -> Parser e c s g (List i) (Tuple tag (List a))
-parseBestTagToEnd f fE fT taggedPats = lowerError fE do
+parseBestTagToEnd f fE fT mEof taggedPats = lowerError fE do
   rmap fst <$> do
     chooseBestTag
       getErrorDepth
       (\tag v -> v /\ (defer \_ -> fT tag))
-      (rmap (Parser.try <<< parseToEnd' f) <$> taggedPats)
+      (rmap (Parser.try <<< parseToEnd' f (fromMaybe defaultEof (flip raiseError <$> mEof))) <$> do
+        taggedPats)
 
 {-
   XXX explain me
@@ -390,14 +426,13 @@ parseToEnd'
   :: ∀ i e c s g u a
    . (Eq u, Generic u, Show a, Show i, Show u, Show e, Pretty e, Pretty i, Pretty u, Pretty a)
   => Matcher u i a e
+  -> (Depth -> Parser (Error e i u) c s g (List i) (List a))
   -> List (Pattern u) -- input patterns
   -> Parser (Error e i u) c s g (List i) (Tuple (List a) Depth)
-parseToEnd' f pats = do
+parseToEnd' f eof pats = do
   vs /\ depth <- parse' f pats
-  is <- getInput
-  case is of
-    Nil  -> Parser.return $ vs /\ depth
-    i:is -> Parser.fail' $ errorAt depth $ UnexpectedInputError (i :| is)
+  vs' <- eof depth
+  Parser.return $ (vs <> vs') /\ depth
 
 {-
   XXX explain me
