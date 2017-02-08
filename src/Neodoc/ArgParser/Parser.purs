@@ -283,7 +283,11 @@ match isKnownToken allowUnknown arg is allowOmissions =
                                       (unsafePartial $ AU.tail xs)
                                       mA'
                     newSrc = "-" <> String.drop 2 src
-                    newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
+
+                    -- note: we increase the id by 1, assuming there's enough
+                    --       space to the right. Ideally, we'd be able to
+                    --       get a fresh id
+                    newPtok = PositionedToken newTok newSrc (Arg.getId arg + 1)
                  in Success false (newPtok : is) $ pure $ BoolValue true
 
               Nothing /\ xs /\ mA' | (not $ A.null xs) ->
@@ -291,13 +295,17 @@ match isKnownToken allowUnknown arg is allowOmissions =
                                       (unsafePartial $ AU.tail xs)
                                       mA'
                     newSrc = "-" <> String.drop 2 src
-                    newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
+
+                    -- note: we increase the id by 1, assuming there's enough
+                    --       space to the right. Ideally, we'd be able to
+                    --       get a fresh id
+                    newPtok = PositionedToken newTok newSrc (Arg.getId arg + 1)
                  in Success false (newPtok : is) $ pure $ BoolValue true
               _ -> NoMatch
 
     opt _ _ _ _ = NoMatch
 
-  fromFallback (Just v) | allowOmissions  = Substituted $ pure v
+  fromFallback (Just v) | allowOmissions = Substituted $ pure v
   fromFallback _ = NoMatch
 
 lowerError
@@ -361,19 +369,20 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
 
                 -- 2. fill in default values
                 let patArgs = concat $ Pattern.toList <$> argPats
-                    matchedArgs = fst <$> vs
+                    matches = rmap force <$> vs
+                    matchedArgs = fst <$> matches
                     missingArgs = filter (not <<< flip elem matchedArgs) patArgs
-                    vs' = catMaybes $ missingArgs <#> \a ->
+                    extraMatches = catMaybes $ missingArgs <#> \a ->
                               Tuple a <$> do
                                 Arg.getFallback a <|> do
                                   if Arg.canTerm a
                                      then pure $ RichValue {
-                                            origin: Origin.Empty
+                                            origin: Origin.Argv
                                           , value: ArrayValue []
                                           }
                                      else Nothing
 
-                Parser.return $ Just branch /\ (((force <$> _) <$> vs) <> vs')
+                Parser.return $ Just branch /\ (matches <> extraMatches)
               y = if not hasEmpty then Nil else singleton $
                     let branch = emptyBranch options.allowUnknown
                       in Tuple branch <$> do
@@ -482,7 +491,7 @@ isKnownToken (Spec { layouts, descriptions }) = memoize go
 {-
   Remove singleton groups and single branch groups (where possible).
 -}
-simplifyLayout :: Pattern _ -> List (Pattern _)
+simplifyLayout :: ∀ a. Pattern a -> List (Pattern a)
 simplifyLayout (ChoicePattern o r f ((x:Nil):Nil)) = simplifyLayout $
   Pattern.modRepeatable (_ || r)
     $ Pattern.modOptional (_ || o)
@@ -512,7 +521,9 @@ toArgLeafs
   -> List (Pattern Arg)
 toArgLeafs options env descriptions xs = evalState (for xs go) 0
   where
-  nextId = State.get <* State.modify (_ + 1)
+  -- note: we increment by an arbitrary high value 'n' in order to allow up to
+  --       'n - 1' stacked options to be unpacked. See comment in 'match' above.
+  nextId = State.get <* State.modify (_ + 100)
   go (LeafPattern o r fix x) = nextId <#> LeafPattern o r fix <<< toArg r x
   go (ChoicePattern o r fix xs) = ChoicePattern o r fix <$> for xs (traverse go)
   toArg r' x id =
@@ -549,7 +560,7 @@ layoutToPattern reqFlags repOpts (Elem x) = case x of
   Solved.Option  a Nothing r ->                        LeafPattern (not reqFlags) (r || repOpts) false x
   Solved.Option  a (Just (OptionArgument _ true)) r -> LeafPattern (not reqFlags) (r || repOpts) false x
   Solved.Option  a mA r -> LeafPattern false (r || repOpts) false x
-  Solved.EOA            -> LeafPattern false false false x
+  Solved.EOA            -> LeafPattern true false false x
   Solved.Stdin          -> LeafPattern false false false x
 
 layoutToPattern reqFlags repOpts (Group o r xs) =

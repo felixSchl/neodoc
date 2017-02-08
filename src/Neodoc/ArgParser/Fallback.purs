@@ -57,6 +57,5 @@ getFallbackValue options env mDescription x = do
       | not options.requireFlags
       = pure if r then ArrayValue []
                   else BoolValue false
-    go (Stdin) = pure $ BoolValue false
-    go (EOA)   = pure $ ArrayValue []
+    go Stdin   = pure $ BoolValue false
     go _       = Nothing

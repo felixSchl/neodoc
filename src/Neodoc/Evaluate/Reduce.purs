@@ -13,7 +13,9 @@ module Neodoc.Evaluate.Reduce (reduce) where
 
 import Prelude
 import Data.Tuple (Tuple, fst, snd)
+import Debug.Trace
 import Data.Tuple.Nested ((/\))
+import Data.Foldable (class Foldable)
 import Data.NonEmpty ((:|))
 import Data.Bifunctor (rmap, lmap, bimap)
 import Data.Map (Map)
@@ -56,14 +58,21 @@ data FacelessLayoutArg
   | EOA
   | Stdin
 
+instance showFacelessLayoutArg :: Show FacelessLayoutArg where
+  show (Command r) = "(Command " <> show r <> ")"
+  show (Positional r) = "(Positional " <> show r <> ")"
+  show (Option mA r) = "(Option " <> show mA <> " " <> show r <> ")"
+  show EOA = "(EOA)"
+  show Stdin = "(Stdin)"
+
 reduce
   :: Env
   -> List Description
   -> Maybe (Branch SolvedLayoutArg)
   -> List KeyValue
-  -> _ -- Map ArgKey RichValue
+  -> StrMap Value
 reduce _ _ Nothing _ = StrMap.empty
-reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
+reduce env descriptions (Just branch) vs =
   let -- 1. annotate all layout elements with their description
       annotedBranch = annotateLayout descriptions <$> branch
 
@@ -71,6 +80,7 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
       --    branch. this removes all levels of nesting and is a lossy operation.
       --    it is essentially a target of values we are ought to fill from what
       --    the parser derived
+      target :: Map Key (WithDescription FacelessLayoutArg)
       target = expandLayout (Group false false (annotedBranch :| Nil))
 
       -- 3. Collect the input map. This map reduces the matched values by their
@@ -84,7 +94,9 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
       -- 3. fill the values for each key of the target map
       values = fillValues target input
 
-   in finalFold values
+      -- 4. perform the final fold
+      final = _.value <<< unRichValue <$> finalFold values
+   in final
 
   where
 
@@ -97,7 +109,7 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
   fillValues
     :: Map Key (WithDescription FacelessLayoutArg)
     -> Map Key (List RichValue)
-    -> Map Key _
+    -> Map Key (Tuple FacelessLayoutArg (Tuple (Maybe Description) RichValue))
   fillValues target input =
     let
       -- 1. look up the values. Note that the lookup may yield `Nothing`,
@@ -121,7 +133,9 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
     where
     origin cmp o = \x -> (_.origin $ unRichValue x) `cmp` o
 
-  finalFold :: Map Key _ -> StrMap RichValue
+  finalFold
+    :: Map Key (Tuple FacelessLayoutArg (Tuple (Maybe Description) RichValue))
+    -> StrMap RichValue
   finalFold m =
     let x = Map.toList m <#> \(k /\ (a /\ _ /\ RichValue rv)) ->
               let v = fromMaybe rv.value do
@@ -216,7 +230,8 @@ expandLayout (Group o r xs) =
   mergeArgs forceR (x /\ mDesc) (y /\ _)
     = setRepeatableOr (forceR || isRepeatable y) x /\ mDesc
 
-  fold f = foldl (Map.unionWith f) Map.empty
+  fold :: ∀ k v f. (Ord k, Foldable f) => (v -> v -> v) -> f (Map k v) -> Map k v
+  fold f m = foldl (Map.unionWith f) Map.empty m
 
 isRepeatable :: FacelessLayoutArg -> Boolean
 isRepeatable (Command    r) = r

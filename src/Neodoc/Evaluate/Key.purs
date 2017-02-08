@@ -48,7 +48,7 @@ toKey (x /\ mDesc) = Key (Set.fromFoldable $ go x)
 
 
 instance showKey :: (Show a) => Show Key where
-  show (Key keys) = "Key " <> show keys
+  show (Key k) = "Key " <> show k
 
 instance prettyKey :: (Pretty a) => Pretty Key where
   pretty (Key keys) = pretty $ fromFoldable keys
