@@ -17,7 +17,7 @@ import Data.String.Ext as String
 import Data.Array.Partial as AU
 import Data.Array as A
 import Data.Foldable (foldl, elem, all)
-import Data.Tuple (curry, fst, snd)
+import Data.Tuple (Tuple(..), curry, fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty as NE
@@ -83,6 +83,11 @@ _EOA =
       key = toArgKey arg
    in Arg (-2) arg key false Nothing Nothing
 
+-- Should arguments be read? I.e. "20" -> 20.
+-- TODO: this should become an option to neodoc.
+_READVALS :: Boolean
+_READVALS = true
+
 {-
   Match a single argument against input
 -}
@@ -92,11 +97,11 @@ match
   -> Arg
   -> List PositionedToken
   -> AllowOmissions
-  -> Match PositionedToken ArgParseError KeyValue
+  -> Match PositionedToken ArgParseError LazyKeyValue
 match isKnownToken allowUnknown arg is allowOmissions =
   let a = Arg.getArg arg
       argv = fromArgv (Arg.canTerm arg) a is
-      fallback = fromFallback a (Arg.getFallback arg)
+      fallback = fromFallback (Arg.getFallback arg)
    in ((arg /\ _) <$> (argv <|> fallback)) <|> unknown
 
   where
@@ -105,6 +110,13 @@ match isKnownToken allowUnknown arg is allowOmissions =
   fail = Failed false <<< ArgParser.GenericError
   fatal' = Failed true
   fatal = Failed true <<< ArgParser.GenericError
+
+  readRv rv =
+    let readV = case _ of
+                StringValue v -> Value.read v false
+                ArrayValue vs -> ArrayValue $ readV <$> vs
+                v -> v
+     in RichValue.setValue (readV $ _.value $ unRichValue rv) rv
 
   unknown = case is of
     -- if all fails, try to see if we can consume this input as an "unknown"
@@ -117,36 +129,36 @@ match isKnownToken allowUnknown arg is allowOmissions =
             Tok.Lit _ ->
               NoMatch
             Tok.EOA xs -> Success true is do
-              (_EOA /\ (RichValue.from Origin.Argv $ ArrayValue $ A.fromFoldable xs))
+              (_EOA /\ (pure $ RichValue.from Origin.Argv $ ArrayValue $ A.fromFoldable xs))
             _ -> Success true is do
-              (_UNKNOWN_ARG /\ (RichValue.from Origin.Argv $ StringValue src))
+              (_UNKNOWN_ARG /\ (pure $ RichValue.from Origin.Argv $ StringValue src))
           else NoMatch
     _ -> NoMatch
 
-  fromArgv canTerm a is = RichValue.from Origin.Argv <$> go a is
+  fromArgv canTerm a is = (RichValue.from Origin.Argv <$> _) <$> go a is
     where
 
     terminate is = Terminated do
-      ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
+      pure $ ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
 
-    go arg Nil = NoMatch
+    go _ Nil = NoMatch
 
     go (Command n _) ((PositionedToken (Tok.Lit s) _ _):is)
       | n == s
       = if canTerm
           then terminate is
-          else Success false is $ BoolValue true
+          else Success false is $ pure $ BoolValue true
 
     go (Positional _ _) ((i@(PositionedToken (Tok.Lit s) _ _)):is)
       = if canTerm
           then terminate (i:is)
-          else Success false is $ StringValue s
+          else Success false is $ pure $ StringValue s
 
     go EOA ((PositionedToken (Tok.EOA xs) _ _):is)
-      = Terminated $ ArrayValue (toUnfoldable xs)
+      = Terminated $ pure $ ArrayValue (toUnfoldable xs)
 
     go Stdin ((PositionedToken Tok.Stdin _ _):is)
-      = Success false is $ BoolValue true
+      = Success false is $ pure $ BoolValue true
 
     go (Option a mA r) toks
       = let aliases = case Arg.getDescription arg of
@@ -154,7 +166,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
               _ -> NE.singleton a
          in NE.foldl1 (<|>) $ opt toks mA r <$> aliases
 
-    go arg _ = NoMatch
+    go _ _ = NoMatch
 
     opt ((PositionedToken (Tok.LOpt n' mA') _ _):is) mA r (a@(OA.Long n))
       | String.startsWith n n'
@@ -164,7 +176,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
           Nothing /\ Nothing | n == n' ->
             if canTerm
                then terminate is
-               else Success false is $ BoolValue true
+               else Success false is $ pure $ BoolValue true
           Just (OptionArgument _ o) /\ _ ->
             let explicit = do
                   guard $ n' == n
@@ -199,11 +211,11 @@ match isKnownToken allowUnknown arg is allowOmissions =
                   Just (v /\ is') | canTerm ->
                     let v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is'
                         v'' = ArrayValue $ Value.intoArray v <> Value.intoArray v'
-                      in Terminated v''
+                      in Terminated $ pure v''
                   Nothing | not o ->
                     fatal' $ optionRequiresArgumentError (OA.Long n)
-                  Nothing -> Success false is $ BoolValue true
-                  Just (v /\ is) -> Success false is v
+                  Nothing -> Success false is $ pure $ BoolValue true
+                  Just (v /\ is) -> Success false is $ pure v
           _ -> NoMatch
 
     opt ((PositionedToken (Tok.SOpt f' xs mA') src _):is) mA r (a@(OA.Short f))
@@ -232,7 +244,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
                     v' = if String.null rest then v else [ StringValue rest ]
                     v'' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
                     v''' = ArrayValue $ v' <> Value.intoArray v''
-                 in Terminated v'''
+                 in Terminated $ pure v'''
 
               -- note: allow explict arg even when option does not take one,
               --       when `canTerm` is true.
@@ -240,28 +252,28 @@ match isKnownToken allowUnknown arg is allowOmissions =
                 let v = maybe [] (A.singleton <<< StringValue) mA'
                     v' = ArrayValue $ A.fromFoldable $ StringValue <<< Tok.getSource <$> is
                     v'' = ArrayValue $ v <> Value.intoArray v'
-                 in Terminated v''
+                 in Terminated $ pure v''
 
               Just _ /\ [] /\ (Just s) ->
-                Success false is $ StringValue s
+                Success false is $ pure $ StringValue s
 
               Just (OptionArgument _ o) /\ [] /\ Nothing ->
                 case adjacent of
-                  Just (v /\ is) -> Success false is v
-                  Nothing | o -> Success false is $ BoolValue true
+                  Just (v /\ is) -> Success false is $ pure v
+                  Nothing | o -> Success false is $ pure $ BoolValue true
                   Nothing  -> fatal' $ optionRequiresArgumentError (OA.Short f)
 
               Just _ /\ xs /\ Nothing ->
-                Success false is $ StringValue $ String.fromCharArray xs
+                Success false is $ pure $ StringValue $ String.fromCharArray xs
 
               Nothing /\ [] /\ Nothing ->
-                Success false is $ BoolValue true
+                Success false is $ pure $ BoolValue true
 
               -- note: there's varying opinion here as to what should happen:
               --    -fb=oobar => either (a) -f => "b=oobar"
               --                        (b) fail! (since '-b' is using explicit arg)
               Just (OptionArgument _ false) /\ xs /\ Just _ | (not $ A.null xs) ->
-                Success false is $ StringValue $ String.drop 2 src
+                Success false is $ pure $ StringValue $ String.drop 2 src
 
               Just (OptionArgument _ true) /\ xs /\ _ | (not $ A.null xs) ->
                 let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
@@ -269,7 +281,7 @@ match isKnownToken allowUnknown arg is allowOmissions =
                                       mA'
                     newSrc = "-" <> String.drop 2 src
                     newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
-                 in Success false (newPtok : is) $ BoolValue true
+                 in Success false (newPtok : is) $ pure $ BoolValue true
 
               Nothing /\ xs /\ mA' | (not $ A.null xs) ->
                 let newTok = Tok.SOpt (unsafePartial $ AU.head xs)
@@ -277,14 +289,13 @@ match isKnownToken allowUnknown arg is allowOmissions =
                                       mA'
                     newSrc = "-" <> String.drop 2 src
                     newPtok = PositionedToken newTok newSrc (-1) {- TODO: how to get fresh id? -}
-                 in Success false (newPtok : is) $ BoolValue true
+                 in Success false (newPtok : is) $ pure $ BoolValue true
               _ -> NoMatch
 
     opt _ _ _ _ = NoMatch
 
-  fromFallback arg _ | not allowOmissions = NoMatch
-  fromFallback arg Nothing = NoMatch
-  fromFallback _ (Just v) = Substituted v
+  fromFallback (Just v) | allowOmissions  = Substituted $ pure v
+  fromFallback _ = NoMatch
 
 lowerError
   :: (Token -> Boolean)
@@ -349,30 +360,20 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
                 let patArgs = concat $ Pattern.toList <$> argPats
                     matchedArgs = fst <$> vs
                     missingArgs = filter (not <<< flip elem matchedArgs) patArgs
-                    vs''' = catMaybes $ missingArgs <#> \a -> do
-                              v <- Arg.getFallback a
-                              pure $ a /\ v
+                    vs'' = catMaybes $ missingArgs <#> \a ->
+                              Tuple a <$> do
+                                Arg.getFallback a
 
-                Parser.return $ Just branch /\ (vs <> vs' <> vs''')
+                Parser.return $ Just branch /\ (((force <$> _) <$> vs) <> vs' <> vs'')
               y = if not hasEmpty then Nil else singleton $
                     let branch = emptyBranch options.allowUnknown
-                      in do
-                      vs <- eof options.allowUnknown isKnownToken'
-                      pure $ branch /\ vs
+                      in Tuple branch <$> do
+                          eof options.allowUnknown isKnownToken'
            in x : y
-
-      -- actually parse captured values into their respective types.
-      -- note: previous version of neodoc would do this parse on-the-fly.
-      let readRv rv =
-            let readV = case _ of
-                        StringValue v -> Value.read v false
-                        ArrayValue vs -> ArrayValue $ readV <$> vs
-                        v -> v
-             in RichValue.setValue (readV $ _.value $ unRichValue rv) rv
 
           -- inject the pseudo argument to collect unknown options into layout
           -- so that the value reduction will work.
-          mOutBranch = case mBranch of
+      let mOutBranch = case mBranch of
             Nothing -> mBranch
             Just branch -> Just do
               if options.allowUnknown
@@ -380,7 +381,7 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
                         _UNKNOWN_ARG :| _EOA : Nil
                       ) branch
                 else branch
-      pure $ ArgParseResult mOutBranch (rmap readRv <$> vs)
+      pure $ ArgParseResult mOutBranch vs
 
   where
   eof :: ∀ r. Boolean -> (_ -> Boolean) -> ArgParser r (List KeyValue)

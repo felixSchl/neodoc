@@ -1,6 +1,7 @@
 module Data.Pretty where
 
 import Prelude
+import Data.Lazy
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Data.List (List, fromFoldable)
@@ -41,10 +42,13 @@ instance prettyEither :: (Pretty e, Pretty a) => Pretty (Either e a) where
   pretty (Left e) = pretty e
   pretty (Right a) = pretty a
 
+instance prettyLazy :: (Pretty a) => Pretty (Lazy a) where
+  pretty x = pretty (force x)
+
 instance prettyString :: Pretty String where
   pretty s = s
 
-instance prettyBoolran :: Pretty Boolean where
+instance prettyBoolean :: Pretty Boolean where
   pretty b = show b
 
 instance prettyInt :: Pretty Int where
