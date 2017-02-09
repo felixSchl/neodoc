@@ -58,7 +58,6 @@ type Flags = {
   optionsFirst      :: Boolean -- ^ 'p'
 , smartOptions      :: Boolean -- ^ 's'
 , requireFlags      :: Boolean -- ^ 'r'
-, laxPlacement      :: Boolean -- ^ 'l'
 , repeatableOptions :: Boolean -- ^ 'R'
 , allowUnknown      :: Boolean -- ^ 'u'
 }
@@ -68,7 +67,6 @@ parseFlags s = {
   optionsFirst:      String.contains (Pattern "p") s
 , smartOptions:      String.contains (Pattern "s") s
 , requireFlags:      String.contains (Pattern "r") s
-, laxPlacement:      String.contains (Pattern "l") s
 , repeatableOptions: String.contains (Pattern "R") s
 , allowUnknown:      String.contains (Pattern "u") s
 }
@@ -77,7 +75,6 @@ renderFlags :: Flags -> String
 renderFlags f = (if f.optionsFirst then "p" else "")
              <> (if f.smartOptions then "s" else "")
              <> (if f.requireFlags then "r" else "")
-             <> (if f.laxPlacement then "l" else "")
              <> (if f.repeatableOptions then "R" else "")
              <> (if f.allowUnknown then "u" else "")
 
@@ -115,7 +112,6 @@ readTests filepath = do
       flags <- P.option { optionsFirst: false
                         , smartOptions: false
                         , requireFlags: false
-                        , laxPlacement: false
                         , repeatableOptions: false
                         , allowUnknown: false
                         } $ parseFlags <$> do
@@ -155,7 +151,6 @@ readTests filepath = do
                     , dontExit          = true
                     , smartOptions      = flags.smartOptions
                     , requireFlags      = flags.requireFlags
-                    , laxPlacement      = flags.laxPlacement
                     , repeatableOptions = flags.repeatableOptions
                     , allowUnknown      = flags.allowUnknown
                     }

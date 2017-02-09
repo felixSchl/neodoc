@@ -3600,6 +3600,8 @@ $ prog
 
 # issue 85:
 # laxPlacement doesn't allow positional in the middle of two flags
+# (note: since 2.0.0 laxPlacement is the default behavior and no longer
+# explicitly named)
 
 r"""
 usage: test -a <files>...

@@ -234,7 +234,6 @@ _run input (NeodocOptions opts) = do
             optionsFirst:      opts.optionsFirst
           , stopAt:            opts.stopAt
           , requireFlags:      opts.requireFlags
-          , laxPlacement:      opts.laxPlacement
           , repeatableOptions: opts.repeatableOptions
           , allowUnknown:      opts.allowUnknown
           , helpFlags:         fromFoldable opts.helpFlags
@@ -322,7 +321,6 @@ _runPure input (NeodocOptions opts) mVer = do
           optionsFirst:      opts.optionsFirst
         , stopAt:            opts.stopAt
         , requireFlags:      opts.requireFlags
-        , laxPlacement:      opts.laxPlacement
         , repeatableOptions: opts.repeatableOptions
         , allowUnknown:      opts.allowUnknown
         , helpFlags:         fromFoldable opts.helpFlags

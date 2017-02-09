@@ -59,7 +59,6 @@ type Options =  { stopAt            :: Array String
                 , optionsFirst      :: Boolean
                 , smartOptions      :: Boolean
                 , requireFlags      :: Boolean
-                , laxPlacement      :: Boolean
                 , repeatableOptions :: Boolean
                 , allowUnknown      :: Boolean
                 }
@@ -70,7 +69,6 @@ defaultOptions = {
 , optionsFirst: false
 , smartOptions: true
 , requireFlags: false
-, laxPlacement: false
 , repeatableOptions: false
 , allowUnknown: false
 }
@@ -776,7 +774,6 @@ argParserSpec = \_ -> describe "The parser generator" do
         [ pass
           (Just (defaultOptions {
             stopAt = [ "--speed" ]
-          , laxPlacement = true
           }))
           [ "--speed", "10"  ]
           [ "--speed" :> V.array [ V.str "10" ] ]
@@ -789,7 +786,6 @@ argParserSpec = \_ -> describe "The parser generator" do
         [ pass
           (Just (defaultOptions {
             stopAt = [ "--speed" ]
-          , laxPlacement = true
           }))
           [ "--speed", "10"  ]
           [ "--speed" :> V.array [ V.str "10" ] ]
@@ -802,7 +798,6 @@ argParserSpec = \_ -> describe "The parser generator" do
         [ pass
           (Just (defaultOptions {
             stopAt = [ "--speed" ]
-          , laxPlacement = true
           }))
           [ "--speed", "10"  ]
           [ "--speed" :> V.array [ V.str "10" ] ]
@@ -1030,7 +1025,6 @@ argParserSpec = \_ -> describe "The parser generator" do
                     optionsFirst:      opts.optionsFirst
                   , stopAt:            opts.stopAt
                   , requireFlags:      opts.requireFlags
-                  , laxPlacement:      opts.laxPlacement
                   , repeatableOptions: opts.repeatableOptions
                   , allowUnknown:      opts.allowUnknown
                   , helpFlags:         Nil

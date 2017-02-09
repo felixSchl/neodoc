@@ -96,8 +96,7 @@ the neodoc parser, even though it somewhat defies the original idea of docopt.
 * Stop parsing at any option and collect successive input as the argument to
   that option. Similar to `--` but for named options (and their aliases).
 * Specification parsing (help-text parsing) is separated from argv parsing
-  and can be used for other projects outside of neodoc. _Work is underway to
-  make the argv parser usable from JS as well_.
+  and can be used for other projects outside of neodoc.
 * Count repeated flags
 * Parses values into primitive JS types (bool, string, number)
 * Correct and smart argument parsing. For example, neodoc has absolutely no
@@ -139,9 +138,6 @@ Options:
 * `opts.requireFlags` - Require flags be present in the input. In neodoc, flags
   are optional by default and can be omitted. This option forces the user to
   pass flags explicitly, failing the parse otherwise.
-* `opts.laxPlacement` - Relax placement rules. Positionals and commands are no
-  longer solid anchors. The order amongs them, however, remains fixed. This
-  implies that options can appear anywhere.
 * `opts.versionFlags` - An array of flags that trigger the special version
   behavior: Print the program version and exit with code 0.
 * `opts.version` - The version to print for the special version behavior.
@@ -152,8 +148,7 @@ Options:
   behavior: Print the full program help text and exit with code 0.
 * `opts.repeatableOptions` - Allow options to be repeated even if the spec does
   not explicitly allow this. This "loosens" up the parser to accept more input
-  and makes for a more intuitive command line. _Please note:_ repeatability
-  is still subject to chunking (use `opts.laxPlacement` to relax this further).
+  and makes for a more intuitive command line.
 * `opts.transforms.presolve` - an array of functions to be called prior to
   "solving" the input. This function takes the spec as it's only parameter.
   At this point, the spec is mostly untouched by neodoc with the exception of

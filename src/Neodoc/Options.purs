@@ -40,7 +40,6 @@ newtype NeodocOptions = NeodocOptions {
 , smartOptions :: Boolean      -- ^ parse singleton groups as opts if possible
 , stopAt       :: Array String -- ^ stop parsing at these custom EOA markers
 , requireFlags :: Boolean      -- ^ do not ignore missing flags
-, laxPlacement :: Boolean      -- ^ allow positionals/commands to be appear anywhere
 , version      :: Maybe String -- ^ the version string to display
 , versionFlags :: Array OptionAlias -- ^ list of flags that trigger 'version'
 , helpFlags    :: Array OptionAlias -- ^ list of flags that trigger 'help'
@@ -67,7 +66,6 @@ defaultOptionsObj = {
 , smartOptions: false
 , stopAt:       []
 , requireFlags: false
-, laxPlacement: false
 , version:      Nothing
 , versionFlags: [ OA.Long "version" ]
 , helpFlags:    [ OA.Short 'h', OA.Long "help"    ]
@@ -88,7 +86,6 @@ instance isForeign :: IsForeign NeodocOptions where
     , smartOptions: _
     , stopAt:       _
     , requireFlags: _
-    , laxPlacement: _
     , version:      _
     , versionFlags: _
     , helpFlags:    _
@@ -103,7 +100,6 @@ instance isForeign :: IsForeign NeodocOptions where
       <*> readSmartOptions v
       <*> readStopAt       v
       <*> readRequireFlags v
-      <*> readLaxPlacement v
       <*> readVersion      v
       <*> readVersionFlags v
       <*> readHelpFlags    v
@@ -118,7 +114,6 @@ instance isForeign :: IsForeign NeodocOptions where
     readDontExit      = _readBool "dontExit"          defaultOptionsObj.dontExit
     readSmartOptions  = _readBool "smartOptions"      defaultOptionsObj.smartOptions
     readRequireFlags  = _readBool "requireFlags"      defaultOptionsObj.requireFlags
-    readLaxPlacement  = _readBool "laxPlacement"      defaultOptionsObj.laxPlacement
     readRepeatOptions = _readBool "repeatableOptions" defaultOptionsObj.repeatableOptions
     readAllowUnknown  = _readBool "allowUnknown"      defaultOptionsObj.allowUnknown
     readVersion       = _maybe    "version"

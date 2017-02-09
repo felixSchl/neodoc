@@ -10,7 +10,6 @@ type Options r = {
   optionsFirst      :: Boolean
 , stopAt            :: Array String
 , requireFlags      :: Boolean
-, laxPlacement      :: Boolean
 , repeatableOptions :: Boolean
 , helpFlags         :: List OptionAlias
 , versionFlags      :: List OptionAlias
