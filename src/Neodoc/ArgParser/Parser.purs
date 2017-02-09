@@ -415,7 +415,7 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
         runParser { env, options, spec } {} {} tokens do
           Parser.try explicitOrEmptyP `catch` \_ e ->
             let implicitFlags = options.helpFlags <> options.versionFlags
-             in case mkImplicitToplevelP isKnownToken' implicitFlags of
+             in case mkImplicitToplevelP spec implicitFlags of
                   Just p -> Parser.try p <|> Parser.throw e
                   _      -> Parser.throw e
   where
@@ -468,26 +468,29 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
   -- work". The idea is to remove the empty fallback for '--help' and
   -- '--version' in order to fail that top-level branch.
   mkImplicitToplevelP :: _ -> List OptionAlias -> _
-  mkImplicitToplevelP isKnownToken' flags = case flags of
-    Nil -> Nothing
-    f : fs -> Just
-      let args = toOption f :| (toOption <$> fs)
-          branch = (Group false true $ args <#> Elem >>> (_ :| Nil)) :| Nil
-          pats = layoutToPattern true true <$> NE.toList branch
-          argPats = toArgLeafs (options { requireFlags = true })
-                                Env.empty
-                                descriptions
-                                pats
+  mkImplicitToplevelP _ Nil = Nothing
+  mkImplicitToplevelP spec (f:fs) = Just $
+    let args = toOption f :| (toOption <$> fs)
+        branch = (Group false true $ args <#> Elem >>> (_ :| Nil)) :| Nil
+        pats = layoutToPattern true true <$> NE.toList branch
+        spec' = case spec of
+                  Spec spec -> Spec $ spec { layouts = (branch : Nil) :| NE.toList spec.layouts }
+        isKnownToken' = isKnownToken spec'
+        argPats = toArgLeafs (options { requireFlags = true })
+                              Env.empty
+                              descriptions
+                              pats
+        argPatsWithoutFallbacks = (Arg.setFallback Nothing <$> _) <$> argPats
 
-       in ArgParseResult (Just branch) <$> do
-            -- 1. parse the actual branch
-            (rmap force <$> _) <$> Pattern.parseToEnd
-              (match isKnownToken' true)
-              (lowerError isKnownToken')
-              -- note: allow trailing arguments: only ensure that flags occur
-              --       at beginning of parse
-              (Just $ pure Nil)
-              argPats
+      in ArgParseResult (Just branch) <$> do
+          -- 1. parse the actual branch
+          (rmap force <$> _) <$> Pattern.parseToEnd
+            (match isKnownToken' true)
+            (lowerError isKnownToken')
+            -- note: allow trailing arguments: only ensure that flags occur
+            --       at beginning of parse
+            (Just $ pure Nil)
+            argPatsWithoutFallbacks
     where
     toOption :: OptionAlias -> SolvedLayoutArg
     toOption a = Option a Nothing true

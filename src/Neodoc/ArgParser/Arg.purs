@@ -64,5 +64,8 @@ hasFallback :: Arg -> Boolean
 hasFallback (Arg _ _ _ _ _ (Just _)) = true
 hasFallback _ = false
 
+setFallback :: Maybe RichValue -> Arg -> Arg
+setFallback mRv (Arg a b c d e _) = Arg a b c d e mRv
+
 canTerm :: Arg -> Boolean
 canTerm (Arg _ _ _ c _ _) = c
