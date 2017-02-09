@@ -14,6 +14,7 @@ Major release featuring the 4th iteration of the arg parser.
 * **Faster** - the arg parser now uses a tight recursive approach to matching
   patterns that is also more likely to be able to be ported to other languages
   (less reliance on monads)
+* Relax implicit flags parsing to ignore any non-options on argv
 
 ## [1.3.0] - 2016-11-02
 

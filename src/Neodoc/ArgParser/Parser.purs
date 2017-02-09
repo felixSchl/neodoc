@@ -474,7 +474,10 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
         branch = (Group false true $ args <#> Elem >>> (_ :| Nil)) :| Nil
         pats = layoutToPattern true true <$> NE.toList branch
         spec' = case spec of
-                  Spec spec -> Spec $ spec { layouts = (branch : Nil) :| NE.toList spec.layouts }
+                  Spec spec -> Spec $ spec {
+                    layouts = (branch : Nil)
+                      :| NE.toList spec.layouts
+                  }
         isKnownToken' = isKnownToken spec'
         argPats = toArgLeafs (options { requireFlags = true })
                               Env.empty
@@ -483,7 +486,14 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
         argPatsWithoutFallbacks = (Arg.setFallback Nothing <$> _) <$> argPats
 
       in ArgParseResult (Just branch) <$> do
-          -- 1. parse the actual branch
+          -- 1. remove any non options from the input
+          i <- Parser.getInput
+          let i' = flip filter i case _ of
+                    (PositionedToken (Tok.Lit _) _ _) -> false
+                    _ -> true
+          Parser.setInput i'
+
+          -- 2. parse the implicit branch
           (rmap force <$> _) <$> Pattern.parseToEnd
             (match isKnownToken' true)
             (lowerError isKnownToken')
