@@ -6,7 +6,7 @@ import Debug.Trace
 
 import Data.List (
   List(..), (:), fromFoldable, toUnfoldable, concat, singleton,
-  catMaybes, any, null, filter, length)
+  catMaybes, any, null, filter, length, reverse)
 import Data.List.Extra (spanMap)
 import Data.Maybe
 import Data.Lazy (defer, force)
@@ -348,8 +348,8 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
           let pats = do
                 layoutToPattern options.requireFlags
                                 options.repeatableOptions <$> NE.toList branch
-              argPats = do
-                  toArgLeafs options env descriptions
+              argPats = setCanTermForOptionsFirst options.optionsFirst
+                  $ toArgPats options env descriptions
                     $ concat $ simplifyLayout <$> do
                       pats
               branchLength = defer \_ -> NE.length $ flattenBranch branch
@@ -479,7 +479,7 @@ parse (spec@(Spec { layouts, descriptions })) options env tokens =
                       :| NE.toList spec.layouts
                   }
         isKnownToken' = isKnownToken spec'
-        argPats = toArgLeafs (options { requireFlags = true })
+        argPats = toArgPats (options { requireFlags = true })
                               Env.empty
                               descriptions
                               pats
@@ -557,17 +557,56 @@ simplifyLayout (ChoicePattern o r f xs) = singleton $
 simplifyLayout p = singleton p
 
 {-
+  set the `canTerm` flag if using `opts.optionsFirst` for the trailing, top-most
+  repeated positional argument. For example:
+
+    <foo>... <bar>... <args>... => <args>
+    <foo>... <bar>... [<args>]... => <args>
+    <foo>... <bar>... [<args>...] => <args>
+    (<foo>... <bar>... [<args>...] | <qux>...) => <args> & <qux>
+    (<foo>... <bar>... [<args>...]) => <args>
+-}
+setCanTermForOptionsFirst
+  :: Boolean -- allow optionsFirst?
+  -> List (Pattern Arg)
+  -> List (Pattern Arg)
+setCanTermForOptionsFirst false xs = xs
+setCanTermForOptionsFirst _ xs = reverse
+  let xs' = flip evalState false $ for (reverse xs) f
+      f = case _ of
+              pat@(LeafPattern o r' fix (arg@(Arg _ (Solved.Positional _ r) _ _ _ _))) | r' || r -> do
+                State.get >>= if _
+                  then pure pat
+                  else do
+                    State.put true
+                    pure $ LeafPattern o r' fix (Arg.setCanTerm true arg)
+              pat@(ChoicePattern o r fix xs) -> do
+                State.get >>= if _
+                  then pure pat
+                  else
+                    let xs' = xs <#> flip runState false  <<< (reverse <$> _)
+                                                          <<< traverse f
+                                                          <<< reverse
+                        b = any snd xs'
+                     in do
+                       when b $ State.put b
+                       pure $ ChoicePattern o r fix $ fst <$> xs'
+              x -> pure x
+   in xs'
+
+
+{-
   Convert a list of patterns containing solved layout arguments into a list of
   patterns containing pre-cached `Arg`s.
 -}
-toArgLeafs
+toArgPats
   :: ∀ r
    . Options r
   -> Env
   -> List Description
   -> List (Pattern SolvedLayoutArg)
   -> List (Pattern Arg)
-toArgLeafs options env descriptions xs = evalState (for xs go) 0
+toArgPats options env descriptions xs = evalState (for xs go) 0
   where
   -- note: we increment by an arbitrary high value 'n' in order to allow up to
   --       'n - 1' stacked options to be unpacked. See comment in 'match' above.
@@ -587,7 +626,6 @@ toArgLeafs options env descriptions xs = evalState (for xs go) 0
              in any (_ `elem` options.stopAt) $ aliases <#> case _ of
                       OA.Short s -> "-"  <> String.singleton s
                       OA.Long n  -> "--" <> n
-          Solved.Positional _ r -> (r' || r) && options.optionsFirst
           Solved.EOA -> true
           _ -> false
 
