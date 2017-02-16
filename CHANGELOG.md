@@ -3,6 +3,13 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
+## [1.4.0] - 2017-02-17
+
+### Changes
+
+* Fix [#89]: `[options]` are now expanded without a surrounding group which used
+  to cause patterns being discarded to eagerly due to partial matches
+
 ## [1.3.0] - 2016-11-02
 
 ### New features
@@ -607,6 +614,7 @@ section &mdash; let it fail at the lexing stage.
 
 [@matthewmueller]: https://github.com/matthewmueller
 
+[#89]: https://github.com/felixSchl/neodoc/issues/89
 [#81]: https://github.com/felixSchl/neodoc/issues/81
 [#80]: https://github.com/felixSchl/neodoc/issues/80
 [#79]: https://github.com/felixSchl/neodoc/issues/79
@@ -689,6 +697,8 @@ section &mdash; let it fail at the lexing stage.
 [#2]: https://github.com/felixSchl/neodoc/issues/2
 [#1]: https://github.com/felixSchl/neodoc/issues/1
 
+[1.4.0]: https://github.com/felixschl/neodoc/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/felixschl/neodoc/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/felixschl/neodoc/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/felixschl/neodoc/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/felixschl/neodoc/compare/v1.0.1...v1.0.2
