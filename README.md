@@ -211,11 +211,6 @@ and can be serialized. The output can further be passed to `neodoc.run`. This av
 neodoc having to parse and solve the original help text again, since parsing JSON
 is a order of magnitude faster to parse.
 
-Options:
-
-* `opts.smartOptions` - Enable parsing groups that "look like" options as
-  options. For example: `[-f ARG...]` means `[-f=ARG...]`
-
 ## Language overview and terminology
 
 This section gives an overview over the neodoc cli **specification** language.
