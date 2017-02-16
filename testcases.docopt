@@ -3622,3 +3622,27 @@ usage: p <a> <b>
 
 $ prog
 "missing <a>"
+
+# Fix #89
+r"""
+Usage:
+    test.js -a -b [OPTIONS]
+
+Options:
+    -a  blah blah blah
+    -b  blah blah blah
+    -c  blah blah blah
+    -d  blah blah blah
+"""
+
+$ prog -c -a -b -d
+{"-a": true, "-b": true, "-c": true, "-d": true}
+
+$ prog -c -a -d -b
+{"-a": true, "-b": true, "-c": true, "-d": true}
+
+$ prog -d -c -a -b
+{"-a": true, "-b": true, "-c": true, "-d": true}
+
+$ prog -a -b -c -d
+{"-a": true, "-b": true, "-c": true, "-d": true}
