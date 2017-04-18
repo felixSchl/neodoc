@@ -47,6 +47,8 @@
 
 ## About
 
+[![Join the chat at https://gitter.im/felixSchl/neodoc](https://badges.gitter.im/felixSchl/neodoc.svg)](https://gitter.im/felixSchl/neodoc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 <strong>&lt;neodoc&gt;</strong> is a revised implementation of the [docopt
 language][docopt-orig] for node. In brief, it offers a unique way to author
 command lines by writing the command line's help text first and then deriving
