@@ -1452,7 +1452,7 @@ $ prog --foo --foo=bar
 {"--foo": [true, "bar"]}
 
 $ prog --foo --foobar
-{"--foo": [true, "bar"]}
+"unknown option --foobar" # See #94
 
 $ prog --foo --foo bar
 {"--foo": [true, "bar"]}
@@ -2674,13 +2674,13 @@ Options: -f, --foo=FOO
 """
 
 $ prog --foobar
-{"-f": "bar", "--foo": "bar"}
+"unknown option --foobar" # See #94
 
 $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"unknown command QUX"
+"unknown option --foobar" # See #94
 
 $ prog --foo=bar QUX
 "unknown command QUX"
@@ -2691,13 +2691,13 @@ Options: -f, --foo[=FOO]
 """
 
 $ prog --foobar
-{"-f": "bar", "--foo": "bar"}
+"unknown option --foobar" # See #94
 
 $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"unknown command QUX"
+"unknown option --foobar" # See #94
 
 $ prog --foo=bar QUX
 "unknown command QUX"
