@@ -148,18 +148,6 @@ longOption term n mArg = do
                         , explicitArg:    false
                         }
 
-  -- case 3:
-  -- The name is a substring of the input and no explicit argument has been
-  -- provdided.
-  go (LOpt n' Nothing) _ | not isFlag
-    = case stripPrefix (Pattern n) n' of
-        Just s ->
-          pure { rawValue:        Just s
-                , hasConsumedArg: false
-                , explicitArg:    false
-                }
-        _ -> fail "Invalid substring"
-
   go a _ = fail $ "Invalid token: " <> pretty a
 
 shortOption

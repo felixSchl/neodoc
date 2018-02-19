@@ -941,10 +941,10 @@ argParserSpec = \_ -> describe "The parser generator" do
                   (Just (defaultOptions { stopAt = [ "--foo" ] }))
                   [ "--foo=BAR", "-f"]
                   [ "--foo" :> V.array [ V.str "BAR", V.str "-f" ] ]
-              , pass
+              , fail
                   (Just (defaultOptions { stopAt = [ "--foo" ] }))
                   [ "--fooBAR", "-f"]
-                  [ "--foo" :> V.array [ V.str "BAR", V.str "-f" ] ]
+                  "unknown option --fooBAR"
               ]
           ))
         ])

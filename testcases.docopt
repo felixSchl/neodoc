@@ -1452,7 +1452,7 @@ $ prog --foo --foo=bar
 {"--foo": [true, "bar"]}
 
 $ prog --foo --foobar
-{"--foo": [true, "bar"]}
+"unknown option --foobar" # See #94
 
 $ prog --foo --foo bar
 {"--foo": [true, "bar"]}
@@ -2674,13 +2674,13 @@ Options: -f, --foo=FOO
 """
 
 $ prog --foobar
-{"-f": "bar", "--foo": "bar"}
+"unknown option --foobar" # See #94
 
 $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"unknown command QUX"
+"unknown option --foobar" # See #94
 
 $ prog --foo=bar QUX
 "unknown command QUX"
@@ -2691,13 +2691,13 @@ Options: -f, --foo[=FOO]
 """
 
 $ prog --foobar
-{"-f": "bar", "--foo": "bar"}
+"unknown option --foobar" # See #94
 
 $ prog --foo=bar
 {"-f": "bar", "--foo": "bar"}
 
 $ prog --foobar QUX
-"unknown command QUX"
+"unknown option --foobar" # See #94
 
 $ prog --foo=bar QUX
 "unknown command QUX"
@@ -3646,3 +3646,70 @@ $ prog -d -c -a -b
 
 $ prog -a -b -c -d
 {"-a": true, "-b": true, "-c": true, "-d": true}
+
+# Issue #94
+
+r"""
+Usage:
+  test [--foo <bar>] [--foo-bar <baz>]
+"""
+
+$ prog/s --foo 123
+{"--foo": 123}
+
+$ prog/s --foo-bar 456
+{"--foo-bar": 456}
+
+$ prog/s --foo-bar
+"option requires argument: --foo-bar"
+
+$ prog/s --foo
+"option requires argument: --foo"
+
+$ prog/s --foo --foo-bar
+"option requires argument: --foo"
+
+$ prog/s --foo-bar --foo
+"option requires argument: --foo-bar"
+
+$ prog/s --foo-bar=--foo
+{"--foo-bar": "--foo"}
+
+$ prog/s --foo=--foo-bar
+{"--foo": "--foo-bar"}
+
+r"""
+Usage:
+  test [--foo <bar>]
+  test [--foo-bar <baz>]
+"""
+
+$ prog/s --foo 123
+{"--foo": 123}
+
+$ prog/s --foo-bar 456
+{"--foo-bar": 456}
+
+$ prog/s --foo-bar
+"option requires argument: --foo-bar"
+
+$ prog/s --foo
+"option requires argument: --foo"
+
+$ prog/s --foo --foo-bar
+"option requires argument: --foo"
+
+$ prog/s --foo-bar --foo
+"option requires argument: --foo-bar"
+
+$ prog/s --foo-bar=--foo
+{"--foo-bar": "--foo"}
+
+$ prog/s --foo=--foo-bar
+{"--foo": "--foo-bar"}
+
+$ prog/s --foo=--foo-bar --foo-bar
+"unexpected option --foo-bar"
+
+$ prog/s --foo-bar=--foo --foo
+"unexpected option --foo"
