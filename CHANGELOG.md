@@ -3,6 +3,19 @@
 > Please note that all these tags mark releases that are available on npm with the
 > respective version number - unless otherwise noted.
 
+## [2.0.0] - 2018-02-20
+
+### Changes
+
+* **BREAKING CHANGE** - Fix [#94]: Long options no longer bind
+  implicit arguments through substring matches.\
+  Before this change, the program `usage: foo --foo=<arg>` allowed
+  passing in `--foobar`, which would yield `--foo => "bar"`, which
+  was found to have undesirable side-effects as explored in [#94].
+  Since changing this behavior has not only follow on effects for
+  users of neodoc, but also users of users, a major version bump
+  was necessary.
+
 ## [1.4.0] - 2017-02-17
 
 ### Changes
@@ -614,6 +627,7 @@ section &mdash; let it fail at the lexing stage.
 
 [@matthewmueller]: https://github.com/matthewmueller
 
+[#94]: https://github.com/felixSchl/neodoc/issues/94
 [#89]: https://github.com/felixSchl/neodoc/issues/89
 [#81]: https://github.com/felixSchl/neodoc/issues/81
 [#80]: https://github.com/felixSchl/neodoc/issues/80
@@ -697,6 +711,7 @@ section &mdash; let it fail at the lexing stage.
 [#2]: https://github.com/felixSchl/neodoc/issues/2
 [#1]: https://github.com/felixSchl/neodoc/issues/1
 
+[2.0.0]: https://github.com/felixschl/neodoc/compare/v1.4.0...v2.0.0
 [1.4.0]: https://github.com/felixschl/neodoc/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/felixschl/neodoc/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/felixschl/neodoc/compare/v1.1.0...v1.2.0
