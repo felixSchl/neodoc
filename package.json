@@ -1,6 +1,6 @@
 {
   "name": "neodoc",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Beautiful, handcrafted command line interfaces",
   "main": "index.js",
   "directories": {
