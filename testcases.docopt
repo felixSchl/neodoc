@@ -3690,6 +3690,9 @@ $ prog/s --foo 123
 $ prog/s --foo-bar 456
 {"--foo-bar": 456}
 
+$ prog/s --foo-bar 1230123012301234
+{"--foo-bar": 1230123012301234.0}
+
 $ prog/s --foo-bar
 "option requires argument: --foo-bar"
 

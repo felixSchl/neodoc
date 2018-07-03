@@ -19,11 +19,13 @@ import Global
 import Data.Generic
 import Data.Optimize.Uncurried
 import Data.Int (toNumber, fromNumber)
+import Data.Int as Int
+import Data.Number.Backport as Number
 import Data.Bifunctor (lmap)
 import Data.Array as Array
 import Data.Tuple.Nested ((/\))
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..))
 import Data.List (List(..), toUnfoldable, many, some, (:))
 import Data.Foldable (foldMap)
 import Data.Traversable (for)
@@ -253,7 +255,15 @@ parse s split =
             P.char '.'
             foldMap String.singleton <$> P.some P.digit
           pure $ xs <> "." <> xss
-      , pure $ IntValue $ si * (unsafePartial $ fromJust $ Int.fromString xs)
+      , case Int.fromString xs of
+          Just v ->
+            pure $ IntValue $ si * v
+          Nothing ->
+            case Number.fromString xs of
+              Just v ->
+                pure $ FloatValue $ Int.toNumber si * v
+              Nothing ->
+                P.fail "Value neither Int nor Number"
       ]
 
     bool = true' <|> false'
@@ -278,5 +288,3 @@ skipSpaces = go
   where go = (do space
                  go) <|> pure unit
 skipSomeSpaces = space *> skipSpaces
-
-

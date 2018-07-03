@@ -10,6 +10,7 @@ module Test.Support.CompatParser (
 import Prelude
 import Global (readFloat)
 import Data.Int as Int
+import Data.Number.Backport as Number
 import Data.String as String
 import Data.StrMap as StrMap
 import Data.String.Argv as Argv
@@ -30,11 +31,9 @@ import Node.FS (FS)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync as FS
 
-import Text.Parsing.Parser (runParser, runParserT) as P
-import Text.Parsing.Parser.Combinators (manyTill, optional, between, sepBy,
-                                       try, choice, (<?>), option) as P
-import Text.Parsing.Parser.String (eof, string, anyChar, skipSpaces,
-                                  char, noneOf) as P
+import Text.Parsing.Parser as P
+import Text.Parsing.Parser.Combinators as P
+import Text.Parsing.Parser.String as P
 
 import Neodoc as Neodoc
 import Neodoc.Options
@@ -194,13 +193,19 @@ readTests filepath = do
                   P.char '.'
                   fromCharArray <$> A.some digit
                 pure $ xs <> "." <> xss
-            , pure $ D.IntValue $ si * (unsafePartial $ fromJust $ Int.fromString xs)
+            , case Int.fromString xs of
+                Just v ->
+                  pure $ D.IntValue $ si * v
+                Nothing ->
+                  case Number.fromString xs of
+                    Just v ->
+                      pure $ D.FloatValue $ Int.toNumber si * v
+                    Nothing ->
+                      P.fail "Value neither Int nor Number"
             ]
         ]
-
 
     usage = do
       P.string "r\"\"\""
       fromCharArray <<< toUnfoldable <$> do
         P.manyTill P.anyChar $ P.string "\"\"\"\n"
-
