@@ -259,11 +259,7 @@ parse s split =
           Just v ->
             pure $ IntValue $ si * v
           Nothing ->
-            case Number.fromString xs of
-              Just v ->
-                pure $ FloatValue $ Int.toNumber si * v
-              Nothing ->
-                P.fail "Value neither Int nor Number"
+            P.fail "Value not a valid Int"
       ]
 
     bool = true' <|> false'
