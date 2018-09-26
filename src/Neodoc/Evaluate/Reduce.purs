@@ -18,8 +18,6 @@ import Data.NonEmpty ((:|))
 import Data.Bifunctor (rmap, lmap, bimap)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.StrMap as StrMap
-import Data.StrMap (StrMap())
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.List (
   List(..), concat, head, filter, singleton, reverse, nub, catMaybes
@@ -61,7 +59,7 @@ reduce
   -> Maybe (Branch SolvedLayoutArg)
   -> List KeyValue
   -> _ -- Map ArgKey RichValue
-reduce _ _ Nothing _ = StrMap.empty
+reduce _ _ Nothing _ = Map.empty
 reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
   let -- 1. annotate all layout elements with their description
       annotedBranch = annotateLayout descriptions <$> branch
@@ -120,7 +118,7 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
     where
     origin cmp o = \x -> (_.origin $ unRichValue x) `cmp` o
 
-  finalFold :: Map Key _ -> StrMap RichValue
+  finalFold :: Map Key _ -> Map String RichValue
   finalFold m =
     let x = Map.toList m <#> \(k /\ (a /\ _ /\ RichValue rv)) ->
               let v = fromMaybe rv.value do
@@ -145,7 +143,7 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
                         _ -> Nothing
                       else Nothing
                 in toStrKeys k <#> (_ /\ (RichValue $ rv { value = v }))
-    in StrMap.fromFoldable $ concat x
+    in Map.fromFoldable $ concat x
 
 -- Reduce a solved layout arg to a faceless layout arg, that is a layout arg
 -- whose identifying properties have been stripped since they are already

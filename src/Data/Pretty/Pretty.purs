@@ -8,8 +8,6 @@ import Data.Map (Map)
 import Data.Set (Set)
 import Data.Map as Map
 import Data.Either
-import Data.StrMap (StrMap)
-import Data.StrMap as StrMap
 import Data.Foldable (class Foldable, intercalate)
 import Data.Pretty (class Pretty, pretty)
 import Data.NonEmpty (NonEmpty)
@@ -30,8 +28,8 @@ instance prettyMap :: (Pretty k, Pretty v) => Pretty (Map k v) where
   pretty kvs = intercalate ", " $ Map.toList kvs <#> \(k /\ v) ->
                   pretty k <> " => " <> pretty v
 
-instance prettyStrMap :: (Pretty v) => Pretty (StrMap v) where
-  pretty kvs = intercalate ", " $ StrMap.toList kvs <#> \(k /\ v) ->
+instance prettyStrMap :: (Pretty v) => Pretty (Map String  v) where
+  pretty kvs = intercalate ", " $ Map.toList kvs <#> \(k /\ v) ->
                   k <> " => " <> pretty v
 
 instance prettySet :: (Pretty k) => Pretty (Set k) where

@@ -4,8 +4,6 @@ import Prelude
 import Control.Alt ((<|>))
 import Data.Maybe
 import Data.Either (either)
-import Data.StrMap (StrMap)
-import Data.StrMap as StrMap
 import Data.Either (Either(..))
 import Data.Array as Array
 import Data.NonEmpty (NonEmpty, (:|))
@@ -64,7 +62,7 @@ isObject :: Foreign -> Boolean
 isObject f = typeOf f == "object"
 
 -- | Interpret a foreign value as a JS dictionary
-readObject :: Foreign -> F (StrMap Foreign)
+readObject :: Foreign -> F (Map String Foreign)
 readObject value | isObject value = pure $ unsafeFromForeign value
 readObject value = fail (TypeMismatch "object" (typeOf value))
 

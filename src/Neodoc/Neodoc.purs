@@ -24,10 +24,8 @@ import Data.Tuple.Nested ((/\))
 import Data.Function.Uncurried
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Data.Either (Either (..), either, fromRight)
-import Data.StrMap (StrMap)
 import Data.String as String
 import Data.Char as Char
-import Data.StrMap as StrMap
 import Data.List (
   List(..), (:), many, toUnfoldable, concat, fromFoldable, catMaybes, filter
 , length)
@@ -98,20 +96,20 @@ type NeodocEff e = (
 )
 
 data Output
-  = VersionOutput (StrMap Value) String
-  | Output        (StrMap Value)
-  | HelpOutput    (StrMap Value) String
+  = VersionOutput (Map String Value) String
+  | Output        (Map String Value)
+  | HelpOutput    (Map String Value) String
 
-getArgs :: Output -> StrMap Value
+getArgs :: Output -> Map String Value
 getArgs (VersionOutput x _) = x
 getArgs (Output          x) = x
 getArgs (HelpOutput    x _) = x
 
 lookup :: String -> Output -> Maybe Value
-lookup k o = StrMap.lookup k (getArgs o)
+lookup k o = Map.lookup k (getArgs o)
 
 lookup' :: String -> Output -> Either String Value
-lookup' k o = case StrMap.lookup k (getArgs o) of
+lookup' k o = case Map.lookup k (getArgs o) of
                   Just v -> Right v
                   _ -> case OptionAlias.fromString k of
                               Right _ -> Right (BoolValue false)
@@ -145,10 +143,10 @@ runJS = mkFn2 go
     pure case x of
       (Output x) -> F.toForeign (rawValue <$> x)
       (HelpOutput x s) ->
-        let x' = StrMap.insert ".help" (StringValue s) x
+        let x' = Map.insert ".help" (StringValue s) x
          in F.toForeign (rawValue <$> x')
       (VersionOutput x s) ->
-        let x' = StrMap.insert ".version" (StringValue s) x
+        let x' = Map.insert ".version" (StringValue s) x
          in F.toForeign (rawValue <$> x')
 
   -- | Convert a Value into a JS-native value.
@@ -302,7 +300,7 @@ _runPure
   -> Either NeodocError Output
 _runPure input (NeodocOptions opts) mVer = do
   let argv = fromMaybe [] opts.argv
-      env  = fromMaybe StrMap.empty opts.env
+      env  = fromMaybe Map.empty opts.env
 
   -- 1. obtain a spec, either by using the provided spec or by parsing a fresh
   --    one.
@@ -417,7 +415,7 @@ has x = any \s ->
                 BoolValue false -> false
                 ArrayValue []   -> false
                 _               -> true
-                ) (StrMap.lookup s x)
+                ) (Map.lookup s x)
 
 trimHelp = Regex.replace (regex' "(^\\s*(\r\n|\n|\r))|((\r\n|\n|\r)\\s*$)" "g") ""
   where regex' a b = unsafePartial $ fromRight $ regex a (Regex.parseFlags b)
