@@ -1,7 +1,7 @@
 module Neodoc.Data.OptionArgument where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
 import Data.Pretty (class Pretty, pretty)
 import Data.Tuple.Nested ((/\))
 import Data.Maybe (Maybe, maybe)

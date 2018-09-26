@@ -1,7 +1,7 @@
 module Neodoc.Error where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
 import Data.Maybe (Maybe (..))
 import Data.Char as Char
 import Data.Pretty (class Pretty, pretty)

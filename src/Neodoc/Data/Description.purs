@@ -4,7 +4,7 @@ module Neodoc.Data.Description (
 
 import Prelude
 import Data.Maybe
-import Data.Generic
+import Data.Generic.Rep
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))

@@ -37,6 +37,7 @@
     "purescript-spec": "^3.0.0",
     "purescript-strings": "^4.0.0",
     "purescript-transformers": "^4.1.0",
-    "purescript-yarn": "^4.0.0"
+    "purescript-yarn": "^4.0.0",
+    "purescript-generics-rep": "^6.1.0"
   }
 }

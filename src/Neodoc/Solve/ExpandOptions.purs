@@ -21,7 +21,7 @@ import Data.List (
 import Control.Alt ((<|>))
 import Control.Bind (join)
 import Control.Plus (empty)
-import Data.Generic
+import Data.Generic.Rep
 import Data.Array as Array
 import Data.Pretty (class Pretty, pretty)
 import Data.Function (on)

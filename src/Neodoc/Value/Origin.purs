@@ -6,7 +6,7 @@ module Neodoc.Value.Origin (
 import Prelude
 import Data.Pretty
 import Data.Function (on)
-import Data.Generic
+import Data.Generic.Rep
 
 data Origin
   = Argv

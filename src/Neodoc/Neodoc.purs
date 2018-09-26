@@ -16,7 +16,7 @@ module Neodoc (
 import Prelude
 import Debug.Profile
 import Data.Array as A
-import Data.Generic
+import Data.Generic.Rep
 import Data.Newtype (unwrap)
 import Data.Bifunctor (lmap)
 import Data.Tuple (Tuple(..))

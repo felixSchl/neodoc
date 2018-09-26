@@ -10,7 +10,7 @@ module Neodoc.Value.RichValue (
 ) where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
 import Data.Pretty (class Pretty, pretty)
 import Neodoc.Value (Value, prettyPrintValue)
 import Neodoc.Value.Origin (Origin)

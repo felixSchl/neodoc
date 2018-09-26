@@ -16,7 +16,7 @@ module Neodoc.Value (
 
 import Prelude
 import Global
-import Data.Generic
+import Data.Generic.Rep
 import Data.Optimize.Uncurried
 import Data.Int (toNumber, fromNumber)
 import Data.Int as Int

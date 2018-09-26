@@ -3,7 +3,7 @@ module Neodoc.ArgParser.ParseLayout where
 import Prelude
 import Data.NonEmpty (NonEmpty)
 import Data.Function (on)
-import Data.Generic
+import Data.Generic.Rep
 import Data.Pretty
 import Data.List (List)
 import Data.Foldable (intercalate)

@@ -1,7 +1,7 @@
 module Neodoc.Data.SolvedLayout where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
 import Data.Either (Either(..))
 import Data.Pretty (class Pretty, pretty)
 import Data.Maybe (Maybe(..), maybe)

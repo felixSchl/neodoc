@@ -4,7 +4,7 @@ import Prelude
 import Debug.Trace hiding (trace)
 import Debug.Trace (trace) as Debug
 import Debug.Profile
-import Data.Generic
+import Data.Generic.Rep
 import Data.Newtype (unwrap)
 import Data.List (
   List(..), some, singleton, filter, fromFoldable, last, groupBy, sortBy, (:)

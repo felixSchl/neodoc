@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
 import Data.Either (Either(..))
 import Control.Monad.Eff
 import Control.Monad.Eff.Exception

@@ -52,7 +52,7 @@ import Neodoc.Data.Layout
 import Neodoc.Data.SolvedLayout
 import Neodoc.ArgParser.Options
 import Neodoc.ArgParser.Token
-import Data.Generic
+import Data.Generic.Rep
 import Neodoc.Env
 import Neodoc.Data.LayoutConversion
 import Data.Map as Map

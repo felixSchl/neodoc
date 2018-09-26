@@ -1,7 +1,7 @@
 module Neodoc.ArgParser.Required where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
 import Data.Tuple.Nested ((/\))
 import Data.Map as Map
 import Data.Map (Map())

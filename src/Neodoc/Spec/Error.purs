@@ -1,7 +1,7 @@
 module Neodoc.Spec.Error where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
 import Data.Pretty
 import Neodoc.Error (NeodocError(..)) as Neodoc
 import Neodoc.Error.Class (class ToNeodocError)
