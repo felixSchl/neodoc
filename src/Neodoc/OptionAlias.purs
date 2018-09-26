@@ -15,7 +15,7 @@ import Data.Maybe (Maybe(..))
 import Data.List (List(Nil), (:))
 import Data.Either (Either(..))
 import Data.Function (on)
-import Data.Generic (class Generic, gEq, gShow)
+import Data.Generic.Rep (class Generic, gEq, gShow)
 import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
 import Data.NonEmpty as NonEmpty

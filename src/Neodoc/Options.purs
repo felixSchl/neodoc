@@ -3,7 +3,6 @@ module Neodoc.Options where
 import Prelude
 import Data.Foreign.Class
 import Data.List (List)
-import Control.Monad.Eff
 import Neodoc.Spec
 import Neodoc.Data.EmptyableLayout
 import Neodoc.Data.UsageLayout
@@ -16,7 +15,8 @@ import Data.Foreign.Class as F
 import Data.Foreign.Extra as F
 import Data.Foreign.Index as F
 import Neodoc.ArgParser.Options as ArgParser
-import Control.Monad.Eff.Exception (Error, throwException, error, EXCEPTION)
+import Effect
+import Effect.Exception (Error, throwException, error, EXCEPTION)
 import Control.Monad.Except (runExcept)
 import Data.Either (Either(..), fromRight)
 import Data.Foreign (F, Foreign)

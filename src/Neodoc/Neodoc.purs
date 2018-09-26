@@ -42,16 +42,13 @@ import Data.Foreign as F
 import Data.Foldable (any, intercalate)
 import Data.String.Yarn (lines, unlines)
 import Control.Alt ((<|>))
-import Control.Monad.Eff.Exception (Error, throwException, error, EXCEPTION)
-import Control.Monad.Eff.Console (CONSOLE)
-import Control.Monad.Eff.Console as Console
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Unsafe
+import Effect.Exception (Error, throwException, error, EXCEPTION)
+import Effect.Console (CONSOLE)
+import Effect.Console as Console
+import Effect.Class (liftEff)
+import Effect (Eff)
+import Effect.Unsafe
 import Control.Monad.Except (throwError, catchError, runExcept)
-import Node.Process (PROCESS)
-import Node.Process as Process
-import Node.FS (FS)
 import Text.Wrap (dedent)
 import Unsafe.Coerce (unsafeCoerce)
 import Partial.Unsafe (unsafePartial)
@@ -86,14 +83,6 @@ _DEVELOPER_ERROR_MESSAGE = dedent """
   This is an error with the program itself and not your fault.
   Please bring this to the program author's attention.
 """
-
-type NeodocEff e = (
-    process :: PROCESS
-  , err     :: EXCEPTION
-  , console :: CONSOLE
-  , fs      :: FS
-  | e
-)
 
 data Output
   = VersionOutput (Map String Value) String
@@ -130,7 +119,7 @@ runJS
    . Fn2
         Foreign
         Foreign
-        (Eff (NeodocEff eff) Foreign)
+        (Effect Foreign)
 runJS = mkFn2 go
   where
   go fSpec fOpts = do
@@ -170,21 +159,21 @@ run
   :: ∀ eff
    . String
   -> NeodocOptions
-  -> Effect (NeodocEff eff) Output
+  -> Effect Output
 run help = _run (Right help)
 
 run'
   :: ∀ eff
    . Spec UsageLayout
   -> NeodocOptions
-  -> Effect (NeodocEff eff) Output
+  -> Effect Output
 run' spec = _run (Left spec)
 
 _run
   :: ∀ eff
    . Either (Spec UsageLayout) String
   -> NeodocOptions
-  -> Effect (NeodocEff eff) Output
+  -> Effect Output
 _run input (NeodocOptions opts) = do
   argv <- maybe (A.drop 2 <$> Process.argv) pure opts.argv
   env  <- maybe Process.getEnv              pure opts.env
@@ -263,7 +252,7 @@ _run input (NeodocOptions opts) = do
     -> Maybe (Array String) -- the flags that trigger --help
     -> Maybe String         -- the shortened usage text
     -> Either NeodocError a
-    -> Effect (NeodocEff eff) a
+    -> Effect a
   runNeodocError mProg mHelpFlags mShortHelp x = case x of
     Left err ->
       let msg = renderNeodocError mProg mHelpFlags mShortHelp err
@@ -341,7 +330,7 @@ parseHelpTextJS
   :: ∀ eff
    . Fn1
         String
-        (Eff (NeodocEff eff) Foreign)
+        (Effect Foreign)
 parseHelpTextJS = mkFn1 go
   where
   go help =

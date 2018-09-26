@@ -5,9 +5,6 @@ import Debug.Trace
 import Data.Either
 import Data.Tuple.Nested
 import Data.Newtype (unwrap)
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
-import Control.Monad.Eff.Unsafe
 
 foreign import _ENABLE_PROFILING_ :: Boolean
 
@@ -43,5 +40,5 @@ profileS msg f =
             r /\ t -> trace (msg <> " (" <> (show t) <> " ms)") \_-> r
     else f unit
 
-foreign import timerStart :: ∀ eff. Effect eff Int
-foreign import timerEnd :: ∀ eff. Int -> Effect eff Int
+foreign import timerStart :: ∀ eff. Effect Int
+foreign import timerEnd :: ∀ eff. Int -> Effect Int

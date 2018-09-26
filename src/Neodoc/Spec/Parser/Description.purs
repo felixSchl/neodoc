@@ -33,7 +33,7 @@ import Neodoc.Spec.Parser.Combinators as P
 
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(Nothing, Just), isJust, isNothing, maybe, fromMaybe)
-import Data.Generic (class Generic, gEq, gShow)
+import Data.Generic.Rep (class Generic, gEq, gShow)
 import Data.Array as A
 import Data.String.Ext ((^=))
 import Data.Pretty (class Pretty, pretty)
