@@ -13,7 +13,7 @@ import Test.Spec.ForeignSpec (foreignSpec)
 import Test.Spec.SolveSpec (solveSpec)
 import Test.Spec.CompatSpec (compatSpec)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff (Eff())
+import Control.Monad.Eff (Effect())
 import Node.FS (FS())
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Eff.Console (CONSOLE)
@@ -22,10 +22,10 @@ import Test.Assert (ASSERT)
 import Test.Support.CompatParser
 
 -- Somehow, purescript needs this:
-_liftEff :: ∀ e a. Eff e a -> Aff e a
+_liftEff :: ∀ e a. Effect e a -> Aff e a
 _liftEff = liftEff
 
-main :: Eff ( err     :: EXCEPTION
+main :: Effect ( err     :: EXCEPTION
             , process :: PROCESS
             , fs      :: FS
             , console :: CONSOLE

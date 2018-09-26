@@ -172,27 +172,27 @@ run
   :: ∀ eff
    . String
   -> NeodocOptions
-  -> Eff (NeodocEff eff) Output
+  -> Effect (NeodocEff eff) Output
 run help = _run (Right help)
 
 run'
   :: ∀ eff
    . Spec UsageLayout
   -> NeodocOptions
-  -> Eff (NeodocEff eff) Output
+  -> Effect (NeodocEff eff) Output
 run' spec = _run (Left spec)
 
 _run
   :: ∀ eff
    . Either (Spec UsageLayout) String
   -> NeodocOptions
-  -> Eff (NeodocEff eff) Output
+  -> Effect (NeodocEff eff) Output
 _run input (NeodocOptions opts) = do
   argv <- maybe (A.drop 2 <$> Process.argv) pure opts.argv
   env  <- maybe Process.getEnv              pure opts.env
 
   let
-    runNeodocError' :: ∀ a. Either _ a -> Eff _ a
+    runNeodocError' :: ∀ a. Either _ a -> Effect _ a
     runNeodocError' = runNeodocError Nothing Nothing Nothing
 
   -- 1. obtain a spec, either by using the provided spec or by parsing a fresh
@@ -205,7 +205,7 @@ _run input (NeodocOptions opts) = do
     let fromJSCallback
           :: ∀ a
            . (Pretty a)
-          => (Spec a -> Eff _ (Spec a))
+          => (Spec a -> Effect _ (Spec a))
           -> (Spec a -> Either _ (Spec a))
         fromJSCallback cb = \spec ->
           let result = unsafePerformEff (cb spec)
@@ -221,7 +221,7 @@ _run input (NeodocOptions opts) = do
         inputSpec
 
   let
-    runNeodocError' :: ∀ a. Either _ a -> Eff _ a
+    runNeodocError' :: ∀ a. Either _ a -> Effect _ a
     runNeodocError' = runNeodocError  (Just program)
                                       (Just (pretty <$> opts.helpFlags))
                                       (Just shortHelp)
@@ -261,12 +261,11 @@ _run input (NeodocOptions opts) = do
   where
 
   runNeodocError
-    :: ∀ eff a
-     . Maybe String         -- the program name, if available
+    :: Maybe String         -- the program name, if available
     -> Maybe (Array String) -- the flags that trigger --help
     -> Maybe String         -- the shortened usage text
     -> Either NeodocError a
-    -> Eff (NeodocEff eff) a
+    -> Effect (NeodocEff eff) a
   runNeodocError mProg mHelpFlags mShortHelp x = case x of
     Left err ->
       let msg = renderNeodocError mProg mHelpFlags mShortHelp err
@@ -428,4 +427,4 @@ foreign import readPkgVersionImpl
   :: ∀ e
    . (String -> Maybe String)
   -> Maybe String
-  -> Eff e (Maybe String)
+  -> Effect e (Maybe String)

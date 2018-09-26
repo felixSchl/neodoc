@@ -27,7 +27,7 @@ import Neodoc.OptionAlias (OptionAlias)
 import Neodoc.Solve (SolveOptions)
 import Neodoc.SpecConversions (fromEmptyableSpec, toEmptyableSpec)
 
-foreign import data JSCALLBACK :: !
+foreign import data JSCALLBACK :: Effect
 
 type JsCallbackEff = (jsCallback :: JSCALLBACK, err :: EXCEPTION)
 
@@ -48,10 +48,10 @@ newtype NeodocOptions = NeodocOptions {
 , allowUnknown      :: Boolean -- ^ allow unknown options in the input
 , transforms   :: {
     presolve :: ∀ eff. Either
-      (Array (Spec UsageLayout -> Eff JsCallbackEff (Spec UsageLayout)))
+      (Array (Spec UsageLayout -> Effect JsCallbackEff (Spec UsageLayout)))
       (Array (Spec UsageLayout -> Either SolveError (Spec UsageLayout)))
   , postsolve :: ∀ eff. Either
-      (Array (Spec SolvedLayout -> Eff JsCallbackEff (Spec SolvedLayout)))
+      (Array (Spec SolvedLayout -> Effect JsCallbackEff (Spec SolvedLayout)))
       (Array (Spec SolvedLayout -> Either SolveError (Spec SolvedLayout)))
   }
 }

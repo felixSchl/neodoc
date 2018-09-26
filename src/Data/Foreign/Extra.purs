@@ -27,7 +27,7 @@ prettyForeignError = go
   nested (ErrorAtProperty prop e) = "[" <> show prop <> "]" <> nested e
   nested e = ": " <> show e
 
-readPropMaybe :: forall a i. (IsForeign a, Index i) => i -> Foreign -> F (Maybe a)
+readPropMaybe :: forall a i. IsForeign a => Index i => i -> Foreign -> F (Maybe a)
 readPropMaybe k v = do
   if hasOwnProperty k v
     then do
@@ -35,7 +35,7 @@ readPropMaybe k v = do
       pure $ unNullOrUndefined x
     else pure Nothing
 
-defaultIfUndefined :: forall a i. (IsForeign a, Index i) => i -> a -> Foreign -> F a
+defaultIfUndefined :: forall a i. IsForeign a => Index i => i -> a -> Foreign -> F a
 defaultIfUndefined k d v = do
   v' :: Maybe Foreign <- readPropMaybe k v
   maybe (pure d) read v'

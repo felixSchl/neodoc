@@ -29,7 +29,7 @@ derive instance genericArgs :: Generic Args
 instance showArgs :: Show Args where
   show = gShow
 
-getArgs :: ∀ e. (Show e) => Either e _ -> Eff _ Args
+getArgs :: ∀ e. (Show e) => Either e _ -> Effect _ Args
 getArgs e = case e of
   Left e  -> throwException $ error $ show e
   Right v -> pure (Args v)

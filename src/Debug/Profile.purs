@@ -43,5 +43,5 @@ profileS msg f =
             r /\ t -> trace (msg <> " (" <> (show t) <> " ms)") \_-> r
     else f unit
 
-foreign import timerStart :: ∀ eff. Eff eff Int
-foreign import timerEnd :: ∀ eff. Int -> Eff eff Int
+foreign import timerStart :: ∀ eff. Effect eff Int
+foreign import timerEnd :: ∀ eff. Int -> Effect eff Int

@@ -21,7 +21,7 @@ import Control.MonadPlus (guard)
 import Control.Monad.Except (ExceptT(..), throwError)
 import Control.Monad.State (StateT(..))
 
-debug :: ∀ a m. (Show a, Monad m) => a -> m Unit
+debug :: ∀ a m. Show a => Monad m => a -> m Unit
 debug x = traceShow x $ const $ pure unit
 
 -- -- | Return the current parser position
@@ -64,7 +64,7 @@ getInput = (P.ParserT <<< ExceptT <<< StateT) \(s@(P.ParseState i pos _)) ->
 -- setPos pos = (P.ParserT <<< ExceptT <<< StateT) \(s@(P.ParseState i _ _)) ->
 --   pure $ Right unit /\ (P.ParseState i pos false)
 --
--- traceInput :: ∀ a m. (Show a, Monad m) => P.ParserT a m Unit
+-- traceInput :: ∀ a m. Show a => Monad m => P.ParserT a m Unit
 -- traceInput = getInput >>= debug
 
 satisfyCode :: ∀ m. (Monad m) => (Int -> Boolean) -> P.ParserT String m Char

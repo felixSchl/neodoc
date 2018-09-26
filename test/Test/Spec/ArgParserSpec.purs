@@ -3,7 +3,7 @@ module Test.Spec.ArgParserSpec (argParserSpec) where
 import Prelude
 import Debug.Trace
 import Data.Tuple (Tuple(..))
-import Control.Monad.Eff (Eff())
+import Control.Monad.Eff (Effect())
 import Control.Monad (when)
 import Control.Monad.Eff.Exception (EXCEPTION())
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -1023,7 +1023,7 @@ argParserSpec = \_ -> describe "The parser generator" do
         -> Env
         -> Maybe Options
         -> Either String (StrMap Value)
-        -> Eff (err :: EXCEPTION | eff) Unit
+        -> Effect (err :: EXCEPTION | eff) Unit
       validate (spec@(Spec { descriptions })) argv env mOptions expected =
         let opts = fromMaybe defaultOptions mOptions
             result = do

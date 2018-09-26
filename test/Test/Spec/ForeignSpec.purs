@@ -5,7 +5,7 @@ import Debug.Trace
 import Data.Foreign (toForeign)
 import Data.Foreign.Extra as F
 import Data.Newtype (unwrap)
-import Control.Monad.Eff (Eff())
+import Control.Monad.Eff (Effect())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)
 import Control.Alt ((<|>))

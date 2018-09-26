@@ -3,7 +3,7 @@ module Test.Spec.CompatSpec (compatSpec) where
 import Prelude
 import Debug.Trace
 import Debug.Profile
-import Control.Monad.Eff (Eff())
+import Control.Monad.Eff (Effect())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Aff (Aff, later)
 import Control.Alt ((<|>))

@@ -20,7 +20,7 @@ import Data.Maybe (Maybe(..), fromMaybe, fromJust)
 import Data.Tuple (Tuple(..))
 import Data.Array as A
 import Data.List (List, many, toUnfoldable)
-import Control.Monad.Eff (Eff())
+import Control.Monad.Eff (Effect())
 import Control.Monad.Eff.Class (liftEff)
 import Control.Alt ((<|>))
 import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
@@ -81,7 +81,7 @@ renderFlags f = (if f.optionsFirst then "p" else "")
 
 readTests :: ∀ eff
    . String
-  -> Eff (fs :: FS, err :: EXCEPTION | eff) (List Test)
+  -> Effect (fs :: FS, err :: EXCEPTION | eff) (List Test)
 readTests filepath = do
   f <- FS.readTextFile UTF8 filepath
   runEitherEff
