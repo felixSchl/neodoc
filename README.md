@@ -86,7 +86,7 @@ the neodoc parser, even though it somewhat defies the original idea of docopt.
     * `<arg>`, `ARG` positionals
     * `clone`, `pull`, etc. commands
     * `[<arg>]` optional groupings
-    * `(<arg>])` required groupings
+    * `(<arg>)` required groupings
     * `[-f ARG]` POSIX-style flags
     * `-f[=ARG]...` repeating elements
     * `--` end of options separator
