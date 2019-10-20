@@ -33,7 +33,6 @@ import Data.Map as Map
 import Data.Map (Map)
 import Data.Pretty (pretty, class Pretty)
 import Control.Alt ((<|>))
-import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Control.Monad.State
 import Control.Monad.State as State
 import Control.Lazy (defer)
@@ -697,7 +696,7 @@ parseArg x = go x
             LOpt _ _   -> true
             SOpt _ _ _ -> true
             _          -> false
-        -> do
+      _ -> do
           aliases /\ def /\ env <- do
             description <- lookupDescription' a
             case description of
@@ -827,13 +826,13 @@ unknownOption = do
       case tok of
         LOpt _ _ -> true
         SOpt _ _ _ -> true
-        _ -> false -> do
-      isKnown <- isKnownToken' tok
-      if isKnown
-        then fail "expected unknown option"
-        else setInput toks
-          *> modifyDepth (_ + 1)
-          $> (_UNKNOWN_ARG /\ RichValue.from Origin.Argv (StringValue source))
+        _ -> do
+          isKnown <- isKnownToken' tok
+          if isKnown
+            then fail "expected unknown option"
+            else setInput toks
+              *> modifyDepth (_ + 1)
+              $> (_UNKNOWN_ARG /\ RichValue.from Origin.Argv (StringValue source))
     _ -> fail "expected unknown option"
 
 {-

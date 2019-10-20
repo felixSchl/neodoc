@@ -3,7 +3,9 @@ module Neodoc.Parsing.Parser.String where
 import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Data.String as S
+import Data.String.CodeUnits
 import Data.Char as C
+import Data.Char.Unicode as C
 import Data.List (List, many)
 import Data.Array as A
 import Data.Newtype (wrap)
@@ -27,7 +29,7 @@ satisfy :: ∀ e c g. (Char -> Boolean) -> StringParser e c g Char
 satisfy f = try do
   c <- anyChar
   if f c then return c
-         else fail $ "Character '" <> S.singleton c <> "' did not satisfy predicate"
+         else fail $ "Character '" <> singleton c <> "' did not satisfy predicate"
 
 foreign import getFirst :: String -> Char
 foreign import getRest :: String -> String
@@ -40,7 +42,7 @@ anyChar = Parser \(a@(ParseArgs c s g i)) ->
     str ->
       let head = getFirst str
           tail = getRest str
-          s' = P.updatePosString s (S.singleton head)
+          s' = P.updatePosString s $ singleton head
        in Step true (ParseArgs c s' g tail) (Right head)
 
 -- | Match the specified string.

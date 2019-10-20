@@ -2,7 +2,7 @@ module Neodoc.ArgParser.Debug where
 
 import Prelude
 import Debug.Trace hiding (trace)
-import Data.String as String
+import Data.String.CodeUnits (fromCharArray)
 import Data.Pretty
 import Data.List (List)
 import Data.List.Lazy as LL
@@ -19,7 +19,7 @@ trace l f = if _ENABLE_DEBUG_
                 input       <- getInput
                 state       <- getState
                 globalState <- getGlobalState
-                traceA $ indent l <> stateLabel state globalState <> (f input)
+                traceM $ indent l <> stateLabel state globalState <> (f input)
               else pure unit
 
 traceError :: ∀ r a. Int -> String -> ArgParser r a  -> ArgParser r a
@@ -29,10 +29,10 @@ traceError l s = catch' \st e ->
     *> throw e
 
 traceInput :: ∀ r. ArgParser r Unit
-traceInput = traceA =<< pretty <$> getInput
+traceInput = traceM =<< pretty <$> getInput
 
 indent :: Int -> String
-indent l = String.fromCharArray $ LL.toUnfoldable $ LL.take (l) $ LL.repeat ' '
+indent l = fromCharArray $ LL.toUnfoldable $ LL.take (l) $ LL.repeat ' '
 
 traceBracket
   :: ∀ r a

@@ -12,7 +12,6 @@ import Global (readFloat)
 import Data.Int as Int
 import Data.Number.Backport as Number
 import Data.String as String
-import Data.StrMap as StrMap
 import Data.String.Argv as Argv
 import Data.String (fromCharArray, Pattern(..))
 import Data.Either (Either(..), either)
@@ -20,16 +19,13 @@ import Data.Maybe (Maybe(..), fromMaybe, fromJust)
 import Data.Tuple (Tuple(..))
 import Data.Array as A
 import Data.List (List, many, toUnfoldable)
-import Control.Monad.Eff (Effect())
-import Control.Monad.Eff.Class (liftEff)
+import Effect (Effect())
+import Effect.Class (liftEff)
 import Control.Alt ((<|>))
-import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
+import Effect.Exception (EXCEPTION, error, throwException)
 import Control.Monad.Trampoline (runTrampoline)
 import Partial.Unsafe (unsafePartial)
 
-import Node.FS (FS)
-import Node.Encoding (Encoding(..))
-import Node.FS.Sync as FS
 
 import Text.Parsing.Parser as P
 import Text.Parsing.Parser.Combinators as P

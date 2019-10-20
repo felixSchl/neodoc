@@ -28,8 +28,8 @@ instance showParseError :: (Show e) => Show (ParseError e) where
   show (ParseError b e) = "ParseError " <> show b <> " "<> show e
 
 instance prettyParseError :: (Pretty e) => Pretty (ParseError e) where
-  pretty (ParseError false e) = either id pretty e
-  pretty (ParseError true e) = "Fatal: " <> either id pretty e
+  pretty (ParseError false e) = either identity pretty e
+  pretty (ParseError true e) = "Fatal: " <> either identity pretty e
 
 -- XXX: could this be a Comonad?
 extractError :: ∀ e . (String -> e) -> ParseError e -> e

@@ -75,7 +75,6 @@ import Data.Foldable (any, intercalate)
 import Data.Pretty
 import Control.Monad.State
 import Control.Monad.State as State
-import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Control.Comonad (extract)
 
 import Neodoc.Spec

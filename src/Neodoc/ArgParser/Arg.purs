@@ -4,6 +4,7 @@ import Prelude
 import Data.Maybe
 import Data.Function (on)
 import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Foldable (all)
 import Data.Pretty
 import Neodoc.Data.Layout
@@ -27,10 +28,10 @@ data Arg
         Boolean           -- is this argument optional?
 type ArgLayout = Layout Arg
 
-derive instance genericArg :: Generic Arg
+derive instance genericArg :: Generic Arg _
 
 instance showArg :: Show Arg where
-  show = gShow
+  show = genericShow
 
 instance prettyArg :: Pretty Arg where
   pretty (Arg i a _ _ o) =

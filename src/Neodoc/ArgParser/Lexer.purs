@@ -12,7 +12,7 @@ import Data.Optimize.Uncurried
 import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
 import Data.List (List(..), (:), singleton, many, fromFoldable, some, toUnfoldable)
-import Data.String (singleton) as String
+import Data.String.CodeUnits (singleton) as String
 import Data.Traversable (foldMap)
 import Data.Foldable (elem)
 import Neodoc.Parsing.Parser as P
@@ -57,18 +57,18 @@ parseToken = do
 
     stdin :: StringParser' Token
     stdin = do
-      P.char '-'
+      _ <- P.char '-'
       pure Stdin
 
     eoa :: StringParser' Token
     eoa = do
-      P.string "--"
+      _ <- P.string "--"
       pure $ EOA empty
 
     -- | Parse a short option
     sopt :: StringParser' Token
     sopt = do
-      P.char '-'
+      _ <- P.char '-'
       x   <- P.noneOf illegalSOptChar
       xs  <- A.many $ P.noneOf illegalOptChar -- re-allow '-'s
       arg <- P.optionMaybe arg
@@ -77,7 +77,7 @@ parseToken = do
     -- | Parse a long option
     lopt :: StringParser' Token
     lopt = do
-      P.string "--"
+      _ <- P.string "--"
       xs <- foldMap String.singleton <$> do
         some $ P.noneOf illegalOptChar
       arg <- P.optionMaybe arg
@@ -89,7 +89,7 @@ parseToken = do
       many P.anyChar
 
     arg = do
-      P.char '='
+      _ <- P.char '='
       foldMap String.singleton <$> many P.anyChar
 
 -- | Reduce the array of arguments (argv) to a list of tokens, by parsing each
@@ -99,7 +99,7 @@ lex
    . List String
   -> Options r
   -> Either String (List PositionedToken)
-lex xs options = lmap (P.extractError id) $ go xs 1
+lex xs options = lmap (P.extractError identity) $ go xs 1
   where
     go Nil _ = pure Nil
     go (x:xs) n = do

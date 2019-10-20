@@ -16,7 +16,7 @@ import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.NonEmpty ((:|))
 import Data.Bifunctor (rmap, lmap, bimap)
-import Data.Map (Map)
+import Data.Map (Map, toUnfoldable)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.List (
@@ -99,7 +99,7 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
     let
       -- 1. look up the values. Note that the lookup may yield `Nothing`,
       --    meaning that it is ought to be omitted.
-      values = Map.toList target <#> \(k /\ (a /\ d)) -> do
+      values = toUnfoldable target <#> \(k /\ (a /\ d)) -> do
         vs <- Map.lookup k input
         let vs' = filter (origin (/=) Origin.Empty) vs
             vs'' = filter (origin (/=) Origin.Default) vs'
@@ -120,7 +120,7 @@ reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
 
   finalFold :: Map Key _ -> Map String RichValue
   finalFold m =
-    let x = Map.toList m <#> \(k /\ (a /\ _ /\ RichValue rv)) ->
+    let x = fromFoldable m <#> \(k /\ (a /\ _ /\ RichValue rv)) ->
               let v = fromMaybe rv.value do
                     if isFlag a || isCommand a
                       then case rv.value of
@@ -235,4 +235,6 @@ isCommand :: FacelessLayoutArg -> Boolean
 isCommand (Command _) = true
 isCommand _ = false
 
+
+setRepeatableOr :: Boolean -> FacelessLayoutArg -> FacelessLayoutArg
 setRepeatableOr r x = setRepeatable (isRepeatable x || r) x

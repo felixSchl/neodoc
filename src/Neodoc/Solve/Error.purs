@@ -2,6 +2,7 @@ module Neodoc.Solve.Error where
 
 import Prelude
 import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Either (Either(..))
 import Data.Pretty (class Pretty, pretty)
 import Neodoc.Error (NeodocError(..))
@@ -9,10 +10,10 @@ import Neodoc.Error.Class (class ToNeodocError)
 
 newtype SolveError = SolveError String
 
-derive instance genericSolveError :: Generic SolveError
+derive instance genericSolveError :: Generic SolveError _
 
 instance showSolveError :: Show SolveError where
-  show = gShow
+  show = genericShow
 
 instance prettySolveError :: Pretty SolveError where
   pretty (SolveError s) = s

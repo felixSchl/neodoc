@@ -89,12 +89,12 @@ parse toks =
       (P.many $ P.try $ P.moreIndented *> elem) `P.sepBy1` P.vbar
     eoa <- P.choice [
       P.try $ do
-        maybeInParens do
-          maybeInParens do
+        _ <- maybeInParens do
+          _ <- maybeInParens do
             P.doubleDash
             P.many elem
           P.many elem
-        P.many elem
+        _ <- P.many elem
         P.return $ Just $ Elem EOA
     , (do
         P.eof <|> (P.lookAhead $ P.lessIndented <|> P.sameIndent)

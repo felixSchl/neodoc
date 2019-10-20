@@ -16,7 +16,8 @@ module Neodoc.Value (
 
 import Prelude
 import Global
-import Data.Generic.Rep
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Optimize.Uncurried
 import Data.Int (toNumber, fromNumber)
 import Data.Int as Int
@@ -33,16 +34,14 @@ import Control.Apply ((*>), (<*))
 import Control.Alt ((<|>))
 import Data.Array as A
 import Data.Int (toNumber, fromString) as Int
-import Data.String (singleton, toUpper, trim) as String
+import Data.String.CodeUnits (singleton) as String
+import Data.String (toUpper, trim) as String
 import Partial.Unsafe (unsafePartial)
 import Data.Pretty (class Pretty, pretty)
-import Data.Foreign (F)
-import Data.Foreign as F
-import Data.Foreign.Class as F
-import Data.Foreign.Index as F
-import Data.Foreign.Index ((!))
-import Data.Foreign.Class
-import Data.Foreign.Extra as F
+import Foreign (F)
+import Foreign as F
+import Foreign.Index as F
+import Foreign.Index ((!))
 
 import Neodoc.Parsing.Parser.Pos as P
 import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
@@ -61,26 +60,31 @@ data Value
 
 derive instance eqValue :: Eq Value
 derive instance ordValue :: Ord Value
-derive instance genericValue :: Generic Value
+derive instance genericValue :: Generic Value _
 
 instance showValue :: Show Value where
-  show = gShow
+  show (StringValue string) = string
+  show (BoolValue   boolean) = show boolean
+  show (ArrayValue  array) = show array
+  show (IntValue    int) = show int
+  show (FloatValue  number) = show number
 
-instance isForeignValue :: IsForeign Value where
-  read v = do
-        (BoolValue   <$> F.readBoolean v)
-    <|> (IntValue    <$> F.readInt     v)
-    <|> (FloatValue  <$> F.readNumber  v)
-    <|> (StringValue <$> F.readString  v)
-    <|> (ArrayValue  <$> (F.readArray v >>= \vs -> for vs F.read))
-    <|> (F.fail $ F.JSONError "Invalid value")
 
-instance asForeignValue :: AsForeign Value where
-  write (BoolValue    v) = F.toForeign v
-  write (IntValue     v) = F.toForeign v
-  write (FloatValue   v) = F.toForeign v
-  write (StringValue  v) = F.toForeign v
-  write (ArrayValue  vs) = F.toForeign $ F.write <$> vs
+-- instance isForeignValue :: IsForeign Value where
+--   read v = do
+--         (BoolValue   <$> F.readBoolean v)
+--     <|> (IntValue    <$> F.readInt     v)
+--     <|> (FloatValue  <$> F.readNumber  v)
+--     <|> (StringValue <$> F.readString  v)
+--     <|> (ArrayValue  <$> (F.readArray v >>= \vs -> for vs F.read))
+--     <|> (F.fail $ F.JSONError "Invalid value")
+
+-- instance asForeignValue :: AsForeign Value where
+--   write (BoolValue    v) = F.toForeign v
+--   write (IntValue     v) = F.toForeign v
+--   write (FloatValue   v) = F.toForeign v
+--   write (StringValue  v) = F.toForeign v
+--   write (ArrayValue  vs) = F.toForeign $ F.write <$> vs
 
 instance prettyValue :: Pretty Value where
   pretty = prettyPrintValue
@@ -205,7 +209,7 @@ intoArray v               = [v]
 read :: String  -- ^ the input
      -> Boolean -- ^ allow splitting?
      -> Value
-read s split = either (const $ StringValue s) id (parse s split)
+read s split = either (const $ StringValue s) identity (parse s split)
 
 -- | Parser that parses strings
 type StringParser' a = StringParser String Unit Unit a
@@ -224,7 +228,7 @@ parse
   -> Either String Value
 parse s split =
   let p = if split then values else value <* P.eof
-  in lmap (P.extractError id) $
+  in lmap (P.extractError identity) $
       P.runParser (Args5 unit P.initialPos unit s p)
 
   where
@@ -252,7 +256,7 @@ parse s split =
       P.choice [
         FloatValue <<< ((Int.toNumber si) * _) <<< readFloat <$> do
           xss <- do
-            P.char '.'
+            _ <- P.char '.'
             foldMap String.singleton <$> P.some P.digit
           pure $ xs <> "." <> xss
       , case Int.fromString xs of
@@ -265,10 +269,10 @@ parse s split =
     bool = true' <|> false'
       where
         true' = do
-          P.choice $ P.try <<< P.string <$> [ "true", "True", "TRUE" ]
+          _ <- P.choice $ P.try <<< P.string <$> [ "true", "True", "TRUE" ]
           pure $ BoolValue true
         false' = do
-          P.choice $ P.try <<< P.string <$> [ "false", "False", "FALSE" ]
+          _ <- P.choice $ P.try <<< P.string <$> [ "false", "False", "FALSE" ]
           pure $ BoolValue false
 
     quoted = StringValue <$> do
@@ -277,10 +281,11 @@ parse s split =
           P.between (P.char '"')  (P.char '"')  (P.many $ P.noneOf ['"'])
         , P.between (P.char '\'') (P.char '\'') (P.many $ P.noneOf ['\''])
         ]
+        -- Fix syntax highlighting: "
 
 -- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
 space = P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
 skipSpaces = go
-  where go = (do space
+  where go = (do _ <- space
                  go) <|> pure unit
 skipSomeSpaces = space *> skipSpaces

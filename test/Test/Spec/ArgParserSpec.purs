@@ -3,21 +3,19 @@ module Test.Spec.ArgParserSpec (argParserSpec) where
 import Prelude
 import Debug.Trace
 import Data.Tuple (Tuple(..))
-import Control.Monad.Eff (Effect())
+import Effect (Effect())
 import Control.Monad (when)
-import Control.Monad.Eff.Exception (EXCEPTION())
+import Effect.Exception (EXCEPTION())
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Either (Either(..), either, isLeft)
 import Data.List (List(..), fromFoldable, length, singleton, concat)
 import Data.Traversable (for)
 import Data.Map (Map(..))
-import Data.StrMap as StrMap
-import Data.StrMap (StrMap())
 import Data.Tuple (uncurry)
 import Data.Map as Map
 import Data.Array as A
 import Data.Foldable (for_, intercalate)
-import Control.Monad.Eff.Exception (error, throwException)
+import Effect.Exception (error, throwException)
 import Data.String.Chalk as Chalk
 import Data.TemplateString.Unsafe ((<~>))
 import Data.Bifunctor (lmap, rmap)

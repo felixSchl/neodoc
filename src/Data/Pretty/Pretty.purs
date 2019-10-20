@@ -4,12 +4,11 @@ import Prelude
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Data.List (List, fromFoldable)
-import Data.Map (Map)
+import Data.Map (Map, toUnfoldable)
 import Data.Set (Set)
 import Data.Map as Map
 import Data.Either
 import Data.Foldable (class Foldable, intercalate)
-import Data.Pretty (class Pretty, pretty)
 import Data.NonEmpty (NonEmpty)
 
 class Pretty a where
@@ -24,13 +23,13 @@ instance prettyList :: (Pretty a) => Pretty (List a) where
 instance prettyNonEmpty :: (Pretty a, Functor f, Foldable f) => Pretty (NonEmpty f a) where
   pretty as = intercalate ", " $ pretty <$> as
 
-instance prettyMap :: (Pretty k, Pretty v) => Pretty (Map k v) where
-  pretty kvs = intercalate ", " $ Map.toList kvs <#> \(k /\ v) ->
-                  pretty k <> " => " <> pretty v
+-- instance prettyMap :: (Pretty k, Pretty v) => Pretty (Map k v) where
+--   pretty kvs = intercalate ", " $ (toUnfoldable kvs)
+--     <#> \(k /\ v) -> pretty k <> " => " <> pretty v
 
-instance prettyStrMap :: (Pretty v) => Pretty (Map String  v) where
-  pretty kvs = intercalate ", " $ Map.toList kvs <#> \(k /\ v) ->
-                  k <> " => " <> pretty v
+-- instance prettyStrMap :: (Pretty v) => Pretty (Map String  v) where
+--   pretty kvs = intercalate ", " $ fromFoldable kvs <#> \(k /\ v) ->
+--                   k <> " => " <> pretty v
 
 instance prettySet :: (Pretty k) => Pretty (Set k) where
   pretty ks = pretty $ fromFoldable ks

@@ -22,6 +22,7 @@ import Control.Alt ((<|>))
 import Control.Bind (join)
 import Control.Plus (empty)
 import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Array as Array
 import Data.Pretty (class Pretty, pretty)
 import Data.Function (on)
@@ -32,7 +33,9 @@ import Data.Either (Either(..), either)
 import Data.Traversable (for, traverse)
 import Data.Foldable (any)
 import Data.String as S
+import Data.String.CodeUnits (singleton) as S
 import Data.String (Pattern(..))
+import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.String.Unsafe as US
 import Data.String.Ext (endsWith)
 import Data.NonEmpty (NonEmpty, (:|))
@@ -61,10 +64,10 @@ data ExpandedOptionsLayoutArg
   | ReferenceArg String
 
 derive instance eqPreSolvedLayoutArg :: Eq ExpandedOptionsLayoutArg
-derive instance genericPreSolvedLayoutArg :: Generic ExpandedOptionsLayoutArg
+derive instance genericPreSolvedLayoutArg :: Generic ExpandedOptionsLayoutArg _
 
 instance showPreSolvedLayoutArg :: Show ExpandedOptionsLayoutArg where
-  show = gShow
+  show = genericShow
 
 instance prettyPreSolvedLayoutArg :: Pretty ExpandedOptionsLayoutArg where
   pretty (SolvedArg a) = pretty a
@@ -135,7 +138,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                   else solved $ Solved.Option (OptionAlias.Long n) descArg r
                 )
                 (\(adjR /\ adjN /\ adjO) -> do
-                  guardArgNames adjN aN'
+                  _ <- guardArgNames adjN aN'
                   slurped $ Solved.Option
                     (OptionAlias.Long n)
                     (Just $ OptionArgument adjN adjO)
@@ -184,9 +187,9 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
 
       case mArg of
         Just (arg@(OptionArgument aN aO)) -> do
-          lookupValidDescription true h
+          _ <- lookupValidDescription true h
           leading <- fromFoldable <$> for ts \t -> do
-            lookupValidDescription false t
+            _ <- lookupValidDescription false t
             Right $ Solved.Option
                     (OptionAlias.Short t)
                     Nothing
@@ -218,7 +221,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
       -- this implementation is simple and favours the first description to
       -- yield a hit.
       trySubsume = do
-        let fs  = S.fromCharArray $ c `Array.cons` cs
+        let fs  = fromCharArray $ c `Array.cons` cs
         -- XXX: Purescript is not lazy, so this is too expensive.
         --      We could just stop at the first `Just` value.
         match <- head <<< catMaybes <$> for descriptions case _ of
@@ -237,7 +240,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                     let ix = S.length haystack - S.length needle
                      in if unsafePartial (US.charAt ix fs) == f then
                         let
-                          rest = S.toCharArray $ S.take (S.length fs - S.length bareArgname - 1) fs
+                          rest = toCharArray $ S.take (S.length fs - S.length bareArgname - 1) fs
                           opt = Solved.Option (OptionAlias.Short f) (Just (OptionArgument aN aO)) r
                         in Just (rest /\ opt)
                         else Nothing
@@ -245,9 +248,9 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
 
                 -- all of the remaining options must pass the
                 -- `lookupValidDescription` check, otherwise we bail out.
-                rest <- either (const Nothing) (Just <<< id) do
+                rest <- either (const Nothing) (Just <<< identity) do
                   fromFoldable <$> for rest \c -> do
-                    lookupValidDescription false c
+                    _ <- lookupValidDescription false c
                     -- set the same repeatability flag for each stacked option
                     -- as indicated by trailing option.
                     Right $ Solved.Option (OptionAlias.Short c)
@@ -265,7 +268,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
       trySlurp (Args2 h ts) = do
         mDesc <- lookupValidDescription true h
         leading <- fromFoldable <$> for ts \t -> do
-          lookupValidDescription false t
+          _ <- lookupValidDescription false t
           -- note: return a function to override the stacked option's
           -- repeatability later.
           Right $ \r' -> Solved.Option (OptionAlias.Short t) Nothing (r || r')
@@ -284,7 +287,7 @@ expandOptions (Spec (spec@{ layouts, descriptions })) = do
                         Nil    -> opt :| Nil
               )
               (\(adjR /\ adjN /\ adjO) -> do
-                guardArgNames adjN aN'
+                _ <- guardArgNames adjN aN'
                 let
                   leading' = (_ $ adjR) <$> leading
                   opt = Solved.Option (OptionAlias.Short h)

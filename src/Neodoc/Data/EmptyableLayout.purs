@@ -12,12 +12,10 @@ import Data.NonEmpty.Extra (concat)
 import Data.List (List(..), (:), fromFoldable, length, catMaybes)
 import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
-import Data.Foreign (F)
-import Data.Foreign as F
-import Data.Foreign.Class as F
-import Data.Foreign.Index as F
-import Data.Foreign.Index ((!))
-import Data.Foreign.Class
+import Foreign (F)
+import Foreign as F
+import Foreign.Index as F
+import Foreign.Index ((!))
 import Control.Monad.Except (throwError)
 
 -- XXX: This type is required i.o to be able to have 0-length branches in case
@@ -44,30 +42,31 @@ instance showEmptyableLayout :: (Show a) => Show (EmptyableLayout a) where
   show (EmptyableElem  x)      = "EmptyableElem " <> show x
   show (EmptyableGroup o r xs) = "EmptyableGroup " <> show o <> " " <> show r <> " " <> show xs
 
-instance isForeignEmptyableLayout :: (IsForeign a) => IsForeign (EmptyableLayout a) where
-  read v = do
-    typ :: String <- String.toUpper <$> F.readProp "type" v
+-- instance isForeignEmptyableLayout :: (IsForeign a) => IsForeign (EmptyableLayout a) where
+--   read v = do
+--     typ :: String <- String.toUpper <$> F.readProp "type" v
 
-    case typ of
-      "ELEM" -> EmptyableElem
-        <$> F.readProp "elem" v
-      "GROUP" -> EmptyableGroup
-        <$> F.readProp "optional" v
-        <*> F.readProp "repeatable" v
-        <*> do
-            fromFoldable <$> do
-              (fromFoldable <$> _) <$> do
-                F.readProp "branches" v :: F (Array (Array (EmptyableLayout a)))
-      _ -> F.fail $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
+--     case typ of
+--       "ELEM" -> EmptyableElem
+--         <$> F.readProp "elem" v
+--       "GROUP" -> EmptyableGroup
+--         <$> F.readProp "optional" v
+--         <*> F.readProp "repeatable" v
+--         <*> do
+--             fromFoldable <$> do
+--               (fromFoldable <$> _) <$> do
+--                 F.readProp "branches" v :: F (Array (Array (EmptyableLayout a)))
+--       _ -> F.fail $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
-instance asForeignEmptyableLayout :: (AsForeign a) => AsForeign (EmptyableLayout a) where
-  write (EmptyableElem x) = F.toForeign {
-      type: "Elem"
-    , elem: F.write x
-    }
-  write (EmptyableGroup o r xs) = F.toForeign {
-      type: "Group"
-    , optional: F.write o
-    , repeatable: F.write r
-    , branches: Array.fromFoldable $ (Array.fromFoldable <<< (F.write <$> _)) <$> xs
-    }
+
+-- instance asForeignEmptyableLayout :: (AsForeign a) => AsForeign (EmptyableLayout a) where
+--   write (EmptyableElem x) = F.toForeign {
+--       type: "Elem"
+--     , elem: F.write x
+--     }
+--   write (EmptyableGroup o r xs) = F.toForeign {
+--       type: "Group"
+--     , optional: F.write o
+--     , repeatable: F.write r
+--     , branches: Array.fromFoldable $ (Array.fromFoldable <<< (F.write <$> _)) <$> xs
+--     }

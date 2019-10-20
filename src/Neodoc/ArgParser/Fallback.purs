@@ -29,34 +29,35 @@ getFallbackValue
   -> Maybe Description
   -> SolvedLayoutArg
   -> Maybe RichValue
-getFallbackValue options env mDescription x = do
-  (fromEnv       mDescription <#> RValue.from Origin.Environment) <|>
-  (fromDefault x mDescription <#> RValue.from Origin.Default)     <|>
-  (empty       x              <#> RValue.from Origin.Empty)
+getFallbackValue options env mDescription x =
+  do
+    ((fromEnv       mDescription <#> RValue.from Origin.Environment) <|>
+        (fromDefault x mDescription <#> RValue.from Origin.Default)     <|>
+        (empty       x              <#> RValue.from Origin.Empty))
 
   where
-  fromEnv :: Maybe Description -> Maybe Value
-  fromEnv (Just (OptionDescription _ _ _ _ (Just k))) = StringValue <$> Env.lookup k env
-  fromEnv _                                           = Nothing
+    fromEnv :: Maybe Description -> Maybe Value
+    fromEnv (Just (OptionDescription _ _ _ _ (Just k))) = StringValue <$> Env.lookup k env
+    fromEnv _                                           = Nothing
 
-  fromDefault :: SolvedLayoutArg -> Maybe Description -> Maybe Value
-  fromDefault (Option _ _ r) (Just (OptionDescription _ _ _ (Just v) _))
-    = pure if r
-              then ArrayValue $ Value.intoArray v
-              else v
-  fromDefault _ _ = Nothing
+    fromDefault :: SolvedLayoutArg -> Maybe Description -> Maybe Value
+    fromDefault (Option _ _ r) (Just (OptionDescription _ _ _ (Just v) _))
+      = pure if r
+                then ArrayValue $ Value.intoArray v
+                else v
+    fromDefault _ _ = Nothing
 
-  empty :: SolvedLayoutArg -> Maybe Value
-  empty = go
-    where
-    go (Option _ Nothing r)
-      | not options.requireFlags
-      = pure if r then ArrayValue []
-                  else BoolValue false
-    go (Option _ (Just (OptionArgument _ true)) r)
-      | not options.requireFlags
-      = pure if r then ArrayValue []
-                  else BoolValue false
-    go (Stdin) = pure $ BoolValue false
-    go (EOA)   = pure $ ArrayValue []
-    go _       = Nothing
+    empty :: SolvedLayoutArg -> Maybe Value
+    empty = go
+      where
+      go (Option _ Nothing r)
+        | not options.requireFlags
+        = pure if r then ArrayValue []
+                    else BoolValue false
+      go (Option _ (Just (OptionArgument _ true)) r)
+        | not options.requireFlags
+        = pure if r then ArrayValue []
+                    else BoolValue false
+      go (Stdin) = pure $ BoolValue false
+      go (EOA)   = pure $ ArrayValue []
+      go _       = Nothing

@@ -23,8 +23,8 @@ instance showIndexed :: (Show a) => Show (Indexed a) where
 instance prettyIndexed :: (Pretty a) => Pretty (Indexed a) where
   pretty (Indexed n a) = "#" <> show n <> ": " <> pretty a
 
-instance prettyIndexed' :: (Show a) => Pretty (Indexed a) where
-  pretty (Indexed n a) = "#" <> show n <> ": " <> show a
+-- instance prettyIndexed' :: (Show a) => Pretty (Indexed a) where
+--   pretty (Indexed n a) = "#" <> show n <> ": " <> show a
 
 getIndexedElem :: ∀ a. Indexed a -> a
 getIndexedElem (Indexed _ x) = x

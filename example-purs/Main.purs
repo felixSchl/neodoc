@@ -3,9 +3,9 @@ module Main where
 import Prelude
 import Data.Generic.Rep
 import Data.Either (Either(..))
-import Control.Monad.Eff
-import Control.Monad.Eff.Exception
-import Control.Monad.Eff.Console (log)
+import Effect
+import Effect.Exception
+import Effect.Console (log)
 import Neodoc as Neodoc
 import Neodoc.Options as Neodoc
 import Neodoc.Value as Neodoc

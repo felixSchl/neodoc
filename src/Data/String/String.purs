@@ -24,12 +24,12 @@ notUpperCaseEq a b = not (a ^= b)
 infixl 9 notUpperCaseEq as ^/=
 
 startsWith :: String -> String -> Boolean
-startsWith needle haystack = maybe false id do
+startsWith needle haystack = maybe false identity do
   ix <- Str.indexOf (Pattern needle) haystack
   pure $ ix == 0
 
 endsWith :: String -> String -> Boolean
-endsWith needle haystack = maybe false id do
+endsWith needle haystack = maybe false identity do
   ix <- Str.lastIndexOf (Pattern needle) haystack
   pure $ ix == (Str.length haystack - Str.length needle)
 

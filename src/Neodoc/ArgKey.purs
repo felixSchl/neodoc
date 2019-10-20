@@ -2,6 +2,7 @@ module Neodoc.ArgKey where
 
 import Prelude
 import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Pretty (class Pretty, pretty)
 import Data.String as String
 import Neodoc.OptionAlias (OptionAlias)
@@ -14,7 +15,7 @@ data ArgKey
   | StdinKey
 
 derive instance ordArgKey :: Ord ArgKey
-derive instance genericArgKey :: Generic ArgKey
+derive instance genericArgKey :: Generic ArgKey _
 
 instance eqArgKey :: Eq ArgKey where
   -- XXX: we have to call `String.toUpper` over and over again. Can we cache this?
@@ -26,7 +27,7 @@ instance eqArgKey :: Eq ArgKey where
   eq _ _ = false
 
 instance showArgKey :: Show ArgKey where
-  show = gShow
+  show = genericShow
 
 instance prettyArgKey :: Pretty ArgKey where
   pretty (PositionalKey n) = n

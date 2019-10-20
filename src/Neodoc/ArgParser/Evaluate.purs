@@ -20,7 +20,6 @@ import Data.Foldable (class Foldable, maximumBy)
 import Data.Optimize.Uncurried
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
-import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
 import Partial.Unsafe
 
 import Neodoc.Value (Value(..))

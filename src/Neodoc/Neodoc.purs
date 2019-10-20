@@ -35,10 +35,8 @@ import Data.Traversable (for)
 import Data.Pretty (class Pretty, pretty)
 import Data.String.Regex as Regex
 import Data.String.Regex (regex, Regex())
-import Data.Foreign (F, Foreign)
-import Data.Foreign.Class as F
-import Data.Foreign.Extra as F
-import Data.Foreign as F
+import Foreign (F, Foreign)
+import Foreign as F
 import Data.Foldable (any, intercalate)
 import Data.String.Yarn (lines, unlines)
 import Control.Alt ((<|>))
@@ -150,9 +148,9 @@ readSpec
   :: Foreign
   -> F (Either (Spec UsageLayout) String)
 readSpec input = do
-  spec :: Either (Spec (EmptyableLayout UsageLayoutArg)) String <- do
-    (Right <$> F.read input) <|>
-    (Left  <$> F.read input)
+  spec :: Either (Spec (EmptyableLayout UsageLayoutArg)) String <-
+    ((Right <$> F.read input) <|>
+        (Left  <$> F.read input))
   pure $ lmap Spec.fromEmptyableSpec spec
 
 run

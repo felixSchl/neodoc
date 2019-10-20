@@ -3,6 +3,7 @@ module Neodoc.Parsing.Parser.Pos where
 import Prelude
 import Debug.Profile
 import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Foldable (foldl)
 import Data.String as S
 import Data.Newtype (wrap)
@@ -11,11 +12,11 @@ type Line = Int
 type Column = Int
 data Position = Position Line Column
 
-derive instance genericPosition :: Generic Position
+derive instance genericPosition :: Generic Position _
 derive instance eqPosition :: Eq Position
 derive instance ordPosition :: Ord Position
 instance showPosition :: Show Position where
-  show = gShow
+  show = genericShow
 
 -- | The `Position` before any input has been parsed.
 initialPos :: Position

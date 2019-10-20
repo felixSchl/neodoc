@@ -2,20 +2,18 @@ module Test.Spec.ForeignSpec (foreignSpec) where
 
 import Prelude
 import Debug.Trace
-import Data.Foreign (toForeign)
-import Data.Foreign.Extra as F
+import Foreign (toForeign)
 import Data.Newtype (unwrap)
-import Control.Monad.Eff (Effect())
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Aff (Aff, later)
+import Effect (Effect())
+import Effect.Class (liftEff)
+import Effect.Aff (Aff, later)
 import Control.Alt ((<|>))
-import Data.StrMap as StrMap
 import Data.Pretty (pretty)
 import Data.Function.Uncurried
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Either (Either(..), either, fromLeft, fromRight)
 import Data.Foldable (any)
-import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
+import Effect.Exception (EXCEPTION, error, throwException)
 import Data.Foldable (intercalate, for_)
 import Text.Wrap (dedent)
 import Data.Maybe (Maybe(..), fromMaybe, fromJust)
@@ -27,12 +25,9 @@ import Test.Support (vliftEff)
 import Partial.Unsafe (unsafePartial)
 import Unsafe.Coerce (unsafeCoerce)
 import Control.Apply ((*>), (<*))
-import Control.Monad.Eff.Unsafe (unsafeCoerceEff)
 import Control.Monad.Except (runExcept)
 import Data.Array as A
-import Data.Foreign.Class as F
 import Data.Array.Partial as AU
-import Node.FS (FS)
 import Partial.Unsafe
 
 import Neodoc as Neodoc

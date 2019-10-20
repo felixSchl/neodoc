@@ -6,10 +6,9 @@ import Control.Monad (when)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.Pretty (class Pretty)
 import Data.Bifunctor (lmap)
-import Control.Monad.Aff (liftEff')
-import Control.Monad.Eff (Effect())
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (EXCEPTION(), error, throwException)
+import Effect (Effect())
+import Effect.Class (liftEffect)
+import Effect.Exception (error, throwException)
 import Control.Monad.Error.Class (throwError)
 import Data.List (List(..), length, (!!), take, fromFoldable, singleton, (:))
 import Data.Either (Either(..), isRight, isLeft, either)
@@ -280,12 +279,12 @@ usageParserSpec = \_ -> do
               assertEqual expected' (fromFoldable $ (fromFoldable <$> _) <$> layouts)
         otherwise -> do
           it (input <> " should fail") do
-          vliftEff do
-            assertThrows (const true) do
-              runEitherEff do
-                toks <- Error.capture $ Lexer.lexUsage input
-                { layouts } <- Error.capture $ Spec.parseUsage toks
-                debug layouts
+            vliftEff do
+              assertThrows (const true) do
+                runEitherEff do
+                  toks <- Error.capture $ Lexer.lexUsage input
+                  { layouts } <- Error.capture $ Spec.parseUsage toks
+                  debug layouts
 
   runSingleArgumentTests :: _
   runSingleArgumentTests xs =

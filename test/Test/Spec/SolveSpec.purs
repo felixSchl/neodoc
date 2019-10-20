@@ -12,7 +12,7 @@ import Data.Bifunctor (lmap, rmap)
 import Control.Plus (empty)
 import Data.Foldable (intercalate, for_)
 import Data.Traversable (for)
-import Control.Monad.Eff.Exception (error, throwException)
+import Effect.Exception (error, throwException)
 import Data.Array as A
 import Data.Maybe (Maybe(..), maybe)
 import Data.NonEmpty ((:|))

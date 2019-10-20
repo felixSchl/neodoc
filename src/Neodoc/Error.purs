@@ -2,6 +2,7 @@ module Neodoc.Error where
 
 import Prelude
 import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe (..))
 import Data.Char as Char
 import Data.Pretty (class Pretty, pretty)
@@ -15,14 +16,14 @@ data NeodocError
   | ArgParserError String
   | VersionMissingError
 
-derive instance genericNeodocError :: Generic NeodocError
+derive instance genericNeodocError :: Generic NeodocError _
 
 isDeveloperError :: NeodocError -> Boolean
 isDeveloperError (ArgParserError _) = false
 isDeveloperError _ = true
 
 instance showNeodocError :: Show NeodocError where
-  show = gShow
+  show = genericShow
 
 instance prettyNeodocError :: Pretty NeodocError where
   pretty (ScanError msg) = "Failed to disect neodoc text:\n" <> msg

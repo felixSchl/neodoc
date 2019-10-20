@@ -1,7 +1,6 @@
 module Neodoc.Options where
 
 import Prelude
-import Data.Foreign.Class
 import Data.List (List)
 import Neodoc.Spec
 import Neodoc.Data.EmptyableLayout
@@ -10,17 +9,15 @@ import Neodoc.Data.SolvedLayout
 import Neodoc.OptionAlias as OA
 import Neodoc.Solve.Error
 import Unsafe.Coerce
-import Data.Foreign as F
-import Data.Foreign.Class as F
-import Data.Foreign.Extra as F
-import Data.Foreign.Index as F
+import Foreign as F
+import Foreign.Index as F
 import Neodoc.ArgParser.Options as ArgParser
 import Effect
 import Effect.Exception (Error, throwException, error, EXCEPTION)
 import Control.Monad.Except (runExcept)
 import Data.Either (Either(..), fromRight)
-import Data.Foreign (F, Foreign)
-import Data.Foreign.Index ((!))
+import Foreign (F, Foreign)
+import Foreign.Index ((!))
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
 import Neodoc.Env (Env, unwrapEnv)
 import Neodoc.OptionAlias (OptionAlias)

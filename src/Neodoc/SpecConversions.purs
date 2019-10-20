@@ -12,14 +12,11 @@ import Data.Traversable (sequence)
 import Data.Pretty (class Pretty, pretty)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.NonEmpty.Extra as NonEmpty
-import Data.Foreign (Foreign)
-import Data.Foreign as F
-import Data.Foreign.Class as F
-import Data.Foreign.Index as F
-import Data.Foreign.Index ((!))
-import Data.Foreign.Class
-import Data.Foreign.Extra as F
-import Data.Foreign (F)
+import Foreign (Foreign)
+import Foreign as F
+import Foreign.Index as F
+import Foreign.Index ((!))
+import Foreign (F)
 import Control.Alt ((<|>))
 import Neodoc.Spec
 import Neodoc.Data.Layout

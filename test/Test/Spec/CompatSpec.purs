@@ -3,16 +3,12 @@ module Test.Spec.CompatSpec (compatSpec) where
 import Prelude
 import Debug.Trace
 import Debug.Profile
-import Control.Monad.Eff (Effect())
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Aff (Aff, later)
 import Control.Alt ((<|>))
-import Data.StrMap as StrMap
 import Data.Bifunctor (lmap)
 import Data.Pretty (pretty)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Either (Either(..), either)
-import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
+import Effect.Exception (EXCEPTION, error, throwException)
 import Data.Foldable (intercalate, for_)
 import Text.Wrap (dedent)
 import Data.Maybe (Maybe(..), fromMaybe, fromJust, maybe)
@@ -24,7 +20,6 @@ import Data.String as String
 import Test.Support (vliftEff)
 import Partial.Unsafe (unsafePartial)
 import Control.Apply ((*>), (<*))
-import Node.FS (FS)
 
 import Neodoc as Neodoc
 import Neodoc (NeodocOptions(..))
