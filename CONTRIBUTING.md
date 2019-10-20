@@ -6,7 +6,7 @@ in contributing a feature, contact me at felixschlitter@gmail.com and we can
 get the ball rolling &mdash; There's plenty to do. To get up and running, run:
 
 ```sh
-npm i && bower i && npm test
+npm i && spago install && npm test
 ```
 
 NB: Purescript is declared a devDependency in package.json, so no need to bring
