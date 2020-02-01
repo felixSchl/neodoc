@@ -587,7 +587,7 @@ solve (Args4 l repOpts sub req) = skipIf hasTerminated Nil
           rep = if _isLayoutRepeatable x then Just x else Nothing
        in do
         -- resume the parser state with the continuation and the yielded value
-        resume cvs
+        _ <- resume cvs
 
         -- re-sort the remaining elements (XXX: could this be skipped?)
         return (Args4 vs (sortBy (compare `on` getId) $ xs' <> ys) locked rep)
@@ -675,69 +675,70 @@ parseLayout l sub x = do
           let nTimes = if Arg.isArgRepeatable x then some else liftM1 singleton
            in nTimes $ Tuple x <$> fromArgv
 
+
 {-
   Parse a single argument. We do not substitute and ignore repetitions.
 -}
-parseArg
-  :: ∀ r
-   . SolvedLayoutArg
-  -> ArgParser r Value
-parseArg x = go x
-  where
-  go (Solved.Positional n _) = positional n n
-  go (Solved.Command    n _) = command    n n
-  go (Solved.Stdin         ) = stdin
-  go (Solved.EOA           ) = eoa <|> (return $ ArrayValue [])
-  go (Solved.Option a  mA r) = do
-    (ParseArgs { options } _ _ input) <- getParseState
-    case input of
-      (PositionedToken token _ _) : _
-        | case token of
-            LOpt _ _   -> true
-            SOpt _ _ _ -> true
-            _          -> false
-      _ -> do
-          aliases /\ def /\ env <- do
-            description <- lookupDescription' a
-            case description of
-              (OptionDescription aliases' _ _ def' env') ->
-                return $ aliases' /\ def' /\ env'
-              _ -> fail' $ internalError "invalid option description"
-          let
-            ns = NonEmpty.toList $ aliases <#> case _ of
-                  OptionAlias.Short f -> Left  f
-                  OptionAlias.Long  n -> Right n
-            longAliases = mrights ns
-            shortAliases = mlefts ns
-            term = any (_ `elem` options.stopAt) $ aliases <#> case _ of
-                      OptionAlias.Short s -> "-"  <> String.singleton s
-                      OptionAlias.Long  n -> "--" <> n
+parseArg :: ∀ r. SolvedLayoutArg -> ArgParser r Value
+parseArg x =
+  let
+    go (Solved.Positional n _) = positional n n
+    go (Solved.Command    n _) = command    n n
+    go (Solved.Stdin         ) = stdin
+    go (Solved.EOA           ) = eoa <|> (return $ ArrayValue [])
+    go (Solved.Option a  mA r) = do
+      (ParseArgs { options } _ _ input) <- getParseState
+      case input of
+        (PositionedToken token _ _) : _ | (case token of
+              LOpt _ _   -> true
+              SOpt _ _ _ -> true
+              _          -> false)
+          -> do
+            aliases /\ def /\ env <- do
+              description <- lookupDescription' a
+              case description of
+                (OptionDescription aliases' _ _ def' env') ->
+                  return $ aliases' /\ def' /\ env'
+                _ -> fail' $ internalError "invalid option description"
+            let
+              ns = NonEmpty.toList $ aliases <#> case _ of
+                    OptionAlias.Short f -> Left  f
+                    OptionAlias.Long  n -> Right n
+              longAliases = mrights ns
+              shortAliases = mlefts ns
+              term = any (_ `elem` options.stopAt) $ aliases <#> case _ of
+                        OptionAlias.Short s -> "-"
+                          <> String.singleton (String.codePointFromChar s)
+                        OptionAlias.Long  n -> "--" <> n
 
-          -- note: safe to be unsafe because of pattern match above
-          OptRes v canTerm canRepeat <- unsafePartial case token of
-            LOpt _ _ ->
-              case longAliases of
-                Nil -> fail "Option has no long alias"
-                _   -> choice $ longAliases <#> \alias -> try do
-                        longOption term alias mA
-            SOpt _ _ _ ->
-              case shortAliases of
-                Nil -> fail "Option has no short alias"
-                _   -> choice $ shortAliases <#> \alias -> try do
-                        shortOption term alias mA
+            -- note: safe to be unsafe because of pattern match above
+            OptRes v canTerm canRepeat <- unsafePartial case token of
+              LOpt _ _ ->
+                case longAliases of
+                  Nil -> fail "Option has no long alias"
+                  _   -> choice $ longAliases <#> \alias -> try do
+                          longOption term alias mA
+              SOpt _ _ _ ->
+                case shortAliases of
+                  Nil -> fail "Option has no short alias"
+                  _   -> choice $ shortAliases <#> \alias -> try do
+                          shortOption term alias mA
 
-          -- try terminating at this option
-          if term && canTerm
-              then do
-                vs <- terminate x
-                return (ArrayValue (Value.intoArray v <> Value.intoArray vs))
-              else do
-                if isJust mA && r && canRepeat
-                    then do
-                      vs <- Array.many optionArgument
-                      return (ArrayValue (Value.intoArray v <> vs))
-                    else return v
-      _ -> fail "Expected long or short option"
+            -- try terminating at this option
+            if term && canTerm
+                then do
+                  vs <- terminate x
+                  return (ArrayValue (Value.intoArray v <> Value.intoArray vs))
+                else do
+                  if isJust mA && r && canRepeat
+                      then do
+                        vs <- Array.many optionArgument
+                        return (ArrayValue (Value.intoArray v <> vs))
+                      else return v
+        _ -> fail "Expected long or short option"
+  in
+    go x
+
 
 {-
   Convert an ordinary layout to a layout suitable for parsing. Each layout and
@@ -818,15 +819,16 @@ termAs x = go x
   go (ParseElem _ _ x@(Arg _ (Solved.Positional _ r) _ _ _)) | r = Just x
   go _ = Nothing
 
+
 unknownOption :: ∀ r. ArgParser r KeyValue
 unknownOption = do
   i <- getInput
   case i of
-    (PositionedToken tok source _):toks |
-      case tok of
+    (PositionedToken tok source _) : toks | (case tok of
         LOpt _ _ -> true
         SOpt _ _ _ -> true
-        _ -> do
+        _ -> false)
+      -> do
           isKnown <- isKnownToken' tok
           if isKnown
             then fail "expected unknown option"

@@ -75,6 +75,8 @@ import Data.Foldable (any, intercalate)
 import Data.Pretty
 import Control.Monad.State
 import Control.Monad.State as State
+import Control.MonadPlus
+import Control.MonadPlus as CM
 import Control.Comonad (extract)
 
 import Neodoc.Spec
@@ -94,6 +96,26 @@ import Neodoc.Solve.ExpandOptions
 import Neodoc.Evaluate.Annotate
 
 import Partial.Unsafe (unsafePartial)
+
+
+mfromMaybe :: forall m a. (MonadPlus m) => Maybe a -> m a
+mfromMaybe = maybe CM.empty pure
+
+mcatMaybes :: forall m a. (MonadPlus m) => m (Maybe a) -> m a
+mcatMaybes m = m >>= mfromMaybe
+
+mlefts :: forall m a b. (MonadPlus m) => m (Either a b) -> m a
+mlefts = mcatMaybes <<< liftM1 l
+  where
+  l (Left a)  = Just a
+  l (Right _) = Nothing
+
+mrights :: forall m a b. (MonadPlus m) => m (Either a b) -> m b
+mrights = mcatMaybes <<< liftM1 r
+  where
+  r (Left _)  = Nothing
+  r (Right a) = Just a
+
 
 expandReferences
   :: Spec ExpandedOptionsLayout

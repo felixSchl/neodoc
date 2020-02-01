@@ -10,22 +10,25 @@ module Test.Support.CompatParser (
 import Prelude
 import Global (readFloat)
 import Data.Int as Int
+import Data.Map as Map
 import Data.Number.Backport as Number
 import Data.String as String
 import Data.String.Argv as Argv
-import Data.String (fromCharArray, Pattern(..))
+import Data.String (Pattern(..))
+import Data.String.CodeUnits (fromCharArray)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), fromMaybe, fromJust)
 import Data.Tuple (Tuple(..))
 import Data.Array as A
 import Data.List (List, many, toUnfoldable)
 import Effect (Effect())
-import Effect.Class (liftEff)
+import Effect.Class (liftEffect)
 import Control.Alt ((<|>))
-import Effect.Exception (EXCEPTION, error, throwException)
+import Effect.Exception (error, throwException)
 import Control.Monad.Trampoline (runTrampoline)
 import Partial.Unsafe (unsafePartial)
-
+import Node.FS.Sync (readTextFile)
+import Node.Encoding (Encoding(UTF8))
 
 import Text.Parsing.Parser as P
 import Text.Parsing.Parser.Combinators as P
@@ -75,11 +78,10 @@ renderFlags f = (if f.optionsFirst then "p" else "")
              <> (if f.repeatableOptions then "R" else "")
              <> (if f.allowUnknown then "u" else "")
 
-readTests :: ∀ eff
-   . String
-  -> Effect (fs :: FS, err :: EXCEPTION | eff) (List Test)
+
+readTests :: String -> Effect (List Test)
 readTests filepath = do
-  f <- FS.readTextFile UTF8 filepath
+  f <- readTextFile UTF8 filepath
   runEitherEff
     $ runTrampoline
       $ P.runParserT f do
@@ -100,12 +102,12 @@ readTests filepath = do
 
     application = do
       P.skipSpaces *> skipComments *>  P.skipSpaces
-      P.char '$'
-      env <- StrMap.fromFoldable <$> (many $ P.try do
-        A.many (P.char ' ')
+      _ <- P.char '$'
+      env <- Map.fromFoldable <$> (many $ P.try do
+        _ <- A.many (P.char ' ')
         envVar)
-      many (P.char ' ')
-      P.string "prog"
+      _ <- many (P.char ' ')
+      _ <- P.string "prog"
       flags <- P.option { optionsFirst: false
                         , smartOptions: false
                         , requireFlags: false
@@ -113,9 +115,9 @@ readTests filepath = do
                         , repeatableOptions: false
                         , allowUnknown: false
                         } $ parseFlags <$> do
-                              P.char '/'
+                              _ <- P.char '/'
                               fromCharArray <$> A.many alpha
-      many (P.char ' ')
+      _ <- many (P.char ' ')
       input <- Argv.parse <<< fromCharArray <<< toUnfoldable <$>
         P.manyTill (P.noneOf ['\n']) (P.char '\n')
       P.skipSpaces *> skipComments *>  P.skipSpaces
@@ -128,15 +130,15 @@ readTests filepath = do
                 key <- P.between (P.char '"') (P.char '"') do
                         fromCharArray <$> do
                           A.many $ P.noneOf [ '"' ]
-                P.skipSpaces *> P.char ':' <* P.skipSpaces
+                _ <- P.skipSpaces *> P.char ':' <* P.skipSpaces
                 Tuple key <$> value
         , Left <$> do
-            P.char '"'
+            _ <- P.char '"'
             s <- fromCharArray <$> A.many do
                   P.try do
                     (P.char '\\' *> P.char '"') <|> P.noneOf ['"', '\n']
-            P.char '"'
-            many $ P.char ' '
+            _ <- P.char '"'
+            _ <- many $ P.char ' '
             P.optional comment
             pure $ s
         ]
@@ -159,7 +161,7 @@ readTests filepath = do
         envVar = do
           key <- fromCharArray <$> do
             A.many upperAlpha
-          P.char '='
+          _ <- P.char '='
           val <- P.choice $ P.try <$> [
               D.prettyPrintValue <$> value
             , fromCharArray <$> (A.many $ P.noneOf [ ' ' ])
@@ -186,7 +188,7 @@ readTests filepath = do
             P.choice [
               D.FloatValue <<< ((Int.toNumber si) * _) <<< readFloat <$> do
                 xss <- do
-                  P.char '.'
+                  _ <- P.char '.'
                   fromCharArray <$> A.some digit
                 pure $ xs <> "." <> xss
             , case Int.fromString xs of
@@ -198,6 +200,6 @@ readTests filepath = do
         ]
 
     usage = do
-      P.string "r\"\"\""
+      _ <- P.string "r\"\"\""
       fromCharArray <<< toUnfoldable <$> do
         P.manyTill P.anyChar $ P.string "\"\"\"\n"

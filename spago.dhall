@@ -1,7 +1,7 @@
-{ name =
-    "docopt"
+{ name = "docopt"
 , dependencies =
     [ "aff"
+    , "argonaut-core"
     , "arrays"
     , "assert"
     , "bifunctors"
@@ -19,6 +19,8 @@
     , "integers"
     , "lists"
     , "maybe"
+    , "node-fs"
+    , "node-process"
     , "nonempty"
     , "ordered-collections"
     , "parsing"
@@ -28,10 +30,9 @@
     , "strings"
     , "template-strings"
     , "transformers"
+    , "unsafe-coerce"
     , "yarn"
     ]
-, packages =
-    ./packages.dhall
-, sources =
-    [ "src/**/*.purs", "test/**/*.purs" ]
+, packages = ./packages.dhall
+, sources = [ "src/**/*.purs", "test/**/*.purs" ]
 }
