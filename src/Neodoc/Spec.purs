@@ -21,15 +21,21 @@ import Control.Alt ((<|>))
 import Neodoc.Data.Layout
 import Neodoc.Data.Description
 
+
+
+
 type Branch a = NonEmpty List a
+
 type Toplevel a = List (Branch a)
-newtype Spec a = Spec {
-  program :: String
-, layouts :: NonEmpty List (Toplevel a)
-, descriptions :: List Description
-, helpText :: String
-, shortHelp :: String
-}
+
+newtype Spec a = Spec
+  { program :: String
+  -- NonEmpty List (List (NonEmpty List a))
+  , layouts :: NonEmpty List (Toplevel a)
+  , descriptions :: List Description
+  , helpText :: String
+  , shortHelp :: String
+  }
 
 -- instance isForeignOptionAlias :: (IsForeign a) => IsForeign (Spec a) where
 --   read v = Spec <$> do

@@ -1,12 +1,14 @@
 module Neodoc.ArgParser.Arg where
 
 import Prelude
+
 import Data.Maybe
 import Data.Function (on)
 import Data.Generic.Rep
 import Data.Generic.Rep.Show (genericShow)
 import Data.Foldable (all)
 import Data.Pretty
+
 import Neodoc.Data.Layout
 import Neodoc.Value.RichValue
 import Neodoc.ArgKey

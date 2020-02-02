@@ -6,6 +6,7 @@
   "bin": {
     "neodoc": "cli.js"
   },
+  "files": ["lib.js"],
   "directories": {
     "doc": "docs",
     "example": "examples",
@@ -13,16 +14,16 @@
     "test": "test"
   },
   "scripts": {
-    "minify": "uglifyjs --compress --mangle --output=index.js index.js",
-    "bundle": "spago bundle-module && npm run minify",
-    "prepublishOnly": "npm test && npm run bundle",
-    "example": "spago run --main=Example",
-    "build": "spago build",
-    "test": "spago test",
-    "watch": "spago run --watch",
-    "deps": "spago install",
+    "build": "spago bundle-module --main Neodoc --to lib.js && npm run minify",
     "clean": "git stash && git clean -fdX",
-    "prof": "spago build && ./scripts/prof"
+    "deps": "spago install",
+    "examples": "spago run --main=Example.String && spago run --main=Example.Spec",
+    "minify": "uglifyjs --compress --mangle --output=lib.js lib.js",
+    "prepublishOnly": "npm test && npm run build",
+    "prof": "npm run build && ./scripts/prof",
+    "test": "spago test && npm run test-js && npm run examples",
+    "test-js": "mocha test-js/test.js",
+    "watch": "spago run --watch"
   },
   "repository": {
     "type": "git",
@@ -51,6 +52,7 @@
     "js-schema": "^1.0.1",
     "lodash": "^4.12.0",
     "mocha": "^2.4.5",
+    "shelljs": "^0.8.3",
     "spago": "^0.13.1",
     "string-argv": "0.0.2",
     "uglify-js": "^3.7.6"

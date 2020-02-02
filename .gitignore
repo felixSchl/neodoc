@@ -11,5 +11,5 @@ package
 *.log
 /.spago
 /docs/index.html
-/index.js
+/lib.js
 /generated-docs

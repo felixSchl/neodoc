@@ -1,4 +1,4 @@
-const neodoc = require('./index.js')
+const neodoc = require('./lib.js')
 
 helpText = `
 Usage: neodoc [options]
@@ -20,12 +20,10 @@ Options:
   --transforms-postsolve  An array of functions to be called after "solving" the input, just prior to passing the spec to the arg-parser.
   --allow-unknown  Collect unknown options under a special key ? instead of failing.
 
-
 Examples:
   neodoc --options-first < help.txt
 `
 
-console.info(helpText)
-
-// TODO
-// neodoc.runString(helpText)
+console.info(
+  neodoc.run(helpText, {laxPlacement: true})
+)
