@@ -8,16 +8,15 @@ MD_SOURCES=\
 
 docs/index.html: $(MD_SOURCES) docs/template.html docs/docs.css
 	pandoc $(SHARED_PANDOC_OPTIONS) \
-		-t html5 \
+		--to html5 \
 		--standalone \
-		-S \
 		--toc \
-		--chapters \
+		--top-level-division chapter \
 		"--metadata=subtitle:$(VERSION)" \
 		--no-highlight \
-		-c docs.css \
-		-o docs/index.html \
-		--base-header-level=2 \
+		--css docs.css \
+		--output docs/index.html \
+		--shift-heading-level-by 2 \
 		--template=docs/template.html \
 	$(MD_SOURCES)
 

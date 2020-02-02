@@ -3,33 +3,26 @@
   "version": "2.0.2",
   "description": "Beautiful, handcrafted command line interfaces",
   "main": "index.js",
+  "bin": {
+    "neodoc": "cli.js"
+  },
   "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "lib": "src",
     "test": "test"
   },
   "scripts": {
-    "build:src": "shx mkdir -p dist && pulp build --to dist/neodoc.purs.js --skip-entry-point --optimise -m Neodoc && shx echo \"module.exports = PS;\" >> dist/neodoc.purs.js",
-    "build:lib": "babel lib --out-dir dist && node scripts/optimize.js",
-    "build:example": "pulp build -I example-purs --to output/example.js",
-    "prerun:example": "npm run -s build:example",
-    "run:example": "NODE_PATH=output node ./output/example.js",
-    "prebuild": "shx rm -rf dist",
-    "build": "npm run -s build:src && npm run -s build:lib",
-    "pretest": "npm run -s build",
-    "test:js": "mocha --compilers js:babel-register test-js",
-    "test:purs": "pulp test",
-    "test": "npm run -s test:purs && npm run -s test:js",
-    "watch": "npm run -s watch:purs",
-    "watch:all": "pulp -w test",
-    "watch:purs": "pulp -w test",
-    "watch:js": "mocha -w --compilers js:babel-register test-js",
-    "minify": "uglifyjs dist/neodoc.purs.js > dist/neodoc.purs.min.js",
+    "minify": "uglifyjs --compress --mangle --output=index.js index.js",
+    "bundle": "spago bundle-module && npm run minify",
+    "prepublishOnly": "npm test && npm run bundle",
+    "example": "spago run --main=Example",
+    "build": "spago build",
+    "test": "spago test",
+    "watch": "spago run --watch",
     "deps": "spago install",
     "clean": "git stash && git clean -fdX",
-    "prerelease": "npm run -s clean && npm install && npm run -s deps && npm test",
-    "release": "npm version",
-    "preprof": "npm run -s build",
-    "prof": "./scripts/prof",
-    "postrelease": "git push --tags && npm publish"
+    "prof": "spago build && ./scripts/prof"
   },
   "repository": {
     "type": "git",
@@ -53,20 +46,14 @@
   },
   "homepage": "https://github.com/felixschl/neodoc#readme",
   "devDependencies": {
-    "babel-cli": "^6.6.5",
-    "babel-preset-es2015": "^6.6.0",
-    "babel-register": "^6.11.6",
     "chai": "^3.5.0",
     "chalk": "^1.1.3",
-    "google-closure-compiler-js": "^20161024.0.0",
     "js-schema": "^1.0.1",
     "lodash": "^4.12.0",
     "mocha": "^2.4.5",
-    "shelljs": "^0.7.0",
-    "shx": "^0.1.2",
     "spago": "^0.13.1",
     "string-argv": "0.0.2",
-    "uglifyjs": "^2.4.10"
+    "uglify-js": "^3.7.6"
   },
   "dependencies": {
     "ansi-regex": "^2.0.0"

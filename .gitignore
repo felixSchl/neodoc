@@ -10,3 +10,5 @@ package
 *.tgz
 *.log
 /.spago
+/docs/index.html
+/index.js

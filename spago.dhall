@@ -1,4 +1,4 @@
-{ name = "docopt"
+{ name = "neodoc"
 , dependencies =
     [ "aff"
     , "argonaut-core"
