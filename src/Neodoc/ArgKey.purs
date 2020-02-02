@@ -1,11 +1,14 @@
 module Neodoc.ArgKey where
 
-import Prelude
-import Data.Generic.Rep
+import Prelude (class Eq, class Ord, class Show, eq, map, show)
+import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Map as Map
 import Data.Pretty (class Pretty, pretty)
 import Data.String as String
+import Data.Tuple (Tuple(..))
 import Neodoc.OptionAlias (OptionAlias)
+import Neodoc.Value
 
 data ArgKey
   = PositionalKey String
@@ -35,3 +38,17 @@ instance prettyArgKey :: Pretty ArgKey where
   pretty (OptionKey     a) = pretty a
   pretty (EOAKey         ) = "--"
   pretty (StdinKey       ) = "-"
+
+
+argKeyMapToString :: Map.Map ArgKey Value -> Map.Map String Value
+argKeyMapToString theMap =
+  Map.fromFoldable (map
+    (\(Tuple key val) -> Tuple (show key) val)
+    (Map.toUnfoldable theMap) :: Array (Tuple String Value))
+
+
+stringMapToArgKey :: Map.Map String Value -> Map.Map ArgKey Value
+stringMapToArgKey theMap =
+  Map.fromFoldable (map
+   (\(Tuple key val) -> Tuple (CommandKey key) val)
+   (Map.toUnfoldable theMap) :: Array (Tuple ArgKey Value))

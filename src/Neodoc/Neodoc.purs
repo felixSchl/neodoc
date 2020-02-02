@@ -104,20 +104,6 @@ data Output
   | HelpOutput    (Map ArgKey Value) String
 
 
-argKeyMapToString :: Map ArgKey Value -> Map String Value
-argKeyMapToString theMap =
-  Map.fromFoldable (map
-    (\(Tuple key val) -> Tuple (show key) val)
-    (Map.toUnfoldable theMap) :: Array (Tuple String Value))
-
-
-stringMapToArgKey :: Map String Value -> Map ArgKey Value
-stringMapToArgKey theMap =
-  Map.fromFoldable (map
-   (\(Tuple key val) -> Tuple (CommandKey key) val)
-   (Map.toUnfoldable theMap) :: Array (Tuple ArgKey Value))
-
-
 getArgs :: Output -> Map String Value
 getArgs (VersionOutput x _) = argKeyMapToString x
 getArgs (Output          x) = argKeyMapToString x

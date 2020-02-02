@@ -18,7 +18,7 @@ main :: Effect Unit
 main = do
   tests <- readTests "testcases.docopt"
   launchAff_ $ runSpec [consoleReporter] do
-    scannerSpec unit
+    scannerSpec     unit
     scannerSpec     unit
     usageParserSpec unit
     descParserSpec  unit

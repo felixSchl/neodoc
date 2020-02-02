@@ -1,45 +1,46 @@
-module Test.Support.CompatParser (
-    Test (..)
+module Test.Support.CompatParser
+  ( Test (..)
   , Kase (..)
   , Flags (..)
   , parseFlags
   , renderFlags
   , readTests
-  ) where
+  )
+where
 
 import Prelude
-import Global (readFloat)
+  ( bind, discard, flip, negate, pure, void
+  , ($), (*), (*>), (<$>), (<*), (<<<), (<>)
+  )
+import Control.Alt ((<|>))
+import Control.Monad.Trampoline (runTrampoline)
+import Data.Array as A
+import Data.Either (Either(..))
 import Data.Int as Int
+import Data.List (List, many, toUnfoldable)
 import Data.Map as Map
-import Data.Number.Backport as Number
+import Data.Maybe (Maybe(..))
+import Data.String (Pattern(..))
 import Data.String as String
 import Data.String.Argv as Argv
-import Data.String (Pattern(..))
 import Data.String.CodeUnits (fromCharArray)
-import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), fromMaybe, fromJust)
 import Data.Tuple (Tuple(..))
-import Data.Array as A
-import Data.List (List, many, toUnfoldable)
 import Effect (Effect())
-import Effect.Class (liftEffect)
-import Control.Alt ((<|>))
-import Effect.Exception (error, throwException)
-import Control.Monad.Trampoline (runTrampoline)
-import Partial.Unsafe (unsafePartial)
-import Node.FS.Sync (readTextFile)
+import Global (readFloat)
 import Node.Encoding (Encoding(UTF8))
+import Node.FS.Sync (readTextFile)
+import Text.Parsing.Parser (fail, runParserT) as P
+import Text.Parsing.Parser.Combinators
+  (between, choice, manyTill, option, optional, sepBy, try) as P
+import Text.Parsing.Parser.String
+  (anyChar, char, eof, noneOf, skipSpaces, string) as P
+import Test.Support (runEitherEff)
 
-import Text.Parsing.Parser as P
-import Text.Parsing.Parser.Combinators as P
-import Text.Parsing.Parser.String as P
-
-import Neodoc as Neodoc
 import Neodoc.Options
 import Neodoc.Value (Value(..), prettyPrintValue) as D
-import Neodoc.Spec.Parser.Base (space, digit, alpha, upperAlpha, getInput)
+import Neodoc.Spec.Parser.Base (alpha, digit, space, upperAlpha)
 
-import Test.Support (runEitherEff)
+
 
 newtype Test = Test {
   doc   :: String
