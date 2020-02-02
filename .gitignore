@@ -12,3 +12,4 @@ package
 /.spago
 /docs/index.html
 /index.js
+/generated-docs

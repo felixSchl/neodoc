@@ -1,8 +1,8 @@
 module Test.Spec.ArgParserSpec (argParserSpec) where
 
 import Prelude
-  ( class Monad, Unit, bind, const, map, not, pure
-  , show, unit, when, ($), (/=), (<#>), (<$>), (<>)
+  ( class Monad, Unit, bind, const, not, pure, show
+  , unit, when, ($), (/=), (<#>), (<$>), (<>)
   )
 
 import Data.Array as A
@@ -26,7 +26,6 @@ import Test.Support (runEitherEff, vliftEff)
 import Test.Support.Value as V
 import Text.Wrap (dedent)
 
-import Neodoc.ArgKey (stringMapToArgKey)
 import Neodoc.ArgParser (ArgParseResult(..))
 import Neodoc.ArgParser as ArgParser
 import Neodoc.Data.SolvedLayout (SolvedLayout)
@@ -155,7 +154,24 @@ getSolveErrorMessage :: SolveError -> String
 getSolveErrorMessage (SolveError s) = s
 
 
-basicTestCases :: _
+basicTestCases :: Array
+  { cases :: Array
+      { argv :: Array String
+      , env :: Array (Tuple String String)
+      , expected :: Either String (Map String Value)
+      , options :: Maybe
+          { allowUnknown :: Boolean
+          , laxPlacement :: Boolean
+          , optionsFirst :: Boolean
+          , repeatableOptions :: Boolean
+          , requireFlags :: Boolean
+          , smartOptions :: Boolean
+          , stopAt :: Array String
+          }
+      }
+  , help :: String
+  , skip :: Boolean
+  }
 basicTestCases =
   [ test
       "usage: prog <qux>..."
@@ -840,7 +856,7 @@ validate
   -> Array String
   -> Env
   -> Maybe Options
-  -> _ -- Either String (Map ArgKey Value)
+  -> Either String (Map String Value)
   -> Effect Unit
 validate (spec@(Spec { descriptions })) argv env mOptions localeExpected =
   let opts = fromMaybe defaultOptions mOptions
@@ -1069,16 +1085,11 @@ argParserSpec = \_ -> describe "The parser generator" do
                       else "(no input)"
           help' = dedent help
 
-          -- prettyPrintStrMap :: Map String Value -> String
-          -- prettyPrintStrMap m = intercalate "\n\t" $
-          --   (Map.toUnfoldable m) <#> \(Tuple arg val) ->
-          --     arg <> " => " <> prettyPrintValue val
-
         in
           it (premsg <> " -> " <> msg) $ vliftEff do
             spec <- runEitherEff do
               -- scan the input text
-              { originalUsage, usage, options } <- Error.capture do
+              { originalUsage, usage, options: opt } <- Error.capture do
                 Scanner.scan help'
 
               -- lex/parse the usage section
@@ -1087,7 +1098,7 @@ argParserSpec = \_ -> describe "The parser generator" do
                 Error.capture $ Spec.parseUsage toks
 
               -- lex/parse the description section(s)
-              descriptions <- concat <$> for options \description -> do
+              descriptions <- concat <$> for opt \description -> do
                 toks <- Error.capture $ Lexer.lexDescs description
                 Error.capture $ Spec.parseDescription toks
 
@@ -1101,5 +1112,4 @@ argParserSpec = \_ -> describe "The parser generator" do
                         , shortHelp: originalUsage
                         })
 
-            validate spec argv (Env.fromFoldable env) options
-              (map (\theMap -> stringMapToArgKey theMap) expected)
+            validate spec argv (Env.fromFoldable env) options expected

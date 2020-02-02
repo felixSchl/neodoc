@@ -318,13 +318,14 @@ _runPure input (NeodocOptions opts) mVer = do
   let output = Evaluate.reduce env descriptions mBranch vs
 
   if output `has` (pretty <$> opts.helpFlags)
-    then pure (HelpOutput output (trimHelp helpText))
-    else
-      if output `has` (pretty <$> opts.versionFlags) then do
-        case mVer of
-          Just ver -> pure (VersionOutput output ver)
-          Nothing ->  Left Error.VersionMissingError
-      else pure (Output output)
+  then pure (HelpOutput (stringMapToArgKey output) (trimHelp helpText))
+  else
+    if output `has` (pretty <$> opts.versionFlags)
+    then do
+      case mVer of
+        Just ver -> pure (VersionOutput (stringMapToArgKey output) ver)
+        Nothing ->  Left Error.VersionMissingError
+    else pure (Output (stringMapToArgKey output))
 
 
 parseHelpText :: String -> Either NeodocError (Spec UsageLayout)
