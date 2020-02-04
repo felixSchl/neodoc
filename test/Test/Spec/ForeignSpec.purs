@@ -2,35 +2,35 @@ module Test.Spec.ForeignSpec
 -- (foreignSpec)
 where
 
-import Prelude
--- import Debug.Trace
--- -- import Foreign (toForeign)
--- import Data.Newtype (unwrap)
--- import Effect (Effect())
--- import Effect.Class (liftEffect)
--- import Effect.Aff (Aff)
+-- import Prelude
+
 -- import Control.Alt ((<|>))
--- import Data.Pretty (pretty)
--- import Data.Function.Uncurried
--- import Data.Tuple (Tuple(..), fst, snd)
--- import Data.Either (Either(..), either, fromLeft, fromRight)
--- import Data.Foldable (any)
--- import Effect.Exception (error, throwException)
--- import Data.Foldable (intercalate, for_)
--- import Text.Wrap (dedent)
--- import Data.Maybe (Maybe(..), fromMaybe, fromJust)
--- import Data.List (List(..), (:), many, toUnfoldable)
--- import Data.List.NonEmpty as NEL
--- import Test.Spec (Spec(), describe, it)
--- import Data.String as String
--- import Test.Support (vliftEff)
--- import Partial.Unsafe (unsafePartial)
--- import Unsafe.Coerce (unsafeCoerce)
 -- import Control.Apply ((*>), (<*))
 -- import Control.Monad.Except (runExcept)
 -- import Data.Array as A
 -- import Data.Array.Partial as AU
+-- import Data.Either (Either(..), either, fromLeft, fromRight)
+-- import Data.Foldable (any)
+-- import Data.Foldable (intercalate, for_)
+-- import Data.Function.Uncurried
+-- import Data.List (List(..), (:), many, toUnfoldable)
+-- import Data.List.NonEmpty as NEL
+-- import Data.Maybe (Maybe(..), fromMaybe, fromJust)
+-- import Data.Newtype (unwrap)
+-- import Data.Pretty (pretty)
+-- import Data.String as String
+-- import Data.Tuple (Tuple(..), fst, snd)
+-- import Debug.Trace
+-- import Effect (Effect())
+-- import Effect.Aff (Aff)
+-- import Effect.Class (liftEffect)
+-- import Effect.Exception (error, throwException)
 -- import Partial.Unsafe
+-- import Partial.Unsafe (unsafePartial)
+-- import Test.Spec (Spec(), describe, it)
+-- import Test.Support (vliftEff)
+-- import Text.Wrap (dedent)
+-- import Unsafe.Coerce (unsafeCoerce)
 
 -- import Neodoc as Neodoc
 -- import Neodoc.SpecConversions (fromEmptyableSpec)
@@ -39,7 +39,7 @@ import Prelude
 -- import Test.Support.CompatParser
 
 
--- foreignSpec :: ∀ e. List Test -> Spec Effect Unit
+-- foreignSpec :: List Test -> Spec Effect Unit
 -- foreignSpec tests = describe "Crossing JS/purescript" do
 --   for_ tests \(Test { doc, kases }) -> do
 --     if any (\(Kase k) -> case k.out of
@@ -56,8 +56,7 @@ import Prelude
 --           --      actions that run purely synchronous. Ideally, we would run
 --           --      the `Aff` action using it's `MonadRec` instance.
 --           -- Refer: https://github.com/owickstrom/purescript-spec/issues/24
-
---           later (pure unit)
+--           -- later (pure unit)
 
 --           vliftEff do
 --             let helpText = dedent doc
@@ -70,7 +69,7 @@ import Prelude
 --             -- we could use `specToForeign` on the ouput above, but this -
 --             -- albeit slower - gives more confidence that everything's
 --             -- alright.
---             input <- unsafeCoerceEff do
+--             input <- unsafeCoerce do
 --               runFn1 Neodoc.parseHelpTextJS helpText
 
 --             let result = fromEmptyableSpec <$> F.read input

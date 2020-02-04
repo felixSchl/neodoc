@@ -2,26 +2,28 @@ module Test.Spec.CompatSpec
 -- (compatSpec)
 where
 
-import Prelude
--- import Debug.Trace
--- import Debug.Profile
+-- import Prelude
+
 -- import Control.Alt ((<|>))
--- import Data.Bifunctor (lmap)
--- import Data.Pretty (pretty)
--- import Data.Tuple (Tuple(..), fst, snd)
--- import Data.Either (Either(..), either)
--- import Effect.Exception (error, throwException)
--- import Data.Foldable (intercalate, for_)
--- import Text.Wrap (dedent)
--- import Data.Maybe (Maybe(..), fromMaybe, fromJust, maybe)
--- import Data.Traversable (for)
--- import Data.List (List(..), many, toUnfoldable, concat)
--- import Test.Spec (Spec(), describe, it)
--- import Test.Spec (Spec()) as Test
--- import Data.String as String
--- import Test.Support (vliftEff)
--- import Partial.Unsafe (unsafePartial)
 -- import Control.Apply ((*>), (<*))
+-- import Data.Bifunctor (lmap)
+-- import Effect
+-- import Data.Either (Either(..), either)
+-- import Data.Foldable (intercalate, for_)
+-- import Data.List (List(..), many, toUnfoldable, concat)
+-- import Data.Maybe (Maybe(..), fromMaybe, fromJust, maybe)
+-- import Data.Pretty (pretty)
+-- import Data.String as String
+-- import Data.Traversable (for)
+-- import Data.Tuple (Tuple(..), fst, snd)
+-- import Debug.Profile
+-- import Debug.Trace
+-- import Effect.Exception (error, throwException)
+-- import Partial.Unsafe (unsafePartial)
+-- import Test.Spec (Spec()) as Test
+-- import Test.Spec (Spec(), describe, it)
+-- import Test.Support (vliftEff)
+-- import Text.Wrap (dedent)
 
 -- import Neodoc as Neodoc
 -- import Neodoc (NeodocOptions(..))
@@ -36,8 +38,11 @@ import Prelude
 -- import Neodoc.Scanner as Scanner
 -- import Neodoc.Solve as Solver
 -- import Neodoc.Solve.Error (SolveError(..))
--- import Neodoc.Solve.ExpandOptions (expandOptions, ExpandedOptionsLayout(..)
--- , ExpandedOptionsLayoutArg(..))
+-- import Neodoc.Solve.ExpandOptions
+--   ( expandOptions
+--   , ExpandedOptionsLayout(..)
+--   , ExpandedOptionsLayoutArg(..)
+--   )
 -- import Neodoc.Data.SolvedLayout (SolvedLayout(..))
 -- import Neodoc.Data.SolvedLayout as Solved
 -- import Neodoc.ArgParser as ArgParser
@@ -62,7 +67,7 @@ import Prelude
 --                                       , allowUnknown: opts.allowUnknown
 --                                       }
 --           describe (intercalate " " (
---             (toUnfoldable $ StrMap.toList env <#> \t ->
+--             (toUnfoldable $ Map.toList env <#> \t ->
 --                 fst t <> "=\"" <> snd t <> "\"")
 --               <> argv
 --             )
@@ -78,7 +83,7 @@ import Prelude
 
 --               later (pure unit)
 
---               let env = fromMaybe StrMap.empty opts.env
+--               let env = fromMaybe Map.empty opts.env
 
 --               result <- prof "testcase" \_-> pure $ Neodoc.runPure (dedent doc) (NeodocOptions opts) Nothing
 
@@ -100,11 +105,11 @@ import Prelude
 --                     (\_ -> do
 --                       throwException $ error $
 --                         "Unexpected output: \n"
---                           <> pretty (StrMap.toList output)
+--                           <> pretty (Map.toList output)
 --                     )
 --                     (\expected ->
---                       let actual = StrMap.toList output
---                        in if (StrMap.fromFoldable expected /= output)
+--                       let actual = Map.toList output
+--                        in if (Map.fromFoldable expected /= output)
 --                         then throwException $ error $
 --                           "Unexpected output:\n"
 --                             <> pretty actual

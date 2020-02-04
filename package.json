@@ -6,7 +6,9 @@
   "bin": {
     "neodoc": "cli.js"
   },
-  "files": ["lib.js"],
+  "files": [
+    "lib.js"
+  ],
   "directories": {
     "doc": "docs",
     "example": "examples",

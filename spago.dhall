@@ -3,6 +3,7 @@
     [ "aff"
     , "argonaut-codecs"
     , "argonaut-core"
+    , "argonaut-generic"
     , "arrays"
     , "assert"
     , "bifunctors"

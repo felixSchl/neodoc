@@ -13,11 +13,13 @@ where
 
 import Prelude
   (class Ord, class Show, bind, not, pure, show, ($), (<$>), (<>), (>))
+
 import Data.Argonaut.Core
+  (Json, jsonNull, jsonSingletonArray, jsonSingletonObject)
 import Data.Argonaut.Decode (decodeJson)
 import Data.Argonaut.Encode (encodeJson)
 import Data.Array as A
-import Data.Either (Either (..), either, fromRight)
+import Data.Either (Either(..), either, fromRight)
 import Data.Foldable (class Foldable, any, intercalate)
 import Data.List (concat, fromFoldable)
 import Data.Map (Map)
@@ -42,18 +44,16 @@ import Neodoc.Error (NeodocError)
 import Neodoc.Error.Class (capture) as Error
 import Neodoc.Evaluate as Evaluate
 import Neodoc.OptionAlias as OptionAlias
-import Neodoc.Options (NeodocOptions(..))
 import Neodoc.Options
   (Argv, NeodocOptions(..), customize, defaultOptions, defaultOptionsObj)
   as Options
+import Neodoc.Options (NeodocOptions(..))
 import Neodoc.Scanner as Scanner
 import Neodoc.Solve as Solver
 import Neodoc.Spec (Spec(..))
 import Neodoc.Spec.Lexer as Lexer
 import Neodoc.Spec.Parser (parseDescription, parseUsage) as Spec
 import Neodoc.Value (Value(..))
-
-import Debug.Trace (traceM)
 
 foreign import readPkgVersionImpl
   :: (String -> Maybe String)
@@ -97,29 +97,30 @@ instance showOutput :: Show Output where
   show (Output          s) = "Output " <> show s
 
 
-runStringJs :: String -> Json -> Either String Json
+runStringJs :: String -> Json -> Json
 runStringJs helpStr opts =
-    let
-      result = do
-        NeodocOptions neodocOptsObj <- decodeJson opts
+  let
+    jsonResult = do
+      NeodocOptions neodocOptsObj <- decodeJson opts
 
-        let outputResult = runString
-              helpStr
-              (NeodocOptions neodocOptsObj)
-              neodocOptsObj.version
+      let outputResult = runString
+            helpStr
+            (NeodocOptions neodocOptsObj)
+            neodocOptsObj.version
 
-        case outputResult of
-          Left neodocError -> Left $ show neodocError
-          Right val -> Right $ encodeJson $ case val of
-            (Output x) ->
-              argKeyMapToString x
-            (HelpOutput x s) ->
-              Map.insert ".help" (StringValue s) (argKeyMapToString x)
-            (VersionOutput x s) ->
-              Map.insert ".version" (StringValue s) (argKeyMapToString x)
-    in
-      -- TODO: Return Json instead of Either String Json
-      result
+      case outputResult of
+        Left neodocError -> Right $ encodeJson neodocError
+        Right val -> Right $ encodeJson $ case val of
+          (Output x) -> argKeyMapToString x
+          (HelpOutput x s) ->
+            Map.insert ".help" (StringValue s) (argKeyMapToString x)
+          (VersionOutput x s) ->
+            Map.insert ".version" (StringValue s) (argKeyMapToString x)
+  in
+    case jsonResult of
+      Left err -> jsonSingletonObject "errors" $
+        jsonSingletonArray $ encodeJson err
+      Right val -> val
 
 
 runSpecJs :: Json -> Json -> Json
@@ -217,9 +218,8 @@ renderNeodocError
   :: Maybe String         -- the program name, if available
   -> Maybe (Array String) -- the flags that trigger --help
   -> Maybe String         -- the shortened usage text
-  -> NeodocError          -- the error that occured
+  -> NeodocError          -- the error that occurred
   -> String
-renderNeodocError _ _ _ e = pretty e
 renderNeodocError (Just prog) mHelpFlags mShortHelp (Error.ArgParserError msg) =
   -- de-capitalize the error message after the colon
   let
@@ -244,7 +244,7 @@ renderNeodocError (Just prog) mHelpFlags mShortHelp (Error.ArgParserError msg) =
     "See " <> prog_ <> " " <> (intercalate "/" flags)
       <> " for more information"
   renderHelpFlags _ _ = ""
-
+renderNeodocError _ _ _ e = pretty e
 
 
 has :: forall a b. Foldable a => Ord b => Map b Value -> a b -> Boolean
