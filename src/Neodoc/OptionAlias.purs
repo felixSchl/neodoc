@@ -6,43 +6,48 @@ module Neodoc.OptionAlias (
   , toAliasList
   , fromString
   , module NonEmpty
-  ) where
+  )
+where
 
 import Prelude
-import Data.String as String
-import Data.Bifunctor (lmap, bimap)
+
+import Data.Argonaut.Encode (class EncodeJson, encodeJson)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson)
+import Data.Either (Either(..), note)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.List (List, (:))
 import Data.Maybe (Maybe(..))
-import Data.List (List(Nil), (:))
-import Data.Either (Either(..))
-import Data.Function (on)
-import Data.Generic (class Generic, gEq, gShow)
-import Data.String (singleton) as String
-import Data.NonEmpty (NonEmpty(..), fromNonEmpty)
-import Data.NonEmpty as NonEmpty
+import Data.NonEmpty (NonEmpty, fromNonEmpty)
+import Data.NonEmpty
+  (NonEmpty(..), foldl1, fromNonEmpty, head, oneOf, singleton, tail, (:|))
+  as NonEmpty
 import Data.Pretty (class Pretty)
-import Data.Foreign as F
-import Data.Foreign.Class as F
-import Data.Foreign.Index as F
-import Data.Foreign.Index ((!))
-import Data.Foreign.Class
-import Data.Foreign.Extra as F
+import Data.String.CodeUnits (singleton, uncons) as String
+
 
 type Aliases = NonEmpty List OptionAlias
+
 data OptionAlias = Short Char | Long String
 
 derive instance eqOptionAlias :: Eq OptionAlias
 derive instance ordOptionAlias :: Ord OptionAlias
-derive instance genericOptionAlias :: Generic OptionAlias
+derive instance genericOptionAlias :: Generic OptionAlias _
 
 instance showOptionAlias :: Show OptionAlias where
-  show = gShow
+  show = genericShow
 
-instance isForeignOptionAlias :: IsForeign OptionAlias where
-  read v = do
-    s :: String <- read v
-    case fromString s of
-      Left  msg -> F.fail $ F.JSONError msg
-      Right s   -> pure s
+instance encodeJsonOptionAlias :: EncodeJson OptionAlias where
+  encodeJson option = encodeJson (toString option)
+
+instance decodeJsonOptionAlias :: DecodeJson OptionAlias where
+  decodeJson json = decodeJson json >>= fromString
+
+
+toString :: OptionAlias -> String
+toString (Short c) = "-"  <> (String.singleton c)
+toString (Long  n) = "--" <> n
+
 
 fromString :: String -> Either String OptionAlias
 fromString s = case String.uncons s of
@@ -56,9 +61,6 @@ fromString s = case String.uncons s of
   Nothing -> Left "option may not be empty"
   _ -> Left "option must start with a dash"
 
-instance asForeignOptionAlias :: AsForeign OptionAlias where
-  write (Short c) = F.toForeign $ "-"  <> (String.singleton c)
-  write (Long  n) = F.toForeign $ "--" <> n
 
 instance prettyOptionAlias :: Pretty OptionAlias where
   pretty (Short c) = "-"  <> (String.singleton c)

@@ -6,7 +6,8 @@ module Neodoc.Value.Origin (
 import Prelude
 import Data.Pretty
 import Data.Function (on)
-import Data.Generic
+import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 
 data Origin
   = Argv
@@ -16,10 +17,10 @@ data Origin
 
 derive instance eqOrigin :: Eq Origin
 derive instance ordOrigin :: Ord Origin
-derive instance genericOrigin :: Generic Origin
+derive instance genericOrigin :: Generic Origin _
 
 instance showOrigin :: Show Origin where
-  show = gShow
+  show = genericShow
 
 instance prettyOrigin :: Pretty Origin where
   pretty Argv = "Argv"

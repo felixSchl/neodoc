@@ -10,7 +10,8 @@ module Neodoc.Value.RichValue (
 ) where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Pretty (class Pretty, pretty)
 import Neodoc.Value (Value, prettyPrintValue)
 import Neodoc.Value.Origin (Origin)
@@ -27,10 +28,10 @@ newtype RichValue = RichValue {
 }
 
 derive instance eqRichValue :: Eq RichValue
-derive instance genericRichValue :: Generic RichValue
+derive instance genericRichValue :: Generic RichValue _
 
 instance showRichValue :: Show RichValue where
-  show = gShow
+  show = genericShow
 
 instance prettyRichValue :: Pretty RichValue where
   pretty (RichValue v) = pretty v.value <> " " <> "(" <> pretty v.origin <> ")"

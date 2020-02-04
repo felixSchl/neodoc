@@ -16,7 +16,9 @@ import Partial.Unsafe
 -- to inject and the neighbor if it was not consumed.
 zipTraverseM
   :: ∀ a b m
-   . (Monad m, Show a, Show b)
+   . Monad m
+  => Show a
+  => Show b
   => (a -> Maybe a -> m (Tuple (NonEmpty List b) (Maybe a)))
   -> NonEmpty List a
   -> m (NonEmpty List b)
@@ -46,7 +48,9 @@ zipTraverseM f = go
 
 zipTraverseM'
   :: ∀ a b m
-   . (Monad m, Show a, Show b)
+   . Monad m
+  => Show a
+  => Show b
   => (a -> Maybe a -> m (Tuple b (Maybe a)))
   -> NonEmpty List a
   -> m (NonEmpty List b)

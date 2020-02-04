@@ -1,7 +1,8 @@
 module Neodoc.Data.SolvedLayout where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Either (Either(..))
 import Data.Pretty (class Pretty, pretty)
 import Data.Maybe (Maybe(..), maybe)
@@ -12,12 +13,9 @@ import Data.String as String
 import Data.List (List(Nil))
 import Data.String (singleton) as String
 import Data.NonEmpty (NonEmpty)
-import Data.Foreign as F
-import Data.Foreign.Class as F
-import Data.Foreign.Index as F
-import Data.Foreign.Index ((!))
-import Data.Foreign.Class
-import Data.Foreign.Extra as F
+import Foreign as F
+import Foreign.Index as F
+import Foreign.Index ((!))
 import Neodoc.Data.Layout
 import Neodoc.OptionAlias
 import Neodoc.OptionAlias as OptionAlias
@@ -40,10 +38,10 @@ singletonGroup o r x = Group o r ((x:|Nil):|Nil)
 
 derive instance eqSolvedLayoutArg :: Eq SolvedLayoutArg
 derive instance ordSolvedLayoutArg :: Ord SolvedLayoutArg
-derive instance genericSolvedLayoutArg :: Generic SolvedLayoutArg
+derive instance genericSolvedLayoutArg :: Generic SolvedLayoutArg _
 
 instance showSolvedLayoutArg :: Show SolvedLayoutArg where
-  show = gShow
+  show = genericShow
 
 instance toArgKeySolvedLayoutArg :: ToArgKey SolvedLayoutArg where
   toArgKey (Command     n   _) = CommandKey n
@@ -66,47 +64,47 @@ instance prettySolvedLayoutArg :: Pretty SolvedLayoutArg where
         <> n
         <> (if o then "]" else "")
 
-instance asForeignSolvedLayoutArg :: AsForeign SolvedLayoutArg where
-  write (Command n r) = F.toForeign {
-      type: "Command"
-    , name: F.write n
-    , repeatable: F.write r
-    }
-  write (Positional n r) = F.toForeign {
-      type: "Positional"
-    , name: F.write n
-    , repeatable: F.write r
-    }
-  write (Option n mArg r) = F.toForeign {
-      type: "Option"
-    , name: F.write n
-    , argument: maybe F.undefined F.write mArg
-    , repeatable: F.write r
-    }
-  write Stdin = F.toForeign { type: "Stdin" }
-  write EOA = F.toForeign { type: "EOA" }
+-- instance asForeignSolvedLayoutArg :: AsForeign SolvedLayoutArg where
+--   write (Command n r) = F.toForeign {
+--       type: "Command"
+--     , name: F.write n
+--     , repeatable: F.write r
+--     }
+--   write (Positional n r) = F.toForeign {
+--       type: "Positional"
+--     , name: F.write n
+--     , repeatable: F.write r
+--     }
+--   write (Option n mArg r) = F.toForeign {
+--       type: "Option"
+--     , name: F.write n
+--     , argument: maybe F.undefined F.write mArg
+--     , repeatable: F.write r
+--     }
+--   write Stdin = F.toForeign { type: "Stdin" }
+--   write EOA = F.toForeign { type: "EOA" }
 
-instance isForeignSolvedLayoutArg :: IsForeign SolvedLayoutArg where
-  read v = do
-    typ :: String <- String.toUpper <$> F.readProp "type" v
+-- instance isForeignSolvedLayoutArg :: IsForeign SolvedLayoutArg where
+--   read v = do
+--     typ :: String <- String.toUpper <$> F.readProp "type" v
 
-    case typ of
-      "EOA" -> pure EOA
-      "STDIN" -> pure Stdin
-      "COMMAND" ->
-        Command
-          <$> F.readProp "name"       v
-          <*> F.readProp "repeatable" v
-      "POSITIONAL" ->
-        Positional
-          <$> F.readProp "name"       v
-          <*> F.readProp "repeatable" v
-      "OPTION" ->
-        Option
-          <$> F.readProp "name" v
-          <*> F.readPropMaybe "argument" v
-          <*> F.readProp "repeatable" v
-      _ -> F.fail $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
+--     case typ of
+--       "EOA" -> pure EOA
+--       "STDIN" -> pure Stdin
+--       "COMMAND" ->
+--         Command
+--           <$> F.readProp "name"       v
+--           <*> F.readProp "repeatable" v
+--       "POSITIONAL" ->
+--         Positional
+--           <$> F.readProp "name"       v
+--           <*> F.readProp "repeatable" v
+--       "OPTION" ->
+--         Option
+--           <$> F.readProp "name" v
+--           <*> F.readPropMaybe "argument" v
+--           <*> F.readProp "repeatable" v
+--       _ -> F.fail $ F.errorAt "type" (F.JSONError $ "unknown type: " <> typ)
 
 isRepeatable :: SolvedLayout -> Boolean
 isRepeatable (Group _ r _) = r

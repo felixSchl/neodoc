@@ -6,11 +6,10 @@ import Data.Array as A
 import Data.NonEmpty ((:|), NonEmpty)
 import Data.NonEmpty as NonEmpty
 import Data.NonEmpty.Extra as NonEmpty
-import Data.String (fromCharArray)
+import Data.String.CodeUnits (fromCharArray)
 import Data.Maybe (Maybe(..), isNothing, fromMaybe)
 import Data.Either (Either(..))
 import Data.List (List)
-import Neodoc.Spec.Token
 import Neodoc.Parsing.Parser.Pos as P
 
 data PositionedToken = PositionedToken P.Position Token

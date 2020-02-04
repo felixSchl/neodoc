@@ -1,7 +1,6 @@
 *.un~
 *.sw[a-z]
 dist/
-bower_components/
 node_modules/
 output/
 .psci*
@@ -10,3 +9,7 @@ src/.webpack.js
 package
 *.tgz
 *.log
+/.spago
+/docs/index.html
+/lib.js
+/generated-docs

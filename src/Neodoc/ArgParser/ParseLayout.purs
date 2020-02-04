@@ -3,7 +3,8 @@ module Neodoc.ArgParser.ParseLayout where
 import Prelude
 import Data.NonEmpty (NonEmpty)
 import Data.Function (on)
-import Data.Generic
+import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Pretty
 import Data.List (List)
 import Data.Foldable (intercalate)
@@ -56,9 +57,9 @@ getId :: ∀ a. ParseLayout a -> Int
 getId (ParseElem id _ _) = id
 getId (ParseGroup id _ _ _ _) = id
 
-derive instance genericParseLayout :: (Generic a) => Generic (ParseLayout a)
-instance showParseLayout :: (Generic a, Show a) => Show (ParseLayout a) where
-  show = gShow
+derive instance genericParseLayout :: Generic (ParseLayout a) _
+instance showParseLayout :: Show a => Show (ParseLayout a) where
+  show = genericShow
 
 instance eqParseLayout :: Eq (ParseLayout a) where
   eq = eq `on` getId

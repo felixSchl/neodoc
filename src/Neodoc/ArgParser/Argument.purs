@@ -17,7 +17,8 @@ import Data.Maybe (Maybe(..), maybe, fromMaybe, isNothing, isJust)
 import Data.String.Ext ((~~))
 import Data.String as String
 import Data.Pretty (pretty)
-import Data.String (fromCharArray, stripPrefix, Pattern(..))
+import Data.String (stripPrefix, Pattern(..))
+import Data.String.CodeUnits (fromCharArray)
 import Partial.Unsafe (unsafePartial)
 
 import Neodoc.Parsing.Parser

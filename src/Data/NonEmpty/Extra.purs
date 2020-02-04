@@ -15,7 +15,8 @@ concat ((x :| xs) :| ys) = x :| xs <> (List.concat $ toList <$> ys)
 
 append
   :: ∀ f a
-   . (Semigroup (f a), Applicative f)
+   . Semigroup (f a)
+  => Applicative f
   => NonEmpty f a
   -> NonEmpty f a
   -> NonEmpty f a
@@ -23,7 +24,8 @@ append (x :| xs) (y :| ys) = x :| xs <> pure y <> ys
 
 cons
   :: ∀ f a
-   . (Semigroup (f a), Applicative f)
+   . Semigroup (f a)
+  => Applicative f
   => a
   -> NonEmpty f a
   -> NonEmpty f a

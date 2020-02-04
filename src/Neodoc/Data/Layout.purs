@@ -12,12 +12,10 @@ import Data.List (List(..), (:))
 import Data.Foldable (find)
 import Data.Foldable.Extra (findMap)
 import Data.NonEmpty (NonEmpty())
-import Data.Foreign (F)
-import Data.Foreign as F
-import Data.Foreign.Class as F
-import Data.Foreign.Index as F
-import Data.Foreign.Index ((!))
-import Data.Foreign.Class
+import Foreign (F)
+import Foreign as F
+import Foreign.Index as F
+import Foreign.Index ((!))
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Neodoc.Data.EmptyableLayout

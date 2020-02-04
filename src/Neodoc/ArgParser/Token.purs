@@ -1,14 +1,15 @@
 module Neodoc.ArgParser.Token where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Function (on)
 import Data.Pretty (class Pretty, pretty)
 import Data.Tuple.Nested ((/\))
 import Data.Maybe (Maybe(), maybe)
 import Data.Foldable (intercalate)
 import Data.List (List())
-import Data.String (fromCharArray)
+import Data.String.CodeUnits (fromCharArray)
 import Data.Array as A
 
 import Neodoc.Value (Value)
@@ -21,10 +22,10 @@ data Token
 
 derive instance ordToken :: Ord Token
 derive instance eqToken :: Eq Token
-derive instance genericToken :: Generic Token
+derive instance genericToken :: Generic Token _
 
 instance showToken :: Show Token where
-  show = gShow
+  show = genericShow
 
 instance prettyToken :: Pretty Token where
   pretty (Stdin) = "-"
@@ -39,10 +40,10 @@ data PositionedToken = PositionedToken Token String Int
 
 derive instance eqPositionedToken :: Eq PositionedToken
 derive instance ordPositionedToken :: Ord PositionedToken
-derive instance genericPositionedToken :: Generic PositionedToken
+derive instance genericPositionedToken :: Generic PositionedToken _
 
 instance showPositionedToken :: Show PositionedToken where
-  show = gShow
+  show = genericShow
 
 instance prettyPositionedToken :: Pretty PositionedToken where
   pretty (PositionedToken tok _ _) = pretty tok

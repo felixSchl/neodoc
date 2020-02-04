@@ -1,7 +1,8 @@
 module Neodoc.ArgParser.Required where
 
 import Prelude
-import Data.Generic
+import Data.Generic.Rep
+import Data.Generic.Rep.Show (genericShow)
 import Data.Tuple.Nested ((/\))
 import Data.Map as Map
 import Data.Map (Map())
@@ -18,10 +19,10 @@ data Required  a
 
 derive instance eqRequired :: (Eq a) => Eq (Required a)
 derive instance ordRequired :: (Ord a) => Ord (Required a)
-derive instance genericRequired :: (Generic a) => Generic (Required a)
+derive instance genericRequired :: Generic (Required a) _
 
-instance showRequired :: (Generic a, Show a) => Show (Required a) where
-  show = gShow
+instance showRequired :: Show a => Show (Required a) where
+  show = genericShow
 
 instance prettyRequired :: (Pretty a) => Pretty (Required a) where
   pretty (Required   x) = "R(" <> pretty x <> ")"

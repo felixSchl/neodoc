@@ -1,24 +1,25 @@
-module Neodoc.ArgParser (
-  run
-, module Reexports
-) where
+module Neodoc.ArgParser
+  ( run
+  , module Reexports
+  )
+where
 
-import Prelude
-import Data.Either
+import Prelude (bind, ($))
+import Data.Either (Either)
 import Data.Bifunctor (lmap)
 import Data.List (fromFoldable)
 import Neodoc.Env (Env)
 import Neodoc.Spec (Spec)
 import Neodoc.Data.SolvedLayout (SolvedLayout)
 import Neodoc.ArgParser.Options (Options)
-import Neodoc.Parsing.Parser
+import Neodoc.Parsing.Parser (extractError)
 import Neodoc.ArgParser.Type
 import Neodoc.ArgParser.Parser (parse)
-import Neodoc.ArgParser.Result (ArgParseResult(..))
+import Neodoc.ArgParser.Result (ArgParseResult)
 import Neodoc.ArgParser.Lexer as Lexer
 
-import Neodoc.ArgParser.Options as Reexports
-import Neodoc.ArgParser.Result as Reexports
+import Neodoc.ArgParser.Options (Options) as Reexports
+import Neodoc.ArgParser.Result (ArgParseResult(..), getResult) as Reexports
 
 run
   :: ∀ r

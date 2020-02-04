@@ -1,11 +1,15 @@
 module Neodoc.Error where
 
 import Prelude
-import Data.Generic
-import Data.Maybe (Maybe (..))
-import Data.Char as Char
-import Data.Pretty (class Pretty, pretty)
-import Data.String as String
+
+import Data.Argonaut.Decode (class DecodeJson)
+import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
+import Data.Argonaut.Encode (class EncodeJson)
+import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Pretty (class Pretty)
+
 
 data NeodocError
   = ScanError String
@@ -15,14 +19,16 @@ data NeodocError
   | ArgParserError String
   | VersionMissingError
 
-derive instance genericNeodocError :: Generic NeodocError
+derive instance genericNeodocError :: Generic NeodocError _
 
-isDeveloperError :: NeodocError -> Boolean
-isDeveloperError (ArgParserError _) = false
-isDeveloperError _ = true
+instance decodeJsonNeodocError :: DecodeJson NeodocError where
+  decodeJson = genericDecodeJson
+
+instance encodeJsonNeodocError :: EncodeJson NeodocError where
+  encodeJson = genericEncodeJson
 
 instance showNeodocError :: Show NeodocError where
-  show = gShow
+  show = genericShow
 
 instance prettyNeodocError :: Pretty NeodocError where
   pretty (ScanError msg) = "Failed to disect neodoc text:\n" <> msg
@@ -31,3 +37,8 @@ instance prettyNeodocError :: Pretty NeodocError where
   pretty (SpecSolveError msg) = "Incoherent specification:\n" <> msg
   pretty (VersionMissingError) = "Package version could not be detected"
   pretty (ArgParserError msg) = msg
+
+
+isDeveloperError :: NeodocError -> Boolean
+isDeveloperError (ArgParserError _) = false
+isDeveloperError _ = true

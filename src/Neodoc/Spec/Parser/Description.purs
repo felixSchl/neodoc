@@ -33,7 +33,9 @@ import Neodoc.Spec.Parser.Combinators as P
 
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(Nothing, Just), isJust, isNothing, maybe, fromMaybe)
-import Data.Generic (class Generic, gEq, gShow)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Array as A
 import Data.String.Ext ((^=))
 import Data.Pretty (class Pretty, pretty)
@@ -110,9 +112,9 @@ parse toks =
 
   positionalsDesc :: P.TokenParser Description
   positionalsDesc = do
-    P.angleName <|> P.shoutName
-    P.option false $ P.tripleDot $> true
-    descContent false
+    _ <- P.angleName <|> P.shoutName
+    _ <- P.option false $ P.tripleDot $> true
+    _ <- descContent false
     pure CommandDescription
 
   optionDesc :: P.TokenParser Description
@@ -122,8 +124,8 @@ parse toks =
 
     let defaults = getDefaultValue <$> filter isDefaultTag description
         envs     = getEnvKey       <$> filter isEnvTag     description
-        default  = head defaults >>= id
-        env      = head envs     >>= id
+        default  = head defaults >>= identity
+        env      = head envs     >>= identity
 
     when (length defaults > 1) do
       P.fatal $

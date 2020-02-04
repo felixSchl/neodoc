@@ -1,8 +1,3 @@
-/* global exports */
-"use strict";
+const chalk = require('chalk')
 
-// module Data.String.Argv
-
-var chalk = require('chalk');
-
-exports.blue = chalk.blue;
+exports.blue = chalk.blue

@@ -43,7 +43,7 @@ runTokenParser
    . List PositionedToken
   -> TokenParser a
   -> Either String a
-runTokenParser s p = lmap (P.extractError id) do
+runTokenParser s p = lmap (P.extractError identity) do
   P.runParser $ Args5 unit ParserState.initialState unit s p
 
 token :: ∀ a. (Token -> Maybe a) -> TokenParser a

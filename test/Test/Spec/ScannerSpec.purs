@@ -2,10 +2,10 @@ module Test.Spec.ScannerSpec (scannerSpec) where
 
 import Prelude
 import Debug.Trace
-import Control.Monad.Aff
-import Control.Monad.Eff (Eff())
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (error, throwException, EXCEPTION())
+import Effect.Aff
+import Effect (Effect())
+import Effect.Class (liftEffect)
+import Effect.Exception (error, throwException)
 import Data.Bifunctor (lmap)
 import Data.List (List(..), length, (!!), take)
 import Data.Pretty (pretty)
@@ -108,7 +108,7 @@ scannerSpec = \_ ->
 
 scan = lmap pretty <<< Scanner.scan <<< dedent
 
-shouldFailWith :: ∀ a. Either String a -> String -> Eff _ Unit
+shouldFailWith :: ∀ a. Either String a -> String -> Effect Unit
 shouldFailWith ea msg = case ea of
                       Left m | m == msg -> pure unit
                       Right _           -> throwException $ error $
@@ -119,14 +119,14 @@ shouldFailWith ea msg = case ea of
                                               <> "Expected :\n"
                                               <> msg
 
-shouldEq :: ∀ a. (Show a, Eq a) => a -> a -> Eff _ Unit
+shouldEq :: ∀ a. Show a => Eq a => a -> a -> Effect Unit
 shouldEq a b = if a /= b
                   then
                     throwException $ error $
                       "Expected " <> show a <> " to equal " <> show b
                   else pure unit
 
-shouldEqS :: String -> String -> Eff _ Unit
+shouldEqS :: String -> String -> Effect Unit
 shouldEqS a = shouldEq a
   <<< stripInitialNewline
   <<< addTrailingNewline

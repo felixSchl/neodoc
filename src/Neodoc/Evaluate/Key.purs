@@ -3,18 +3,16 @@
 
 module Neodoc.Evaluate.Key where
 
-import Prelude
+import Prelude (class Eq, class Ord, class Show, bind, show, ($), (<$>), (<>))
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
-import Data.Map as Map
 import Data.Pretty (class Pretty, pretty)
-import Data.Array as Array
 import Data.List (List)
 import Data.NonEmpty.Extra as NonEmpty
 import Control.Alt (alt)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Data.List (singleton, (:), fromFoldable)
-import Data.String (singleton) as String
+import Data.String.CodeUnits (singleton) as String
 import Data.Foldable (intercalate)
 import Data.Array (fromFoldable) as Array
 import Data.Function (on)
@@ -27,7 +25,7 @@ import Neodoc.ArgKey.Class (toArgKey)
 import Neodoc.OptionAlias as OptionAlias
 import Neodoc.Data.Description (Description(..))
 import Neodoc.Data.SolvedLayout (SolvedLayoutArg(..))
-import Neodoc.Evaluate.Annotate
+import Neodoc.Evaluate.Annotate (WithDescription)
 
 -- A key uniquely identify an argument, which in turn may have multiple keys
 -- to refer to it.

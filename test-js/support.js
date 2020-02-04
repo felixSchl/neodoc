@@ -5,7 +5,7 @@ const NODE_CMD = $.which('node');
 /**
  * Execute a node script in a separate process
  */
-export function exec(script, args) {
+module.exports.exec = function (script, args) {
   const p = $.exec(`"${NODE_CMD}" "${script}" ${args}`, { silent: true });
   if (p.code === 0) {
     return p.stdout;
@@ -24,7 +24,7 @@ export function exec(script, args) {
  * Note: it's crude but works in the context of neodoc since all operations
  * are synchronous and tests are run in series.
  */
-export function runFakeProc(f) {
+module.exports.runFakeProc = function (f) {
   let code = 0;
   const stderr = [], stdout = [];
   const clog = console.log, cerror = console.error, pexit = process.exit;

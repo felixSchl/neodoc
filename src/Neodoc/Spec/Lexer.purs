@@ -24,8 +24,9 @@ import Control.Monad.State (StateT(..), State(..), evalState)
 import Control.Monad.Except (ExceptT(..), throwError)
 import Data.List (List(..), many, catMaybes, toUnfoldable, (:), some, reverse)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
-import Data.String (fromCharArray, trim, Pattern(..))
-import Data.String (singleton, toUpper, split, joinWith) as String
+import Data.String (trim, Pattern(..))
+import Data.String (toUpper, split, joinWith) as String
+import Data.String.CodeUnits (fromCharArray, singleton) as String
 import Data.String.Regex (Regex(), regex)
 import Data.String.Regex (test, parseFlags, replace) as Regex
 import Data.String.Ext ((^=), (~~))
@@ -54,7 +55,7 @@ type StringParser' a = StringParser String Unit Unit a
 -- | Optimal: Faster P.skipSpaces since it does not accumulate into a list.
 skipSpaces :: ∀ e c g. StringParser' Unit
 skipSpaces = (do
-    P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
+    _ <- P.satisfy \c -> c == '\n' || c == '\r' || c == ' ' || c == '\t'
     skipSpaces
   ) <|> P.return unit
 
@@ -78,7 +79,7 @@ lex m input =
                 Usage        -> Regex.replace referenceRegex "@$1" input
                 Descriptions -> input
    in do
-     lmap (SpecParseError <<< (P.extractError id)) $
+     lmap (SpecParseError <<< (P.extractError identity)) $
         P.runParser $ Args5 unit P.initialPos unit input' (parseTokens m)
 
 lexDescs :: String -> Either SpecParseError (List PositionedToken)
@@ -170,7 +171,7 @@ white = void $ P.oneOf [ '\n', '\r', ' ', '\t' ]
 
 _stdin :: StringParser' Token
 _stdin = defer \_-> do
-  P.char '-'
+  _ <- P.char '-'
   -- Ensure the argument is correctly bounded
   P.eof <|> (P.lookAhead $ P.choice [
     void $ white
@@ -183,7 +184,7 @@ _stdin = defer \_-> do
 
 _eoa :: StringParser' Token
 _eoa = defer \_-> do
-  P.string "--"
+  _ <- P.string "--"
   -- Ensure the argument is correctly bounded
   P.eof <|> (P.lookAhead $ P.choice [
     void $ white
@@ -194,7 +195,7 @@ _eoa = defer \_-> do
 
 _reference :: StringParser' Token
 _reference = Reference <$> do
-  P.char '@'
+  _ <- P.char '@'
   foldMap String.singleton <$> P.many (P.noneOf [' ', '\n'])
 
 _tag :: StringParser' Token
@@ -209,7 +210,7 @@ _tag = P.between (P.char '[') (P.char ']') do
 
 _angleName :: StringParser' String
 _angleName = do
-  P.char '<'
+  _ <- P.char '<'
   n <- do
     P.someChar $ P.choice [
       identLetter
@@ -217,14 +218,14 @@ _angleName = do
       -- errors for the user
     , P.noneOf [ '<', '>' ]
     ]
-  P.char '>'
+  _ <- P.char '>'
   P.return $ "<" ~~ n ~~ ">"
 
 _shortOption :: StringParser' Token
 _shortOption = defer \_-> do
   let validChar = P.alphaNum <|> P.oneOf [ '?' ]
 
-  P.char '-'
+  _ <- P.char '-'
   x  <- validChar
   xs <- A.fromFoldable <$> P.many validChar
 
@@ -256,7 +257,7 @@ _shortOption = defer \_-> do
 
 _longOption :: StringParser' Token
 _longOption = defer \_-> do
-  P.string "--"
+  _ <- P.string "--"
 
   name' <- (~~)
       <$> (String.singleton <$> P.alphaNum)

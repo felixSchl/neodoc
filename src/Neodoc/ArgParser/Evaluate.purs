@@ -14,13 +14,14 @@ import Data.List (
 import Data.Function (on)
 import Data.Either (Either(..), fromRight)
 import Data.NonEmpty (NonEmpty(..), (:|))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (for)
 import Data.Foldable (class Foldable, maximumBy)
 import Data.Optimize.Uncurried
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
-import Control.MonadPlus.Partial (mrights, mlefts, mpartition)
+import Control.MonadPlus
+import Control.MonadPlus as CM
 import Partial.Unsafe
 
 import Neodoc.Value (Value(..))
@@ -63,6 +64,26 @@ isSuccessEvaluation _ = false
 getEvaluationDepth :: ∀ c g i e a. Evaluation c ArgParseState g i e a -> Int
 getEvaluationDepth (ErrorEvaluation (ParserCont _ s _ _) _) = s.depth
 getEvaluationDepth (SuccessEvaluation (ParserCont _ s _ _) _) = s.depth
+
+
+mfromMaybe :: forall m a. (MonadPlus m) => Maybe a -> m a
+mfromMaybe = maybe CM.empty pure
+
+mcatMaybes :: forall m a. (MonadPlus m) => m (Maybe a) -> m a
+mcatMaybes m = m >>= mfromMaybe
+
+mlefts :: forall m a b. (MonadPlus m) => m (Either a b) -> m a
+mlefts = mcatMaybes <<< liftM1 l
+  where
+  l (Left a)  = Just a
+  l (Right _) = Nothing
+
+mrights :: forall m a b. (MonadPlus m) => m (Either a b) -> m b
+mrights = mcatMaybes <<< liftM1 r
+  where
+  r (Left _)  = Nothing
+  r (Right a) = Just a
+
 
 -- Evaluate multiple parsers, producing a new parser that chooses the best
 -- succeeding match or fails otherwise. If any of the parsers yields a fatal
@@ -133,7 +154,7 @@ evalParsers (Args2 p parsers) = do
     -- transport adjacent error messages up, even on success. should we fail
     -- at a later stage, we have access to this valuable information and
     -- can present the best error message possible.
-    unsafePartial $ for results case _ of
+    _ <- unsafePartial $ for results case _ of
       ErrorEvaluation (ParserCont _ { depth } { deepestError } _) e -> do
         case deepestError of
           Just (d /\ e) -> setErrorAtDepth d e

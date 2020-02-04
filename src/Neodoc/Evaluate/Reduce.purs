@@ -9,45 +9,47 @@
 --         merging duplicate occurences as makes sense for that option
 --      4. culling values considered empty
 
-module Neodoc.Evaluate.Reduce (reduce) where
+module Neodoc.Evaluate.Reduce (reduce)
+where
 
 import Prelude
-import Data.Tuple (Tuple, fst, snd)
-import Data.Tuple.Nested ((/\))
-import Data.NonEmpty ((:|))
-import Data.Bifunctor (rmap, lmap, bimap)
-import Data.Map (Map)
-import Data.Map as Map
-import Data.StrMap as StrMap
-import Data.StrMap (StrMap())
-import Data.Maybe (Maybe(..), fromJust, fromMaybe)
-import Data.List (
-  List(..), concat, head, filter, singleton, reverse, nub, catMaybes
-, fromFoldable)
-import Data.Array as A
-import Data.NonEmpty (NonEmpty)
-import Data.Foldable (any, foldl, maximum, all)
+  ( bind, not, pure, ($), (&&), (/=)
+  , (<#>), (<$>), (<<<), (<>), (||)
+  )
+
 import Control.Alt ((<|>))
-import Neodoc.Env (Env)
-import Neodoc.Data.Layout (Layout(..), Branch, getElem)
-import Neodoc.Data.Description (Description(..))
-import Neodoc.Data.SolvedLayout (SolvedLayout, SolvedLayoutArg)
-import Neodoc.Data.SolvedLayout as Solved
-import Neodoc.Data.OptionArgument
-import Neodoc.Value.RichValue
-import Neodoc.ArgParser.KeyValue (KeyValue)
-import Neodoc.ArgParser.Arg
-import Neodoc.ArgKey (ArgKey(..))
-import Neodoc.ArgKey.Class (class ToArgKey, toArgKey)
-import Neodoc.Value
-import Neodoc.Value as Value
-import Neodoc.Value.Origin as Origin
-import Neodoc.Value.RichValue as RichValue
-import Neodoc.Evaluate.Annotate
-import Neodoc.Evaluate.Key
+import Data.Array as A
+import Data.Bifunctor (rmap, lmap)
+import Data.Foldable (all, foldl, maximum)
+import Data.Function (flip)
+import Data.List (List(..), catMaybes, concat, filter, nub, reverse, singleton)
+import Data.Map (Map, toUnfoldable)
+import Data.Map as Map
+import Data.Maybe (Maybe(..), fromJust, fromMaybe)
+import Data.Tuple (Tuple)
+import Data.Tuple.Nested ((/\))
 import Partial.Unsafe (unsafePartial)
 
+import Neodoc.ArgParser.Arg (getArgKey)
+import Neodoc.ArgParser.KeyValue (KeyValue)
+import Neodoc.Data.Description (Description(..))
+import Neodoc.Data.Layout (Branch, Layout(..))
+import Neodoc.Data.OptionArgument (isOptionArgumentOptional)
+import Neodoc.Data.SolvedLayout (SolvedLayoutArg)
+import Neodoc.Data.SolvedLayout as Solved
+import Neodoc.Env (Env)
+import Neodoc.Evaluate.Annotate
+  (AnnotatedLayout, WithDescription, annotateLayout, findArgKeys)
+import Neodoc.Evaluate.Key (Key(..), toKey, toStrKeys)
+import Neodoc.OptionAlias (NonEmpty, (:|))
+import Neodoc.Value (Value(..), isBoolValue)
+import Neodoc.Value as Value
+import Neodoc.Value.Origin as Origin
+import Neodoc.Value.RichValue (RichValue(..), unRichValue)
+
+
 type FacelessLayout = Layout FacelessLayoutArg
+
 data FacelessLayoutArg
   = Command     Boolean
   | Positional  Boolean
@@ -55,97 +57,131 @@ data FacelessLayoutArg
   | EOA
   | Stdin
 
+
+mergeVals
+  :: forall a b c d
+  .  Tuple a (Tuple b RichValue)
+  -> Tuple c (Tuple d RichValue)
+  -> Tuple a (Tuple b RichValue)
+mergeVals (a /\ d /\ RichValue v) (_ /\ _ /\ RichValue v') =
+  a /\ d /\ (RichValue $
+    { origin: unsafePartial $ fromJust $ maximum [ v.origin, v'.origin ]
+    , value:  ArrayValue $ Value.intoArray v'.value
+                    <> Value.intoArray v.value
+    })
+
+
+fillValues
+  :: Map Key (WithDescription FacelessLayoutArg)
+  -> Map Key (List RichValue)
+  -> Map Key (Tuple FacelessLayoutArg (Tuple (Maybe Description) RichValue))
+fillValues target input =
+  let
+    origin cmp o = \x -> (_.origin $ unRichValue x) `cmp` o
+
+    -- 1. look up the values. Note that the lookup may yield `Nothing`,
+    --    meaning that it is ought to be omitted.
+    newValues = toUnfoldable target <#> \(k /\ (a /\ d)) -> do
+      vs <- Map.lookup k input
+      let vs' = filter (origin (/=) Origin.Empty) vs
+          vs'' = filter (origin (/=) Origin.Default) vs'
+          vs''' = case vs'' of
+                      Nil -> nub vs'
+                      vs  -> vs
+          vs'''' = vs''' <#> \(RichValue v) -> RichValue $ v {
+                    value = if isRepeatable a
+                              then ArrayValue $ Value.intoArray v.value
+                              else v.value
+                    }
+      -- return: k => arg , description , value
+      pure $ vs'''' <#> \v -> k /\ (a /\ d /\ v)
+  in
+    Map.fromFoldableWith mergeVals $ concat $ catMaybes $ newValues
+
+
+finalFold
+  :: Map Key (Tuple FacelessLayoutArg (Tuple (Maybe Description) RichValue))
+  -> Map String RichValue
+finalFold m =
+  let
+    tupleList :: List (Tuple Key (Tuple FacelessLayoutArg (Tuple (Maybe Description) RichValue)))
+    tupleList = Map.toUnfoldable m
+
+    tupleToList
+      :: Tuple Key (Tuple FacelessLayoutArg (Tuple (Maybe Description) RichValue))
+      -> List (Tuple String RichValue)
+    tupleToList (k /\ (a /\ _ /\ RichValue rv)) =
+      let
+        v = fromMaybe rv.value do
+              if isFlag a || isCommand a
+              then case rv.value of
+                ArrayValue xs -> pure
+                  if all isBoolValue xs && not (A.null xs)
+                  then
+                    IntValue (A.length $ flip A.filter xs \x ->
+                      case x of
+                        BoolValue b -> b
+                        _           -> false
+                    )
+                  else ArrayValue xs
+
+                BoolValue b ->
+                  if isRepeatable a
+                  then pure
+                    if b
+                    then IntValue 1
+                    else IntValue 0
+                  else Nothing
+
+                _ -> Nothing
+
+              else Nothing
+      in
+        toStrKeys k <#> (_ /\ (RichValue $ rv { value = v }))
+
+    x :: List (List (Tuple String RichValue))
+    x = tupleList <#> tupleToList
+
+  in
+    Map.fromFoldable $ concat x
+
+
 reduce
   :: Env
   -> List Description
   -> Maybe (Branch SolvedLayoutArg)
   -> List KeyValue
-  -> _ -- Map ArgKey RichValue
-reduce _ _ Nothing _ = StrMap.empty
+  -> Map String Value
+reduce _ _ Nothing _ = Map.empty
 reduce env descriptions (Just branch) vs = (_.value <<< unRichValue) <$>
-  let -- 1. annotate all layout elements with their description
+  let
+      -- 1. annotate all layout elements with their description
+      annotedBranch :: NonEmpty List (Layout (Tuple SolvedLayoutArg (Maybe Description)))
       annotedBranch = annotateLayout descriptions <$> branch
 
       -- 2. derive a set of arguments and their description for the matched
       --    branch. this removes all levels of nesting and is a lossy operation.
       --    it is essentially a target of values we are ought to fill from what
       --    the parser derived
+      target :: Map Key (Tuple FacelessLayoutArg (Maybe Description))
       target = expandLayout (Group false false (annotedBranch :| Nil))
 
       -- 3. Collect the input map. This map reduces the matched values by their
       --    denominator. Currently, this denominator is the `Key` derived from
       --    the option's name as it was matched.
+      input :: Map Key (List RichValue)
       input = Map.fromFoldableWith (<>) $
                 rmap singleton <$>
                 lmap (Key <<< findArgKeys descriptions) <$>
                 reverse (lmap getArgKey <$> vs)
 
-      -- 3. fill the values for each key of the target map
+      -- 4. fill the values for each key of the target map
+      values :: Map Key (Tuple FacelessLayoutArg (Tuple (Maybe Description) RichValue))
       values = fillValues target input
 
-   in finalFold values
+  in
+    finalFold values
 
-  where
-
-  mergeVals (a /\ d /\ RichValue v) (_ /\ _ /\ RichValue v') = a /\ d /\ (RichValue $ {
-    origin: unsafePartial $ fromJust $ maximum [ v.origin, v'.origin ]
-  , value:  ArrayValue $ Value.intoArray v'.value
-                      <> Value.intoArray v.value
-  })
-
-  fillValues
-    :: Map Key (WithDescription FacelessLayoutArg)
-    -> Map Key (List RichValue)
-    -> Map Key _
-  fillValues target input =
-    let
-      -- 1. look up the values. Note that the lookup may yield `Nothing`,
-      --    meaning that it is ought to be omitted.
-      values = Map.toList target <#> \(k /\ (a /\ d)) -> do
-        vs <- Map.lookup k input
-        let vs' = filter (origin (/=) Origin.Empty) vs
-            vs'' = filter (origin (/=) Origin.Default) vs'
-            vs''' = case vs'' of
-                        Nil -> nub vs'
-                        vs  -> vs
-            vs'''' = vs''' <#> \(RichValue v) -> RichValue $ v {
-                      value = if isRepeatable a
-                                then ArrayValue $ Value.intoArray v.value
-                                else v.value
-                      }
-        -- return: k => arg , description , value
-        pure $ vs'''' <#> \v -> k /\ (a /\ d /\ v)
-     in Map.fromFoldableWith mergeVals $ concat $ catMaybes $ values
-
-    where
-    origin cmp o = \x -> (_.origin $ unRichValue x) `cmp` o
-
-  finalFold :: Map Key _ -> StrMap RichValue
-  finalFold m =
-    let x = Map.toList m <#> \(k /\ (a /\ _ /\ RichValue rv)) ->
-              let v = fromMaybe rv.value do
-                    if isFlag a || isCommand a
-                      then case rv.value of
-                        ArrayValue xs -> pure
-                          if all isBoolValue xs && not (A.null xs)
-                            then
-                              IntValue (A.length $ flip A.filter xs \x ->
-                                  case x of
-                                      BoolValue b -> b
-                                      _           -> false
-                              )
-                            else ArrayValue xs
-                        BoolValue b ->
-                          if isRepeatable a
-                              then
-                                pure if b
-                                          then IntValue 1
-                                          else IntValue 0
-                              else Nothing
-                        _ -> Nothing
-                      else Nothing
-                in toStrKeys k <#> (_ /\ (RichValue $ rv { value = v }))
-    in StrMap.fromFoldable $ concat x
 
 -- Reduce a solved layout arg to a faceless layout arg, that is a layout arg
 -- whose identifying properties have been stripped since they are already
@@ -160,6 +196,7 @@ toFacelessLayoutArg = go
   go (Solved.Command    _ r) = Command r
   go Solved.EOA              = EOA
   go Solved.Stdin            = Stdin
+
 
 -- Expand a layout into a map of `Key => Argument`, where `Key` must uniquely
 -- identify the argument in order to avoid loss.
@@ -190,7 +227,7 @@ expandLayout (Group o r xs) =
   --       we can only keep one, so we combine them as best possible.
   -- note: we simply choose the left option's name since the name won't matter
   --       too much as long as it resolves to the same description which is
-  --       implicitely true due to the encapsulating `Key`. The same applies
+  --       implicitly true due to the encapsulating `Key`. The same applies
   --       for the option's option-argument.
   -- idea: maybe we need a more appropriate data structure to capture the
   --       semantics of this reduction?
@@ -217,11 +254,13 @@ expandLayout (Group o r xs) =
 
   fold f = foldl (Map.unionWith f) Map.empty
 
+
 isRepeatable :: FacelessLayoutArg -> Boolean
 isRepeatable (Command    r) = r
 isRepeatable (Positional r) = r
 isRepeatable (Option   _ r) = r
 isRepeatable _ = false
+
 
 setRepeatable :: Boolean -> FacelessLayoutArg -> FacelessLayoutArg
 setRepeatable r (Command    _) = Command    r
@@ -229,12 +268,16 @@ setRepeatable r (Positional _) = Positional r
 setRepeatable r (Option   x _) = Option   x r
 setRepeatable _ x = x
 
+
 isFlag :: FacelessLayoutArg -> Boolean
 isFlag (Option Nothing _) = true
 isFlag _ = false
+
 
 isCommand :: FacelessLayoutArg -> Boolean
 isCommand (Command _) = true
 isCommand _ = false
 
+
+setRepeatableOr :: Boolean -> FacelessLayoutArg -> FacelessLayoutArg
 setRepeatableOr r x = setRepeatable (isRepeatable x || r) x
