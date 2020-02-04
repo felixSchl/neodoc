@@ -1,6 +1,7 @@
 { name = "neodoc"
 , dependencies =
     [ "aff"
+    , "argonaut-codecs"
     , "argonaut-core"
     , "arrays"
     , "assert"

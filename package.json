@@ -14,7 +14,8 @@
     "test": "test"
   },
   "scripts": {
-    "build": "spago bundle-module --main Neodoc --to lib.js && npm run minify",
+    "build": "npm run bundle && npm run minify",
+    "bundle": "spago bundle-module --main Neodoc --to lib.js",
     "clean": "git stash && git clean -fdX",
     "deps": "spago install",
     "examples": "spago run --main=Example.String && spago run --main=Example.Spec",

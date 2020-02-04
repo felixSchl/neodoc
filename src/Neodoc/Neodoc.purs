@@ -7,15 +7,15 @@ module Neodoc
   , lookup
   , lookup'
   , Output (..)
-  , module Reexports
+  , module Options
   )
 where
 
 import Prelude
-  ( class Ord, class Show, bind, pure, not, show
-  , ($), (<$>), (>), (<>)
-  )
+  (class Ord, class Show, bind, not, pure, show, ($), (<$>), (<>), (>))
 import Data.Argonaut.Core
+import Data.Argonaut.Decode (decodeJson)
+import Data.Argonaut.Encode (encodeJson)
 import Data.Array as A
 import Data.Either (Either (..), either, fromRight)
 import Data.Foldable (class Foldable, any, intercalate)
@@ -45,7 +45,7 @@ import Neodoc.OptionAlias as OptionAlias
 import Neodoc.Options (NeodocOptions(..))
 import Neodoc.Options
   (Argv, NeodocOptions(..), customize, defaultOptions, defaultOptionsObj)
-  as Reexports
+  as Options
 import Neodoc.Scanner as Scanner
 import Neodoc.Solve as Solver
 import Neodoc.Spec (Spec(..))
@@ -53,18 +53,12 @@ import Neodoc.Spec.Lexer as Lexer
 import Neodoc.Spec.Parser (parseDescription, parseUsage) as Spec
 import Neodoc.Value (Value(..))
 
+import Debug.Trace (traceM)
 
 foreign import readPkgVersionImpl
   :: (String -> Maybe String)
   -> Maybe String
   -> Effect (Maybe String)
-
-
-_DEVELOPER_ERROR_MESSAGE :: String
-_DEVELOPER_ERROR_MESSAGE = dedent """
-  This is an error with the program itself and not your fault.
-  Please bring this to the program author's attention.
-"""
 
 
 data Output
@@ -103,8 +97,29 @@ instance showOutput :: Show Output where
   show (Output          s) = "Output " <> show s
 
 
-runStringJs :: String -> Json -> Json
-runStringJs helpStr opts = jsonNull
+runStringJs :: String -> Json -> Either String Json
+runStringJs helpStr opts =
+    let
+      result = do
+        NeodocOptions neodocOptsObj <- decodeJson opts
+
+        let outputResult = runString
+              helpStr
+              (NeodocOptions neodocOptsObj)
+              neodocOptsObj.version
+
+        case outputResult of
+          Left neodocError -> Left $ show neodocError
+          Right val -> Right $ encodeJson $ case val of
+            (Output x) ->
+              argKeyMapToString x
+            (HelpOutput x s) ->
+              Map.insert ".help" (StringValue s) (argKeyMapToString x)
+            (VersionOutput x s) ->
+              Map.insert ".version" (StringValue s) (argKeyMapToString x)
+    in
+      -- TODO: Return Json instead of Either String Json
+      result
 
 
 runSpecJs :: Json -> Json -> Json

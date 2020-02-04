@@ -1,5 +1,5 @@
-module Neodoc.Value (
-    Value (..)
+module Neodoc.Value
+  ( Value (..)
   , read
   , parse
   , isSameValueType
@@ -12,44 +12,38 @@ module Neodoc.Value (
   , fromValueAs
   , ReadError
   , class FromValue
-  ) where
+  )
+where
 
 import Prelude
-import Global
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
-import Data.Optimize.Uncurried
-import Data.Int (toNumber, fromNumber)
-import Data.Int as Int
-import Data.Number.Backport as Number
-import Data.Bifunctor (lmap)
-import Data.Array as Array
-import Data.Tuple.Nested ((/\))
-import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..))
-import Data.List (List(..), toUnfoldable, many, some, (:))
-import Data.Foldable (foldMap)
-import Data.Traversable (for)
-import Control.Apply ((*>), (<*))
-import Control.Alt ((<|>))
-import Data.Array as A
-import Data.Int (toNumber, fromString) as Int
-import Data.String.CodeUnits (singleton) as String
-import Data.String (toUpper, trim) as String
-import Partial.Unsafe (unsafePartial)
-import Data.Pretty (class Pretty, pretty)
-import Foreign (F)
-import Foreign as F
-import Foreign.Index as F
-import Foreign.Index ((!))
+  ( class Eq, class Ord, class Show, Unit, bind, const, identity, negate, pure
+  , show, unit, ($), (*), (*>), (<$>), (<*), (<<<), (<>), (==), (>), (||)
+  )
 
-import Neodoc.Parsing.Parser.Pos as P
-import Neodoc.Parsing.Parser (Parser(..), ParserArgs(..), Step(..))
+import Control.Alt ((<|>))
+import Data.Argonaut.Encode (class EncodeJson, encodeJson)
+import Data.Array as Array
+import Data.Bifunctor (lmap)
+import Data.Either (Either(..), either)
+import Data.Foldable (foldMap)
+import Data.Generic.Rep (class Generic)
+import Data.Int (fromNumber, toNumber)
+import Data.Int as Int
+import Data.List (List(..), toUnfoldable, (:))
+import Data.Maybe (Maybe(..))
+import Data.Optimize.Uncurried
+import Data.Pretty (class Pretty)
+import Data.String (toUpper, trim) as String
+import Data.String.CodeUnits (singleton) as String
+import Data.Traversable (for)
+import Data.Tuple.Nested ((/\))
+import Global (isFinite, readFloat, readInt)
+
+import Neodoc.Parsing.Parser (extractError, fail, runParser) as P
+import Neodoc.Parsing.Parser.Combinators (between, choice, many, option, sepBy1, some, try) as P
+import Neodoc.Parsing.Parser.Pos (initialPos) as P
+import Neodoc.Parsing.Parser.String (char, digit, eof, noneOf, satisfy, string) as P
 import Neodoc.Parsing.Parser.String (StringParser)
-import Neodoc.Parsing.Parser.String as P
-import Neodoc.Parsing.Parser.Combinators ((<?>), (<??>))
-import Neodoc.Parsing.Parser.Combinators as P
-import Neodoc.Parsing.Parser as P
 
 data Value
   = StringValue String
@@ -68,6 +62,9 @@ instance showValue :: Show Value where
   show (ArrayValue  array) = show array
   show (IntValue    int) = show int
   show (FloatValue  number) = show number
+
+instance encodeJsonValue :: EncodeJson Value where
+  encodeJson value = encodeJson (show value)
 
 
 -- instance isForeignValue :: IsForeign Value where
